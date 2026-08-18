@@ -22,6 +22,13 @@
       "when": 1786971896767,
       "tag": "0002_striped_victor_mancha",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787063359092,
+      "tag": "0003_admin_app_role",
+      "breakpoints": true
     }
   ]
 }
