@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { constrainToHost } from "../host-scope.js";
+import { changePasswordRoutes } from "./routes/change-password.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
 import { loginRoutes } from "./routes/login.js";
 import { logoutRoutes } from "./routes/logout.js";
@@ -38,6 +39,12 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
   await app.register(async (signedIn) => {
     // Signed in, but possibly still owing the forced first-sign-in password change.
     requireSession(signedIn, { idleMinutes: opts.sessionIdleMinutes });
+
+    // Deliberately outside `requirePasswordChanged`: this is the way through that gate, so under
+    // the hook it would redirect to itself.
+    await signedIn.register(changePasswordRoutes, {
+      sessionAbsoluteHours: opts.sessionAbsoluteHours,
+    });
 
     await signedIn.register(logoutRoutes);
 
