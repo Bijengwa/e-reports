@@ -335,6 +335,40 @@ describe("staff sign-in", () => {
   });
 });
 
+describe("the staff door's authenticated area", () => {
+  // These run without a database: with no cookie present the guard redirects before it would
+  // query. Signed-in behaviour is tests/integration/staff-login.test.ts.
+  it("sends an unsigned-in visitor to the sign-in page", async () => {
+    const res = await app.inject({ url: "/dashboard", headers: { host: config.STAFF_HOST } });
+
+    expect(res.statusCode).toBe(302);
+    expect(res.headers.location).toBe("/");
+  });
+
+  it("guards the forced password change too — it is not an anonymous page", async () => {
+    const res = await app.inject({
+      url: "/change-password",
+      headers: { host: config.STAFF_HOST },
+    });
+
+    expect(res.statusCode).toBe(302);
+    expect(res.headers.location).toBe("/");
+  });
+
+  it("keeps the authenticated area off the public host entirely", async () => {
+    // Not a redirect to sign-in: on the public hostname these routes must not exist at all.
+    const res = await app.inject({ url: "/dashboard", headers: { host: config.PUBLIC_HOST } });
+
+    expect(res.statusCode).toBe(404);
+  });
+
+  it("leaves the sign-in page itself reachable", async () => {
+    const res = await app.inject({ url: "/", headers: { host: config.STAFF_HOST } });
+
+    expect(res.statusCode).toBe(200);
+  });
+});
+
 describe("configuration guards host isolation", () => {
   const base = {
     PUBLIC_HOST: "public.test",
