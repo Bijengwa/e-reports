@@ -1,6 +1,7 @@
 import rateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { constrainToHost } from "../host-scope.js";
+import { activityRoutes } from "./routes/activity.js";
 import { changePasswordRoutes } from "./routes/change-password.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
 import { loginRoutes } from "./routes/login.js";
@@ -73,6 +74,7 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
         requireRole(administration, ["administrator"]);
 
         await administration.register(usersRoutes);
+        await administration.register(activityRoutes);
       });
     });
   });
