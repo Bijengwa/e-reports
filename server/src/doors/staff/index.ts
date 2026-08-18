@@ -5,7 +5,8 @@ import { changePasswordRoutes } from "./routes/change-password.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
 import { loginRoutes } from "./routes/login.js";
 import { logoutRoutes } from "./routes/logout.js";
-import { requirePasswordChanged, requireSession } from "./session-guard.js";
+import { usersRoutes } from "./routes/users.js";
+import { requirePasswordChanged, requireRole, requireSession } from "./session-guard.js";
 
 export type StaffDoorOptions = {
   host: string;
@@ -18,7 +19,7 @@ export type StaffDoorOptions = {
 };
 
 /**
- * The staff portal door: three nested scopes, each one narrower than the last.
+ * The staff portal door: four nested scopes, each one narrower than the last.
  *
  * Reachable only on STAFF_HOST. The session cookie uses the `__Host-` prefix, which forbids a
  * Domain attribute and so cannot be sent to the public hostname at all.
@@ -64,6 +65,15 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
       requirePasswordChanged(active);
 
       await active.register(dashboardRoutes);
+
+      await active.register(async (administration) => {
+        // Narrower still: creating staff accounts is the administrator's alone. A manager or
+        // assessor reaching anything registered here is refused with 403 rather than redirected —
+        // they are signed in and settled, so there is nowhere else to send them.
+        requireRole(administration, ["administrator"]);
+
+        await administration.register(usersRoutes);
+      });
     });
   });
 }

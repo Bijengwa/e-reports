@@ -1,0 +1,254 @@
+import { Layout } from "../../../views/shared/layout.js";
+
+/** The roles an administrator may hand out. Never `administrator`. */
+export const ASSIGNABLE_ROLES = ["manager", "assessor"] as const;
+
+export type AssignableRole = (typeof ASSIGNABLE_ROLES)[number];
+
+/**
+ * A row of the staff list, as the page needs it.
+ *
+ * `passwordHash` is absent by construction rather than by discipline: the route's SELECT does not
+ * name that column, and this type gives it nowhere to land if someone later adds it back.
+ */
+export type StaffUser = {
+  email: string;
+  fullName: string;
+  role: string;
+  isActive: boolean;
+  mustChangePassword: boolean;
+  createdAt: Date;
+  lastSignInAt: Date | null;
+};
+
+/** A date an auditor can read, in one place. Null means it has not happened yet. */
+function day(value: Date | null): string {
+  return value ? new Date(value).toISOString().slice(0, 10) : "Never";
+}
+
+export type UsersPageProps = {
+  users: StaffUser[];
+};
+
+/**
+ * Every staff account.
+ *
+ * The temp password issued at creation is deliberately not here. It exists in one response body,
+ * once, and is unrecoverable afterwards — a list that could show it again would make it a
+ * standing credential rather than a handover.
+ */
+export function UsersPage({ users }: UsersPageProps): JSX.Element {
+  return (
+    <Layout title="Staff accounts — AE Reports" locale="en" bodyClass="staff">
+      <main class="staff-shell">
+        <div class="staff-head">
+          <div class="sp">
+            <h1>Staff accounts</h1>
+            <p class="hint">
+              {users.length} account{users.length === 1 ? "" : "s"}
+            </p>
+          </div>
+          <a href="/users/new" class="btn">
+            Add user
+          </a>
+        </div>
+
+        <table class="utable">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Added</th>
+              <th>Last sign-in</th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map((user) => (
+              <tr>
+                <td safe>{user.fullName}</td>
+                <td safe>{user.email}</td>
+                <td safe>{user.role}</td>
+                <td>
+                  {user.isActive ? (
+                    <span class="tag">Active</span>
+                  ) : (
+                    <span class="tag muted">Deactivated</span>
+                  )}
+                  {user.mustChangePassword && <span class="tag warn">Password not set</span>}
+                </td>
+                <td>{day(user.createdAt)}</td>
+                <td>{day(user.lastSignInAt)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <p class="hint staff-foot">
+          <a href="/dashboard">Back to the dashboard</a>
+        </p>
+      </main>
+    </Layout>
+  );
+}
+
+export type NewUserPageProps = {
+  error?: string;
+  /**
+   * Echoed back so a refused submission does not make the administrator retype it.
+   *
+   * These are the only place raw submitted text reaches an attribute rather than a text node, so
+   * `safe` — which governs children — does not cover them. It does not need to: the runtime
+   * escapes `"` and `'` in every attribute it writes, and the attributes below are double-quoted,
+   * so the value cannot be closed. A `<` surviving inside the value looks alarming in the source
+   * and is inert; an entity such as `&#34;` decodes into the value's data, because the tokenizer
+   * fixes the delimiters before it resolves any entity. Neither can start a new attribute. What
+   * it does cost is a round trip: a name typed with a literal `&#34;` redisplays as `"`, which is
+   * a wrong echo on a refused form and not a way in.
+   */
+  email?: string;
+  name?: string;
+  role?: AssignableRole | undefined;
+};
+
+/**
+ * The form for creating a staff account.
+ *
+ * The role control offers exactly the two assignable roles, and the route parses against the same
+ * list — the select is a convenience, never the check. There is no password field: the account's
+ * first password is generated server-side, so an administrator cannot choose one and therefore
+ * cannot know one that outlives the handover.
+ */
+export function NewUserPage({ error, email, name, role }: NewUserPageProps): JSX.Element {
+  return (
+    <Layout title="Add a staff account — AE Reports" locale="en" bodyClass="staff">
+      <main class="staff-shell staff-narrow">
+        <div class="staff-head">
+          <div class="sp">
+            <h1>Add a staff account</h1>
+            <p class="hint">
+              A one-time password is generated here and shown once. The user must replace it at
+              first sign-in.
+            </p>
+          </div>
+        </div>
+
+        {error && (
+          <div class="alert alert-error" safe>
+            {error}
+          </div>
+        )}
+
+        <div class="card card-b">
+          <form method="POST" action="/users/new">
+            <div class="f">
+              <label for="name">
+                Full name <i>*</i>
+              </label>
+              <input type="text" id="name" name="name" required maxlength={200} value={name} />
+            </div>
+
+            <div class="f">
+              <label for="email">
+                Email <i>*</i>
+              </label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                required
+                maxlength={254}
+                placeholder="name@tmda.go.tz"
+                value={email}
+              />
+            </div>
+
+            <div class="f">
+              <label for="role">
+                Role <i>*</i>
+              </label>
+              <select id="role" name="role" required>
+                <option value="" disabled selected={role === undefined}>
+                  Choose a role
+                </option>
+                {ASSIGNABLE_ROLES.map((assignable) => (
+                  <option value={assignable} selected={role === assignable}>
+                    {assignable === "manager" ? "Manager" : "Assessor"}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div class="bar">
+              <button type="submit" class="btn">
+                Create account
+              </button>
+              <a href="/users" class="btn ghost">
+                Cancel
+              </a>
+            </div>
+          </form>
+        </div>
+      </main>
+    </Layout>
+  );
+}
+
+export type UserCreatedPageProps = {
+  email: string;
+  fullName: string;
+  role: AssignableRole;
+  /** Shown here and nowhere else, ever. */
+  password: string;
+};
+
+/**
+ * The one place the temp password is ever displayed.
+ *
+ * This is the body of the POST's own 200 response, not a page reached by redirect. A redirect
+ * would have to carry the password in the URL, where it would land in the access log, in
+ * `Referer`, and in the administrator's history; the alternative, a server-side flash store,
+ * would mean the password outlived the request that made it. Only the Argon2 hash was persisted,
+ * so once this page is closed the password is genuinely gone and the account needs a reset.
+ */
+export function UserCreatedPage({
+  email,
+  fullName,
+  role,
+  password,
+}: UserCreatedPageProps): JSX.Element {
+  return (
+    <Layout title="Account created — AE Reports" locale="en" bodyClass="staff">
+      <main class="staff-shell staff-narrow">
+        <div class="staff-head">
+          <div class="sp">
+            <p class="eyebrow">Account created</p>
+            <h1 safe>{fullName}</h1>
+            <p class="hint">
+              <span safe>{email}</span> · <span safe>{role}</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="temp-password">
+          <p class="eyebrow">One-time password</p>
+          <code safe>{password}</code>
+          <p class="hint">
+            Give this to the user by a channel they already trust. It is shown only on this page —
+            reloading or leaving will not bring it back, and it must be replaced at first sign-in.
+          </p>
+        </div>
+
+        <div class="bar">
+          <a href="/users/new" class="btn ghost">
+            Add another
+          </a>
+          <a href="/users" class="btn">
+            Done
+          </a>
+        </div>
+      </main>
+    </Layout>
+  );
+}

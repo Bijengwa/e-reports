@@ -670,3 +670,137 @@ textarea[aria-invalid="true"] {
 .ofoot .sub {
   margin: 4px 0;
 }
+
+/* ---------- staff shell ---------- */
+/*
+ * The signed-in pages. The orange form's own primitives — .card, .f, .btn, .bar — are reused as
+ * they stand; only what the prototype had no equivalent for is defined here.
+ */
+.staff {
+  background: var(--paper);
+  min-height: 100vh;
+}
+
+.staff-shell {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 30px 20px 56px;
+}
+
+.staff-narrow {
+  max-width: 560px;
+}
+
+.staff-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.staff-head h1 {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.staff-head .hint {
+  margin-top: 3px;
+}
+
+.staff-foot {
+  margin-top: 20px;
+}
+
+/* ---------- staff account list ---------- */
+.utable {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.utable th {
+  text-align: left;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 500;
+  padding: 9px 12px;
+  background: var(--green-bg);
+  border-bottom: 1px solid var(--rule);
+}
+
+.utable td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+
+.utable tr:last-child td {
+  border-bottom: 0;
+}
+
+.tag {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--leaf-bg);
+  color: var(--leaf-d);
+  white-space: nowrap;
+}
+
+.tag + .tag {
+  margin-left: 5px;
+}
+
+.tag.muted {
+  background: #ecefed;
+  color: var(--ink-3);
+}
+
+.tag.warn {
+  background: var(--orange-bg);
+  color: var(--orange-d);
+}
+
+/* ---------- the one-time password ---------- */
+/*
+ * Deliberately loud. This is the only time the credential is ever on screen, so the page has to
+ * make it obvious that it is the thing to copy before leaving.
+ */
+.temp-password {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--leaf);
+  border-radius: var(--r);
+  padding: 16px 18px;
+  margin-bottom: 20px;
+}
+
+.temp-password code {
+  display: block;
+  font-family: var(--mono);
+  font-size: 19px;
+  letter-spacing: 0.09em;
+  word-break: break-all;
+  color: var(--ink);
+  margin: 8px 0 10px;
+}
+
+@media (max-width: 620px) {
+  /* The list is wider than a phone; scrolling it beats stacking six columns into unreadable rows. */
+  .utable {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}

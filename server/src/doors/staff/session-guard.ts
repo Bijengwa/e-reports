@@ -5,6 +5,7 @@ import {
   SESSION_COOKIE_OPTIONS,
   type StaffSession,
 } from "../../auth/session.js";
+import { ForbiddenPage } from "./views/forbidden.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -54,6 +55,30 @@ export function requirePasswordChanged(app: FastifyInstance): void {
   app.addHook("onRequest", async (request, reply) => {
     if (request.staffSession?.mustChangePassword) {
       return reply.redirect("/change-password", 302);
+    }
+  });
+}
+
+/**
+ * Additionally require that the user holds one of these roles.
+ *
+ * The third and narrowest gate, applied the same way as the two above it: to a scope, so a route
+ * is administrator-only because of where it was registered. Adding a page to that scope next year
+ * carries the restriction with it, and there is no per-route check anyone can forget to write —
+ * or write twice, differently.
+ *
+ * It answers 403 rather than redirecting. The other two guards redirect because there is somewhere
+ * to send the user and following it is how they get in; there is no route out of "your role does
+ * not include this", so a redirect would drop the request and read as a missing page. The session
+ * is not cleared and the cookie is left alone: the user is who they say they are, which is exactly
+ * why this is 403 and not 401.
+ */
+export function requireRole(app: FastifyInstance, roles: readonly StaffSession["role"][]): void {
+  app.addHook("onRequest", async (request, reply) => {
+    // `requireSession` runs first and redirects when there is no session, so the null case here is
+    // a route registered in the wrong scope. Refusing is the safe reading of that mistake.
+    if (!request.staffSession || !roles.includes(request.staffSession.role)) {
+      return reply.status(403).html(ForbiddenPage());
     }
   });
 }

@@ -20,6 +20,16 @@ export function DashboardPage({ fullName, role }: DashboardPageProps): JSX.Eleme
           Signed in as <strong safe>{fullName}</strong> (<span safe>{role}</span>)
         </p>
 
+        {/* Shown to administrators only. The link is not the access control — the route sits in
+            an administrator-only scope and refuses anyone else with 403 — it is only the reason
+            an administrator has somewhere to click. Hiding it from a manager keeps the page
+            honest about what they can do. */}
+        {role === "administrator" && (
+          <p>
+            <a href="/users">Manage staff accounts</a>
+          </p>
+        )}
+
         {/* A POST, not a link: signing out changes state, and a Lax cookie is withheld from a
             cross-site POST, which is what stops another origin doing it for the user. */}
         <form method="POST" action="/logout">
