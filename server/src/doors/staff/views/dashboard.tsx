@@ -1,4 +1,4 @@
-import { Layout } from "../../../views/shared/layout.js";
+import { StaffShell } from "./shell.js";
 
 export type DashboardPageProps = {
   fullName: string;
@@ -8,36 +8,23 @@ export type DashboardPageProps = {
 /**
  * Where a fully signed-in user lands.
  *
- * Deliberately almost empty. It exists because sign-in needs a destination and because the
- * forced-password-change gate needs something to hold shut; the staff app proper is later slices.
+ * Still almost empty, and now honestly so: the rail carries navigation and sign-out, so this page
+ * is only the greeting. What an administrator can actually do lives behind the rail's two extra
+ * entries rather than behind links repeated here.
  */
 export function DashboardPage({ fullName, role }: DashboardPageProps): JSX.Element {
   return (
-    <Layout title="AE Reports — Staff" locale="en" bodyClass="staff">
-      <main class="staff-shell">
-        <h1>AE Reports</h1>
-        <p>
-          Signed in as <strong safe>{fullName}</strong> (<span safe>{role}</span>)
-        </p>
-
-        {/* Shown to administrators only. The link is not the access control — the route sits in
-            an administrator-only scope and refuses anyone else with 403 — it is only the reason
-            an administrator has somewhere to click. Hiding it from a manager keeps the page
-            honest about what they can do. */}
-        {role === "administrator" && (
-          <p>
-            <a href="/users">Manage staff accounts</a>
+    <StaffShell title="AE Reports — Staff" role={role} active="dashboard">
+      <div class="staff-head">
+        <div class="sp">
+          <h1>Dashboard</h1>
+          <p class="hint">
+            Signed in as <strong safe>{fullName}</strong> (<span safe>{role}</span>)
           </p>
-        )}
+        </div>
+      </div>
 
-        {/* A POST, not a link: signing out changes state, and a Lax cookie is withheld from a
-            cross-site POST, which is what stops another origin doing it for the user. */}
-        <form method="POST" action="/logout">
-          <button type="submit" class="btn">
-            Sign out
-          </button>
-        </form>
-      </main>
-    </Layout>
+      <p class="hint">Reports arrive here in a later slice.</p>
+    </StaffShell>
   );
 }

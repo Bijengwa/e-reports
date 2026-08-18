@@ -57,7 +57,7 @@ function echoed(body: unknown): { email: string; name: string; role: AssignableR
  * disagree with the first.
  */
 export async function usersRoutes(app: FastifyInstance): Promise<void> {
-  app.get("/users", async (_request, reply) => {
+  app.get("/users", async (request, reply) => {
     // `password_hash` is deliberately not selected. A view cannot leak a column it was never
     // handed, and this is cheaper to keep true than a rule about what views may render.
     const rows = await app.db.execute(sql`
@@ -90,17 +90,21 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
       };
     });
 
-    return reply.html(<UsersPage users={users} />);
+    return reply.html(<UsersPage users={users} viewerRole={currentSession(request).role} />);
   });
 
-  app.get("/users/new", async (_request, reply) => reply.html(<NewUserPage />));
+  app.get("/users/new", async (request, reply) =>
+    reply.html(<NewUserPage viewerRole={currentSession(request).role} />),
+  );
 
   app.post("/users/new", async (request, reply) => {
     const session = currentSession(request);
 
     const parsed = Submitted.safeParse(request.body);
     if (!parsed.success) {
-      return reply.status(422).html(<NewUserPage error={INVALID} {...echoed(request.body)} />);
+      return reply
+        .status(422)
+        .html(<NewUserPage error={INVALID} viewerRole={session.role} {...echoed(request.body)} />);
     }
 
     const { email, name, role } = parsed.data;
@@ -139,7 +143,15 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
       if (isUniqueViolation(error, USERS_EMAIL_UNIQUE)) {
         return reply
           .status(409)
-          .html(<NewUserPage error={EMAIL_TAKEN} email={email} name={name} role={role} />);
+          .html(
+            <NewUserPage
+              error={EMAIL_TAKEN}
+              email={email}
+              name={name}
+              role={role}
+              viewerRole={session.role}
+            />,
+          );
       }
       throw error;
     }
@@ -148,7 +160,13 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
     // password has to reach the administrator exactly once, and a redirect could only carry it
     // in the URL. See `UserCreatedPage`.
     return reply.html(
-      <UserCreatedPage email={email} fullName={name} role={role} password={password} />,
+      <UserCreatedPage
+        email={email}
+        fullName={name}
+        role={role}
+        password={password}
+        viewerRole={session.role}
+      />,
     );
   });
 }

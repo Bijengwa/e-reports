@@ -1,4 +1,4 @@
-import { Layout } from "../../../views/shared/layout.js";
+import { StaffShell } from "./shell.js";
 
 /** The roles an administrator may hand out. Never `administrator`. */
 export const ASSIGNABLE_ROLES = ["manager", "assessor"] as const;
@@ -28,6 +28,15 @@ function day(value: Date | null): string {
 
 export type UsersPageProps = {
   users: StaffUser[];
+  /**
+   * The reader's own role, for the rail.
+   *
+   * Named apart from the `role` on a row and on the create form, which mean the account's role.
+   * Threaded from the session rather than written as "administrator" here: the guard on this
+   * scope is what makes that true, and restating it in the view would be a second place for it
+   * to stop being true.
+   */
+  viewerRole: string;
 };
 
 /**
@@ -37,59 +46,53 @@ export type UsersPageProps = {
  * once, and is unrecoverable afterwards — a list that could show it again would make it a
  * standing credential rather than a handover.
  */
-export function UsersPage({ users }: UsersPageProps): JSX.Element {
+export function UsersPage({ users, viewerRole }: UsersPageProps): JSX.Element {
   return (
-    <Layout title="Staff accounts — AE Reports" locale="en" bodyClass="staff">
-      <main class="staff-shell">
-        <div class="staff-head">
-          <div class="sp">
-            <h1>Staff accounts</h1>
-            <p class="hint">
-              {users.length} account{users.length === 1 ? "" : "s"}
-            </p>
-          </div>
-          <a href="/users/new" class="btn">
-            Add user
-          </a>
+    <StaffShell title="Staff accounts — AE Reports" role={viewerRole} active="users">
+      <div class="staff-head">
+        <div class="sp">
+          <h1>Staff accounts</h1>
+          <p class="hint">
+            {users.length} account{users.length === 1 ? "" : "s"}
+          </p>
         </div>
+        <a href="/users/new" class="btn">
+          Add user
+        </a>
+      </div>
 
-        <table class="utable">
-          <thead>
+      <table class="utable">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th>Added</th>
+            <th>Last sign-in</th>
+          </tr>
+        </thead>
+        <tbody>
+          {users.map((user) => (
             <tr>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Role</th>
-              <th>Status</th>
-              <th>Added</th>
-              <th>Last sign-in</th>
+              <td safe>{user.fullName}</td>
+              <td safe>{user.email}</td>
+              <td safe>{user.role}</td>
+              <td>
+                {user.isActive ? (
+                  <span class="tag">Active</span>
+                ) : (
+                  <span class="tag muted">Deactivated</span>
+                )}
+                {user.mustChangePassword && <span class="tag warn">Password not set</span>}
+              </td>
+              <td>{day(user.createdAt)}</td>
+              <td>{day(user.lastSignInAt)}</td>
             </tr>
-          </thead>
-          <tbody>
-            {users.map((user) => (
-              <tr>
-                <td safe>{user.fullName}</td>
-                <td safe>{user.email}</td>
-                <td safe>{user.role}</td>
-                <td>
-                  {user.isActive ? (
-                    <span class="tag">Active</span>
-                  ) : (
-                    <span class="tag muted">Deactivated</span>
-                  )}
-                  {user.mustChangePassword && <span class="tag warn">Password not set</span>}
-                </td>
-                <td>{day(user.createdAt)}</td>
-                <td>{day(user.lastSignInAt)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <p class="hint staff-foot">
-          <a href="/dashboard">Back to the dashboard</a>
-        </p>
-      </main>
-    </Layout>
+          ))}
+        </tbody>
+      </table>
+    </StaffShell>
   );
 }
 
@@ -110,6 +113,8 @@ export type NewUserPageProps = {
   email?: string;
   name?: string;
   role?: AssignableRole | undefined;
+  /** The reader's own role, for the rail. See `UsersPageProps`. */
+  viewerRole: string;
 };
 
 /**
@@ -120,10 +125,16 @@ export type NewUserPageProps = {
  * first password is generated server-side, so an administrator cannot choose one and therefore
  * cannot know one that outlives the handover.
  */
-export function NewUserPage({ error, email, name, role }: NewUserPageProps): JSX.Element {
+export function NewUserPage({
+  error,
+  email,
+  name,
+  role,
+  viewerRole,
+}: NewUserPageProps): JSX.Element {
   return (
-    <Layout title="Add a staff account — AE Reports" locale="en" bodyClass="staff">
-      <main class="staff-shell staff-narrow">
+    <StaffShell title="Add a staff account — AE Reports" role={viewerRole} active="users">
+      <div class="staff-narrow">
         <div class="staff-head">
           <div class="sp">
             <h1>Add a staff account</h1>
@@ -190,8 +201,8 @@ export function NewUserPage({ error, email, name, role }: NewUserPageProps): JSX
             </div>
           </form>
         </div>
-      </main>
-    </Layout>
+      </div>
+    </StaffShell>
   );
 }
 
@@ -201,6 +212,8 @@ export type UserCreatedPageProps = {
   role: AssignableRole;
   /** Shown here and nowhere else, ever. */
   password: string;
+  /** The reader's own role, for the rail. See `UsersPageProps`. */
+  viewerRole: string;
 };
 
 /**
@@ -217,10 +230,11 @@ export function UserCreatedPage({
   fullName,
   role,
   password,
+  viewerRole,
 }: UserCreatedPageProps): JSX.Element {
   return (
-    <Layout title="Account created — AE Reports" locale="en" bodyClass="staff">
-      <main class="staff-shell staff-narrow">
+    <StaffShell title="Account created — AE Reports" role={viewerRole} active="users">
+      <div class="staff-narrow">
         <div class="staff-head">
           <div class="sp">
             <p class="eyebrow">Account created</p>
@@ -248,7 +262,7 @@ export function UserCreatedPage({
             Done
           </a>
         </div>
-      </main>
-    </Layout>
+      </div>
+    </StaffShell>
   );
 }

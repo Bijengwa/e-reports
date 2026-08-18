@@ -78,7 +78,9 @@ export function requireRole(app: FastifyInstance, roles: readonly StaffSession["
     // `requireSession` runs first and redirects when there is no session, so the null case here is
     // a route registered in the wrong scope. Refusing is the safe reading of that mistake.
     if (!request.staffSession || !roles.includes(request.staffSession.role)) {
-      return reply.status(403).html(ForbiddenPage());
+      // The refusal is rendered with the reader's own role, so the rail on that page offers what
+      // they can reach rather than the entries they were just turned away from.
+      return reply.status(403).html(ForbiddenPage({ role: request.staffSession?.role }));
     }
   });
 }
