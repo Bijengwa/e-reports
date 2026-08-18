@@ -1,0 +1,863 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AE Reports — TMDA medical device vigilance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --ink:#101913; --ink-2:#45534A; --ink-3:#75837A;
+  --paper:#F5F8F5; --card:#FFF; --rule:#DFE7E0; --rule-2:#C3CFC6;
+  --green:#166534; --green-d:#0C3B1E; --green-h:#1B7A40; --green-bg:#E7F2EA;
+  --leaf:#7CB518; --leaf-d:#4A6D0C; --leaf-bg:#F0F7E2;
+  --orange:#E1611F; --orange-d:#8C3A0F; --orange-bg:#FDF0E8; --orange-deep:#C24E12;
+  --flag:#A8341F; --flag-bg:#FBEBE7;
+  --amber:#8A6207; --amber-bg:#FDF3DC;
+  --r:5px;
+  --sans:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:var(--sans);background:var(--paper);color:var(--ink);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit;max-width:100%}
+a{color:var(--green)}
+svg{max-width:100%}
+
+/* ---------- logo ---------- */
+.logo{width:26px;height:26px;flex:none}
+.logo .doc{fill:none;stroke:var(--leaf);stroke-width:42;stroke-linecap:round}
+.logo .tab{fill:var(--leaf)}
+.logo .body{fill:var(--green)}
+.logo .cross{fill:#fff}
+.on-dark .logo .body{fill:#fff}
+.on-dark .logo .cross{fill:var(--green-d)}
+.orange-page .logo .body{fill:#fff}
+.orange-page .logo .cross{fill:var(--orange-deep)}
+.orange-page .logo .doc{stroke:#FBD9C4}
+.orange-page .logo .tab{fill:#FBD9C4}
+
+/* ---------- shell ---------- */
+.shell{display:flex;min-height:100vh}
+.rail{width:238px;flex:none;background:var(--green-d);color:#C9DACE;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;z-index:60}
+.brand{padding:18px 18px 15px;border-bottom:1px solid #1B5231;display:flex;align-items:center;gap:10px}
+.brand b{display:block;color:#fff;font-weight:600;letter-spacing:-.01em;font-size:15px;line-height:1.2}
+.brand span{display:block;font-size:11px;color:#7FA48B;margin-top:1px}
+.rolebox{padding:13px 18px;border-bottom:1px solid #1B5231}
+.rolebox label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#7FA48B;display:block;margin-bottom:6px}
+.rolebox select{width:100%;background:#14522B;border:1px solid #266B3F;color:#fff;padding:7px 9px;border-radius:var(--r)}
+nav{padding:11px;flex:1;overflow:auto}
+nav a{display:flex;align-items:center;gap:9px;padding:8px 11px;border-radius:var(--r);color:#A9C4B1;text-decoration:none;margin-bottom:2px;font-size:13.5px}
+nav a:hover{background:#14522B;color:#fff}
+nav a.on{background:#1E6B39;color:#fff;font-weight:500}
+nav a .n{margin-left:auto;font-family:var(--mono);font-size:11px;background:var(--orange);color:#fff;border-radius:9px;padding:0 6px;line-height:17px}
+.railfoot{padding:13px 18px;border-top:1px solid #1B5231;font-size:12px;color:#7FA48B}
+.scrim{display:none;position:fixed;inset:0;background:rgba(12,59,30,.5);z-index:50}
+
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.top{background:var(--card);border-bottom:1px solid var(--rule);padding:0 22px;min-height:56px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:30}
+.top h1{font-size:16px;font-weight:600;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sp{flex:1;min-width:0}
+.lang{display:flex;border:1px solid var(--rule-2);border-radius:var(--r);overflow:hidden;flex:none}
+.lang button{background:none;border:0;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--ink-2)}
+.lang button.on{background:var(--green);color:#fff}
+.who{display:flex;align-items:center;gap:8px;font-size:13px;flex:none;cursor:pointer;border:0;background:none;padding:4px;border-radius:var(--r)}
+.who:hover{background:var(--green-bg)}
+.av{width:28px;height:28px;border-radius:50%;background:var(--green);color:#fff;display:grid;place-items:center;font-size:11px;font-weight:600;flex:none}
+.body{padding:22px;flex:1;max-width:1220px;width:100%}
+.burger{display:none;background:none;border:1px solid var(--rule-2);border-radius:var(--r);padding:6px 9px;cursor:pointer;line-height:1}
+
+/* ---------- primitives ---------- */
+.eyebrow{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);font-weight:500}
+.card{background:var(--card);border:1px solid var(--rule);border-radius:var(--r)}
+.card-h{padding:12px 16px;border-bottom:1px solid var(--rule);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.card-h h2{font-size:14px;font-weight:600}
+.card-b{padding:16px}
+.mono{font-family:var(--mono)}
+.muted{color:var(--ink-2)}
+.hint{font-size:12.5px;color:var(--ink-3)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.split{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:20px}
+.bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+
+.btn{background:var(--green);color:#fff;border:1px solid var(--green);padding:8px 15px;border-radius:var(--r);cursor:pointer;font-weight:500;font-size:13.5px;white-space:nowrap}
+.btn:hover{background:var(--green-h)}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--rule-2)}
+.btn.ghost:hover{background:#ECF2ED}
+.btn.orange{background:var(--orange);border-color:var(--orange)}
+.btn.orange:hover{background:var(--orange-deep)}
+.btn.sm{padding:5px 11px;font-size:12.5px}
+.btn:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,.chk:focus-within,.who:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+
+.f{margin-bottom:14px}
+.f label{display:block;font-size:12.5px;font-weight:500;margin-bottom:5px}
+.f label i{color:var(--flag);font-style:normal}
+.f input,.f select,.f textarea{width:100%;padding:8px 10px;border:1px solid var(--rule-2);border-radius:var(--r);background:#fff}
+.f textarea{min-height:70px;resize:vertical}
+.f .sub{font-size:11.5px;color:var(--ink-3);margin-top:4px}
+.checks{display:flex;flex-wrap:wrap;gap:7px}
+.checks.col{flex-direction:column;align-items:stretch}
+.chk{display:flex;align-items:flex-start;gap:8px;border:1px solid var(--rule-2);border-radius:var(--r);padding:7px 11px;cursor:pointer;background:#fff;font-size:13px}
+.chk input{margin-top:3px}
+.chk .hint{display:block}
+.chk:has(input:checked){border-color:var(--green);background:var(--green-bg);color:var(--green-d)}
+.orange-page .chk:has(input:checked){border-color:var(--orange);background:var(--orange-bg);color:var(--orange-d)}
+.drop{border:1.5px dashed var(--rule-2);border-radius:var(--r);padding:22px;text-align:center;color:var(--ink-3);font-size:13px}
+
+.pill{display:inline-flex;align-items:center;font-size:11.5px;font-weight:500;padding:2px 9px;border-radius:11px;white-space:nowrap}
+.p-new{background:var(--orange-bg);color:var(--orange-d)}
+.p-work{background:var(--amber-bg);color:var(--amber)}
+.p-mgr{background:var(--green-bg);color:var(--green)}
+.p-done{background:var(--leaf-bg);color:var(--leaf-d)}
+.p-off{background:#EAEFEB;color:var(--ink-2)}
+.p-sev{background:var(--flag-bg);color:var(--flag)}
+
+.stat{background:var(--card);border:1px solid var(--rule);border-radius:var(--r);padding:14px 15px}
+.stat .k{font-family:var(--mono);font-size:26px;font-weight:500;letter-spacing:-.02em;line-height:1.1}
+.stat .l{font-size:12.5px;color:var(--ink-2);margin-top:3px}
+
+/* ---------- tables ---------- */
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse}
+.tw table{min-width:680px}
+.tw table.narrow{min-width:0}
+th{text-align:left;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);font-weight:500;padding:9px 13px;border-bottom:1px solid var(--rule);background:#F8FAF8;white-space:nowrap}
+td{padding:11px 13px;border-bottom:1px solid var(--rule);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+tr.rowlink{cursor:pointer}
+tr.rowlink:hover td{background:#F6FAF7}
+
+/* ---------- record display ---------- */
+.dl{display:grid;grid-template-columns:230px minmax(0,1fr)}
+.dl dt{padding:9px 12px 9px 0;font-size:12.5px;color:var(--ink-3);border-bottom:1px solid #EDF2EE}
+.dl dd{padding:9px 0;border-bottom:1px solid #EDF2EE;min-width:0;overflow-wrap:anywhere}
+.dl dt:last-of-type,.dl dd:last-of-type{border-bottom:0}
+.sec-h{display:flex;align-items:center;gap:10px;margin:26px 0 10px}
+.sec-h .num{font-family:var(--mono);font-size:11px;font-weight:500;background:var(--green);color:#fff;min-width:21px;height:21px;display:grid;place-items:center;border-radius:3px;flex:none;padding:0 4px}
+.orange-page .sec-h .num{background:var(--orange)}
+.sec-h h3{font-size:13.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.blank{color:var(--ink-3);font-style:italic}
+
+.custody{list-style:none}
+.custody li{position:relative;padding:0 0 17px 24px;border-left:1.5px solid var(--rule);margin-left:5px}
+.custody li:last-child{border-left-color:transparent;padding-bottom:0}
+.custody li:before{content:'';position:absolute;left:-5.5px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--rule-2);border:2px solid var(--paper)}
+.custody li.hit:before{background:var(--leaf)}
+.custody li.now:before{background:var(--orange);box-shadow:0 0 0 3px var(--orange-bg)}
+.custody .ct{font-weight:500;font-size:13px}
+.custody .cm{font-size:12px;color:var(--ink-3)}
+
+/* ---------- comparison ---------- */
+.cmp{border:1px solid var(--rule);border-radius:var(--r);overflow:hidden;background:var(--card)}
+.cmp-h,.cmp-r{display:grid;grid-template-columns:180px minmax(0,1fr) minmax(0,1fr)}
+.cmp-h{background:#F8FAF8;border-bottom:1px solid var(--rule)}
+.cmp-h div{padding:11px 14px;font-size:12.5px;font-weight:600}
+.cmp-h div+div,.cmp-r>div+div{border-left:1px solid var(--rule)}
+.cmp-r{border-bottom:1px solid var(--rule)}
+.cmp-r:last-child{border-bottom:0}
+.cmp-r>div{padding:12px 14px;min-width:0;overflow-wrap:anywhere}
+.cmp-r .lbl{font-size:12.5px;color:var(--ink-3);background:#FBFDFB}
+.cmp-r.diff{background:var(--flag-bg)}
+.cmp-r.diff .lbl{background:#F7E2DC}
+.cmp-r.diff .lbl:after{content:'differs';display:block;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--flag);font-weight:600;margin-top:3px}
+
+/* ---------- steps ---------- */
+.steps{display:flex;margin-bottom:20px;border-bottom:1px solid #F0CFB6;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.steps button{background:none;border:0;border-bottom:2px solid transparent;padding:9px 14px;cursor:pointer;color:var(--ink-3);font-size:13px;display:flex;align-items:center;gap:8px;white-space:nowrap}
+.steps button.on{color:var(--ink);border-bottom-color:var(--orange);font-weight:500}
+.steps button .num{font-family:var(--mono);font-size:11px;border:1px solid var(--rule-2);border-radius:3px;width:19px;height:19px;display:grid;place-items:center;flex:none}
+.steps button.on .num{background:var(--orange);border-color:var(--orange);color:#fff}
+
+/* ---------- auth ---------- */
+.auth{min-height:100vh;display:grid;place-items:center;padding:20px;background:var(--green-d)}
+.auth-c{width:100%;max-width:396px;background:var(--card);border-radius:7px;overflow:hidden}
+.auth-top{background:var(--leaf);height:5px}
+.auth-b{padding:28px 26px}
+.auth-b h2{font-size:19px;font-weight:600;letter-spacing:-.01em}
+.auth-logo{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+.auth-logo .logo{width:34px;height:34px}
+.auth-logo b{font-size:17px;font-weight:600;display:block;line-height:1.2}
+.auth-logo span{font-size:11.5px;color:var(--ink-3)}
+
+.note{border-left:3px solid var(--orange);background:var(--orange-bg);padding:11px 13px;border-radius:0 var(--r) var(--r) 0;font-size:13px;margin-bottom:16px}
+.note.ok{border-color:var(--leaf);background:var(--leaf-bg)}
+.note.info{border-color:var(--green);background:var(--green-bg)}
+.screen{display:none}
+.screen.on{display:block}
+.protobar{background:#14522B;color:#A9C4B1;font-size:12px;padding:6px 22px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.protobar b{color:#fff;font-weight:500}
+
+/* ---------- public orange page ---------- */
+.orange-page{background:#FBF3EC;min-height:100vh}
+.orange-page .otop{background:var(--orange);color:#fff;padding:0 22px;min-height:58px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:30}
+.orange-page .otop h1{font-size:16px;font-weight:600}
+.orange-page .obody{padding:22px;max-width:880px;margin:0 auto}
+.orange-page .card{border-color:#F0CFB6}
+.orange-page .lang{border-color:#EF9E63}
+.orange-page .lang button{color:#FBD9C4}
+.orange-page .lang button.on{background:#fff;color:var(--orange-d)}
+.orange-page .obanner{background:#fff;border:1px solid #F0CFB6;border-left:5px solid var(--orange);border-radius:0 var(--r) var(--r) 0;padding:13px 15px;font-size:13px;margin-bottom:18px}
+.orange-page .btn.ghost{border-color:#E3B694}
+.confirm-num{font-family:var(--mono);font-size:24px;font-weight:500;color:var(--orange-d);letter-spacing:-.01em}
+
+/* ================= RESPONSIVE ================= */
+@media (max-width:1000px){ .split{grid-template-columns:1fr} .sticky{position:static!important} }
+@media (max-width:900px){
+  .rail{position:fixed;top:0;left:0;transform:translateX(-100%);transition:transform .22s ease}
+  .rail.open{transform:none}
+  .scrim.on{display:block}
+  .burger{display:block}
+  .body,.orange-page .obody{padding:16px}
+  .top,.orange-page .otop{padding:0 14px}
+  .protobar{padding:6px 14px}
+}
+@media (max-width:700px){
+  .cmp-h{display:none}
+  .cmp-r{grid-template-columns:1fr}
+  .cmp-r>div+div{border-left:0;border-top:1px solid var(--rule)}
+  .cmp-r>div+div:before{content:attr(data-l);display:block;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);margin-bottom:4px}
+  .dl{grid-template-columns:1fr}
+  .dl dt{border-bottom:0;padding:9px 0 0}
+  .dl dd{padding-top:1px}
+  .who span:not(.av){display:none}
+  .top h1{font-size:15px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<template id="logo"><svg class="logo" viewBox="0 0 512 512" role="img" aria-label="AE Reports"><path class="doc" d="M177 47h258a38 38 0 0 1 38 38v300a38 38 0 0 1-38 38h-14"/><rect class="tab" x="243" y="103" width="172" height="42" rx="9"/><path class="body" d="M39 213a58 58 0 0 1 58-58h81a24 24 0 0 1 17 7l45 45h130a58 58 0 0 1 58 58v142a58 58 0 0 1-58 58H97a58 58 0 0 1-58-58z"/><path class="cross" d="M195 285h48v56h56v48h-56v56h-48v-56h-56v-48h56z"/></svg></template>
+
+<!-- ==================== STAFF SIGN IN ==================== -->
+<div class="screen on" id="sc-login"><div class="auth"><div class="auth-c">
+  <div class="auth-top"></div>
+  <div class="auth-b">
+    <div class="auth-logo"><span data-logo></span><span><b>AE Reports</b><span>TMDA staff · Medical device vigilance</span></span></div>
+    <h2 style="margin-bottom:16px">Staff sign in</h2>
+    <div class="f"><label>Work email</label><input value="j.mushi@tmda.go.tz" autocomplete="username"></div>
+    <div class="f"><label>Password</label><input type="password" value="············" autocomplete="current-password"></div>
+    <button class="btn" style="width:100%" onclick="go('sc-pw')">Sign in</button>
+    <p style="margin-top:14px;font-size:12.5px"><a href="#" onclick="alert('A reset link is emailed to the address on the account.');return false">Forgot your password?</a></p>
+    <p class="hint" style="margin-top:20px">This address is for TMDA staff only. Hospitals and pharmacies report at the separate public address.
+    <a href="#" onclick="go('sc-orange');return false">Open the public page</a> <span class="muted">(prototype shortcut)</span></p>
+  </div>
+</div></div></div>
+
+<!-- ==================== FIRST SIGN-IN ==================== -->
+<div class="screen" id="sc-pw"><div class="auth"><div class="auth-c">
+  <div class="auth-top"></div>
+  <div class="auth-b">
+    <div class="eyebrow">First sign-in</div>
+    <h2 style="margin:4px 0 6px">Set your own password</h2>
+    <p class="hint" style="margin-bottom:18px">The administrator created your account and gave you a starting password. It stops working now. Nobody, including the administrator, can see the password you choose.</p>
+    <div class="f"><label>Starting password</label><input type="password" value="········"></div>
+    <div class="f"><label>New password</label><input type="password" placeholder="At least 10 characters"></div>
+    <div class="f" style="margin-bottom:16px"><label>Repeat new password</label><input type="password"></div>
+    <button class="btn" style="width:100%" onclick="enter()">Save password and continue</button>
+  </div>
+</div></div></div>
+
+<!-- ==================== STAFF APP ==================== -->
+<div class="screen" id="sc-app">
+<div class="protobar"><b>Prototype</b><span>Sample data. Switch roles in the sidebar to see each person's view.</span></div>
+<div class="scrim" id="scrim" onclick="drawer(false)"></div>
+<div class="shell">
+  <aside class="rail on-dark" id="rail">
+    <div class="brand"><span data-logo></span><span><b>AE Reports</b><span>TMDA · Device vigilance</span></span></div>
+    <div class="rolebox"><label>Viewing as</label>
+      <select id="role" onchange="setRole(this.value)">
+        <option value="manager">Manager — J. Mushi</option>
+        <option value="officer">Assessor — A. Kimaro</option>
+        <option value="assessor2">Assessor — F. Ngowi</option>
+        <option value="admin">Administrator</option>
+      </select></div>
+    <nav id="nav"></nav>
+    <div class="railfoot" id="railfoot"></div>
+  </aside>
+  <div class="main">
+    <header class="top">
+      <button class="burger" onclick="drawer(true)" aria-label="Open menu">☰</button>
+      <h1 id="pgtitle">Overview</h1><div class="sp"></div>
+      <div class="lang"><button class="on" onclick="setLang('en')">EN</button><button onclick="setLang('sw')">SW</button></div>
+      <button class="who" onclick="setView('profile')" title="My profile"><span class="av" id="avatar">JM</span><span id="whoname">J. Mushi</span></button>
+    </header>
+    <div class="body" id="page"></div>
+  </div>
+</div></div>
+
+<!-- ==================== PUBLIC ORANGE FORM ==================== -->
+<div class="screen" id="sc-orange"><div class="orange-page">
+  <header class="otop">
+    <span data-logo style="display:flex"></span>
+    <h1>Report a medical device problem</h1><div class="sp"></div>
+    <div class="lang"><button class="on" onclick="setLang('en')">EN</button><button onclick="setLang('sw')">SW</button></div>
+  </header>
+  <div class="obody" id="orange-fill">
+    <div class="obanner">This is the <b>orange form</b> — for hospitals, pharmacies, diagnostic centres and consumers. Fill in what you know. Fields marked <i style="color:var(--flag);font-style:normal">*</i> are required; leave the rest blank if you do not have the information. Sending a report does not discredit the competence of the reporter.</div>
+    <div class="steps" id="ostep"></div>
+    <div class="card"><div class="card-b" id="opanel"></div></div>
+    <div class="bar" style="margin-top:16px">
+      <button class="btn ghost" onclick="ostep(-1)">Back</button>
+      <button class="btn orange" onclick="ostep(1)" id="onext">Continue</button>
+      <span class="hint" style="margin-left:auto">Saved as you type.</span>
+    </div>
+    <p class="hint" style="padding:14px 0 30px">Tanzania Medicines and Medical Devices Authority · P.O. Box 1253, Dodoma · Toll free 0800 110 084 · info@tmda.go.tz</p>
+  </div>
+  <div class="obody" id="orange-done" style="display:none">
+    <div class="card"><div class="card-b" style="text-align:center;padding:34px 22px">
+      <div class="eyebrow" style="color:var(--orange-d)">Report received — thank you</div>
+      <div class="confirm-num" style="margin:10px 0 4px">MD-AE/2026/0185</div>
+      <p class="hint" style="margin-bottom:18px">Keep this number. Use it when you call or write to TMDA about this report.</p>
+      <div class="tw" style="text-align:left"><table class="narrow"><tbody>
+        <tr><td class="muted" style="width:180px">Form</td><td class="mono">TMDA/DMD/MDV/F/001 Rev 06</td></tr>
+        <tr><td class="muted">Report number</td><td class="mono">MD-AE/2026/0185</td></tr>
+        <tr><td class="muted">Date received</td><td>17 Aug 2026, 11:05</td></tr>
+        <tr><td class="muted">What happens next</td><td>A TMDA assessor is assigned automatically. You get an SMS and email confirmation now, and TMDA will contact you if anything is unclear.</td></tr>
+      </tbody></table></div>
+      <button class="btn orange" style="margin-top:20px" onclick="resetOrange()">Send another report</button>
+    </div></div>
+  </div>
+</div></div>
+
+<script>
+/* ============ the cascade ============
+ 1 Report received (online, or entered by an assessor if it came by email/paper) → number auto-generated
+ 2 System auto-picks the 1st assessor from assessors marked Available
+ 3 1st assessment on form F004 → report moves to the manager
+ 4 Manager reads it, assigns the 2nd assessor (a different person)
+ 5 2nd assessor reviews the whole F004 and adds concluding remarks (section 7.2) → back to the manager
+ 6 Manager sees both conclusions side by side, records the decision → closed
+ Manager sees every report, every worker and every workload at all times, and can move
+ a report from one assessor to another. */
+
+const CASE = {
+  no:'MD-AE/2026/0179', received:'08 Aug 2026', channel:'Email — entered by A. Kimaro',
+  st:'2nd assessment with F. Ngowi', stc:'work', sev:'Death',
+  device:{
+    'Full name of the medical device or IVD':'BeneVision N12 patient monitor','Brand name':'BeneVision',
+    'Common name':'Vital signs monitor','Size':'','Manufacturing date':'14 / 11 / 2024','Expiry date':'',
+    'Serial number':'BN12-4471-22887','Batch number / lot number':'LOT-2024-11B',
+    "Manufacturer's name and physical address":'Shenzhen Mindray Bio-Medical Electronics Co. Ltd, Nanshan, Shenzhen 518057, China',
+    'Source of device':'Hospital','Name of the supplier and physical address':'Medisel (T) Ltd, Plot 44 Nyerere Road, Dar es Salaam',
+    'Status of the device':'New device','How long the device has been in use':'1-5 years'},
+  incident:{'Onset date of incident':'06 / 08 / 2026','Type of incident (device related)':'Malfunction',
+    'Incident narrative description':'The monitor stopped refreshing and stopped sounding alarms while a patient was in the high dependency unit at about 02:30. The screen stayed lit but froze on the last reading taken. Staff noticed only during the 04:00 round.',
+    'Number of devices involved':'1'},
+  event:{'Onset date of event':'06 / 08 / 2026','Type of event (user related)':'Death',
+    'Event narrative description':'The patient deteriorated without any alarm being raised. Resuscitation was started late and was not successful.',
+    'Number of users involved':'1'},
+  operator:{'User / operator at the time of the event':'Healthcare Providers',
+    'Measures taken by the user / operator':'The monitor was switched off, removed from the ward and quarantined in the biomedical workshop with a warning label.',
+    'Outcome of the measures taken':'No repeat on the replacement monitor.',
+    'Have you informed the supplier?':'Yes — 07 / 08 / 2026'},
+  reporter:{'Name or initials':'Dr. S. Mwakalinga','Reporter type':'Medical practitioner',
+    'Physical address (facility)':'Mbeya Zonal Referral Hospital, Hospital Hill Road','District / region / city':'Mbeya Urban, Mbeya',
+    'Email':'biomed@mzrh.go.tz','Telephone / mobile phone':'+255 754 000 000','Date of report':'08 / 08 / 2026',
+    'Current location of the device':'Biomedical workshop, MZRH — sealed and labelled'},
+  files:['Signed orange form.pdf','Monitor front photo.jpg','Serial plate photo.jpg','Ward event log 06 Aug.pdf']
+};
+
+/* stc: work (with an assessor) | mgr (with manager) | done */
+const REPORTS = [
+ {no:'MD-AE/2026/0184', dev:'Volumat MC Agilia infusion pump', by:'Dr. S. Mwakalinga', byRole:'Medical practitioner', fac:'Muhimbili National Hospital', ch:'Online form', got:'14 Aug 2026', sev:'Life threatening', stc:'work', st:'1st assessment with G. Shirima', a1:'G. Shirima'},
+ {no:'MD-AE/2026/0183', dev:'AccuChek Active glucose test strips', by:'E. Massawe', byRole:'Other — laboratory scientist', fac:'Bugando Medical Centre', ch:'Online form', got:'13 Aug 2026', sev:'Other', stc:'work', st:'1st assessment with A. Kimaro', a1:'A. Kimaro'},
+ {no:'MD-AE/2026/0181', dev:'Vicryl 3-0 surgical suture', by:'Dr. H. Lyimo', byRole:'Medical practitioner', fac:'KCMC Moshi', ch:'Email', got:'11 Aug 2026', sev:'Required or prolonged hospitalization', stc:'mgr', st:'With manager — assign 2nd assessor', a1:'A. Kimaro'},
+ {no:'MD-AE/2026/0179', dev:'BeneVision N12 patient monitor', by:'Dr. S. Mwakalinga', byRole:'Medical practitioner', fac:'Mbeya Zonal Referral', ch:'Email', got:'08 Aug 2026', sev:'Death', stc:'work', st:'2nd assessment with F. Ngowi', a1:'A. Kimaro', a2:'F. Ngowi'},
+ {no:'MD-AE/2026/0176', dev:'SD Bioline HIV 3.0 rapid test kit', by:'R. Kessy', byRole:'Other — maintenance engineer', fac:'Temeke Regional Hospital', ch:'Online form', got:'05 Aug 2026', sev:'Other', stc:'mgr', st:'With manager — decision', a1:'A. Kimaro', a2:'F. Ngowi'},
+ {no:'MD-AE/2026/0170', dev:'EverFlo oxygen concentrator', by:'J. Mtei', byRole:'Other — biomedical technician', fac:'Dodoma Regional Hospital', ch:'Hard copy', got:'29 Jul 2026', sev:'Life threatening', stc:'done', st:'Closed — device removal', a1:'G. Shirima', a2:'F. Ngowi'}
+];
+
+const STAFF = [
+ {n:'Anna Kimaro',  role:'Assessor', s:'Available', open:'0183 (1st, draft)', done:3},
+ {n:'Grace Shirima',role:'Assessor', s:'Available', open:'0184 (1st, in progress)', done:2},
+ {n:'Frank Ngowi',  role:'Assessor', s:'Available', open:'0179 (2nd, not started)', done:4},
+ {n:'David Temba',  role:'Assessor', s:'On leave', until:'25 Aug 2026', open:'—', done:1}
+];
+
+const USERS = [
+ {n:'Joseph Mushi', e:'j.mushi@tmda.go.tz', r:'Manager', s:'Active', last:'Today, 08:12'},
+ {n:'Anna Kimaro', e:'a.kimaro@tmda.go.tz', r:'Assessor', s:'Active', last:'Today, 07:55'},
+ {n:'Grace Shirima', e:'g.shirima@tmda.go.tz', r:'Assessor', s:'Active', last:'Today, 07:40'},
+ {n:'Frank Ngowi', e:'f.ngowi@tmda.go.tz', r:'Assessor', s:'Active', last:'Yesterday, 16:40'},
+ {n:'David Temba', e:'d.temba@tmda.go.tz', r:'Assessor', s:'Active', last:'01 Aug 2026'},
+ {n:'Peter Malale', e:'p.malale@tmda.go.tz', r:'Assessor', s:'Deactivated', last:'12 Jun 2026'}
+];
+
+/* ============ language ============ */
+const SW={'Overview':'Muhtasari','My actions':'Kazi zangu','All reports':'Ripoti zote','Audit trail':'Kumbukumbu',
+'Workers':'Wafanyakazi','Enter a report':'Ingiza ripoti','My work':'Kazi zangu','Users':'Watumiaji','My profile':'Wasifu wangu',
+'Device details':'Taarifa za kifaa','Incident details':'Taarifa za tukio','Event details':'Madhara kwa mtumiaji',
+'User / equipment operator details':'Mtumiaji wa kifaa','Particulars of the reporter':'Taarifa za mtoa taarifa',
+'Device':'Kifaa','Facility':'Kituo','Submitted by':'Ametuma','Received':'Ilipokelewa','Severity':'Ukali','Status':'Hali',
+'Open':'Fungua','Number':'Namba','Attachments':'Viambatisho','Report':'Ripoti','Stage':'Hatua','My assessment':'Tathmini yangu'};
+let lang='en';
+function setLang(l){lang=l;document.querySelectorAll('.lang button').forEach(b=>b.classList.toggle('on',b.textContent.toLowerCase()===l));if(document.getElementById('sc-app').classList.contains('on'))render();paintOrange();}
+function t(s){return lang==='sw'&&SW[s]?SW[s]:s}
+
+/* ============ shell ============ */
+function go(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));document.getElementById(id).classList.add('on');logos();window.scrollTo(0,0);}
+function logos(){const tpl=document.getElementById('logo');document.querySelectorAll('[data-logo]').forEach(s=>{if(!s.firstChild)s.appendChild(tpl.content.cloneNode(true))});}
+function drawer(o){document.getElementById('rail').classList.toggle('open',o);document.getElementById('scrim').classList.toggle('on',o);}
+function enter(){go('sc-app');setRole('manager');}
+
+const NAV={
+ manager:[['overview','Overview'],['actions','My actions',2],['workers','Workers'],['all','All reports'],['audit','Audit trail'],['profile','My profile']],
+ officer:[['mywork','My work',1],['new','Enter a report'],['profile','My profile']],
+ assessor2:[['mywork','My work',1],['new','Enter a report'],['profile','My profile']],
+ admin:[['users','Users'],['audit','Audit trail'],['profile','My profile']]};
+const WHO={manager:['J. Mushi','JM','j.mushi@tmda.go.tz'],officer:['A. Kimaro','AK','a.kimaro@tmda.go.tz'],
+ assessor2:['F. Ngowi','FN','f.ngowi@tmda.go.tz'],admin:['System admin','SA','admin@tmda.go.tz']};
+let role='manager',view='overview';
+
+function setRole(r){role=r;view=NAV[r][0][0];document.getElementById('role').value=r;
+ document.getElementById('whoname').textContent=WHO[r][0];document.getElementById('avatar').textContent=WHO[r][1];
+ document.getElementById('railfoot').textContent='Signed in as '+WHO[r][0];render();}
+function setView(v){view=v;drawer(false);render();window.scrollTo(0,0);}
+
+const TITLES={overview:'Overview',actions:'My actions',workers:'Workers',all:'All reports',audit:'Audit trail',
+ profile:'My profile',new:'Enter a report',mywork:'My work',users:'Users',report:'Case file',assess:'Assessment — F004',compare:'Final decision'};
+
+function render(){
+ document.getElementById('nav').innerHTML=NAV[role].map(([k,l,n])=>
+  `<a href="#" class="${k===view?'on':''}" onclick="setView('${k}');return false">${t(l)}${n?`<span class="n">${n}</span>`:''}</a>`).join('');
+ const V={overview:vOverview,actions:vActions,workers:vWorkers,all:vAll,audit:vAudit,profile:vProfile,
+  new:vNew,mywork:vMyWork,users:vUsers,report:vReport,assess:vAssess,compare:vCompare}[view]||vOverview;
+ document.getElementById('page').innerHTML=V();
+ document.getElementById('pgtitle').textContent=t(TITLES[view]||'Overview');
+}
+
+function stat(k,l){return `<div class="stat"><div class="k">${k}</div><div class="l">${l}</div></div>`}
+function sevPill(s){return ['Death','Life threatening'].includes(s)?`<span class="pill p-sev">${s}</span>`:`<span class="muted">${s}</span>`}
+function stPill(r){return `<span class="pill p-${r.stc}">${r.st}</span>`}
+
+function reportsTable(rows,extraCol){
+ return `<div class="tw"><table><thead><tr><th>${t('Number')}</th><th>${t('Device')}</th><th>${t('Submitted by')}</th><th>${t('Facility')}</th><th>${t('Received')}</th><th>${t('Severity')}</th><th>${t('Status')}</th>${extraCol?`<th></th>`:''}</tr></thead><tbody>
+ ${rows.map(r=>`<tr class="rowlink" onclick="setView('report')">
+  <td><span class="mono" style="font-size:12.5px;color:var(--green);font-weight:500">${r.no}</span></td>
+  <td>${r.dev}</td>
+  <td>${r.by}<br><span class="hint">${r.byRole} · ${r.ch}</span></td>
+  <td>${r.fac}</td><td class="muted" style="white-space:nowrap">${r.got}</td>
+  <td>${sevPill(r.sev)}</td><td>${stPill(r)}</td>
+  ${extraCol?`<td onclick="event.stopPropagation()">${extraCol(r)||''}</td>`:''}</tr>`).join('')}
+ </tbody></table></div>`;
+}
+
+/* ============ manager ============ */
+function vOverview(){
+ return `<div class="grid4" style="margin-bottom:20px">
+  ${stat(2,'In 1st assessment')}${stat(1,'Needs a 2nd assessor')}${stat(1,'Awaiting your decision')}${stat(11,'Closed this month')}</div>
+ <div class="note info">You see every report at every stage. New reports go to the assessor team automatically — the system picks the first available assessor. Your jobs: assign the 2nd assessor after the 1st assessment, take the final decision after the 2nd, and move work between assessors when needed.</div>
+ <div class="card"><div class="card-h"><h2>${t('All reports')} — live</h2></div>
+ ${reportsTable(REPORTS,r=>r.stc==='work'?`<button class="btn ghost sm" onclick="reassign('${r.no}','${r.a2&&r.st.includes('2nd')?r.a2:r.a1}')">Move</button>`:'')}</div>`;
+}
+
+function vActions(){
+ const a=REPORTS.filter(r=>r.stc==='mgr');
+ return `<div class="note">These reports are waiting for you and nobody else.</div>
+ <div class="card"><div class="card-h"><h2>Waiting for you</h2></div>
+ ${reportsTable(a,r=>r.st.includes('assign')
+  ?`<button class="btn sm" onclick="assign2('${r.no}')">Assign 2nd assessor</button>`
+  :`<button class="btn sm" onclick="setView('compare')">Decide</button>`)}</div>`;
+}
+
+function vWorkers(){
+ return `<div class="note info">Every worker, what they are working on now, and what they have finished. Assessors marked <b>On leave</b> are skipped by the automatic assignment. Use <b>Move</b> on any report (Overview or All reports) to shift work from one assessor to another.</div>
+ <div class="card"><div class="card-h"><h2>${t('Workers')}</h2></div>
+ <div class="tw"><table><thead><tr><th>Name</th><th>Role</th><th>Availability</th><th>Working on now</th><th>Closed this month</th><th></th></tr></thead><tbody>
+ ${STAFF.map(w=>`<tr><td style="font-weight:500">${w.n}</td><td>${w.role}</td>
+  <td><span class="pill p-${w.s==='Available'?'done':'off'}">${w.s}${w.until?' · until '+w.until:''}</span></td>
+  <td class="mono" style="font-size:12.5px">${w.open}</td><td class="mono">${w.done}</td>
+  <td><button class="btn ghost sm" onclick="alert('${w.s==='Available'?'Marked on leave. The automatic assignment will skip '+w.n+'.':'Marked available. '+w.n+' can receive new reports again.'}')">${w.s==='Available'?'Mark on leave':'Mark available'}</button></td></tr>`).join('')}
+ </tbody></table></div></div>`;
+}
+
+/* ============ assessor: my work = reports matched to my assessments ============ */
+function vMyWork(){
+ const second=role==='assessor2';
+ const rows=second
+  ?[{no:'MD-AE/2026/0179',dev:'BeneVision N12 patient monitor',stage:'2nd',got:'12 Aug · by manager',mine:'Not started',mc:'new',act:`<button class="btn sm" onclick="setView('assess')">Start 2nd assessment</button>`},
+    {no:'MD-AE/2026/0176',dev:'SD Bioline HIV 3.0 rapid test kit',stage:'2nd',got:'10 Aug · by manager',mine:'Submitted 12 Aug',mc:'done',act:`<button class="btn ghost sm" onclick="setView('report')">${t('Open')}</button>`},
+    {no:'MD-AE/2026/0170',dev:'EverFlo oxygen concentrator',stage:'2nd',got:'03 Aug · by manager',mine:'Submitted 05 Aug',mc:'done',act:`<button class="btn ghost sm" onclick="setView('report')">${t('Open')}</button>`}]
+  :[{no:'MD-AE/2026/0183',dev:'AccuChek Active glucose test strips',stage:'1st',got:'13 Aug · automatic',mine:'Draft — not submitted',mc:'work',act:`<button class="btn sm" onclick="setView('assess')">Continue 1st assessment</button>`},
+    {no:'MD-AE/2026/0181',dev:'Vicryl 3-0 surgical suture',stage:'1st',got:'11 Aug · automatic',mine:'Submitted 14 Aug',mc:'done',act:`<button class="btn ghost sm" onclick="setView('report')">${t('Open')}</button>`},
+    {no:'MD-AE/2026/0179',dev:'BeneVision N12 patient monitor',stage:'1st',got:'08 Aug · automatic',mine:'Submitted 11 Aug',mc:'done',act:`<button class="btn ghost sm" onclick="setView('report')">${t('Open')}</button>`}];
+ return `<div class="note info">You see only reports assigned to you. Each one is matched with your own assessment, so you always know what is finished and what is waiting. ${second?'For a 2nd assessment you review the whole F004 filled by the 1st assessor and add your concluding remarks (section 7.2).':''}</div>
+ <div class="card"><div class="card-h"><h2>${t('My work')}</h2></div>
+ <div class="tw"><table><thead><tr><th>${t('Report')}</th><th>${t('Device')}</th><th>${t('Stage')}</th><th>Given to me</th><th>${t('My assessment')}</th><th></th></tr></thead><tbody>
+ ${rows.map(r=>`<tr><td><span class="mono" style="font-size:12.5px;color:var(--green);font-weight:500">${r.no}</span></td>
+  <td>${r.dev}</td><td><span class="pill p-${r.stage==='1st'?'mgr':'work'}">${r.stage} assessment</span></td><td class="muted">${r.got}</td>
+  <td><span class="pill p-${r.mc}">${r.mine}</span></td><td>${r.act}</td></tr>`).join('')}
+ </tbody></table></div></div>`;
+}
+
+function vNew(){
+ return `<div class="note">Use this when a report reaches TMDA by email, post or phone. The screen follows the orange form section by section — copy it straight across. When you save it, the system numbers it and assigns it automatically, same as an online report.</div>
+ <div class="card" style="max-width:560px"><div class="card-b">
+ <div class="f"><label>How did this report reach TMDA? <i>*</i></label><select><option>Email</option><option>Hard copy delivered</option><option>Telephone</option><option>Toll free line 0800 110 084</option><option>Inspection finding</option></select></div>
+ <div class="f"><label>Date received <i>*</i></label><input type="date" value="2026-08-17"></div>
+ <div class="f"><label>Attach the original</label><div class="drop">Drop the scanned form or photos here</div></div>
+ <button class="btn" onclick="go('sc-orange')">Start data entry (opens the orange form)</button></div></div>`;
+}
+
+/* ============ shared ============ */
+function vAll(){
+ return `<div class="card"><div class="card-h"><h2>${t('All reports')}</h2><div class="sp"></div>
+  <input placeholder="Search number, device, facility, reporter…" style="padding:6px 10px;border:1px solid var(--rule-2);border-radius:var(--r);width:250px">
+  <select style="padding:6px 10px;border:1px solid var(--rule-2);border-radius:var(--r)"><option>Any status</option><option>1st assessment</option><option>With manager</option><option>2nd assessment</option><option>Closed</option></select>
+  <button class="btn ghost sm">Export</button></div>
+ ${reportsTable(REPORTS,role==='manager'?r=>r.stc==='work'?`<button class="btn ghost sm" onclick="reassign('${r.no}','${r.a2&&r.st.includes('2nd')?r.a2:r.a1}')">Move</button>`:'':null)}</div>`;
+}
+
+function vAudit(){
+ const A=[['Today 09:41','System','MD-AE/2026/0184 auto-assigned to G. Shirima (first available assessor)'],
+  ['Today 08:12','J. Mushi','Signed in'],
+  ['Yesterday 16:40','F. Ngowi','Submitted 2nd assessment on MD-AE/2026/0176 → to manager'],
+  ['Yesterday 14:02','J. Mushi','Moved MD-AE/2026/0183 from D. Temba to A. Kimaro (D. Temba on leave)'],
+  ['Yesterday 11:20','J. Mushi','Marked D. Temba on leave until 25 Aug'],
+  ['12 Aug 10:05','System','Orange form received online → MD-AE/2026/0184, number generated']];
+ return `<div class="card"><div class="card-h"><h2>${t('Audit trail')}</h2><div class="sp"></div><button class="btn ghost sm">Export</button></div>
+ <div class="tw"><table><thead><tr><th>When</th><th>Who</th><th>What happened</th></tr></thead><tbody>
+ ${A.map(a=>`<tr><td class="mono muted" style="font-size:12.5px;white-space:nowrap">${a[0]}</td><td style="white-space:nowrap">${a[1]}</td><td>${a[2]}</td></tr>`).join('')}
+ </tbody></table></div></div>`;
+}
+
+function vProfile(){
+ const w=WHO[role];
+ return `<div class="card" style="max-width:520px"><div class="card-h"><h2>${t('My profile')}</h2></div><div class="card-b">
+ <div class="f"><label>Name</label><input value="${w[0]}" disabled style="background:#F1F5F1"></div>
+ <div class="f"><label>Work email</label><input value="${w[2]}" disabled style="background:#F1F5F1"></div>
+ <div class="f"><label>Mobile number</label><input value="+255 755 111 222"><div class="sub">Used for SMS alerts.</div></div>
+ <hr style="border:0;border-top:1px solid var(--rule);margin:18px 0">
+ <div class="eyebrow" style="margin-bottom:12px">Change password</div>
+ <div class="f"><label>Current password</label><input type="password"></div>
+ <div class="f"><label>New password</label><input type="password" placeholder="At least 10 characters"></div>
+ <div class="f"><label>Repeat new password</label><input type="password"></div>
+ <div class="bar" style="margin:0"><button class="btn" onclick="alert('Password changed. You stay signed in on this device.')">Save changes</button></div>
+ </div></div>`;
+}
+
+/* ============ admin ============ */
+function vUsers(){
+ return `<div class="note info">The administrator creates each account: name, work email, role, and a starting password. The user must replace the starting password on first sign-in, and nobody can read the password they choose.</div>
+ <div class="card"><div class="card-h"><h2>${t('Users')}</h2><div class="sp"></div><button class="btn sm" onclick="newUser()">Add a user</button></div>
+ <div class="tw"><table><thead><tr><th>Name</th><th>Work email</th><th>Role</th><th>Account</th><th>Last sign-in</th><th></th></tr></thead><tbody>
+ ${USERS.map(u=>`<tr><td style="font-weight:500">${u.n}</td><td class="muted">${u.e}</td>
+  <td>${u.r}</td><td><span class="pill p-${u.s==='Active'?'done':'off'}">${u.s}</span></td>
+  <td class="muted">${u.last}</td>
+  <td><button class="btn ghost sm" onclick="alert('A new starting password is emailed to ${u.e}. The password they choose afterwards is never visible to you.')">Reset password</button></td></tr>`).join('')}
+ </tbody></table></div></div>`;
+}
+
+function newUser(){document.getElementById('page').innerHTML=`
+ <div class="card" style="max-width:520px"><div class="card-h"><h2>Add a user</h2></div><div class="card-b">
+ <div class="f"><label>Full name <i>*</i></label><input placeholder="e.g. Grace Shirima"></div>
+ <div class="f"><label>Work email <i>*</i></label><input placeholder="name@tmda.go.tz"><div class="sub">The starting password is sent here.</div></div>
+ <div class="f"><label>Mobile number</label><input placeholder="+255 7xx xxx xxx"></div>
+ <div class="f"><label>Role <i>*</i></label><select><option>Assessor</option><option>Manager</option><option>Administrator</option></select></div>
+ <div class="f"><label>Starting password <i>*</i></label><input value="Generated automatically" disabled style="background:#F1F5F1"><div class="sub">The user is forced to replace it on first sign-in.</div></div>
+ <div class="bar" style="margin:0"><button class="btn" onclick="alert('Account created. Starting password emailed.');setView('users')">Create account</button>
+ <button class="btn ghost" onclick="setView('users')">Cancel</button></div></div></div>`;}
+
+/* ============ case file ============ */
+function dl(obj){return `<dl class="dl">${Object.entries(obj).map(([k,v])=>
+ `<dt>${k}</dt><dd>${v?(v==='Death'?`<span class="pill p-sev">Death</span>`:v):'<span class="blank">not filled in</span>'}</dd>`).join('')}</dl>`;}
+
+function vReport(){
+ const c=CASE;
+ return `<div class="bar">
+  <button class="btn ghost sm" onclick="setView('${NAV[role][0][0]}')">Back</button>
+  <span class="mono" style="font-size:16px;font-weight:500">${c.no}</span>
+  <span class="pill p-work">${c.st}</span><span class="pill p-sev">${c.sev}</span>
+  <div class="sp"></div><button class="btn ghost sm">Download PDF</button></div>
+ <div class="split"><div>
+  <div class="card"><div class="tw"><table class="narrow"><tbody>
+   <tr><td class="muted" style="width:190px">Form</td><td class="mono">TMDA/DMD/MDV/F/001 Rev 06</td></tr>
+   <tr><td class="muted">Report number</td><td class="mono">${c.no}</td></tr>
+   <tr><td class="muted">Date received</td><td>${c.received}</td></tr>
+   <tr><td class="muted">Channel</td><td>${c.channel}</td></tr>
+  </tbody></table></div></div>
+  <div class="sec-h"><span class="num">1</span><h3>${t('Device details')}</h3></div>${dl(c.device)}
+  <div class="sec-h"><span class="num">2</span><h3>${t('Incident details')}</h3></div>${dl(c.incident)}
+  <div class="sec-h"><span class="num">3</span><h3>${t('Event details')}</h3></div>${dl(c.event)}
+  <div class="sec-h"><span class="num">4</span><h3>${t('User / equipment operator details')}</h3></div>${dl(c.operator)}
+  <div class="sec-h"><span class="num">5</span><h3>${t('Particulars of the reporter')}</h3></div>${dl(c.reporter)}
+  <div class="sec-h"><span class="num">6</span><h3>${t('Attachments')}</h3></div>
+  <div class="card"><div class="card-b" style="display:flex;gap:10px;flex-wrap:wrap">
+   ${c.files.map(f=>`<div style="border:1px solid var(--rule);border-radius:var(--r);padding:8px 12px;font-size:12.5px">${f}</div>`).join('')}</div></div>
+ </div>
+ <div><div class="card sticky" style="position:sticky;top:74px"><div class="card-h"><h2>Where it is</h2></div><div class="card-b">
+  <ul class="custody">
+   <li class="hit"><div class="ct">Received by email</div><div class="cm">08 Aug, 09:14 · entered by A. Kimaro</div></li>
+   <li class="hit"><div class="ct">Auto-assigned to A. Kimaro</div><div class="cm">08 Aug, 11:40 · first available assessor</div></li>
+   <li class="hit"><div class="ct">1st assessment submitted</div><div class="cm">11 Aug, 15:22 → to manager</div></li>
+   <li class="hit"><div class="ct">2nd assessor assigned</div><div class="cm">12 Aug, 09:05 · F. Ngowi, by J. Mushi</div></li>
+   <li class="now"><div class="ct">2nd assessment in progress</div><div class="cm">with F. Ngowi — reviewing the F004</div></li>
+   <li><div class="ct">Manager decision</div><div class="cm">Not started</div></li>
+  </ul></div></div></div></div>`;
+}
+
+/* ============ F004 assessment form ============ */
+const MITIGATIONS=['Request for samples and laboratory analysis','Risk communication','Request for labelling and design changes','Request changes to the Instructions for Use (IFU)','Device removal or correction','Issue public safety alerts','Market license suspension','Conduct field investigations (manufacturer or regulatory authority)','Request post-marketing studies','Enhance monitoring','Provide feedback to users (e.g. training, following the IFU)'];
+
+function imdrfGroup(label,annex,levels){
+ return `<div class="f"><label>${label} <span class="muted" style="font-weight:400">— IMDRF N43 Annex ${annex}</span></label>
+  <div class="grid4">${Array.from({length:levels},(_,i)=>`<input placeholder="Level ${i+1} term">`).join('')}<input placeholder="Code"></div></div>`;
+}
+
+function a1summary(){
+ return `<div class="card" style="margin-bottom:16px;border-left:4px solid var(--leaf)"><div class="card-h"><h2>1st assessment — A. Kimaro, submitted 11 Aug</h2></div>
+ <div class="tw"><table class="narrow"><tbody>
+  <tr><td class="muted" style="width:230px">2.6 Categorisation</td><td>Serious — led to a death</td></tr>
+  <tr><td class="muted">2.7 Public health concern</td><td>No</td></tr>
+  <tr><td class="muted">4.1 Expectedness</td><td>Unexpected</td></tr>
+  <tr><td class="muted">4.2 Causal association</td><td>Probable</td></tr>
+  <tr><td class="muted">5.0 Signal detection</td><td>Potential signal — seriousness; unlabelled risk</td></tr>
+  <tr><td class="muted">6.0 Risk level</td><td>Critical</td></tr>
+  <tr><td class="muted">7.1 Recommendations</td><td>Request for samples and laboratory analysis; Conduct field investigations</td></tr>
+ </tbody></table></div>
+ <div class="card-b" style="border-top:1px solid var(--rule)"><span class="eyebrow">7.1 Conclusion</span>
+ <p style="font-size:13px;margin-top:5px">Alarm failure after six days of continuous use points to a software or watchdog fault rather than user error. The same model is in use in at least four referral hospitals; field investigation is needed before wider action.</p></div></div>`;
+}
+
+function vAssess(){
+ const second=role==='assessor2';
+ return `<div class="bar">
+  <button class="btn ghost sm" onclick="setView('mywork')">Back</button>
+  <span class="mono" style="font-size:15px;font-weight:500">${second?'MD-AE/2026/0179':'MD-AE/2026/0183'}</span>
+  <span class="pill p-work">${second?'2nd':'1st'} assessment</span>
+  <span class="pill p-mgr">Form F004</span></div>
+ <div class="note info">This screen follows TMDA's assessment form <b>TMDA/DMD/MDV/F/004 (revised)</b>. Part A fills itself from the orange form, so the assessor types nothing twice.</div>
+ ${second?`<div class="note">You are the <b>2nd assessor</b>. Review the whole first assessment below, then add your concluding remarks in section 7.2 — exactly like the paper F004, which both assessors sign.</div>`:''}
+ <div class="split"><div>
+ ${second?a1summary():''}
+ <div class="card"><div class="card-b">
+
+  <div class="sec-h" style="margin-top:0"><span class="num">A</span><h3>Administrative information</h3></div>
+  <div class="note ok" style="margin-bottom:12px">Items 1.1–1.18 are filled automatically from the orange form and shown in the case file. Confirm the four items the reporter cannot know:</div>
+  <div class="grid2">
+   <div class="f"><label>1.3 Type of device <i>*</i></label>
+    <div class="checks">${['Medical device (MD)','In vitro diagnostic (IVD)'].map(c=>`<label class="chk"><input type="radio" name="ty">${c}</label>`).join('')}</div></div>
+   <div class="f"><label>1.10 Device registration number</label><input placeholder="From the TMDA register (RIMS)"></div>
+   <div class="f"><label>1.11 Device class</label><select><option>Choose one</option><option>Class A</option><option>Class B</option><option>Class C</option><option>Class D</option></select></div>
+   <div class="f"><label>1.19 Report type <i>*</i></label>
+    <div class="checks">${['Initial','Follow up','Final'].map(c=>`<label class="chk"><input type="radio" name="rt">${c}</label>`).join('')}</div></div>
+  </div>
+
+  <div class="sec-h"><span class="num">2</span><h3>Event / incident assessment</h3></div>
+  <div class="f"><label>2.1–2.4 Event information</label>
+   <div class="hint" style="margin-bottom:6px">Description, onset date, number of devices and number of patients come from the orange form. Add your comments:</div>
+   <textarea placeholder="Comments on the event as presented by the reporter"></textarea></div>
+  <div class="f"><label>2.5 Source of the event / incident <i>*</i></label>
+   <div class="hint" style="margin-bottom:6px">For a medical device:</div>
+   <div class="checks col">${['Malfunction — failure to perform as intended when used per the manufacturer\u2019s instructions','Inaccuracy in the labelling or instructions for use, including omissions and deficiencies','Degradation or destruction of the device, or inappropriate diagnosis','Error on the user of the medical device','Inadequacy or deficiency in identity, quality, durability, reliability, safety or performance'].map(c=>`<label class="chk"><input type="checkbox">${c}</label>`).join('')}</div>
+   <div class="hint" style="margin:8px 0 6px">For an IVD:</div>
+   <div class="checks col">${['Risk that an erroneous result leads to a life-threatening patient decision, or death or severe disability','False positive or false negative results outside the declared performance of the test'].map(c=>`<label class="chk"><input type="checkbox">${c}</label>`).join('')}</div>
+   <textarea style="margin-top:8px" placeholder="Reasons — review scientific literature, the registration dossier in RIMS, and safety information from other regulatory authorities"></textarea></div>
+  <div class="f"><label>2.6 Categorisation of the event / incident <i>*</i></label>
+   <div class="checks col">${['Non-serious','Serious — led to a death','Serious — led to serious deterioration in health (intervention needed to prevent life-threatening illness, injury or permanent impairment)','Serious — indirect harm from an incorrect diagnostic or IVD test result'].map(c=>`<label class="chk"><input type="radio" name="cat">${c}</label>`).join('')}</div></div>
+  <div class="f"><label>2.7 Does it constitute a significant public health concern?</label>
+   <div class="checks">${['Yes','No'].map(c=>`<label class="chk"><input type="radio" name="ph">${c}</label>`).join('')}</div>
+   <div class="sub">For example condoms, or devices used to diagnose Malaria, TB, HIV, Covid-19, Hepatitis or Syphilis.</div></div>
+
+  <div class="sec-h"><span class="num">3</span><h3>IMDRF category (N43)</h3></div>
+  <div class="hint" style="margin-bottom:10px">Pick the preferred terms and codes. In the full system these come from a searchable IMDRF code list, not typing.</div>
+  ${imdrfGroup('3.1(a) Device component involved','G',3)}
+  ${imdrfGroup('3.1(b) Medical device problem','A',3)}
+  ${imdrfGroup('3.2(a) Health effects — health impact','F',3)}
+  ${imdrfGroup('3.2(b) Clinical signs, symptoms or conditions','E',3)}
+  ${imdrfGroup('3.3(a) Cause investigation — type of investigation','B',1)}
+  ${imdrfGroup('3.3(b) Cause investigation — investigation findings','C',3)}
+  ${imdrfGroup('3.3(c) Cause investigation — investigation conclusion','D',2)}
+
+  <div class="sec-h"><span class="num">4</span><h3>Relationship / causality</h3></div>
+  <div class="f"><label>4.1 Expected or unexpected? <i>*</i></label>
+   <div class="checks col">${['Expected — consistent with the effects listed in the risk analysis report (RIMS dossier)','Unexpected — not consistent with the risk analysis report'].map(c=>`<label class="chk"><input type="radio" name="ex">${c}</label>`).join('')}</div></div>
+  <div class="f"><label>4.2 Causal association <i>*</i></label>
+   <div class="checks col">
+    <label class="chk"><input type="radio" name="ca"><span><b>Unrelated</b><span class="hint">No time link with the device; implausible; another cause explains it; wrong body-site; no false result involved.</span></span></label>
+    <label class="chk"><input type="radio" name="ca"><span><b>Possible</b><span class="hint">A weak link that cannot be ruled out; other causes are also possible. Use this too when it cannot be assessed.</span></span></label>
+    <label class="chk"><input type="radio" name="ca"><span><b>Probable</b><span class="hint">The link seems relevant and no other cause reasonably explains the event.</span></span></label>
+    <label class="chk"><input type="radio" name="ca"><span><b>Certain</b><span class="hint">Linked beyond reasonable doubt: known pattern, time link, right body-site, other causes ruled out, or a false diagnostic result.</span></span></label>
+   </div></div>
+  <div class="f"><label>Discussion of the causal relationship <i>*</i></label>
+   <textarea placeholder="Discuss: time link, scientific and regulatory information, the manufacturer\u2019s product information, opinions from healthcare professionals, similar previous events, and whether the device passed its service life or shelf life."></textarea></div>
+
+  <div class="sec-h"><span class="num">5</span><h3>Signal detection</h3></div>
+  <div class="f"><label>Does this event point to a potential safety signal? Tick what applies:</label>
+   <div class="checks">${['Serious event','New or unexpected event','Device new on the market','Public health impact','Vulnerable population involved','Unlabelled or unidentified risk','Benefit/risk ratio shifting','Event was preventable','Pattern of similar events','Action by other regulators'].map(c=>`<label class="chk"><input type="checkbox">${c}</label>`).join('')}</div>
+   <textarea style="margin-top:8px" placeholder="Consider trends in the adverse events register. One serious or unexpected event with public health implications can be enough."></textarea></div>
+
+  <div class="sec-h"><span class="num">6</span><h3>Risk assessment</h3></div>
+  <div class="f"><label>Risk level <i>*</i></label>
+   <div class="checks col">
+    <label class="chk"><input type="radio" name="rk"><span><b>Critical</b><span class="hint">Death, life-threatening condition, permanent impairment, or serious public health consequences — actual or likely.</span></span></label>
+    <label class="chk"><input type="radio" name="rk"><span><b>High</b><span class="hint">Serious injury or significant deterioration; medical or surgical intervention needed to prevent permanent impairment.</span></span></label>
+    <label class="chk"><input type="radio" name="rk"><span><b>Medium</b><span class="hint">Temporary or minor injury, reversible impairment, limited clinical consequences.</span></span></label>
+    <label class="chk"><input type="radio" name="rk"><span><b>Low</b><span class="hint">No harm or negligible harm.</span></span></label>
+   </div>
+   <div class="sub">For IVDs, also consider indirect harm from incorrect test results.</div>
+   <textarea style="margin-top:8px" placeholder="Comment"></textarea></div>
+
+  <div class="sec-h"><span class="num">7</span><h3>${second?'7.2 Second assessor — concluding remarks':'7.1 Conclusion of assessment'}</h3></div>
+  <div class="f"><label>Proposed risk mitigation action(s) <i>*</i></label>
+   <div class="checks">${MITIGATIONS.map(c=>`<label class="chk"><input type="checkbox">${c}</label>`).join('')}</div></div>
+  <div class="f"><label>${second?'Concluding remarks':'Recommendations and conclusion, including proposed regulatory action(s)'} <i>*</i></label><textarea style="min-height:100px"></textarea></div>
+
+  <div class="bar" style="margin:0">
+   <button class="btn" onclick="alert('Submitted and signed electronically. The report moves to the manager, who is notified by email and SMS.');setView('mywork')">Submit ${second?'2nd':'1st'} assessment — send to manager</button>
+   <button class="btn ghost" onclick="alert('Saved. You can come back to it.')">Save draft</button></div>
+ </div></div></div>
+ <div><div class="card sticky" style="position:sticky;top:74px"><div class="card-h"><h2>The report</h2></div><div class="card-b" style="font-size:13px">
+  <div class="eyebrow">Device</div><p style="margin-bottom:11px">${second?'BeneVision N12 patient monitor':'AccuChek Active glucose test strips'}</p>
+  <div class="eyebrow">Incident</div><p style="margin-bottom:11px">${second?'Monitor froze and stopped alarming during the night.':'Strips gave readings far above the laboratory reference on three patients.'}</p>
+  <div class="eyebrow">Event</div><p style="margin-bottom:11px">${second?'Death':'Other'}</p>
+  <div class="eyebrow">Submitted by</div><p>${second?'Dr. S. Mwakalinga · Mbeya Zonal Referral':'E. Massawe · Bugando Medical Centre'}</p>
+  <button class="btn ghost sm" style="margin-top:12px;width:100%" onclick="setView('report')">Open full case file</button>
+ </div></div></div></div>`;
+}
+
+/* ============ manager: assign 2nd assessor, move report, decide ============ */
+function assign2(no){document.getElementById('page').innerHTML=`
+ <div class="card" style="max-width:520px"><div class="card-h"><h2>Assign the 2nd assessor</h2></div><div class="card-b">
+ <p class="mono" style="margin-bottom:6px">${no}</p>
+ <p class="hint" style="margin-bottom:14px">1st assessment by A. Kimaro was submitted 14 Aug. Choose who reviews it and adds the concluding remarks (F004 section 7.2).</p>
+ <div class="f"><label>2nd assessor <i>*</i></label><select><option>Frank Ngowi — 1 open</option><option>Grace Shirima — 1 open</option></select>
+ <div class="sub">The person who did the 1st assessment cannot be chosen. Assessors on leave are not listed.</div></div>
+ <div class="f"><label>Due by</label><input type="date" value="2026-08-24"></div>
+ <div class="note">They get an email and an SMS as soon as you assign, and they see the full first assessment to review.</div>
+ <div class="bar" style="margin:0"><button class="btn" onclick="alert('Assigned. 2nd assessor notified.');setView('actions')">Assign</button>
+ <button class="btn ghost" onclick="setView('actions')">Cancel</button></div></div></div>`;}
+
+function reassign(no,cur){document.getElementById('page').innerHTML=`
+ <div class="card" style="max-width:520px"><div class="card-h"><h2>Move to another assessor</h2></div><div class="card-b">
+ <p class="mono" style="margin-bottom:6px">${no}</p>
+ <p class="hint" style="margin-bottom:14px">Currently with ${cur}.</p>
+ <div class="f"><label>Move to <i>*</i></label><select>${STAFF.filter(w=>w.s==='Available'&&w.n!==cur).map(w=>`<option>${w.n}</option>`).join('')}</select>
+ <div class="sub">Assessors on leave are not listed.</div></div>
+ <div class="f"><label>Reason</label><input placeholder="e.g. workload, leave, conflict of interest"></div>
+ <div class="note">Both assessors are notified. The move is recorded in the audit trail.</div>
+ <div class="bar" style="margin:0"><button class="btn" onclick="alert('Moved. Both assessors notified.');setView('overview')">Move report</button>
+ <button class="btn ghost" onclick="setView('overview')">Cancel</button></div></div></div>`;}
+
+function vCompare(){
+ const rows=[
+  ['2.6 Categorisation','Serious — indirect harm from an incorrect IVD test result','Serious — indirect harm from an incorrect IVD test result',false],
+  ['2.7 Public health concern','Yes — HIV rapid test','Yes — HIV rapid test',false],
+  ['4.1 Expectedness','Unexpected','Unexpected',false],
+  ['4.2 Causal association','Probable','Possible',true],
+  ['5.0 Signal detection','Potential signal — public health impact; pattern of similar events','Potential signal — public health impact',true],
+  ['6.0 Risk level','High','Medium',true],
+  ['7.x Proposed actions','Request for samples and laboratory analysis; Risk communication','Request for samples and laboratory analysis; Enhance monitoring',true],
+  ['Conclusion','Three kits from one lot gave false negatives against a known positive control. Lot records normal through customs.','False negatives confirmed, but the cold-chain log shows a nine-hour gap at the regional store on 22 July — storage is the more likely source.',true],
+  ['Assessor','A. Kimaro · 09 Aug 2026','F. Ngowi · 12 Aug 2026',false]];
+ const d=rows.filter(r=>r[3]).length;
+ return `<div class="bar">
+  <button class="btn ghost sm" onclick="setView('actions')">Back</button>
+  <span class="mono" style="font-size:15px;font-weight:500">MD-AE/2026/0176</span>
+  <span class="muted">SD Bioline HIV 3.0 rapid test kit · Temeke Regional Hospital</span></div>
+ <div class="note">The two assessors differ on ${d} of ${rows.length} points. Those rows are marked.</div>
+ <div class="cmp"><div class="cmp-h"><div></div><div>1st assessment (7.1)</div><div>2nd assessment (7.2)</div></div>
+ ${rows.map(([l,a,b,x])=>`<div class="cmp-r${x?' diff':''}"><div class="lbl">${l}</div><div data-l="${l} — 1st">${a}</div><div data-l="2nd">${b}</div></div>`).join('')}</div>
+ <div class="card" style="margin-top:20px"><div class="card-h"><h2>Record your decision</h2></div><div class="card-b">
+ <div class="f"><label>Decision <i>*</i></label><select><option>Choose one</option>
+  <option>Close — no further action</option>
+  ${MITIGATIONS.map(m=>`<option>${m}</option>`).join('')}
+  <option>Other</option></select>
+  <div class="sub">The list follows the mitigation actions in F004 section 7. More than one action can be recorded in the reasons.</div></div>
+ <div class="f"><label>Which assessment did you follow?</label>
+  <div class="checks">${['1st assessment','2nd assessment','Neither — my own conclusion'].map(c=>`<label class="chk"><input type="radio" name="fw">${c}</label>`).join('')}</div></div>
+ <div class="f"><label>Reasons <i>*</i></label><textarea placeholder="Explain the decision, especially where the two assessors differed."></textarea></div>
+ <div class="bar" style="margin:0"><button class="btn" onclick="alert('Decision recorded and locked. Everyone involved is notified.');setView('overview')">Record decision and close</button>
+ <button class="btn ghost" onclick="alert('Sent back with a note.')">Send back for more work</button></div>
+ </div></div>`;
+}
+
+/* ============ public orange form — TMDA/DMD/MDV/F/001 Rev 06 ============ */
+const OSTEPS=[
+ ['1','Device details',()=>`
+  <div class="f"><label>Full name of the medical device or in vitro diagnostic <i>*</i></label><input placeholder="Exactly as written on the label"></div>
+  <div class="grid2">
+   <div class="f"><label>Brand name</label><input></div>
+   <div class="f"><label>Common name</label><input placeholder="e.g. infusion pump"></div>
+   <div class="f"><label>Size (if applicable)</label><input></div>
+   <div class="f"><label>Serial number</label><input></div>
+   <div class="f"><label>Manufacturing date</label><input type="date"></div>
+   <div class="f"><label>Batch number / lot number</label><input></div>
+   <div class="f"><label>Expiry date</label><input type="date"></div>
+  </div>
+  <div class="f"><label>Manufacturer's name and physical address</label><textarea style="min-height:62px"></textarea></div>
+  <div class="f"><label>Source of device</label>
+   <div class="checks">${['Hospital','Pharmacy / medical device outlet','Diagnostic centre','Others'].map(c=>`<label class="chk"><input type="radio" name="src">${c}</label>`).join('')}</div></div>
+  <div class="f"><label>Name of the supplier and physical address (if known)</label><textarea style="min-height:62px"></textarea></div>
+  <div class="f"><label>Status of the device</label>
+   <div class="checks">${['New device','Re-serviced / refurbished'].map(c=>`<label class="chk"><input type="radio" name="cond">${c}</label>`).join('')}</div></div>
+  <div class="f"><label>How long the device has been in use</label>
+   <div class="checks">${['Less than six (6) months','Less than one (1) year','1-5 years','Others'].map(c=>`<label class="chk"><input type="radio" name="use">${c}</label>`).join('')}</div>
+   <input placeholder="If others, please explain" style="margin-top:8px"></div>`],
+ ['2','Incident details',()=>`
+  <p class="hint" style="margin-bottom:16px">This section is about the device — what went wrong with it.</p>
+  <div class="grid2">
+   <div class="f"><label>Onset date of incident <i>*</i></label><input type="date"></div>
+   <div class="f"><label>Number of devices involved</label><input type="number" min="1" value="1"></div></div>
+  <div class="f"><label>Type of incident (device related) <i>*</i></label>
+   <div class="checks">${['Inadequate design','Inaccurate labeling / instruction for use','Malfunction','Deterioration','Other'].map(c=>`<label class="chk"><input type="checkbox">${c}</label>`).join('')}</div>
+   <input placeholder="If other, please give details" style="margin-top:8px"></div>
+  <div class="f"><label>Incident narrative description <i>*</i></label>
+   <textarea style="min-height:130px" placeholder="Explain what went wrong with the device. Include the date, the time, who was present and what was noticed first."></textarea></div>`],
+ ['3','Event details',()=>`
+  <p class="hint" style="margin-bottom:16px">This section is about the person — what happened to the patient or the user.</p>
+  <div class="grid2">
+   <div class="f"><label>Onset date of event</label><input type="date"></div>
+   <div class="f"><label>Number of users involved</label><input type="number" min="0" value="1"></div></div>
+  <div class="f"><label>Type of event (user related) <i>*</i></label>
+   <div class="checks">${['Death','Life threatening','Malfunction','Caused persistent disability or incapability','Required or prolonged hospitalization','Other'].map(c=>`<label class="chk"><input type="checkbox">${c}</label>`).join('')}</div>
+   <input placeholder="If other, please give details" style="margin-top:8px"></div>
+  <div class="f"><label>Event narrative description <i>*</i></label><textarea style="min-height:130px"></textarea></div>`],
+ ['4','User / operator details',()=>`
+  <div class="f"><label>User or operator at the time of the event or incident</label>
+   <div class="checks">${['Healthcare Providers','Maintenance Engineer','Other'].map(c=>`<label class="chk"><input type="radio" name="op">${c}</label>`).join('')}</div>
+   <input placeholder="If other, please mention" style="margin-top:8px"></div>
+  <div class="f"><label>Measures taken by the user or operator <i>*</i></label>
+   <textarea placeholder="e.g. stopped using it, kept it aside, switched to another one"></textarea></div>
+  <div class="f"><label>Outcome of the measures taken (if applicable)</label><textarea></textarea></div>
+  <div class="f"><label>Have you informed the supplier?</label>
+   <div class="checks">${['Yes','No'].map(c=>`<label class="chk"><input type="radio" name="inf">${c}</label>`).join('')}</div>
+   <input type="date" style="margin-top:8px"><div class="sub">If yes, the date you informed them.</div></div>`],
+ ['5','Reporter details',()=>`
+  <div class="grid2">
+   <div class="f"><label>Name or initials <i>*</i></label><input></div>
+   <div class="f"><label>Are you a medical practitioner?</label>
+    <div class="checks">${['Medical practitioner','Other'].map(c=>`<label class="chk"><input type="radio" name="rt2">${c}</label>`).join('')}</div></div>
+  </div>
+  <div class="f"><label>Physical address (facility) <i>*</i></label><input></div>
+  <div class="grid2">
+   <div class="f"><label>District / region / city <i>*</i></label><input></div>
+   <div class="f"><label>Email</label><input type="email"></div>
+   <div class="f"><label>Telephone / mobile phone <i>*</i></label><input placeholder="+255 7xx xxx xxx"><div class="sub">TMDA sends your report number by SMS.</div></div>
+   <div class="f"><label>Date of report <i>*</i></label><input type="date"></div>
+  </div>
+  <div class="f"><label>Current location of the device <i>*</i></label><input placeholder="e.g. sealed in the biomedical workshop"></div>
+  <div class="f"><label>Attach photos or documents</label>
+   <div class="drop">Photos of the device, the label, the serial plate, and the instructions for use</div></div>`]
+];
+let oi=0;
+function paintOrange(){
+ const st=document.getElementById('ostep'); if(!st) return;
+ st.innerHTML=OSTEPS.map(([n,l],i)=>
+  `<button class="${i===oi?'on':''}" onclick="oi=${i};paintOrange()"><span class="num">${n}</span>${t(l)}</button>`).join('');
+ document.getElementById('opanel').innerHTML=OSTEPS[oi][2]();
+ document.getElementById('onext').textContent=oi===OSTEPS.length-1?'Submit report':'Continue';
+}
+function ostep(d){
+ if(oi===OSTEPS.length-1&&d>0){
+  document.getElementById('orange-fill').style.display='none';
+  document.getElementById('orange-done').style.display='block';
+  window.scrollTo(0,0); return;
+ }
+ oi=Math.max(0,Math.min(OSTEPS.length-1,oi+d));paintOrange();window.scrollTo(0,0);
+}
+function resetOrange(){oi=0;document.getElementById('orange-done').style.display='none';document.getElementById('orange-fill').style.display='block';paintOrange();window.scrollTo(0,0);}
+
+logos(); paintOrange();
+</script>
