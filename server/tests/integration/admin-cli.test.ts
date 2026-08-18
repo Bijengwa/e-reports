@@ -1,11 +1,27 @@
 import { sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { createAdmin } from "../../src/cli/create-admin.js";
+import { ADMIN_BOOTSTRAP_LOCK_KEY, createAdmin } from "../../src/cli/create-admin.js";
 import type { Database, DatabaseHandle } from "../../src/db/client.js";
 import { INTEGRATION_ENABLED, openApp, openOwner, truncateAll } from "./helpers.js";
 
 let owner: DatabaseHandle;
 let app: DatabaseHandle;
+let first: DatabaseHandle;
+let second: DatabaseHandle;
+
+/**
+ * One place closes every handle, once, after every suite in the file.
+ *
+ * Closing inside a describe's own afterAll ends a connection that the next describe still reuses
+ * through `??=` — which does not reopen an already-assigned handle. The truncation then fails with
+ * CONNECTION_ENDED, which looks like a fault in the code under test and is not one.
+ */
+afterAll(async () => {
+  await owner?.close();
+  await app?.close();
+  await first?.close();
+  await second?.close();
+});
 
 /** A non-administrator, inserted through the owner so the app role is only used by commands. */
 async function seedUser(
@@ -32,11 +48,6 @@ describe.skipIf(!INTEGRATION_ENABLED)("createAdmin", () => {
     owner ??= openOwner();
     app ??= openApp();
     await truncateAll(owner.db);
-  });
-
-  afterAll(async () => {
-    await owner?.close();
-    await app?.close();
   });
 
   it("creates one administrator that must change its password", async () => {
@@ -128,5 +139,31 @@ describe.skipIf(!INTEGRATION_ENABLED)("createAdmin", () => {
     const serialized = JSON.stringify(rows[0]);
     expect(serialized).not.toContain(result.password);
     expect(serialized).not.toContain("$argon2id$");
+  });
+});
+
+describe.skipIf(!INTEGRATION_ENABLED)("createAdmin concurrency", () => {
+  beforeEach(async () => {
+    owner ??= openOwner();
+    // Two clients, not two queries on one: postgres.js cannot hold overlapping transactions on a
+    // single connection, so a one-client version would serialize and never race at all.
+    first ??= openApp();
+    second ??= openApp();
+    await truncateAll(owner.db);
+  });
+
+  it("lets exactly one of two concurrent bootstraps win", async () => {
+    const results = await Promise.all([
+      createAdmin(first.db, { email: "one@tmda.go.tz", name: "One" }),
+      createAdmin(second.db, { email: "two@tmda.go.tz", name: "Two" }),
+    ]);
+
+    expect(results.filter((r) => r.status === "ok")).toHaveLength(1);
+    expect(results.filter((r) => r.status === "refused")).toHaveLength(1);
+    expect(await administratorCount(owner.db)).toBe(1);
+  });
+
+  it("uses the shared lock key rather than a repeated literal", () => {
+    expect(ADMIN_BOOTSTRAP_LOCK_KEY).toBe(4_170_825_113n);
   });
 });
