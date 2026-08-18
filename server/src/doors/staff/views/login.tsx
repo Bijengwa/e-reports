@@ -1,4 +1,5 @@
 import { Layout } from "../../../views/shared/layout.js";
+import { Logo } from "../../../views/shared/logo.js";
 
 export type LoginPageProps = {
   error?: string;
@@ -19,9 +20,12 @@ export type LoginPageProps = {
  */
 export function LoginPage({ error, publicFormUrl }: LoginPageProps): JSX.Element {
   return (
-    <Layout title="Staff sign in — AE Reports" locale="en" bodyClass="staff-login">
+    <Layout title="Staff sign in — AE Reports" locale="en" bodyClass="staff-login" passwordToggle>
       <div class="login-card">
         <div class="login-header">
+          <div class="auth-logo">
+            <Logo />
+          </div>
           <h1>AE Reports</h1>
           <p>Medical Device Vigilance — TMDA Staff Portal</p>
         </div>

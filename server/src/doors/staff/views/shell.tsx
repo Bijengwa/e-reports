@@ -1,5 +1,6 @@
 import type { Children } from "@kitajs/html";
 import { Layout } from "../../../views/shared/layout.js";
+import { Logo } from "../../../views/shared/logo.js";
 
 export type StaffShellProps = {
   title: string;
@@ -36,10 +37,15 @@ export function StaffShell({ title, role, active, children }: StaffShellProps): 
   return (
     <Layout title={title} locale="en" bodyClass="staff">
       <div class="staff-app">
-        <nav class="rail" aria-label="Staff navigation">
+        {/* `on-dark` is what recolours the mark for the rail: white folder, green cross. The
+            paths are the same ones the sign-in card renders. */}
+        <nav class="rail on-dark" aria-label="Staff navigation">
           <div class="rail-brand">
-            <span class="rail-mark">AE</span>
-            <span class="rail-name">AE Reports</span>
+            <Logo />
+            <span>
+              <b class="rail-name">AE Reports</b>
+              <span class="rail-sub">TMDA · Device vigilance</span>
+            </span>
           </div>
 
           <ul class="rail-nav">

@@ -707,23 +707,20 @@ textarea[aria-invalid="true"] {
   border-bottom: 1px solid rgb(255 255 255 / 12%);
 }
 
-.rail-mark {
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: var(--r);
-  background: var(--leaf);
-  color: var(--green-d);
-  font-size: 11px;
-  font-weight: 600;
-}
-
 .rail-name {
+  display: block;
   color: #fff;
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.rail-sub {
+  display: block;
+  font-size: 11px;
+  color: #7fa48b;
+  margin-top: 1px;
 }
 
 .rail-nav {
@@ -808,13 +805,19 @@ textarea[aria-invalid="true"] {
 }
 
 /* ---------- staff account list ---------- */
+/*
+ * No `overflow: hidden` here, deliberately. It would clip the rounded corners neatly and also
+ * make `position: sticky` on the header inert — an overflow other than `visible` on an ancestor
+ * turns it into the sticky element's scroll container. The corners are rounded on the cells
+ * instead.
+ */
 .utable {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   background: var(--card);
   border: 1px solid var(--rule);
   border-radius: var(--r);
-  overflow: hidden;
   font-size: 13px;
 }
 
@@ -828,6 +831,19 @@ textarea[aria-invalid="true"] {
   padding: 9px 12px;
   background: var(--green-bg);
   border-bottom: 1px solid var(--rule);
+  /* The header alone. Freezing a first data row as well would hide a real record behind a
+     heading and make the count on the page disagree with what is readable. */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.utable thead th:first-child {
+  border-top-left-radius: var(--r);
+}
+
+.utable thead th:last-child {
+  border-top-right-radius: var(--r);
 }
 
 .utable td {
@@ -955,4 +971,99 @@ textarea[aria-invalid="true"] {
     overflow-x: auto;
     white-space: nowrap;
   }
+}
+
+/* ---------- the application mark ---------- */
+/*
+ * Geometry from the prototype's <template id="logo">; only the fills change between surfaces.
+ * The staff rail carries `on-dark`, which inverts the folder and cross so the mark reads against
+ * the deep green. The sign-in card leaves them as they are.
+ */
+.logo {
+  width: 26px;
+  height: 26px;
+  flex: none;
+}
+
+.logo .doc {
+  fill: none;
+  stroke: var(--leaf);
+  stroke-width: 42;
+  stroke-linecap: round;
+}
+
+.logo .tab {
+  fill: var(--leaf);
+}
+
+.logo .body {
+  fill: var(--green);
+}
+
+.logo .cross {
+  fill: #fff;
+}
+
+.on-dark .logo .body {
+  fill: #fff;
+}
+
+.on-dark .logo .cross {
+  fill: var(--green-d);
+}
+
+.auth-logo {
+  margin-bottom: 12px;
+}
+
+.auth-logo .logo {
+  width: 34px;
+  height: 34px;
+}
+
+/* ---------- show / hide a password ---------- */
+/*
+ * The wrapper and the button are built by password-toggle.js, so none of this applies until the
+ * enhancement has run. Without it the field is a plain input and these rules match nothing.
+ */
+.pw-wrap {
+  position: relative;
+  display: block;
+}
+
+.pw-wrap input {
+  /* Room for the button, so a long password never slides under it. */
+  padding-right: 38px;
+}
+
+.pw-toggle {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+
+.pw-toggle:hover {
+  color: var(--ink);
+  background: #eef2ee;
+}
+
+.pw-toggle svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }

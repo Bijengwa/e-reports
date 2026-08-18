@@ -8,6 +8,13 @@ export type LayoutProps = {
   locale: Locale;
   /** Applied to <body>; the public door uses this to select the orange palette. */
   bodyClass?: string;
+  /**
+   * Load the show/hide enhancement for password fields.
+   *
+   * Opt-in and off by default, so a page with no password field does not fetch a script that
+   * would find nothing to do — the orange form's markup is unchanged by this prop existing.
+   */
+  passwordToggle?: boolean;
   children?: Children;
 };
 
@@ -18,7 +25,13 @@ export type LayoutProps = {
  * government vigilance portal must not leak reporter traffic to a third-party CDN, so fonts are
  * self-hosted under /assets.
  */
-export function Layout({ title, locale, bodyClass, children }: LayoutProps): JSX.Element {
+export function Layout({
+  title,
+  locale,
+  bodyClass,
+  passwordToggle,
+  children,
+}: LayoutProps): JSX.Element {
   return (
     <html lang={locale}>
       <head>
@@ -30,6 +43,9 @@ export function Layout({ title, locale, bodyClass, children }: LayoutProps): JSX
         {/* Enhancement only — the form works with this blocked, because every rule it applies is
             also enforced server-side. Served from our own origin to satisfy the CSP. */}
         <script src="/assets/orange-form.js" defer></script>
+        {/* Also enhancement only, and also served from our own origin to satisfy the CSP. The
+            field works without it; the script only ever changes the input's `type`. */}
+        {passwordToggle && <script src="/assets/password-toggle.js" defer></script>}
       </head>
       <body class={bodyClass ?? ""}>{children}</body>
     </html>
