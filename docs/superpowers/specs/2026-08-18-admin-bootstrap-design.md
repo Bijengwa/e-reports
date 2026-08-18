@@ -110,6 +110,62 @@ password is read aloud over a phone, `U` by Crockford's convention. 20 character
 32, so mapping each byte from `randomBytes(20)` through `byte % 32` is uniform. This is a property
 of the arithmetic, not something to be established by sampling.
 
+### 4.5 Database roles and grants
+
+**A premise worth correcting before it reaches the code:** `docker compose exec app` does *not* run
+as `ereports_app` today. `compose.yml` builds `DATABASE_URL` from `POSTGRES_USER`, which the
+`postgres:18-alpine` image creates as superuser and owner of the database. The application connects
+as the owner, and `ereports_app` does not exist at all — migration `0001` wraps its grants in
+`IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ereports_app')` and currently takes the `ELSE`
+branch, raising a notice and granting nothing.
+
+Everything `0001` grants, in full:
+
+| Object | Privileges | To |
+|---|---|---|
+| `audit_log` | `SELECT`, `INSERT` | `ereports_app` |
+| `audit_log_id_seq` | `USAGE`, `SELECT` | `ereports_app` |
+
+It also revokes `UPDATE`, `DELETE` and `TRUNCATE` on `audit_log` from that role. **Nothing anywhere
+grants `ereports_app` any privilege on `users` or `sessions`.**
+
+The contract therefore has to be established, not merely written down:
+
+1. **Production target:** application and CLI run as `ereports_app`. This is not true yet and this
+   slice does not make it true — pointing `compose.yml` at that role would break every table with no
+   grants (`reports`, `assessments`, `attachments`, `report_counters`). That is its own migration and
+   its own change.
+
+2. **This slice creates the role and grants only what these two commands touch**, in a new
+   migration, so the integration tests can run the commands as `ereports_app` and prove the
+   privileges are sufficient:
+
+   | Object | Privileges |
+   |---|---|
+   | schema `public` | `USAGE` |
+   | `users` | `SELECT`, `INSERT`, `UPDATE` |
+   | `sessions` | `SELECT`, `DELETE` |
+   | `audit_log` | `INSERT` — already granted by `0001` |
+   | `audit_log_id_seq` | `USAGE`, `SELECT` — already granted by `0001` |
+
+   `pg_advisory_xact_lock` requires no privilege. Adding a role and grants takes nothing away from
+   the owner, so the running application is unaffected.
+
+3. **Tests use two connections** (see §10.3). A single owner connection exercises a superset of
+   production's privileges and proves nothing about them: the tests would pass while the container
+   failed.
+
+### 4.6 Input normalization and output language
+
+`--email` is trimmed and lower-cased before Zod validation and before it reaches the unique index.
+Without this, `A@tmda.go.tz` and `a@tmda.go.tz` become two rows, `23505` never fires, and the login
+slice — which will look accounts up by a normalized address — reliably finds neither.
+
+`--name` is trimmed only. Its capitalisation is the operator's to choose.
+
+All CLI output is English. These commands are staff operations tooling; the `i18n` module exists for
+the orange form and does not apply here.
+
 ## 5. Command: `create`
 
 Everything below happens inside one transaction.
@@ -249,9 +305,15 @@ Before connecting, refuse to run when:
 The advisory lock is per-database. Failing closed prevents a stray test run from taking the
 bootstrap lock — or truncating tables — in the development database.
 
-### 10.3 Teardown
+### 10.3 Connections and teardown
 
-`TRUNCATE users, sessions, audit_log RESTART IDENTITY CASCADE` between tests.
+Two connections, as set out in §4.5: the **owner** applies migrations and truncates, and
+**`ereports_app`** runs the commands under test. Running the commands as the owner would exercise a
+superset of production's privileges — the tests would pass while the container failed on a missing
+grant.
+
+`TRUNCATE users, sessions, audit_log RESTART IDENTITY CASCADE` between tests, on the owner
+connection.
 
 It must be `TRUNCATE`, not `DELETE`. Migration `0001` installs a `BEFORE UPDATE OR DELETE ... FOR
 EACH ROW` trigger on `audit_log` that raises for **every** role including the owner. Row-level
@@ -267,9 +329,11 @@ Integration tests connect as the **owner** role. `TRUNCATE` on `audit_log` is re
    `must_change_password = true`.
 2. `create` a second time returns `refused` and adds no row.
 3. `create` refuses when an administrator exists even though other, non-administrator users exist.
-4. **Race:** two `createAdmin()` calls in `Promise.all`, each on its **own** client — postgres.js
-   cannot hold overlapping transactions on one connection. Assert one `ok`, one `refused`, and
-   `COUNT(*) FILTER (WHERE role = 'administrator') = 1`.
+4. **Race:** two `createAdmin()` calls in `Promise.all`, each on its **own `ereports_app` client** —
+   postgres.js cannot hold overlapping transactions on one connection, so two queries on one client
+   would not race at all. Assert one `ok`, one `refused`, and
+   `COUNT(*) FILTER (WHERE role = 'administrator') = 1`. The test imports
+   `ADMIN_BOOTSTRAP_LOCK_KEY` rather than repeating its value.
 5. `reset-password` deletes that user's sessions and leaves other users' sessions untouched.
 6. `reset-password` refuses on an inactive account, and on an address with no user.
 7. `audit_log` rows are written for both commands and contain neither the hash nor the password.
