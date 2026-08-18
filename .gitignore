@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+
+# Local environment — never commit real configuration
+.env
+.env.*
+!.env.example
+
+# Local object storage for the filesystem storage adapter
+var/
+
+# Tooling caches
+.ruff_cache/
+*.tsbuildinfo
+.DS_Store
