@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { ADMIN_BOOTSTRAP_LOCK_KEY, createAdmin } from "../../src/cli/create-admin.js";
+import { resetPassword } from "../../src/cli/reset-password.js";
 import type { Database, DatabaseHandle } from "../../src/db/client.js";
 import { INTEGRATION_ENABLED, openApp, openOwner, truncateAll } from "./helpers.js";
 
@@ -165,5 +166,88 @@ describe.skipIf(!INTEGRATION_ENABLED)("createAdmin concurrency", () => {
 
   it("uses the shared lock key rather than a repeated literal", () => {
     expect(ADMIN_BOOTSTRAP_LOCK_KEY).toBe(4_170_825_113n);
+  });
+});
+
+describe.skipIf(!INTEGRATION_ENABLED)("resetPassword", () => {
+  // No afterAll here: the file-level one owns every handle. Closing a shared connection inside a
+  // describe leaves the next suite holding a dead socket.
+  beforeEach(async () => {
+    owner ??= openOwner();
+    app ??= openApp();
+    await truncateAll(owner.db);
+  });
+
+  async function seedSession(db: Database, userId: string, tokenHash: string): Promise<void> {
+    await db.execute(sql`
+      INSERT INTO sessions (user_id, token_hash, expires_at)
+      VALUES (${userId}, ${tokenHash}, now() + interval '1 hour')
+    `);
+  }
+
+  it("replaces the hash, forces a change, and kills only that user's sessions", async () => {
+    const target = await seedUser(owner.db, { email: "target@tmda.go.tz", role: "manager" });
+    const other = await seedUser(owner.db, { email: "other@tmda.go.tz", role: "assessor" });
+    await seedSession(owner.db, target, "target-token");
+    await seedSession(owner.db, other, "other-token");
+
+    const result = await resetPassword(app.db, { email: "target@tmda.go.tz" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") return;
+    expect(result.password).toHaveLength(20);
+
+    const users = await owner.db.execute(sql`
+      SELECT password_hash, must_change_password FROM users WHERE id = ${target}
+    `);
+    expect((users[0] as { password_hash: string }).password_hash).toMatch(/^\$argon2id\$/);
+    expect(users[0]).toMatchObject({ must_change_password: true });
+
+    const sessions = await owner.db.execute(sql`SELECT user_id FROM sessions`);
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]).toMatchObject({ user_id: other });
+  });
+
+  it("matches on the normalized address", async () => {
+    await seedUser(owner.db, { email: "target@tmda.go.tz", role: "manager" });
+
+    expect((await resetPassword(app.db, { email: "  Target@TMDA.go.tz " })).status).toBe("ok");
+  });
+
+  it("refuses an address with no user", async () => {
+    expect(await resetPassword(app.db, { email: "nobody@tmda.go.tz" })).toMatchObject({
+      status: "refused",
+      message: "No user with that email.",
+    });
+  });
+
+  it("refuses a deactivated account rather than issuing an unusable password", async () => {
+    await seedUser(owner.db, { email: "gone@tmda.go.tz", role: "manager", isActive: false });
+
+    expect(await resetPassword(app.db, { email: "gone@tmda.go.tz" })).toMatchObject({
+      status: "refused",
+      message: "That account is deactivated. Reactivate it before resetting the password.",
+    });
+  });
+
+  it("writes an audit row carrying no secret", async () => {
+    const target = await seedUser(owner.db, { email: "target@tmda.go.tz", role: "manager" });
+    const result = await resetPassword(app.db, { email: "target@tmda.go.tz" });
+    if (result.status !== "ok") throw new Error("expected ok");
+
+    const rows = await owner.db.execute(sql`
+      SELECT actor_user_id, action, entity_type, entity_id, after FROM audit_log
+    `);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      actor_user_id: null,
+      action: "user.password_reset",
+      entity_type: "user",
+      entity_id: target,
+    });
+
+    const serialized = JSON.stringify(rows[0]);
+    expect(serialized).not.toContain(result.password);
+    expect(serialized).not.toContain("$argon2id$");
   });
 });
