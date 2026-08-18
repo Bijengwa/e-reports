@@ -12,6 +12,7 @@ export type AssignableRole = (typeof ASSIGNABLE_ROLES)[number];
  * name that column, and this type gives it nowhere to land if someone later adds it back.
  */
 export type StaffUser = {
+  id: string;
   email: string;
   fullName: string;
   role: string;
@@ -19,6 +20,14 @@ export type StaffUser = {
   mustChangePassword: boolean;
   createdAt: Date;
   lastSignInAt: Date | null;
+  /**
+   * Whether this row is the administrator reading the page.
+   *
+   * Decided in the route by comparing against the session, not by matching on role: there is
+   * exactly one administrator today, but "the row that is me" and "the row that is an
+   * administrator" are different questions and only the first one protects the right person.
+   */
+  isSelf: boolean;
 };
 
 /** A date an auditor can read, in one place. Null means it has not happened yet. */
@@ -28,6 +37,8 @@ function day(value: Date | null): string {
 
 export type UsersPageProps = {
   users: StaffUser[];
+  /** A refused action, re-rendered over the list it was refused on. */
+  error?: string;
   /**
    * The reader's own role, for the rail.
    *
@@ -46,7 +57,7 @@ export type UsersPageProps = {
  * once, and is unrecoverable afterwards — a list that could show it again would make it a
  * standing credential rather than a handover.
  */
-export function UsersPage({ users, viewerRole }: UsersPageProps): JSX.Element {
+export function UsersPage({ users, error, viewerRole }: UsersPageProps): JSX.Element {
   return (
     <StaffShell title="Staff accounts — AE Reports" role={viewerRole} active="users">
       <div class="staff-head">
@@ -61,6 +72,12 @@ export function UsersPage({ users, viewerRole }: UsersPageProps): JSX.Element {
         </a>
       </div>
 
+      {error && (
+        <div class="alert alert-error" safe>
+          {error}
+        </div>
+      )}
+
       <table class="utable">
         <thead>
           <tr>
@@ -70,12 +87,16 @@ export function UsersPage({ users, viewerRole }: UsersPageProps): JSX.Element {
             <th>Status</th>
             <th>Added</th>
             <th>Last sign-in</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           {users.map((user) => (
             <tr>
-              <td safe>{user.fullName}</td>
+              <td>
+                <span safe>{user.fullName}</span>
+                {user.isSelf && <span class="tag muted">You</span>}
+              </td>
               <td safe>{user.email}</td>
               <td safe>{user.role}</td>
               <td>
@@ -88,6 +109,35 @@ export function UsersPage({ users, viewerRole }: UsersPageProps): JSX.Element {
               </td>
               <td>{day(user.createdAt)}</td>
               <td>{day(user.lastSignInAt)}</td>
+              <td>
+                {/* Nothing at all on your own row. An administrator may not reset or deactivate
+                    themselves, and the surest way to render that is to render no control — though
+                    the routes check it again, because a missing button is not a control. */}
+                {user.isSelf ? (
+                  <span class="hint">—</span>
+                ) : (
+                  <div class="row-actions">
+                    {/* Offered only while the account is active, because a reset of a deactivated
+                        account is refused. A button that always fails is worse than no button. */}
+                    {user.isActive && (
+                      <form method="POST" action={`/users/${user.id}/reset`}>
+                        <button type="submit" class="btn ghost btn-sm">
+                          Reset password
+                        </button>
+                      </form>
+                    )}
+
+                    <form
+                      method="POST"
+                      action={`/users/${user.id}/${user.isActive ? "deactivate" : "reactivate"}`}
+                    >
+                      <button type="submit" class="btn ghost btn-sm">
+                        {user.isActive ? "Deactivate" : "Reactivate"}
+                      </button>
+                    </form>
+                  </div>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -258,6 +308,66 @@ export function UserCreatedPage({
           <a href="/users/new" class="btn ghost">
             Add another
           </a>
+          <a href="/users" class="btn">
+            Done
+          </a>
+        </div>
+      </div>
+    </StaffShell>
+  );
+}
+
+export type PasswordResetPageProps = {
+  email: string;
+  fullName: string;
+  /** Shown here and nowhere else, ever. */
+  password: string;
+  /** The reader's own role, for the rail. See `UsersPageProps`. */
+  viewerRole: string;
+};
+
+/**
+ * The other place a temp password is displayed, on the same terms as the first.
+ *
+ * 200 in the body of the POST, never a redirect, for the reason `UserCreatedPage` gives. It also
+ * says what the reset did beyond the password: every session that account had is gone, so anyone
+ * signed in as them — including whoever prompted the reset — has been signed out.
+ */
+export function PasswordResetPage({
+  email,
+  fullName,
+  password,
+  viewerRole,
+}: PasswordResetPageProps): JSX.Element {
+  return (
+    <StaffShell title="Password reset — AE Reports" role={viewerRole} active="users">
+      <div class="staff-narrow">
+        <div class="staff-head">
+          <div class="sp">
+            <p class="eyebrow">Password reset</p>
+            <h1 safe>{fullName}</h1>
+            <p class="hint" safe>
+              {email}
+            </p>
+          </div>
+        </div>
+
+        <div class="temp-password">
+          <p class="eyebrow">One-time password</p>
+          <code safe>{password}</code>
+          <p class="hint">
+            Give this to the user by a channel they already trust. It is shown only on this page —
+            reloading or leaving will not bring it back, and it must be replaced at their next
+            sign-in.
+          </p>
+        </div>
+
+        <p class="hint staff-foot">
+          Every session on that account has been ended. They will have to sign in again with this
+          password.
+        </p>
+
+        <div class="bar">
           <a href="/users" class="btn">
             Done
           </a>
