@@ -19,6 +19,8 @@ const config: Config = Object.freeze({
   STORAGE_DRIVER: "filesystem",
   STORAGE_ROOT: path.join(os.tmpdir(), "e-reports-test-storage"),
   MAX_UPLOAD_MB: 10,
+  SESSION_IDLE_MINUTES: 30,
+  SESSION_ABSOLUTE_HOURS: 12,
 } satisfies Config);
 
 let app: FastifyInstance;
@@ -340,5 +342,23 @@ describe("configuration guards host isolation", () => {
     expect(publicOrigin(loadConfig({ ...base, NODE_ENV: "production" }))).toBe(
       "https://public.test",
     );
+  });
+
+  it("reads the session lifetimes from the environment", () => {
+    const config = loadConfig({ ...base, SESSION_IDLE_MINUTES: "45", SESSION_ABSOLUTE_HOURS: "8" });
+
+    expect(config.SESSION_IDLE_MINUTES).toBe(45);
+    expect(config.SESSION_ABSOLUTE_HOURS).toBe(8);
+  });
+
+  it("falls back to the documented defaults", () => {
+    expect(loadConfig(base).SESSION_IDLE_MINUTES).toBe(30);
+    expect(loadConfig(base).SESSION_ABSOLUTE_HOURS).toBe(12);
+  });
+
+  it("refuses a session lifetime of zero", () => {
+    // A zero idle window expires every session before its first request, which would look
+    // exactly like a broken password check.
+    expect(() => loadConfig({ ...base, SESSION_IDLE_MINUTES: "0" })).toThrow();
   });
 });

@@ -20,6 +20,16 @@ const EnvSchema = z.object({
 
   DATABASE_URL: z.string().min(1),
 
+  /**
+   * Sliding idle window for a staff session, in minutes. Each request pushes it back.
+   *
+   * The ceiling is a day: anything longer is an absolute lifetime wearing an idle window's name,
+   * and `SESSION_ABSOLUTE_HOURS` is the honest place to say that.
+   */
+  SESSION_IDLE_MINUTES: z.coerce.number().int().min(1).max(1440).default(30),
+  /** Hard ceiling on a staff session, measured from sign-in. Never extended by activity. */
+  SESSION_ABSOLUTE_HOURS: z.coerce.number().int().min(1).max(168).default(12),
+
   /** Attachment bytes never go in the database — only the key does. */
   STORAGE_DRIVER: z.enum(["filesystem"]).default("filesystem"),
   STORAGE_ROOT: z.string().min(1).default("./var/storage"),
