@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { generateTempPassword, hashPassword } from "../auth/password.js";
 import type { Database } from "../db/client.js";
+import { isUniqueViolation, USERS_EMAIL_UNIQUE } from "../db/unique-violation.js";
 import type { CommandResult } from "./result.js";
 
 /**
@@ -16,32 +17,6 @@ const InputSchema = z.object({
   email: z.string().trim().toLowerCase().pipe(z.email()),
   name: z.string().trim().min(1),
 });
-
-/**
- * Recognises a duplicate address, through two layers.
- *
- * postgres.js maps the wire protocol's `n` field to `constraint_name` — there is no `constraint`
- * property, whatever the surrounding ecosystem suggests. Drizzle then wraps driver errors in its
- * own query error, so the PostgresError arrives as a `cause` rather than as the thrown value.
- * Reading `error.code` directly finds `undefined` and the collision is misreported as a crash.
- *
- * The chain is walked rather than unwrapped once, so an extra layer of wrapping in a future
- * Drizzle release does not silently reintroduce that bug. Depth is capped because a `cause` that
- * points at itself would otherwise spin.
- */
-function isEmailTaken(error: unknown): boolean {
-  let current: unknown = error;
-
-  for (let depth = 0; current && depth < 5; depth += 1) {
-    const candidate = current as { code?: string; constraint_name?: string; cause?: unknown };
-    if (candidate.code === "23505" && candidate.constraint_name === "users_email_unique") {
-      return true;
-    }
-    current = candidate.cause;
-  }
-
-  return false;
-}
 
 /**
  * Creates the first administrator, once.
@@ -96,7 +71,7 @@ export async function createAdmin(
   } catch (error) {
     // The bootstrap guard can pass while the address collides with a non-administrator. Saying
     // "bootstrap is closed" there would be a lie, and exit 3 would claim the database is broken.
-    if (isEmailTaken(error)) {
+    if (isUniqueViolation(error, USERS_EMAIL_UNIQUE)) {
       return { status: "refused", message: "A user with that email already exists." };
     }
     throw error;
