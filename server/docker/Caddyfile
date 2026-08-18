@@ -1,0 +1,21 @@
+# Both doors terminate here and proxy to the same app container. The app itself
+# decides which door answers, based on the Host header Caddy forwards.
+#
+# Keeping them as separate site blocks means the staff portal can later be
+# restricted at the edge — IP allow-list, mTLS, or a private network — without
+# touching the public form.
+
+{$PUBLIC_HOST} {
+	encode zstd gzip
+	reverse_proxy app:3000
+}
+
+{$STAFF_HOST} {
+	encode zstd gzip
+
+	# The staff portal is internal. Tighten this to TMDA ranges before go-live.
+	# @external not remote_ip 10.0.0.0/8 192.168.0.0/16
+	# respond @external 403
+
+	reverse_proxy app:3000
+}

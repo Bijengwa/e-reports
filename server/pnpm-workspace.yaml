@@ -1,0 +1,8 @@
+# pnpm 11 reads build-script approval from here, not from package.json.
+# Without it, `pnpm run` and `pnpm exec` abort with ERR_PNPM_IGNORED_BUILDS
+# and every package script fails.
+#
+# esbuild backs tsx and vitest; biome ships a platform binary.
+allowBuilds:
+  esbuild: true
+  "@biomejs/biome": true

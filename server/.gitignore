@@ -1,0 +1,18 @@
+# Mirrors the repository-root .gitignore for the entries that matter inside this package.
+# Biome resolves `vcs.useIgnoreFile` against its own root, which is this folder, so the
+# root file one level up is not visible to it.
+
+node_modules/
+dist/
+coverage/
+
+# Local environment — never commit real configuration
+.env
+.env.*
+!.env.example
+
+# Local object storage for the filesystem storage adapter
+var/
+
+# Tooling caches
+*.tsbuildinfo
