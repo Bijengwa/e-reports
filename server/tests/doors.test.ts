@@ -335,6 +335,72 @@ describe("staff sign-in", () => {
   });
 });
 
+describe("sign-in rate limiting", () => {
+  /** Posts only the address, so the shape check answers before any query. */
+  function attempt(email: string) {
+    return app.inject({
+      method: "POST",
+      url: "/login",
+      headers: {
+        host: config.STAFF_HOST,
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      payload: new URLSearchParams({ email }).toString(),
+    });
+  }
+
+  it("stops answering after ten attempts on one address from one place", async () => {
+    const answers = [];
+    for (let n = 0; n < 11; n += 1) answers.push(await attempt("target@tmda.go.tz"));
+
+    expect(answers[9]?.statusCode).toBe(400);
+    expect(answers[10]?.statusCode).toBe(429);
+  });
+
+  it("counts a different address separately", async () => {
+    // Keyed on the address as well as the IP, so one person fumbling their password cannot lock
+    // out everyone else behind the same office NAT.
+    expect((await attempt("someone-else@tmda.go.tz")).statusCode).toBe(400);
+  });
+
+  it("normalizes the address, so casing cannot buy a second bucket", async () => {
+    for (let n = 0; n < 10; n += 1) await attempt("shared@tmda.go.tz");
+
+    // Same account, different spelling. It must land in the bucket that is already full.
+    expect((await attempt("  Shared@TMDA.go.tz  ")).statusCode).toBe(429);
+  });
+
+  it("does not disturb the limit the orange form already has", async () => {
+    // The public door registers its own rate limit, 30 a minute, because it is the
+    // unauthenticated door. The sign-in limit is registered in the staff door's scope rather
+    // than at the root precisely so it cannot reach across and replace that one.
+    const form = await app.inject({
+      method: "POST",
+      url: "/orange-form",
+      headers: {
+        host: config.PUBLIC_HOST,
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      payload: new URLSearchParams({
+        step: "1",
+        action: "next",
+        device_name: "Infusion Pump X",
+      }).toString(),
+    });
+
+    expect(form.headers["x-ratelimit-limit"]).toBe("30");
+  });
+
+  it("applies the stricter limit to sign-in and nothing else", async () => {
+    const signIn = await attempt("header-check@tmda.go.tz");
+    const loginPage = await app.inject({ url: "/", headers: { host: config.STAFF_HOST } });
+
+    expect(signIn.headers["x-ratelimit-limit"]).toBe("10");
+    // global:false — the sign-in page itself is not a credential check and carries no limit.
+    expect(loginPage.headers["x-ratelimit-limit"]).toBeUndefined();
+  });
+});
+
 describe("the staff door's authenticated area", () => {
   // These run without a database: with no cookie present the guard redirects before it would
   // query. Signed-in behaviour is tests/integration/staff-login.test.ts.

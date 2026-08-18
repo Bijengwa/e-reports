@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { verifyAgainstAbsentUser, verifyPassword } from "../../../auth/password.js";
 import { createSession, SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "../../../auth/session.js";
@@ -35,6 +35,29 @@ const Credentials = z.object({
 });
 
 /**
+ * Ten attempts per address per source in five minutes.
+ *
+ * Keyed on the submitted address as well as the IP. TMDA staff share an office NAT, so an
+ * IP-only bucket would let one person's fumbled password lock out the floor — and would still
+ * not slow an attacker spraying a single guess across many accounts. Pairing the two counts
+ * attempts against a particular account from a particular place, which is the thing worth
+ * limiting.
+ *
+ * The address is normalized the same way `Credentials` normalizes it, so `A@x` and `a@x` cannot
+ * be spent as two buckets against one account.
+ */
+const LOGIN_RATE_LIMIT = {
+  max: 10,
+  timeWindow: "5 minutes",
+  keyGenerator: (request: FastifyRequest) => {
+    const body = request.body as { email?: unknown } | undefined;
+    const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+
+    return `${request.ip}:${email}`;
+  },
+};
+
+/**
  * The staff sign-in page and the sign-in itself.
  *
  * These are the staff door's anonymous routes — the only ones reachable without a session.
@@ -46,7 +69,7 @@ export async function loginRoutes(app: FastifyInstance, opts: LoginRoutesOptions
     reply.html(<LoginPage publicFormUrl={opts.publicFormUrl} />),
   );
 
-  app.post("/login", async (request, reply) => {
+  app.post("/login", { config: { rateLimit: LOGIN_RATE_LIMIT } }, async (request, reply) => {
     const parsed = Credentials.safeParse(request.body);
 
     if (!parsed.success) {

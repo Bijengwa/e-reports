@@ -1,3 +1,4 @@
+import rateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { constrainToHost } from "../host-scope.js";
 import { changePasswordRoutes } from "./routes/change-password.js";
@@ -29,6 +30,15 @@ export type StaffDoorOptions = {
  */
 export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): Promise<void> {
   constrainToHost(app, opts.host);
+
+  // Registered in this door's scope rather than at the composition root, mirroring how the public
+  // door registers its own. The root is shared, and a limiter there would reach into the public
+  // door and contend with the 30-a-minute limit the orange form already carries — the one thing
+  // this slice must not disturb.
+  //
+  // `global: false` so only routes that ask for a limit get one; `preHandler` rather than the
+  // default `onRequest` so a route's keyGenerator can read the parsed body.
+  await app.register(rateLimit, { global: false, hook: "preHandler" });
 
   // Anonymous: the sign-in page, the sign-in itself, and the health probe.
   await app.register(loginRoutes, {
