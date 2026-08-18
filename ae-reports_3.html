@@ -99,6 +99,13 @@ nav a .n{margin-left:auto;font-family:var(--mono);font-size:11px;background:var(
 .f .sub{font-size:11.5px;color:var(--ink-3);margin-top:4px}
 .checks{display:flex;flex-wrap:wrap;gap:7px}
 .checks.col{flex-direction:column;align-items:stretch}
+.tag{display:inline-block;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:500;padding:1px 6px;border-radius:8px;background:var(--leaf-bg);color:var(--leaf-d);margin-left:7px;vertical-align:1px;white-space:nowrap}
+.tag.own{background:var(--orange-bg);color:var(--orange-d)}
+.af input,.af textarea,.af select{background:#FAFDF3;border-color:#CBDDA8}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+.fgrid .wide{grid-column:1/-1}
+.itemno{font-family:var(--mono);font-size:11.5px;color:var(--green);font-weight:500;margin-right:4px}
+.cmt-l{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:500;margin-bottom:4px}
 .chk{display:flex;align-items:flex-start;gap:8px;border:1px solid var(--rule-2);border-radius:var(--r);padding:7px 11px;cursor:pointer;background:#fff;font-size:13px}
 .chk input{margin-top:3px}
 .chk .hint{display:block}
@@ -202,6 +209,55 @@ tr.rowlink:hover td{background:#F6FAF7}
 .orange-page .btn.ghost{border-color:#E3B694}
 .confirm-num{font-family:var(--mono);font-size:24px;font-weight:500;color:var(--orange-d);letter-spacing:-.01em}
 
+/* ---------- two assessors side by side ---------- */
+:root{--a1-bg:#E9F1EC; --a1-bg2:#DCE9E0; --a1:#166534;
+      --a2-bg:#FBF2E2; --a2-bg2:#F6E7CA; --a2:#8A6207;}
+.legend{display:flex;gap:8px 16px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.key{display:inline-flex;align-items:center;gap:7px;font-size:12.5px}
+.key i{width:13px;height:13px;border-radius:3px;display:block;flex:none;border:1px solid rgba(0,0,0,.12)}
+.dual{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--rule);border-radius:var(--r);background:var(--card)}
+.dgrid{min-width:900px}
+.crow{display:grid;grid-template-columns:190px minmax(330px,1fr) minmax(330px,1fr);border-bottom:1px solid var(--rule)}
+.crow:last-child{border-bottom:0}
+.crow>div{padding:11px 14px;min-width:0;overflow-wrap:anywhere;font-size:13px}
+.crow .lbl{background:#F7FAF8;position:sticky;left:0;z-index:2;border-right:1px solid var(--rule-2);font-size:12.5px;color:var(--ink-2)}
+.crow .lbl .n{font-family:var(--mono);font-size:11px;color:var(--green);font-weight:500;display:block}
+.crow .c1{background:var(--a1-bg);border-right:1px solid rgba(0,0,0,.06)}
+.crow .c2{background:var(--a2-bg)}
+.crow.head>div{font-weight:600;font-size:12.5px;padding:12px 14px;border-bottom:2px solid var(--rule-2);position:sticky;top:0;z-index:3}
+.crow.head .lbl{z-index:4}
+.crow.head .c1{background:var(--a1-bg2);color:var(--a1)}
+.crow.head .c2{background:var(--a2-bg2);color:var(--a2)}
+.crow.head .who{font-weight:400;color:var(--ink-2);display:block;font-size:11.5px;margin-top:1px}
+.crow.sub>div{background:#EFF3F0;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;font-weight:600;color:var(--ink-3);padding:7px 14px}
+.crow.sub .c1,.crow.sub .c2{background:#EFF3F0}
+.crow.same .lbl:after{content:'same';display:inline-block;margin-top:5px;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:var(--leaf-d);background:var(--leaf-bg);padding:1px 6px;border-radius:8px}
+.crow.differ .lbl{background:var(--flag-bg);box-shadow:inset 3px 0 0 var(--flag)}
+.crow.differ .lbl:after{content:'differs';display:inline-block;margin-top:5px;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:#fff;background:var(--flag);padding:1px 6px;border-radius:8px}
+.crow.differ .c1{background:var(--a1-bg2);box-shadow:inset 0 -2px 0 var(--flag)}
+.crow.differ .c2{background:var(--a2-bg2);box-shadow:inset 0 -2px 0 var(--flag)}
+.dgrid.only .crow:not(.differ):not(.head):not(.sub){display:none}
+.tick{color:var(--leaf-d);font-weight:600}
+
+/* ---------- assessor 2 review blocks ---------- */
+.rv{border:1px solid var(--rule);border-radius:var(--r);margin-bottom:12px;overflow:hidden}
+.rv-h{padding:9px 13px;background:#F7FAF8;border-bottom:1px solid var(--rule);font-size:12.5px;font-weight:500;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.rv-h .n{font-family:var(--mono);font-size:11px;color:var(--green);font-weight:500}
+.rv-a1{background:var(--a1-bg);padding:11px 13px;font-size:13px;border-bottom:1px solid var(--rule)}
+.rv-a1 .tagl{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:var(--a1);display:block;margin-bottom:3px}
+.rv-pick{display:flex;gap:7px;padding:11px 13px;flex-wrap:wrap;align-items:center}
+.rv-own{background:var(--a2-bg);padding:11px 13px;border-top:1px solid var(--rule)}
+.rv-own .tagl{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:var(--a2);display:block;margin-bottom:5px}
+.rv-own[hidden]{display:none}
+.rv.is-agree{border-color:#BFD9C6}
+.rv.is-agree .rv-h{background:var(--leaf-bg)}
+.rv.is-differ{border-color:#E3B3A6}
+.rv.is-differ .rv-h{background:var(--flag-bg)}
+.chk.ag:has(input:checked){border-color:var(--leaf-d);background:var(--leaf-bg);color:var(--leaf-d)}
+.chk.df:has(input:checked){border-color:var(--flag);background:var(--flag-bg);color:var(--flag)}
+.rvbar{position:sticky;top:56px;z-index:20;background:var(--card);border:1px solid var(--rule);border-radius:var(--r);padding:10px 14px;display:flex;gap:8px 16px;flex-wrap:wrap;align-items:center;margin-bottom:14px;font-size:12.5px}
+.rvbar b{font-family:var(--mono)}
+
 /* ================= RESPONSIVE ================= */
 @media (max-width:1000px){ .split{grid-template-columns:1fr} .sticky{position:static!important} }
 @media (max-width:900px){
@@ -223,6 +279,10 @@ tr.rowlink:hover td{background:#F6FAF7}
   .dl dd{padding-top:1px}
   .who span:not(.av){display:none}
   .top h1{font-size:15px}
+  /* the two assessments stay side by side and scroll sideways */
+  .crow{grid-template-columns:132px minmax(280px,1fr) minmax(280px,1fr)}
+  .dgrid{min-width:700px}
+  .rvbar{position:static}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -482,7 +542,7 @@ function vMyWork(){
   :[{no:'MD-AE/2026/0183',dev:'AccuChek Active glucose test strips',stage:'1st',got:'13 Aug · automatic',mine:'Draft — not submitted',mc:'work',act:`<button class="btn sm" onclick="setView('assess')">Continue 1st assessment</button>`},
     {no:'MD-AE/2026/0181',dev:'Vicryl 3-0 surgical suture',stage:'1st',got:'11 Aug · automatic',mine:'Submitted 14 Aug',mc:'done',act:`<button class="btn ghost sm" onclick="setView('report')">${t('Open')}</button>`},
     {no:'MD-AE/2026/0179',dev:'BeneVision N12 patient monitor',stage:'1st',got:'08 Aug · automatic',mine:'Submitted 11 Aug',mc:'done',act:`<button class="btn ghost sm" onclick="setView('report')">${t('Open')}</button>`}];
- return `<div class="note info">You see only reports assigned to you. Each one is matched with your own assessment, so you always know what is finished and what is waiting. ${second?'For a 2nd assessment you review the whole F004 filled by the 1st assessor and add your concluding remarks (section 7.2).':''}</div>
+ return `<div class="note info">You see only reports assigned to you. Each one is matched with your own assessment, so you always know what is finished and what is waiting. ${second?'For a 2nd assessment you go through the 1st assessor’s F004 item by item, marking where you agree and where you differ, and you still submit a complete assessment of your own.':''}</div>
  <div class="card"><div class="card-h"><h2>${t('My work')}</h2></div>
  <div class="tw"><table><thead><tr><th>${t('Report')}</th><th>${t('Device')}</th><th>${t('Stage')}</th><th>Given to me</th><th>${t('My assessment')}</th><th></th></tr></thead><tbody>
  ${rows.map(r=>`<tr><td><span class="mono" style="font-size:12.5px;color:var(--green);font-weight:500">${r.no}</span></td>
@@ -598,6 +658,74 @@ function vReport(){
 }
 
 /* ============ F004 assessment form ============ */
+
+/* Values carried across from the orange form. F004 is an independent, signed
+   document, so EVERY item 1.1-1.19 is shown and must end up complete. Items the
+   reporter already answered arrive filled in; the assessor checks and can correct. */
+const F004SRC={
+ '0183':{
+  '1.1':'AccuChek','1.2':'Blood glucose test strips','1.4':'Active — 50 strips per vial',
+  '1.5':'LOT AC-2606-114','1.6':'02 / 2026','1.7':'08 / 2027',
+  '1.8':'Roche Diagnostics GmbH, Sandhofer Strasse 116, 68305 Mannheim, Germany',
+  '1.9':'Bhavika Medical Supplies Ltd, Nyerere Road, Mwanza',
+  '1.12':'New device','1.13':'Less than six (6) months',
+  '1.14':'E. Massawe (laboratory scientist), Bugando Medical Centre, Wurzburg Road, Mwanza',
+  '1.15':'Healthcare Providers','1.16':'Bugando Medical Centre, Wurzburg Road, Mwanza',
+  '1.17':'13 / 08 / 2026','1.18':'13 / 08 / 2026',
+  '2.1':'Strips from one vial gave readings far above the laboratory reference method on three patients on the same morning. The meter and the control solution both passed their checks. The vial had been opened four days earlier and stored on the bench.',
+  '2.2':'11 / 08 / 2026','2.3':'1 vial (one lot)','2.4':'3'
+ },
+ '0179':{
+  '1.1':'BeneVision','1.2':'Vital signs monitor','1.4':'',
+  '1.5':'Serial BN12-4471-22887 · Lot LOT-2024-11B','1.6':'14 / 11 / 2024','1.7':'',
+  '1.8':'Shenzhen Mindray Bio-Medical Electronics Co. Ltd, Nanshan, Shenzhen 518057, China',
+  '1.9':'Medisel (T) Ltd, Plot 44 Nyerere Road, Dar es Salaam',
+  '1.12':'New device','1.13':'1-5 years',
+  '1.14':'Dr. S. Mwakalinga (medical practitioner), Mbeya Zonal Referral Hospital, Hospital Hill Road, Mbeya Urban, Mbeya',
+  '1.15':'Healthcare Providers','1.16':'Mbeya Zonal Referral Hospital, Hospital Hill Road, Mbeya',
+  '1.17':'08 / 08 / 2026','1.18':'08 / 08 / 2026',
+  '2.1':'The monitor stopped refreshing and stopped sounding alarms while a patient was in the high dependency unit at about 02:30. The screen stayed lit but froze on the last reading taken. Staff noticed only during the 04:00 round. The unit had been switched on continuously for six days.',
+  '2.2':'06 / 08 / 2026','2.3':'1','2.4':'1'
+ }
+};
+
+/* [number, label, control, options, filledByAssessor, wide] */
+const F004_A=[
+ ['1.1','Device brand name','text',null,false,false],
+ ['1.2','Device common name','text',null,false,false],
+ ['1.3','Type of device (MD or IVD)','radio',['Medical device (MD)','In vitro diagnostic (IVD)'],true,true],
+ ['1.4','Size / model (if applicable)','text',null,false,false],
+ ['1.5','Batch number / lot number / serial number','text',null,false,false],
+ ['1.6','Manufacturing date','text',null,false,false],
+ ['1.7','Expiry date / service life (if applicable)','text',null,false,false],
+ ['1.8','Manufacturer name and physical address','area',null,false,true],
+ ['1.9','Supplier name and physical address (if indicated)','area',null,false,true],
+ ['1.10','Device registration number (if applicable)','text',null,true,false],
+ ['1.11','Device class','select',['Choose one','Class A','Class B','Class C','Class D'],true,false],
+ ['1.12','Status of the device (new or refurbished)','text',null,false,false],
+ ['1.13','Duration of use','text',null,false,false],
+ ['1.14','Name and physical address of the reporter','area',null,false,true],
+ ['1.15','Operator at the time of the event / incident','text',null,false,false],
+ ['1.16','Facility name and physical address','area',null,false,true],
+ ['1.17','Date of the report','text',null,false,false],
+ ['1.18','Date received at TMDA','text',null,false,false],
+ ['1.19','Initial / follow up / final report','radio',['Initial','Follow up','Final'],true,true]
+];
+
+function f004Field(row,src,grp){
+ const [n,l,ctl,opts,own,wide]=row;
+ const v=own?'':(src[n]||'');
+ const tag=own?'<span class="tag own">to fill</span>'
+   :(v?'<span class="tag">from orange form</span>':'<span class="tag own">not given — fill in</span>');
+ let input;
+ if(ctl==='radio') input=`<div class="checks">${opts.map(c=>`<label class="chk"><input type="radio" name="${grp}${n.replace('.','_')}">${c}</label>`).join('')}</div>`;
+ else if(ctl==='select') input=`<select>${opts.map(o=>`<option>${o}</option>`).join('')}</select>`;
+ else if(ctl==='area') input=`<textarea style="min-height:56px" placeholder="${v?'':'Not given in the orange form — complete it here'}">${v}</textarea>`;
+ else input=`<input value="${v}" placeholder="${v?'':'Not given in the orange form — complete it here'}">`;
+ return `<div class="f${wide?' wide':''}${own||!v?'':' af'}">
+   <label><span class="itemno">${n}</span>${l}${tag}</label>${input}</div>`;
+}
+
 const MITIGATIONS=['Request for samples and laboratory analysis','Risk communication','Request for labelling and design changes','Request changes to the Instructions for Use (IFU)','Device removal or correction','Issue public safety alerts','Market license suspension','Conduct field investigations (manufacturer or regulatory authority)','Request post-marketing studies','Enhance monitoring','Provide feedback to users (e.g. training, following the IFU)'];
 
 function imdrfGroup(label,annex,levels){
@@ -605,60 +733,113 @@ function imdrfGroup(label,annex,levels){
   <div class="grid4">${Array.from({length:levels},(_,i)=>`<input placeholder="Level ${i+1} term">`).join('')}<input placeholder="Code"></div></div>`;
 }
 
-function a1summary(){
- return `<div class="card" style="margin-bottom:16px;border-left:4px solid var(--leaf)"><div class="card-h"><h2>1st assessment — A. Kimaro, submitted 11 Aug</h2></div>
- <div class="tw"><table class="narrow"><tbody>
-  <tr><td class="muted" style="width:230px">2.6 Categorisation</td><td>Serious — led to a death</td></tr>
-  <tr><td class="muted">2.7 Public health concern</td><td>No</td></tr>
-  <tr><td class="muted">4.1 Expectedness</td><td>Unexpected</td></tr>
-  <tr><td class="muted">4.2 Causal association</td><td>Probable</td></tr>
-  <tr><td class="muted">5.0 Signal detection</td><td>Potential signal — seriousness; unlabelled risk</td></tr>
-  <tr><td class="muted">6.0 Risk level</td><td>Critical</td></tr>
-  <tr><td class="muted">7.1 Recommendations</td><td>Request for samples and laboratory analysis; Conduct field investigations</td></tr>
- </tbody></table></div>
- <div class="card-b" style="border-top:1px solid var(--rule)"><span class="eyebrow">7.1 Conclusion</span>
- <p style="font-size:13px;margin-top:5px">Alarm failure after six days of continuous use points to a software or watchdog fault rather than user error. The same model is in use in at least four referral hospitals; field investigation is needed before wider action.</p></div></div>`;
-}
+/* Full paired F004 answers. 'x' marks a real difference between the two assessors.
+   Used by the manager's side-by-side view (case 0176) and by the 2nd assessor's
+   review screen (case 0179, where only the 1st assessor's column exists yet). */
+const PAIRED={
+ '0176':{
+  dev:'SD Bioline HIV 3.0 rapid test kit', fac:'Temeke Regional Hospital',
+  a1:{who:'A. Kimaro',date:'09 Aug 2026'}, a2:{who:'F. Ngowi',date:'12 Aug 2026'},
+  rows:[
+   ['sub','A · Administrative information'],
+   ['1.3','Type of device','In vitro diagnostic (IVD)','In vitro diagnostic (IVD)',false],
+   ['1.10','Device registration number','TZ-IVD-2024-0417','TZ-IVD-2024-0417',false],
+   ['1.11','Device class','Class C','Class C',false],
+   ['1.19','Report type','Initial','Initial',false],
+   ['sub','2 · Event / incident assessment'],
+   ['2.5','Source of the event','IVD — false positive or false negative results falling outside the declared performance of the test','IVD — false positive or false negative results falling outside the declared performance of the test',false],
+   ['2.5','Reasons','Three kits from lot 3HIV-2606-B gave negative results against a known positive control. The meter-free visual read was repeated twice by two officers. Lot records show the shipment cleared customs normally and arrived within temperature.','False negatives confirmed on repeat testing. However the cold-chain log at the regional store shows a nine-hour gap on 22 July with no temperature record, which is the more likely source.',true],
+   ['2.6','Categorisation','Serious — indirect harm from an incorrect IVD test result','Serious — indirect harm from an incorrect IVD test result',false],
+   ['2.7','Significant public health concern','Yes — HIV diagnosis','Yes — HIV diagnosis',false],
+   ['sub','3 · IMDRF category (N43)'],
+   ['3.1(b)','Medical device problem','Failure to perform as expected · False negative result · Code pending N43 list','Failure to perform as expected · False negative result · Code pending N43 list',false],
+   ['3.3(a)','Type of investigation','Laboratory evaluation','Laboratory evaluation',false],
+   ['3.3(b)','Investigation findings','Manufacturing or quality control deficiency','Storage and transport conditions outside specification',true],
+   ['sub','4 · Relationship / causality'],
+   ['4.1','Expected or unexpected','Unexpected','Unexpected',false],
+   ['4.2','Causal association','Probable','Possible',true],
+   ['4.2','Discussion','The failure repeated across three kits of one lot with a valid control, and no other cause was found. That points beyond coincidence to the product itself.','Relatedness cannot be separated from the storage gap. Under the form\u2019s own note, a case that cannot be adequately assessed is classified as possible, not probable.',true],
+   ['sub','5 · Signal detection'],
+   ['5.0','Criteria ticked','Seriousness · Public health impact · Type and pattern of the incident','Public health impact',true],
+   ['5.0','Conclusion','Potential safety signal identified','Potential safety signal identified',false],
+   ['sub','6 · Risk assessment'],
+   ['6.0','Risk level','High risk','Medium risk',true],
+   ['6.0','Comment','A false negative HIV result sends an infected patient away untreated and infectious. That is serious deterioration by any reading.','Harm is real but indirect and reversible once retested; the three patients were recalled and retested within four days.',true],
+   ['sub','7 · Conclusion of assessment'],
+   ['7.1 / 7.2','Proposed mitigation actions','Request for samples and laboratory analysis · Risk communication','Request for samples and laboratory analysis · Enhance monitoring',true],
+   ['7.1 / 7.2','Conclusion and remarks','Quarantine the remaining stock of lot 3HIV-2606-B nationally, take samples for laboratory analysis, and issue a risk communication to all testing sites using the lot.','I agree the lot must be sampled and tested. I do not support a national risk communication yet — until the laboratory result separates a product fault from the cold-chain gap, a communication would name the product wrongly. Enhance monitoring at the three sites drawing from this store in the meantime.',true]
+  ]
+ }
+};
 
-function vAssess(){
- const second=role==='assessor2';
+/* The 1st assessor's completed F004 on case 0179, for the 2nd assessor to review.
+   [item, label, answer, controlType, options] */
+const A1_0179=[
+ ['2.5','Source of the event / incident','Malfunction or failure — the device failed to perform in accordance with its intended purpose','checks',
+   ['Malfunction or failure','Labelling or instructions for use','Degradation or destruction','User error','Inadequacy or deficiency of the device','IVD — risk from an erroneous result','IVD — false positive or false negative results']],
+ ['2.5','Reasons','The alarm system stopped annunciating after six days of continuous operation while the display remained powered. The ward log shows no alarm sound and no visual alarm banner. No user action explains a silent frozen display.','area',null],
+ ['2.6','Categorisation of the event','Serious — led to the death of a patient','radio',['Non-serious','Serious']],
+ ['2.7','Significant public health concern','No','radio',['Yes','No']],
+ ['3.1(b)','IMDRF device problem (Annex A)','Alarm system problem · Failure to alarm · Code pending N43 list','text',null],
+ ['3.3(b)','IMDRF investigation findings (Annex C)','Software or firmware deficiency','text',null],
+ ['4.1','Expected or unexpected','Unexpected — not consistent with the effects listed in the risk analysis report','radio',['Expected','Unexpected']],
+ ['4.2','Causal association','Probable','radio',['Unrelated','Possible','Probable','Certain']],
+ ['4.2','Discussion of the causal relationship','The event has a clear temporal relationship with six days of uninterrupted use, involves the exact function the device exists to provide, and no concurrent illness explains the absence of an alarm. Other causes were ruled out on the replacement unit.','area',null],
+ ['5.0','Signal detection','Potential safety signal identified — seriousness; unlabelled or previously unidentified risk','radio',['Potential safety signal identified','Not considered a signal at this stage']],
+ ['6.0','Risk level','Critical risk','radio',['Critical risk','High risk','Medium risk','Low risk']],
+ ['7.1','Proposed mitigation actions','Request for samples and laboratory analysis · Conduct field investigations','checks',MITIGATIONS],
+ ['7.1','Recommendations and conclusion','Alarm failure after six days of continuous use points to a software or watchdog fault rather than user error. The same model is in use in at least four referral hospitals, so a field investigation is needed before any wider action.','area',null]
+];
+
+function vAssess(){ return role==='assessor2' ? vAssess2() : vAssess1(); }
+
+function vAssess1(){
+ const second=false;
+ const key='0183';
+ const src=F004SRC[key];
  return `<div class="bar">
   <button class="btn ghost sm" onclick="setView('mywork')">Back</button>
-  <span class="mono" style="font-size:15px;font-weight:500">${second?'MD-AE/2026/0179':'MD-AE/2026/0183'}</span>
+  <span class="mono" style="font-size:15px;font-weight:500">MD-AE/2026/${key}</span>
   <span class="pill p-work">${second?'2nd':'1st'} assessment</span>
-  <span class="pill p-mgr">Form F004</span></div>
- <div class="note info">This screen follows TMDA's assessment form <b>TMDA/DMD/MDV/F/004 (revised)</b>. Part A fills itself from the orange form, so the assessor types nothing twice.</div>
+  <span class="pill p-mgr">Form F004</span>
+  <div class="sp"></div>
+  <button class="btn ghost sm" onclick="window.print()">Print / save F004</button></div>
+ <div class="note info">This screen follows TMDA's assessment form <b>TMDA/DMD/MDV/F/004 (revised)</b>. It is a complete document on its own — every item is shown and every item must be filled. Answers the reporter already gave arrive filled in, so nobody types the same fact twice.</div>
  ${second?`<div class="note">You are the <b>2nd assessor</b>. Review the whole first assessment below, then add your concluding remarks in section 7.2 — exactly like the paper F004, which both assessors sign.</div>`:''}
  <div class="split"><div>
  ${second?a1summary():''}
  <div class="card"><div class="card-b">
 
   <div class="sec-h" style="margin-top:0"><span class="num">A</span><h3>Administrative information</h3></div>
-  <div class="note ok" style="margin-bottom:12px">Items 1.1–1.18 are filled automatically from the orange form and shown in the case file. Confirm the four items the reporter cannot know:</div>
-  <div class="grid2">
-   <div class="f"><label>1.3 Type of device <i>*</i></label>
-    <div class="checks">${['Medical device (MD)','In vitro diagnostic (IVD)'].map(c=>`<label class="chk"><input type="radio" name="ty">${c}</label>`).join('')}</div></div>
-   <div class="f"><label>1.10 Device registration number</label><input placeholder="From the TMDA register (RIMS)"></div>
-   <div class="f"><label>1.11 Device class</label><select><option>Choose one</option><option>Class A</option><option>Class B</option><option>Class C</option><option>Class D</option></select></div>
-   <div class="f"><label>1.19 Report type <i>*</i></label>
-    <div class="checks">${['Initial','Follow up','Final'].map(c=>`<label class="chk"><input type="radio" name="rt">${c}</label>`).join('')}</div></div>
-  </div>
+  <div class="note ok" style="margin-bottom:12px">All nineteen items appear here, because F004 is a complete document on its own. Items the reporter already answered arrive <b>filled in</b> (green) — check them and correct anything wrong. Items marked <b>to fill</b> are yours.</div>
+  <div class="fgrid">${F004_A.map(r=>f004Field(r,src,second?'b':'a')).join('')}</div>
 
   <div class="sec-h"><span class="num">2</span><h3>Event / incident assessment</h3></div>
-  <div class="f"><label>2.1–2.4 Event information</label>
-   <div class="hint" style="margin-bottom:6px">Description, onset date, number of devices and number of patients come from the orange form. Add your comments:</div>
-   <textarea placeholder="Comments on the event as presented by the reporter"></textarea></div>
-  <div class="f"><label>2.5 Source of the event / incident <i>*</i></label>
+  <div class="f"><label><span class="itemno">2.1</span>Event / incident description — as presented by the reporter<span class="tag">from orange form</span></label>
+   <div class="af"><textarea style="min-height:96px">${src['2.1']}</textarea></div>
+   <textarea style="margin-top:8px;min-height:56px" placeholder="Comment"></textarea></div>
+  <div class="fgrid">
+   <div class="f af"><label><span class="itemno">2.2</span>Date of onset of the event<span class="tag">from orange form</span></label><input value="${src['2.2']}"></div>
+   <div class="f af"><label><span class="itemno">2.3</span>How many devices were involved?<span class="tag">from orange form</span></label><input value="${src['2.3']}"></div>
+   <div class="f af"><label><span class="itemno">2.4</span>How many patients or users were affected?<span class="tag">from orange form</span></label><input value="${src['2.4']}"></div>
+   <div class="f"><label>Comment on 2.2–2.4</label><input placeholder="Optional"></div>
+  </div>
+  <div class="f"><label><span class="itemno">2.5</span>Source of the event / incident <i>*</i></label>
    <div class="hint" style="margin-bottom:6px">For a medical device:</div>
    <div class="checks col">${['Malfunction — failure to perform as intended when used per the manufacturer\u2019s instructions','Inaccuracy in the labelling or instructions for use, including omissions and deficiencies','Degradation or destruction of the device, or inappropriate diagnosis','Error on the user of the medical device','Inadequacy or deficiency in identity, quality, durability, reliability, safety or performance'].map(c=>`<label class="chk"><input type="checkbox">${c}</label>`).join('')}</div>
    <div class="hint" style="margin:8px 0 6px">For an IVD:</div>
    <div class="checks col">${['Risk that an erroneous result leads to a life-threatening patient decision, or death or severe disability','False positive or false negative results outside the declared performance of the test'].map(c=>`<label class="chk"><input type="checkbox">${c}</label>`).join('')}</div>
-   <textarea style="margin-top:8px" placeholder="Reasons — review scientific literature, the registration dossier in RIMS, and safety information from other regulatory authorities"></textarea></div>
-  <div class="f"><label>2.6 Categorisation of the event / incident <i>*</i></label>
-   <div class="checks col">${['Non-serious','Serious — led to a death','Serious — led to serious deterioration in health (intervention needed to prevent life-threatening illness, injury or permanent impairment)','Serious — indirect harm from an incorrect diagnostic or IVD test result'].map(c=>`<label class="chk"><input type="radio" name="cat">${c}</label>`).join('')}</div></div>
-  <div class="f"><label>2.7 Does it constitute a significant public health concern?</label>
-   <div class="checks">${['Yes','No'].map(c=>`<label class="chk"><input type="radio" name="ph">${c}</label>`).join('')}</div>
-   <div class="sub">For example condoms, or devices used to diagnose Malaria, TB, HIV, Covid-19, Hepatitis or Syphilis.</div></div>
+   <div class="cmt-l" style="margin-top:10px">Reasons / comment <i style="color:var(--flag);font-style:normal">*</i></div>
+   <textarea placeholder="Review scientific literature, the registration dossier in RIMS, and safety information from other regulatory authorities."></textarea></div>
+  <div class="f"><label><span class="itemno">2.6</span>Categorisation of the event / incident <i>*</i></label>
+   <div class="checks col">${['Non-serious','Serious'].map(c=>`<label class="chk"><input type="radio" name="cat${second?'b':'a'}">${c}</label>`).join('')}</div>
+   <div class="hint" style="margin:8px 0 6px">If serious, tick which applies:</div>
+   <div class="checks col">${['Led to a death of a patient, user or other person','Serious deterioration in health — intervention needed to prevent life-threatening illness, injury or permanent impairment','Indirect harm from an incorrect diagnostic or IVD test result used within the manufacturer\u2019s instructions'].map(c=>`<label class="chk"><input type="checkbox">${c}</label>`).join('')}</div>
+   <textarea style="margin-top:8px;min-height:56px" placeholder="Comment"></textarea></div>
+  <div class="f"><label><span class="itemno">2.7</span>Does it constitute a significant public health concern? <i>*</i></label>
+   <div class="checks">${['Yes','No'].map(c=>`<label class="chk"><input type="radio" name="ph${second?'b':'a'}">${c}</label>`).join('')}</div>
+   <div class="sub">For example condoms, or devices used to diagnose Malaria, TB, HIV, Covid-19, Hepatitis or Syphilis.</div>
+   <textarea style="margin-top:8px;min-height:56px" placeholder="Comment"></textarea></div>
 
   <div class="sec-h"><span class="num">3</span><h3>IMDRF category (N43)</h3></div>
   <div class="hint" style="margin-bottom:10px">Pick the preferred terms and codes. In the full system these come from a searchable IMDRF code list, not typing.</div>
@@ -671,14 +852,15 @@ function vAssess(){
   ${imdrfGroup('3.3(c) Cause investigation — investigation conclusion','D',2)}
 
   <div class="sec-h"><span class="num">4</span><h3>Relationship / causality</h3></div>
-  <div class="f"><label>4.1 Expected or unexpected? <i>*</i></label>
-   <div class="checks col">${['Expected — consistent with the effects listed in the risk analysis report (RIMS dossier)','Unexpected — not consistent with the risk analysis report'].map(c=>`<label class="chk"><input type="radio" name="ex">${c}</label>`).join('')}</div></div>
-  <div class="f"><label>4.2 Causal association <i>*</i></label>
+  <div class="f"><label><span class="itemno">4.1</span>Expected or unexpected? <i>*</i></label>
+   <div class="checks col">${['Expected — consistent with the effects listed in the risk analysis report (RIMS dossier)','Unexpected — not consistent with the risk analysis report'].map(c=>`<label class="chk"><input type="radio" name="ex${second?'b':'a'}">${c}</label>`).join('')}</div>
+   <textarea style="margin-top:8px;min-height:56px" placeholder="Comment"></textarea></div>
+  <div class="f"><label><span class="itemno">4.2</span>Causal association <i>*</i></label>
    <div class="checks col">
-    <label class="chk"><input type="radio" name="ca"><span><b>Unrelated</b><span class="hint">No time link with the device; implausible; another cause explains it; wrong body-site; no false result involved.</span></span></label>
-    <label class="chk"><input type="radio" name="ca"><span><b>Possible</b><span class="hint">A weak link that cannot be ruled out; other causes are also possible. Use this too when it cannot be assessed.</span></span></label>
-    <label class="chk"><input type="radio" name="ca"><span><b>Probable</b><span class="hint">The link seems relevant and no other cause reasonably explains the event.</span></span></label>
-    <label class="chk"><input type="radio" name="ca"><span><b>Certain</b><span class="hint">Linked beyond reasonable doubt: known pattern, time link, right body-site, other causes ruled out, or a false diagnostic result.</span></span></label>
+    <label class="chk"><input type="radio" name="ca${second?'b':'a'}"><span><b>Unrelated</b><span class="hint">No time link with the device; implausible; another cause explains it; wrong body-site; no false result involved.</span></span></label>
+    <label class="chk"><input type="radio" name="ca${second?'b':'a'}"><span><b>Possible</b><span class="hint">A weak link that cannot be ruled out; other causes are also possible. Use this too when it cannot be assessed.</span></span></label>
+    <label class="chk"><input type="radio" name="ca${second?'b':'a'}"><span><b>Probable</b><span class="hint">The link seems relevant and no other cause reasonably explains the event.</span></span></label>
+    <label class="chk"><input type="radio" name="ca${second?'b':'a'}"><span><b>Certain</b><span class="hint">Linked beyond reasonable doubt: known pattern, time link, right body-site, other causes ruled out, or a false diagnostic result.</span></span></label>
    </div></div>
   <div class="f"><label>Discussion of the causal relationship <i>*</i></label>
    <textarea placeholder="Discuss: time link, scientific and regulatory information, the manufacturer\u2019s product information, opinions from healthcare professionals, similar previous events, and whether the device passed its service life or shelf life."></textarea></div>
@@ -686,15 +868,17 @@ function vAssess(){
   <div class="sec-h"><span class="num">5</span><h3>Signal detection</h3></div>
   <div class="f"><label>Does this event point to a potential safety signal? Tick what applies:</label>
    <div class="checks">${['Serious event','New or unexpected event','Device new on the market','Public health impact','Vulnerable population involved','Unlabelled or unidentified risk','Benefit/risk ratio shifting','Event was preventable','Pattern of similar events','Action by other regulators'].map(c=>`<label class="chk"><input type="checkbox">${c}</label>`).join('')}</div>
-   <textarea style="margin-top:8px" placeholder="Consider trends in the adverse events register. One serious or unexpected event with public health implications can be enough."></textarea></div>
+   <div class="hint" style="margin:10px 0 6px">Conclusion <i style="color:var(--flag);font-style:normal">*</i></div>
+   <div class="checks">${['Potential safety signal identified','Not considered a signal at this stage'].map(c=>`<label class="chk"><input type="radio" name="sg${second?'b':'a'}">${c}</label>`).join('')}</div>
+   <textarea style="margin-top:8px" placeholder="Comment. Consider trends in the adverse events register — one serious or unexpected event with public health implications can be enough."></textarea></div>
 
   <div class="sec-h"><span class="num">6</span><h3>Risk assessment</h3></div>
   <div class="f"><label>Risk level <i>*</i></label>
    <div class="checks col">
-    <label class="chk"><input type="radio" name="rk"><span><b>Critical</b><span class="hint">Death, life-threatening condition, permanent impairment, or serious public health consequences — actual or likely.</span></span></label>
-    <label class="chk"><input type="radio" name="rk"><span><b>High</b><span class="hint">Serious injury or significant deterioration; medical or surgical intervention needed to prevent permanent impairment.</span></span></label>
-    <label class="chk"><input type="radio" name="rk"><span><b>Medium</b><span class="hint">Temporary or minor injury, reversible impairment, limited clinical consequences.</span></span></label>
-    <label class="chk"><input type="radio" name="rk"><span><b>Low</b><span class="hint">No harm or negligible harm.</span></span></label>
+    <label class="chk"><input type="radio" name="rk${second?'b':'a'}"><span><b>Critical</b><span class="hint">Death, life-threatening condition, permanent impairment, or serious public health consequences — actual or likely.</span></span></label>
+    <label class="chk"><input type="radio" name="rk${second?'b':'a'}"><span><b>High</b><span class="hint">Serious injury or significant deterioration; medical or surgical intervention needed to prevent permanent impairment.</span></span></label>
+    <label class="chk"><input type="radio" name="rk${second?'b':'a'}"><span><b>Medium</b><span class="hint">Temporary or minor injury, reversible impairment, limited clinical consequences.</span></span></label>
+    <label class="chk"><input type="radio" name="rk${second?'b':'a'}"><span><b>Low</b><span class="hint">No harm or negligible harm.</span></span></label>
    </div>
    <div class="sub">For IVDs, also consider indirect harm from incorrect test results.</div>
    <textarea style="margin-top:8px" placeholder="Comment"></textarea></div>
@@ -715,6 +899,104 @@ function vAssess(){
   <div class="eyebrow">Submitted by</div><p>${second?'Dr. S. Mwakalinga · Mbeya Zonal Referral':'E. Massawe · Bugando Medical Centre'}</p>
   <button class="btn ghost sm" style="margin-top:12px;width:100%" onclick="setView('report')">Open full case file</button>
  </div></div></div></div>`;
+}
+
+/* ============ 2nd assessor: review the 1st assessment item by item ============
+   The 2nd assessor works from the 1st assessor's F004 but still produces a complete
+   assessment of their own. For every item they record Agree or Differ. Agree copies
+   the 1st assessor's answer into their form; Differ opens their own answer box. Either
+   way their F004 ends up fully filled, and the manager gets a clean list of the
+   points where the two of them parted company. */
+
+function rvControl(i,type,opts){
+ const nm='own'+i;
+ if(type==='radio') return `<div class="checks col">${opts.map(c=>`<label class="chk"><input type="radio" name="${nm}">${c}</label>`).join('')}</div>`;
+ if(type==='checks') return `<div class="checks">${opts.map(c=>`<label class="chk"><input type="checkbox">${c}</label>`).join('')}</div>`;
+ if(type==='area') return `<textarea style="min-height:90px" placeholder="Your own wording for this item"></textarea>`;
+ return `<input placeholder="Your own answer for this item">`;
+}
+
+function vAssess2(){
+ const A=A1_0179;
+ const blocks=A.map(([n,l,ans,type,opts],i)=>`
+  <div class="rv" id="rv${i}">
+   <div class="rv-h"><span class="n">${n}</span><span>${l}</span></div>
+   <div class="rv-a1"><span class="tagl">1st assessor — A. Kimaro, 11 Aug</span>${ans}</div>
+   <div class="rv-pick">
+    <label class="chk ag"><input type="radio" name="rv${i}" onchange="rv(${i},'agree')">I agree with the 1st assessor</label>
+    <label class="chk df"><input type="radio" name="rv${i}" onchange="rv(${i},'differ')">I differ — my answer is different</label>
+    <span class="hint" id="rvs${i}" style="margin-left:auto"></span>
+   </div>
+   <div class="rv-own" id="rvo${i}" hidden>
+    <span class="tagl">My answer — F. Ngowi</span>
+    ${rvControl(i,type,opts)}
+    <div style="margin-top:9px"><span class="cmt-l">Why I differ <i style="color:var(--flag);font-style:normal">*</i></span>
+     <textarea style="min-height:70px" placeholder="Explain what the 1st assessor concluded and why your reading of the evidence is different. The manager reads this next to their answer."></textarea></div>
+   </div>
+  </div>`).join('');
+
+ return `<div class="bar">
+  <button class="btn ghost sm" onclick="setView('mywork')">Back</button>
+  <span class="mono" style="font-size:15px;font-weight:500">MD-AE/2026/0179</span>
+  <span class="pill p-work">2nd assessment</span><span class="pill p-mgr">Form F004</span>
+  <div class="sp"></div><button class="btn ghost sm" onclick="window.print()">Print / save F004</button></div>
+
+ <div class="note info">You are the <b>2nd assessor</b>. Work through the 1st assessment item by item: mark <b>agree</b> where you agree, and <b>differ</b> where you do not. Agreeing copies that answer into your own F004, so your assessment still ends up complete and signed. Differing opens your own answer next to theirs.</div>
+
+ <div class="rvbar">
+  <span class="key"><i style="background:var(--a1-bg2);width:13px;height:13px;border-radius:3px;display:block"></i>1st assessor</span>
+  <span class="key"><i style="background:var(--a2-bg2);width:13px;height:13px;border-radius:3px;display:block"></i>my answer</span>
+  <div class="sp"></div>
+  <span>Agreed <b id="cAg">0</b></span><span>Differ <b id="cDf">0</b></span><span>Not reviewed <b id="cNr">${A.length}</b> of <b>${A.length}</b></span>
+ </div>
+
+ <div class="split"><div>
+  ${blocks}
+  <div class="card" style="margin-top:16px"><div class="card-b">
+   <div class="sec-h" style="margin-top:0"><span class="num">7.2</span><h3>My concluding remarks</h3></div>
+   <div class="f"><label>Proposed mitigation actions <i>*</i></label>
+    <div class="checks">${MITIGATIONS.map(c=>`<label class="chk"><input type="checkbox">${c}</label>`).join('')}</div></div>
+   <div class="f"><label>Concluding remarks <i>*</i></label>
+    <textarea style="min-height:100px" placeholder="Your overall conclusion, including where you agree with the 1st assessor and where you do not."></textarea></div>
+   <div class="bar" style="margin:0">
+    <button class="btn" onclick="submit2()">Submit 2nd assessment — send to manager</button>
+    <button class="btn ghost" onclick="alert('Saved. You can come back to it.')">Save draft</button></div>
+  </div></div>
+ </div>
+ <div><div class="card sticky" style="position:sticky;top:74px"><div class="card-h"><h2>The report</h2></div><div class="card-b" style="font-size:13px">
+  <div class="eyebrow">Device</div><p style="margin-bottom:11px">BeneVision N12 patient monitor</p>
+  <div class="eyebrow">Incident</div><p style="margin-bottom:11px">Monitor froze and stopped alarming during the night.</p>
+  <div class="eyebrow">Event</div><p style="margin-bottom:11px"><span class="pill p-sev">Death</span></p>
+  <div class="eyebrow">Submitted by</div><p>Dr. S. Mwakalinga · Mbeya Zonal Referral</p>
+  <button class="btn ghost sm" style="margin-top:12px;width:100%" onclick="setView('report')">Open full case file</button>
+  <button class="btn ghost sm" style="margin-top:8px;width:100%" onclick="alert('Opens the 1st assessor\\'s complete F004 as one document.')">View full 1st assessment</button>
+ </div></div></div></div>`;
+}
+
+const RVSTATE={};
+function rv(i,mode){
+ RVSTATE[i]=mode;
+ const box=document.getElementById('rv'+i), own=document.getElementById('rvo'+i), st=document.getElementById('rvs'+i);
+ if(box){ box.classList.toggle('is-agree',mode==='agree'); box.classList.toggle('is-differ',mode==='differ'); }
+ if(own) own.hidden = mode!=='differ';
+ if(st) st.innerHTML = mode==='agree'
+   ? '<span class="tick">Copied into my F004 as the same answer</span>'
+   : 'The manager will see both answers side by side';
+ rvCount();
+}
+function rvCount(){
+ const total=A1_0179.length;
+ let ag=0,df=0;
+ Object.values(RVSTATE).forEach(v=>{ if(v==='agree')ag++; else if(v==='differ')df++; });
+ const set=(id,v)=>{const e=document.getElementById(id); if(e) e.textContent=v;};
+ set('cAg',ag); set('cDf',df); set('cNr',total-ag-df);
+}
+function submit2(){
+ const total=A1_0179.length, done=Object.keys(RVSTATE).length;
+ if(done<total){ alert('Please mark agree or differ on all '+total+' items first. '+(total-done)+' still to go.'); return; }
+ const df=Object.values(RVSTATE).filter(v=>v==='differ').length;
+ alert('2nd assessment submitted.\n\nAgreed on '+(total-df)+' items, differ on '+df+'.\n\nThe manager is notified and will see both assessments side by side.');
+ setView('mywork');
 }
 
 /* ============ manager: assign 2nd assessor, move report, decide ============ */
@@ -741,37 +1023,52 @@ function reassign(no,cur){document.getElementById('page').innerHTML=`
  <button class="btn ghost" onclick="setView('overview')">Cancel</button></div></div></div>`;}
 
 function vCompare(){
- const rows=[
-  ['2.6 Categorisation','Serious — indirect harm from an incorrect IVD test result','Serious — indirect harm from an incorrect IVD test result',false],
-  ['2.7 Public health concern','Yes — HIV rapid test','Yes — HIV rapid test',false],
-  ['4.1 Expectedness','Unexpected','Unexpected',false],
-  ['4.2 Causal association','Probable','Possible',true],
-  ['5.0 Signal detection','Potential signal — public health impact; pattern of similar events','Potential signal — public health impact',true],
-  ['6.0 Risk level','High','Medium',true],
-  ['7.x Proposed actions','Request for samples and laboratory analysis; Risk communication','Request for samples and laboratory analysis; Enhance monitoring',true],
-  ['Conclusion','Three kits from one lot gave false negatives against a known positive control. Lot records normal through customs.','False negatives confirmed, but the cold-chain log shows a nine-hour gap at the regional store on 22 July — storage is the more likely source.',true],
-  ['Assessor','A. Kimaro · 09 Aug 2026','F. Ngowi · 12 Aug 2026',false]];
- const d=rows.filter(r=>r[3]).length;
+ const C=PAIRED['0176'];
+ const items=C.rows.filter(r=>r[0]!=='sub');
+ const d=items.filter(r=>r[4]).length;
+ const rows=C.rows.map(r=>{
+  if(r[0]==='sub') return `<div class="crow sub"><div class="lbl">${r[1]}</div><div class="c1"></div><div class="c2"></div></div>`;
+  const [n,l,a,b,x]=r;
+  return `<div class="crow ${x?'differ':'same'}"><div class="lbl"><span class="n">${n}</span>${l}</div>
+   <div class="c1">${a}</div><div class="c2">${b}</div></div>`;
+ }).join('');
  return `<div class="bar">
   <button class="btn ghost sm" onclick="setView('actions')">Back</button>
   <span class="mono" style="font-size:15px;font-weight:500">MD-AE/2026/0176</span>
-  <span class="muted">SD Bioline HIV 3.0 rapid test kit · Temeke Regional Hospital</span></div>
- <div class="note">The two assessors differ on ${d} of ${rows.length} points. Those rows are marked.</div>
- <div class="cmp"><div class="cmp-h"><div></div><div>1st assessment (7.1)</div><div>2nd assessment (7.2)</div></div>
- ${rows.map(([l,a,b,x])=>`<div class="cmp-r${x?' diff':''}"><div class="lbl">${l}</div><div data-l="${l} — 1st">${a}</div><div data-l="2nd">${b}</div></div>`).join('')}</div>
+  <span class="muted">${C.dev} · ${C.fac}</span>
+  <div class="sp"></div><button class="btn ghost sm" onclick="window.print()">Print both</button></div>
+
+ <div class="note">The two assessors agree on ${items.length-d} points and <b>differ on ${d}</b>. Every differing row is marked in red on the left. On a narrow screen the two columns stay side by side — scroll sideways to compare.</div>
+
+ <div class="legend">
+  <span class="key"><i style="background:var(--a1-bg2)"></i>1st assessor — ${C.a1.who}</span>
+  <span class="key"><i style="background:var(--a2-bg2)"></i>2nd assessor — ${C.a2.who}</span>
+  <span class="key"><i style="background:var(--flag)"></i>they differ</span>
+  <div class="sp"></div>
+  <label class="chk" style="padding:5px 11px"><input type="checkbox" onchange="onlyDiff(this.checked)">Show only the differences</label>
+ </div>
+
+ <div class="dual"><div class="dgrid" id="dgrid">
+  <div class="crow head"><div class="lbl">F004 item</div>
+   <div class="c1">1st assessment — section 7.1<span class="who">${C.a1.who} · submitted ${C.a1.date}</span></div>
+   <div class="c2">2nd assessment — section 7.2<span class="who">${C.a2.who} · submitted ${C.a2.date}</span></div></div>
+  ${rows}
+ </div></div>
+
  <div class="card" style="margin-top:20px"><div class="card-h"><h2>Record your decision</h2></div><div class="card-b">
  <div class="f"><label>Decision <i>*</i></label><select><option>Choose one</option>
   <option>Close — no further action</option>
   ${MITIGATIONS.map(m=>`<option>${m}</option>`).join('')}
   <option>Other</option></select>
   <div class="sub">The list follows the mitigation actions in F004 section 7. More than one action can be recorded in the reasons.</div></div>
- <div class="f"><label>Which assessment did you follow?</label>
-  <div class="checks">${['1st assessment','2nd assessment','Neither — my own conclusion'].map(c=>`<label class="chk"><input type="radio" name="fw">${c}</label>`).join('')}</div></div>
- <div class="f"><label>Reasons <i>*</i></label><textarea placeholder="Explain the decision, especially where the two assessors differed."></textarea></div>
- <div class="bar" style="margin:0"><button class="btn" onclick="alert('Decision recorded and locked. Everyone involved is notified.');setView('overview')">Record decision and close</button>
+ <div class="f"><label>On the ${d} points where they differ, which do you follow?</label>
+  <div class="checks">${['1st assessor','2nd assessor','Neither — my own conclusion'].map(c=>`<label class="chk"><input type="radio" name="fw">${c}</label>`).join('')}</div></div>
+ <div class="f"><label>Reasons <i>*</i></label><textarea placeholder="Explain the decision, especially on the points where the two assessors differed."></textarea></div>
+ <div class="bar" style="margin:0"><button class="btn" onclick="alert('Decision recorded and locked. Both assessors and the reporter are notified.');setView('overview')">Record decision and close</button>
  <button class="btn ghost" onclick="alert('Sent back with a note.')">Send back for more work</button></div>
  </div></div>`;
 }
+function onlyDiff(on){const g=document.getElementById('dgrid');if(g)g.classList.toggle('only',on);}
 
 /* ============ public orange form — TMDA/DMD/MDV/F/001 Rev 06 ============ */
 const OSTEPS=[
