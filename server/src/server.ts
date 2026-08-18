@@ -85,6 +85,8 @@ export async function buildServer(config: Config = loadConfig()): Promise<Fastif
   await app.register(staffDoor, {
     host: config.STAFF_HOST,
     publicOrigin: publicOrigin(config),
+    sessionIdleMinutes: config.SESSION_IDLE_MINUTES,
+    sessionAbsoluteHours: config.SESSION_ABSOLUTE_HOURS,
   });
 
   return app;

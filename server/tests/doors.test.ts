@@ -295,21 +295,43 @@ describe("orange form wizard", () => {
 });
 
 describe("staff sign-in", () => {
-  it("answers the sign-in form instead of 404ing, without authenticating", async () => {
-    const res = await app.inject({
+  /** Post the form the way a browser would, with no JavaScript involved. */
+  async function signIn(fields: Record<string, string>) {
+    return app.inject({
       method: "POST",
       url: "/login",
       headers: {
         host: config.STAFF_HOST,
         "content-type": "application/x-www-form-urlencoded",
       },
-      payload: new URLSearchParams({ email: "a@tmda.go.tz", password: "hunter2" }).toString(),
+      payload: new URLSearchParams(fields).toString(),
     });
+  }
 
-    expect(res.statusCode).toBe(503);
-    expect(res.body).toContain("Sign-in is not available yet");
-    // The submitted password must not come back on the page.
+  // Every case here omits either the address or the password, so the shape check answers before
+  // the first query. That is what keeps this suite runnable without a database; sign-in against
+  // real rows is tests/integration/staff-login.test.ts.
+  it("rejects a submission with no password before it reaches the database", async () => {
+    const res = await signIn({ email: "a@tmda.go.tz" });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toContain("Email or password is incorrect");
+  });
+
+  it("never echoes the submitted password back onto the page", async () => {
+    const res = await signIn({ email: "", password: "hunter2" });
+
     expect(res.body).not.toContain("hunter2");
+  });
+
+  it("says the same thing however the credentials are malformed", async () => {
+    // Distinguishing "no such account" from "wrong password" hands an attacker a list of real
+    // staff addresses. Both malformed shapes must produce one sentence.
+    const missingPassword = await signIn({ email: "a@tmda.go.tz" });
+    const missingEmail = await signIn({ password: "hunter2" });
+
+    expect(missingPassword.body).toContain("Email or password is incorrect");
+    expect(missingEmail.body).toContain("Email or password is incorrect");
   });
 });
 
