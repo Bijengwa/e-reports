@@ -8,7 +8,7 @@ import {
   EXPECTEDNESS_OPTIONS,
   F004_VERSION,
   type F004Answers,
-  IMDRF_BLOCKS,
+  IMDRF_GROUPS,
   IMDRF_NOTE,
   type Issue,
   list,
@@ -20,6 +20,7 @@ import {
   SERIOUSNESS_OPTIONS,
   SIGNAL_CRITERIA,
   SIGNAL_NOTE,
+  SIGNAL_OPTIONS,
   SOURCE_IVD_GUIDANCE,
   SOURCE_MD_GUIDANCE,
   SOURCE_NOTE,
@@ -27,6 +28,9 @@ import {
   value,
   YES_NO,
 } from "../../../domain/f004.js";
+
+/** a, b, c, … — the paper's own sub-labels, for the IMDRF items and the signal criteria list. */
+const LETTERS = "abcdefghij";
 
 /**
  * TMDA/DMD/MDV/F/004 Rev 05, on the web.
@@ -153,34 +157,6 @@ function FactRow({
         <input id={name} name={name} value={value(answers, name)} />
       </div>
     </>
-  );
-}
-
-function Ticks({
-  name,
-  options,
-  answers,
-}: {
-  name: string;
-  options: readonly { value: string; label: string }[];
-  answers: F004Answers;
-}): JSX.Element {
-  const chosen = list(answers, name);
-
-  return (
-    <div class="f4-ticks">
-      {options.map((option) => (
-        <label class={chosen.includes(option.value) ? "f4-tick on" : "f4-tick"}>
-          <input
-            type="checkbox"
-            name={name}
-            value={option.value}
-            checked={chosen.includes(option.value)}
-          />
-          <span safe>{option.label}</span>
-        </label>
-      ))}
-    </div>
   );
 }
 
@@ -351,7 +327,9 @@ export function F004Form({
                 {SOURCE_NOTE}
               </p>
             </div>
-            <Ticks name="source_of_event" options={SOURCE_OPTIONS} answers={answers} />
+            {/* One category, not several: the form asks the assessor to select the source that
+                best describes the event, not to tick every one that might apply. */}
+            <Radios name="source_of_event" options={SOURCE_OPTIONS} answers={answers} />
             <Comment name="c2_5" answers={answers} />
           </div>
 
@@ -382,41 +360,50 @@ export function F004Form({
 
         <section class="f4-section">
           <Bar no="3" title="IMDRF category of the adverse incident / event" />
-          {IMDRF_BLOCKS.map((block) => (
+          {IMDRF_GROUPS.map((group) => (
             <div class="f4-block">
               <div class="f4-blocktitle">
                 <span class="f4-no" safe>
-                  {block.no}
+                  {group.no}
                 </span>{" "}
-                <span safe>{block.title}</span>
+                <span safe>{group.title}</span>
               </div>
-              <p class="f4-note" safe>
-                {block.annex}
-              </p>
-              <div class="f4-grid">
-                {[1, 2, 3]
-                  .filter((level) => level <= block.levels)
-                  .map((level) => (
+
+              {group.items.map((item) => (
+                <div class="f4-imdrf-item">
+                  <div class="f4-imdrf-h">
+                    <span class="f4-letter" safe>{`(${item.letter})`}</span>{" "}
+                    <span safe>{item.title}</span>
+                  </div>
+                  <p class="f4-note" safe>
+                    {item.annex}
+                  </p>
+                  <div class="f4-grid">
+                    {[1, 2, 3]
+                      .filter((level) => level <= item.levels)
+                      .map((level) => (
+                        <div class="f4-field">
+                          <label for={`imdrf_${item.key}_l${level}`}>
+                            Preferred terminology level {String(level)}
+                          </label>
+                          <input
+                            id={`imdrf_${item.key}_l${level}`}
+                            name={`imdrf_${item.key}_l${level}`}
+                            value={value(answers, `imdrf_${item.key}_l${level}`)}
+                          />
+                        </div>
+                      ))}
                     <div class="f4-field">
-                      <label for={`imdrf_${block.key}_l${level}`}>
-                        Preferred terminology level {String(level)}
-                      </label>
+                      <label for={`imdrf_${item.key}_code`}>Coding</label>
                       <input
-                        id={`imdrf_${block.key}_l${level}`}
-                        name={`imdrf_${block.key}_l${level}`}
-                        value={value(answers, `imdrf_${block.key}_l${level}`)}
+                        id={`imdrf_${item.key}_code`}
+                        name={`imdrf_${item.key}_code`}
+                        value={value(answers, `imdrf_${item.key}_code`)}
                       />
                     </div>
-                  ))}
-                <div class="f4-field">
-                  <label for={`imdrf_${block.key}_code`}>Coding</label>
-                  <input
-                    id={`imdrf_${block.key}_code`}
-                    name={`imdrf_${block.key}_code`}
-                    value={value(answers, `imdrf_${block.key}_code`)}
-                  />
+                  </div>
                 </div>
-              </div>
+              ))}
             </div>
           ))}
           <p class="f4-note" safe>
@@ -478,21 +465,26 @@ export function F004Form({
 
         <section class="f4-section">
           <Bar no="5" title="Signal detection" />
-          <div class="f4-guide">
-            <p>
-              Assess whether the reported adverse event/incident represents a potential safety
-              signal by considering the following criteria:
-            </p>
-            <ul>
-              {SIGNAL_CRITERIA.map((line) => (
-                <li safe>{line}</li>
-              ))}
-            </ul>
-            <p class="f4-note" safe>
-              {SIGNAL_NOTE}
-            </p>
+          <div class="f4-block">
+            <div class="f4-guide">
+              <p>
+                Assess whether the reported adverse event/incident represents a potential safety
+                signal by considering the following criteria:
+              </p>
+              <ul>
+                {SIGNAL_CRITERIA.map((line, index) => (
+                  <li>
+                    <strong>({LETTERS[index]})</strong> <span safe>{line}</span>
+                  </li>
+                ))}
+              </ul>
+              <p class="f4-note" safe>
+                {SIGNAL_NOTE}
+              </p>
+            </div>
+            <Radios name="signal_status" options={SIGNAL_OPTIONS} answers={answers} />
+            <Comment name="c5" answers={answers} rows={4} />
           </div>
-          <Comment name="c5" answers={answers} rows={4} />
         </section>
 
         <section class="f4-section">
@@ -562,15 +554,35 @@ export function F004Form({
           </div>
 
           {/* 7.2 belongs to the second assessor. Shown so the document is recognisably the whole
-              form, empty and inert so it cannot be completed on their behalf. */}
+              form — the same eleven actions and a conclusion box, laid out exactly as 7.1 is — but
+              disabled and empty, and every control here carries no `name`. A disabled field is
+              not submitted regardless, but omitting the name too means there is no field in this
+              block the request body could ever carry a value under, whatever reaches the server. */}
           <div class="f4-block f4-locked">
             <div class="f4-blocktitle">
               <span class="f4-no">7.2</span> Second assessor concluding remarks
             </div>
-            <p class="f4-note">
-              The second assessor's section. It is not yours to complete, and it opens when the
-              report reaches them.
-            </p>
+            <p class="f4-pending">Pending second assessor review</p>
+            <div class="f4-ticks f4-11">
+              {ACTIONS.map((action) => (
+                <label class="f4-tick f4-tick-locked">
+                  <input type="checkbox" disabled />
+                  <span>
+                    <span class="f4-no" safe>
+                      {action.no}
+                    </span>{" "}
+                    <span safe>{action.label}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <div class="f4-field">
+              <textarea
+                rows="3"
+                disabled
+                placeholder="(To be completed by the second assessor upon review)"
+              />
+            </div>
           </div>
         </section>
 

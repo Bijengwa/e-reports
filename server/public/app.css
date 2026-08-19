@@ -1522,91 +1522,140 @@ textarea[aria-invalid="true"] {
 .f4 fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .f4 fieldset[disabled] { opacity: 0.85; }
 
+/* One rule for every field in the document, so a dozen selectors do not each restate the same
+   border, radius and background. Radios and checkboxes are excluded because width:100% and a
+   text-field border would misshape them, not because they are styled differently on purpose. */
+.f4 input:not([type="radio"]):not([type="checkbox"]),
+.f4 textarea {
+  width: 100%; border: 1px solid #d0dcec; border-radius: 8px; padding: 6px 10px;
+  font-family: inherit; font-size: 12.5px; background: #fafcff;
+}
+.f4 textarea { resize: vertical; min-height: 50px; }
+.f4 input[type="radio"], .f4 input[type="checkbox"] { accent-color: #0b3b5c; }
+
 .f4-head {
-  display: flex; gap: 18px; align-items: flex-start; justify-content: space-between;
-  border: 1px solid var(--rule); border-bottom: 0; padding: 14px 16px; background: var(--card);
+  display: flex; gap: 18px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap;
+  border-bottom: 3px solid #0b3b5c; padding: 2px 2px 16px; margin-bottom: 4px;
 }
-.f4-authority { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3); }
-.f4-title { font-size: 15px; font-weight: 600; margin-top: 6px; max-width: 46ch; }
-.f4-stamp { font-size: 11px; color: var(--ink-3); text-align: right; white-space: nowrap; }
+.f4-authority { font-size: 11px; letter-spacing: 0.03em; color: #1e3a5f; font-weight: 500; }
+.f4-authority + .f4-authority { font-weight: 700; }
+.f4-title { font-size: 16px; font-weight: 700; color: #0b2a41; margin-top: 5px; max-width: 46ch; line-height: 1.3; }
+.f4-stamp {
+  background: #eef3f9; border: 1px solid #cbd8e6; border-radius: 40px;
+  padding: 7px 16px; font-size: 11px; font-weight: 600; color: #1a405b; text-align: right; white-space: nowrap;
+}
 
+/* The assessor strip: a pill, not a table row, so the two who have signed and the two who have
+   not read as one group rather than four cells that happen to share a border. */
 .f4-assessors {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 2px 18px;
-  background: #eaf1f8; border: 1px solid #cddcea; padding: 10px 16px;
+  display: flex; flex-wrap: wrap; gap: 8px 30px;
+  background: #f8fafc; border: 1px solid #dde5ef; border-radius: 40px;
+  padding: 10px 20px; margin: 4px 0 20px;
 }
-.f4-assessors > div { display: flex; gap: 8px; align-items: baseline; }
-.f4-k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: #33628f; }
-.f4-v { font-weight: 600; }
-.f4-muted, .f4-muted .f4-v { color: var(--ink-3); font-weight: 400; }
+.f4-assessors > div { display: flex; gap: 6px; align-items: baseline; }
+.f4-k { font-size: 12px; font-weight: 600; color: #1f4a6e; }
+.f4-v { font-weight: 500; color: #0b2a41; }
+.f4-muted, .f4-muted .f4-v { opacity: 0.65; font-weight: 400; }
 
-.f4-section { border: 1px solid var(--rule); border-top: 0; break-inside: avoid; }
+.f4-section { border: 1px solid #e0e8f2; border-radius: 14px; overflow: hidden; margin-bottom: 22px; break-inside: avoid; }
 .f4-bar {
-  background: #003366; color: #fff; padding: 8px 16px; font-weight: 600;
-  display: flex; gap: 10px; align-items: baseline; letter-spacing: 0.01em;
+  background: #0b3b5c; color: #fff; padding: 10px 18px; font-weight: 600; font-size: 14px;
+  display: flex; gap: 10px; align-items: center; letter-spacing: 0.01em;
 }
-.f4-bar-no { opacity: 0.75; font-variant-numeric: tabular-nums; }
+/* Gold, not a tint of the bar itself — the number has to read as a mark on the bar, not as part
+   of its background, which is what a same-hue badge would do. */
+.f4-bar-no {
+  background: #f5c542; color: #0b2a41; padding: 2px 11px; border-radius: 30px;
+  font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
 
-.f4-colheads {
-  display: grid; grid-template-columns: 1.15fr 1fr; gap: 16px; padding: 6px 16px;
-  background: #f3f6f9; border-bottom: 1px solid var(--rule);
-  font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-3);
-}
 .f4-row {
   display: grid; grid-template-columns: 1.15fr 1fr; gap: 16px;
-  padding: 10px 16px; border-bottom: 1px solid var(--rule); break-inside: avoid;
+  padding: 12px 18px; border-bottom: 1px solid #eaf0f6; break-inside: avoid;
 }
+.f4-row:last-child { border-bottom: 0; }
 .f4-req { display: flex; gap: 10px; }
-.f4-no { color: #003366; font-weight: 600; font-variant-numeric: tabular-nums; }
-.f4-label { color: var(--ink-2); }
-.f4-filled { margin-top: 3px; font-weight: 500; }
-.f4-blank { margin-top: 3px; color: var(--ink-3); font-style: italic; }
-.f4-comment textarea { width: 100%; }
-
-.f4-block { padding: 12px 16px; border-bottom: 1px solid var(--rule); break-inside: avoid; }
-.f4-blocktitle { font-weight: 600; margin-bottom: 6px; }
-.f4-guide { background: #f7f9fb; border-left: 3px solid #cddcea; padding: 10px 12px; margin-bottom: 10px; }
-.f4-guide-h { font-weight: 600; margin-bottom: 4px; }
-.f4-guide ul { margin: 0 0 8px 16px; }
-.f4-guide li { margin-bottom: 4px; }
-.f4-note { color: var(--ink-3); font-size: 12px; }
-
-.f4-ticks { display: grid; gap: 6px; margin-bottom: 10px; }
-.f4-11 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
-.f4-tick {
-  display: flex; gap: 8px; align-items: flex-start; padding: 7px 10px;
-  border: 1px solid var(--rule); border-radius: var(--r); cursor: pointer;
+.f4-comment { padding-left: 16px; border-left: 1px dashed #cbd8e6; }
+.f4-no { color: #0b3b5c; font-weight: 700; font-variant-numeric: tabular-nums; font-size: 12px; }
+.f4-label { color: #1e3a5f; font-size: 13px; }
+.f4-filled {
+  margin-top: 4px; font-weight: 500; background: #f2f6fc; padding: 2px 11px;
+  border-radius: 16px; display: inline-block; word-break: break-word;
 }
-.f4-tick.on { border-color: #003366; background: #eef3f9; }
+.f4-blank { margin-top: 4px; color: #8a9eb0; font-style: italic; font-size: 12px; }
+
+.f4-block { padding: 14px 18px; border-bottom: 1px solid #eaf0f6; break-inside: avoid; }
+.f4-block:last-child { border-bottom: 0; }
+.f4-blocktitle { font-weight: 700; color: #0b2a41; margin-bottom: 8px; }
+.f4-guide {
+  background: #f5f9ff; border-left: 4px solid #7fa3c4; border-radius: 0 10px 10px 0;
+  padding: 10px 14px; margin-bottom: 12px; font-size: 12.5px; color: #1a3d57;
+}
+.f4-guide-h { font-weight: 600; margin: 6px 0 2px; }
+.f4-guide ul { margin: 4px 0 8px 20px; }
+.f4-guide li { margin-bottom: 3px; }
+.f4-note {
+  color: #2d5a7a; font-size: 11.5px; background: #ecf3fa; padding: 3px 11px;
+  border-radius: 30px; display: inline-block; margin: 4px 0;
+}
+
+/* Pills, not checklist rows: the paper's ticks read as small marks beside a line of text, and a
+   full-width bordered row for each one overstates a single tick the way a table would. */
+.f4-ticks { display: flex; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 10px; }
+.f4-11 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 6px 14px; }
+.f4-tick {
+  display: flex; align-items: baseline; gap: 6px; font-size: 13px;
+  background: #f5f8fe; border: 1px solid #d9e4ef; border-radius: 30px; padding: 5px 14px 5px 10px;
+  cursor: pointer;
+}
+.f4-tick.on { background: #dce8f5; border-color: #2f6b9b; }
+.f4-tick-locked { background: #f4f7fc; border-style: dashed; color: #8a9eb0; cursor: default; }
+
 .f4-field { margin-bottom: 10px; }
-.f4-field label { display: block; font-size: 12px; color: var(--ink-3); margin-bottom: 3px; }
-.f4-field textarea, .f4-field input { width: 100%; }
-.f4-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.f4-field label { display: block; font-size: 12px; font-weight: 500; color: #1f4a6e; margin-bottom: 3px; }
+.f4-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin-top: 6px; }
+
+/* IMDRF: one group per f4-block, one sub-item per (a)/(b)/(c) inside it. */
+.f4-imdrf-item + .f4-imdrf-item { margin-top: 14px; }
+.f4-imdrf-h { font-weight: 600; color: #0b2a41; font-size: 12.5px; margin-bottom: 3px; }
+.f4-letter { color: #0b3b5c; font-weight: 700; }
 
 .f4-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; }
 .f4-card {
-  border: 1px solid var(--rule); border-radius: var(--r); padding: 10px 12px; cursor: pointer;
-  background: var(--card); break-inside: avoid;
+  border: 1px solid #d9e4ef; border-radius: 12px; padding: 12px 14px; cursor: pointer;
+  background: #fafcff; break-inside: avoid;
 }
-.f4-card.on { border-color: #003366; box-shadow: inset 0 0 0 1px #003366; background: #eef3f9; }
+.f4-card.on { border-color: #0b3b5c; background: #f0f6ff; box-shadow: 0 0 0 1px #0b3b5c; }
 .f4-card-h { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
-.f4-card-c { font-size: 12px; color: var(--ink-2); margin: 0 0 0 2px; }
-ul.f4-card-c { padding-left: 16px; }
+.f4-card-c { font-size: 12.5px; color: #1f405b; margin: 0; }
+ul.f4-card-c { padding-left: 18px; list-style: disc; }
 ul.f4-card-c li { margin-bottom: 3px; }
 
-.f4-risk .f4-card { border-left-width: 4px; }
-.f4-card.r-critical { border-left-color: #b3261e; }
-.f4-card.r-high { border-left-color: #c25e00; }
-.f4-card.r-medium { border-left-color: #8a6d00; }
-.f4-card.r-low { border-left-color: #2e7d4f; }
+/* The left accent is the only cue that survives a glance: critical/high/medium/low in one colour
+   sweep, matched to the severity so red reads as the worst outcome without reading the label. */
+.f4-risk .f4-card { border-left-width: 6px; }
+.f4-card.r-critical { border-left-color: #a02020; }
+.f4-card.r-high { border-left-color: #c95a1a; }
+.f4-card.r-medium { border-left-color: #d4a11e; }
+.f4-card.r-low { border-left-color: #3f7e5a; }
 
-.f4-locked { background: #fafafa; }
-.f4-sign { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; padding: 12px 16px; }
-.f4-buttons { margin: 16px 0 4px; }
+.f4-locked { background: #f8fafd; border-top: 2px dashed #b8cde0; }
+.f4-pending {
+  display: inline-block; font-size: 12.5px; color: #1f4a6e; background: #eef3fa;
+  padding: 4px 14px; border-radius: 30px; margin-bottom: 12px;
+}
+.f4-sign { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; padding: 14px 18px; }
+.f4-buttons {
+  display: flex; gap: 12px; margin: 22px 0 4px; justify-content: flex-end;
+  border-top: 1px solid #dde5ef; padding-top: 18px;
+}
+.f4-buttons .btn { border-radius: 40px; padding: 9px 26px; }
 .f4-source { margin-top: 26px; }
 .f4-source summary { cursor: pointer; font-weight: 600; padding: 8px 0; }
 
 @media (max-width: 900px) {
-  .f4-row, .f4-colheads { grid-template-columns: 1fr; }
+  .f4-row, .f4-grid, .f4-11, .f4-sign { grid-template-columns: 1fr; }
+  .f4-comment { padding-left: 0; border-left: 0; border-top: 1px dashed #cbd8e6; padding-top: 8px; margin-top: 6px; }
 }
 @media print {
   .rail, .top, .f4-buttons { display: none !important; }
@@ -1638,7 +1687,7 @@ ul.f4-card-c li { margin-bottom: 3px; }
   }
   #a1-form:checked ~ .a1-tabs label[for="a1-form"],
   #a1-report:checked ~ .a1-tabs label[for="a1-report"] {
-    background: #003366; color: #fff; border-color: #003366;
+    background: #0b3b5c; color: #fff; border-color: #0b3b5c;
   }
   #a1-form:checked ~ .a1-split .a1-report { display: none; }
   #a1-report:checked ~ .a1-split .a1-form { display: none; }
@@ -1647,19 +1696,22 @@ ul.f4-card-c li { margin-bottom: 3px; }
 /* ---------- section 1: number | requirement | value ---------- */
 .f4-fact {
   display: grid;
-  grid-template-columns: 46px minmax(140px, 1fr) minmax(0, 1.4fr);
-  gap: 12px; padding: 7px 16px 3px; align-items: baseline; break-inside: avoid;
+  grid-template-columns: 46px minmax(150px, 1fr) minmax(0, 1.4fr);
+  gap: 10px 12px; padding: 9px 18px 5px; align-items: start; break-inside: avoid;
 }
-.f4-fact .f4-value { font-weight: 500; }
-.f4-fact .f4-blank { font-style: italic; color: var(--ink-3); }
-.f4-note-line { padding: 0 16px 8px 74px; border-bottom: 1px solid var(--rule); }
-.f4-note-line label { font-size: 11px; color: var(--ink-3); }
-.f4-note-line input { width: 100%; font-size: 12px; padding: 4px 8px; }
+.f4-fact .f4-value {
+  font-weight: 500; background: #f2f6fc; padding: 2px 11px; border-radius: 16px;
+  display: inline-block; width: fit-content; word-break: break-word;
+}
+.f4-fact .f4-blank { font-style: italic; color: #8a9eb0; font-size: 12px; }
+.f4-note-line { padding: 0 18px 10px 74px; border-bottom: 1px solid #eaf0f6; }
+.f4-note-line label { font-size: 11px; color: #7c8fa3; }
+.f4-note-line input { font-size: 12px; padding: 5px 10px; }
 
 @media (max-width: 900px) {
-  .f4-fact { grid-template-columns: 40px 1fr; }
-  .f4-fact .f4-value, .f4-fact .f4-blank { grid-column: 2; }
-  .f4-note-line { padding-left: 16px; }
+  .f4-fact { grid-template-columns: 30px 1fr; }
+  .f4-fact .f4-value, .f4-fact .f4-blank { grid-column: 1 / -1; margin-top: 2px; }
+  .f4-note-line { padding-left: 18px; }
 }
 
 /* ---------- my assessments ---------- */

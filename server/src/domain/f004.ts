@@ -232,13 +232,14 @@ export const YES_NO: readonly Option[] = [
 // ---- 3. IMDRF category of the adverse incident/event -------------------------
 
 /**
- * The IMDRF blocks, each a set of preferred-terminology levels and a code.
+ * One IMDRF terminology: a set of preferred-terminology levels and a code.
  *
- * A labelled grid per block rather than one free-text box: the annex, the levels and the coding
- * are separate facts on the paper, and flattening them would lose which annex a term came from.
+ * A labelled grid rather than one free-text box: the annex, the levels and the coding are
+ * separate facts on the paper, and flattening them would lose which annex a term came from.
  */
-export type ImdrfBlock = {
-  no: string;
+export type ImdrfItem = {
+  /** The paper's own sub-label: 3.1(a), 3.1(b), and so on. */
+  letter: string;
   key: string;
   title: string;
   annex: string;
@@ -246,56 +247,82 @@ export type ImdrfBlock = {
   levels: 1 | 2 | 3;
 };
 
-export const IMDRF_BLOCKS: readonly ImdrfBlock[] = [
+/**
+ * The paper groups its seven IMDRF terminologies under three headings, lettered within each —
+ * 3.1(a)/(b), 3.2(a)/(b), 3.3(a)/(b)/(c) — not as seven numbered blocks of their own. The grouping
+ * is itself part of the form: 3.1 is "the category of the adverse incident reported", 3.2 is "the
+ * category of adverse events reported", and 3.3 is the cause investigation, in three stages.
+ */
+export type ImdrfGroup = { no: string; title: string; items: readonly ImdrfItem[] };
+
+export const IMDRF_GROUPS: readonly ImdrfGroup[] = [
   {
     no: "3.1",
-    key: "component",
-    title: "Component of the medical device involved in the incident (If applicable)",
-    annex: "IMDRF N43 Annex G — Medical Device Component",
-    levels: 3,
+    title: "Category of the adverse incident reported",
+    items: [
+      {
+        letter: "a",
+        key: "component",
+        title: "Component of the medical device involved in the incident (If applicable)",
+        annex: "IMDRF N43 Annex G — Medical Device Component",
+        levels: 3,
+      },
+      {
+        letter: "b",
+        key: "device_problem",
+        title: "Medical device problem (If applicable)",
+        annex: "IMDRF N43 Annex A — adverse incident terminologies and coding",
+        levels: 3,
+      },
+    ],
   },
   {
     no: "3.2",
-    key: "device_problem",
-    title: "Medical device problem (If applicable)",
-    annex: "IMDRF N43 Annex A — adverse incident terminologies and coding",
-    levels: 3,
+    title: "Category of adverse events reported",
+    items: [
+      {
+        letter: "a",
+        key: "health_impact",
+        title: "Health effects — health impact (If applicable)",
+        annex: "IMDRF N43 Annex F — adverse event terminologies and coding",
+        levels: 3,
+      },
+      {
+        letter: "b",
+        key: "clinical_signs",
+        title:
+          "Health effects — clinical signs and symptoms or conditions of the affected person (If applicable)",
+        annex: "IMDRF N43 Annex E — terminologies and coding of conditions",
+        levels: 3,
+      },
+    ],
   },
   {
     no: "3.3",
-    key: "health_impact",
-    title: "Health effects — health impact (If applicable)",
-    annex: "IMDRF N43 Annex F — adverse event terminologies and coding",
-    levels: 3,
-  },
-  {
-    no: "3.4",
-    key: "clinical_signs",
-    title:
-      "Health effects — clinical signs and symptoms or conditions of the affected person (If applicable)",
-    annex: "IMDRF N43 Annex E — terminologies and coding of conditions",
-    levels: 3,
-  },
-  {
-    no: "3.5",
-    key: "investigation_type",
-    title: "Cause investigation — type of investigation",
-    annex: "IMDRF N43 Annex B",
-    levels: 1,
-  },
-  {
-    no: "3.6",
-    key: "investigation_findings",
-    title: "Cause investigation — investigation findings (If applicable)",
-    annex: "IMDRF N43 Annex C",
-    levels: 3,
-  },
-  {
-    no: "3.7",
-    key: "investigation_conclusion",
-    title: "Cause investigation — investigation conclusion (If applicable)",
-    annex: "IMDRF N43 Annex D",
-    levels: 2,
+    title: "Investigation of the adverse event/incident reported",
+    items: [
+      {
+        letter: "a",
+        key: "investigation_type",
+        title: "Cause investigation — type of investigation",
+        annex: "IMDRF N43 Annex B",
+        levels: 1,
+      },
+      {
+        letter: "b",
+        key: "investigation_findings",
+        title: "Cause investigation — investigation findings (If applicable)",
+        annex: "IMDRF N43 Annex C",
+        levels: 3,
+      },
+      {
+        letter: "c",
+        key: "investigation_conclusion",
+        title: "Cause investigation — investigation conclusion (If applicable)",
+        annex: "IMDRF N43 Annex D",
+        levels: 2,
+      },
+    ],
   },
 ];
 
@@ -387,6 +414,14 @@ export const SIGNAL_CRITERIA: readonly string[] = [
 
 export const SIGNAL_NOTE =
   "Assessor should consider trends and patterns of reported adverse events/incidents in the Adverse Events/Incidents Register when determining whether a potential safety signal exists. However, a single report involving a serious or unexpected event with significant public health implications may also warrant further signal evaluation.";
+
+/** Whether the criteria above amount to a signal. Not on the paper as a named field, but the
+ *  form asks the assessor to "assess whether ... represents a potential safety signal", and a
+ *  reader needs a place to record the answer rather than leaving it implied by the comment. */
+export const SIGNAL_OPTIONS: readonly Option[] = [
+  { value: "signal", label: "Potential safety signal" },
+  { value: "not_signal", label: "Not a signal at this stage" },
+];
 
 // ---- 6. Risk assessment -------------------------------------------------------
 
@@ -494,16 +529,19 @@ export const F004_FIELDS: readonly string[] = [
   "c2_6",
   "public_health",
   "c2_7",
-  ...IMDRF_BLOCKS.flatMap((block) => [
-    `imdrf_${block.key}_l1`,
-    `imdrf_${block.key}_l2`,
-    `imdrf_${block.key}_l3`,
-    `imdrf_${block.key}_code`,
-  ]),
+  ...IMDRF_GROUPS.flatMap((group) =>
+    group.items.flatMap((item) => [
+      `imdrf_${item.key}_l1`,
+      `imdrf_${item.key}_l2`,
+      `imdrf_${item.key}_l3`,
+      `imdrf_${item.key}_code`,
+    ]),
+  ),
   "expectedness",
   "c4_1",
   "causality",
   "c4_3",
+  "signal_status",
   "c5",
   "risk_level",
   "c6",
