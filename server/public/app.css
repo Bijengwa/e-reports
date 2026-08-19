@@ -1464,7 +1464,9 @@ textarea[aria-invalid="true"] {
 .modal {
   border: 1px solid var(--rule);
   border-radius: 7px;
-  padding: 22px 24px;
+  /* No padding here: see the note in the shell. It belongs to .modal-body so that a click whose
+     target is the dialog means the backdrop and nothing else. */
+  padding: 0;
   max-width: 400px;
   width: calc(100% - 32px);
   background: var(--card);
@@ -1473,6 +1475,10 @@ textarea[aria-invalid="true"] {
 
 .modal::backdrop {
   background: rgb(12 59 30 / 45%);
+}
+
+.modal-body {
+  padding: 22px 24px;
 }
 
 .modal h2 {
@@ -1490,18 +1496,3 @@ textarea[aria-invalid="true"] {
   justify-content: flex-end;
 }
 
-/*
- * The destructive answer, in the palette the form already uses for a problem. Green is this app's
- * "go on" colour, and ending a session is not that -- the button that does it should not look like
- * the button that saves a report.
- */
-.btn.danger {
-  background: var(--flag);
-  border-color: var(--flag);
-  color: #fff;
-}
-
-.btn.danger:hover {
-  background: #8d2b19;
-  border-color: #8d2b19;
-}

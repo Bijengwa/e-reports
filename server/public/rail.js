@@ -105,6 +105,20 @@
         setOpen(false);
         dialog.showModal();
       });
+
+      /*
+       * A click on the backdrop cancels, which Escape already does for free.
+       *
+       * The backdrop is not an element of its own: clicking it dispatches a click whose target is
+       * the dialog itself, while anything inside reports one of the dialog's children. The padding
+       * sits on .modal-body precisely so that test stays exact — with padding on the dialog, a
+       * click on its own margin would read as a backdrop click and close the question.
+       *
+       * close() without a value is a cancel: it submits nothing.
+       */
+      dialog.addEventListener("click", function (event) {
+        if (event.target === dialog) dialog.close();
+      });
     }
   });
 })();

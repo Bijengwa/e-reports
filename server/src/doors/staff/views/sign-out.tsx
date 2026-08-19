@@ -1,11 +1,6 @@
 import { BrandMark } from "../../../views/shared/brand-mark.js";
 import { Layout } from "../../../views/shared/layout.js";
 
-export type SignOutPageProps = {
-  /** Whose session is about to end, so the reader can see they are leaving the right account. */
-  fullName: string;
-};
-
 /**
  * Asks before ending the session.
  *
@@ -19,28 +14,26 @@ export type SignOutPageProps = {
  * out from the rest of the app, so a user still held at the forced password change can arrive here
  * — and the shell's rail would offer them pages they cannot open.
  */
-export function SignOutPage({ fullName }: SignOutPageProps): JSX.Element {
+export function SignOutPage(): JSX.Element {
   return (
     <Layout title="Sign out — AE Reports" locale="en" bodyClass="staff-login">
       <div class="login-card">
         <div class="login-header">
           <BrandMark />
-          <h1>Sign out?</h1>
-          <p>
-            You are signed in as <strong safe>{fullName}</strong>.
-          </p>
+          <h1>Sign out</h1>
+          <p>You will need your password to come back.</p>
         </div>
 
         <form method="POST" action="/logout">
-          <div class="bar">
-            <button type="submit" class="btn danger">
-              Sign out
-            </button>
+          <div class="bar modal-actions">
             {/* Back to where they were going, not to the page they came from: a referrer is the
                 browser's to send or withhold, and this is the one destination always open. */}
             <a href="/dashboard" class="btn ghost">
-              Stay signed in
+              Cancel
             </a>
+            <button type="submit" class="btn">
+              Sign out
+            </button>
           </div>
         </form>
       </div>

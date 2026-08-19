@@ -280,24 +280,33 @@ export function StaffShell({
           Cancel is `formmethod="dialog"`: inside the POST form, that button closes the dialog
           instead of submitting it, so dismissing needs no script of its own.
         */}
-        <dialog class="modal" data-signout-dialog aria-labelledby="signout-title">
-          <h2 id="signout-title">Sign out?</h2>
-          {fullName ? (
-            <p class="hint">
-              You are signed in as <strong safe>{fullName}</strong>.
-            </p>
-          ) : (
-            <p class="hint">This will end your session.</p>
-          )}
+        {/*
+          Closed until the script opens it with showModal(), which is what buys the backdrop, the
+          focus trap and Escape-to-close without writing any of them. Rendered on every page rather
+          than fetched, so the question costs nothing when it is asked.
 
-          <form method="POST" action="/logout" class="bar modal-actions">
-            <button type="submit" formmethod="dialog" class="btn ghost">
-              Stay signed in
-            </button>
-            <button type="submit" class="btn danger">
-              Sign out
-            </button>
-          </form>
+          Cancel is `formmethod="dialog"`: inside the POST form, that button closes the dialog
+          instead of submitting it, so dismissing needs no script of its own — which is also what
+          makes Escape safe, since the browser's own cancel closes without submitting.
+
+          The padding lives on the inner element, not on the dialog. That is what lets the script
+          treat "target is the dialog" as "the backdrop was clicked" without catching clicks that
+          merely landed on the box's own padding.
+        */}
+        <dialog class="modal" data-signout-dialog aria-labelledby="signout-title">
+          <div class="modal-body">
+            <h2 id="signout-title">Sign out</h2>
+            <p class="hint">You will need your password to come back.</p>
+
+            <form method="POST" action="/logout" class="bar modal-actions">
+              <button type="submit" formmethod="dialog" class="btn ghost">
+                Cancel
+              </button>
+              <button type="submit" class="btn">
+                Sign out
+              </button>
+            </form>
+          </div>
         </dialog>
       </div>
     </Layout>

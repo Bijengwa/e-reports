@@ -496,17 +496,21 @@ describe.skipIf(!INTEGRATION_ENABLED)("the activity trail", () => {
     expect(forAssessor.body).toContain("data-signout");
   });
 
-  it("carries the sign-out confirmation on the page, with a destructive-looking answer", async () => {
+  it("carries the sign-out confirmation on the page", async () => {
     const { cookie } = await signedInAs("manager");
 
     const body = (await get("/dashboard", cookie)).body;
 
     // Rendered closed — <dialog> hides itself — so nothing flashes before the script runs.
     expect(body).toContain("data-signout-dialog");
-    expect(body).toContain("Sign out?");
-    // Ending a session is not the app's "go on" action, so its button is not the green one.
-    expect(body).toContain('class="btn danger"');
-    // Cancel closes the dialog without submitting, which needs no script of its own.
+    expect(body).toContain('<h2 id="signout-title">Sign out</h2>');
+    expect(body).toContain("You will need your password to come back.");
+    // The name is in the title bar already; the question does not repeat it.
+    expect(body).not.toContain("You are signed in as");
+    // Cancel closes the dialog without submitting, which needs no script of its own — the same
+    // thing the browser's own Escape does.
     expect(body).toContain('formmethod="dialog"');
+    // Cancel comes first, so it sits left of the confirm.
+    expect(body.indexOf("Cancel")).toBeLessThan(body.lastIndexOf("Sign out"));
   });
 });
