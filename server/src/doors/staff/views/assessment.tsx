@@ -17,16 +17,19 @@ export type Assessment1PageProps = {
 };
 
 /**
- * The first assessment of one report: the F004, and the report it is about.
+ * The first assessment of one report: the F004 in full, and the report a click away.
  *
- * Both at once, because assessing is comparing one against the other. Given the width they sit
- * side by side with the report sticky, so scrolling the form does not scroll away the thing being
- * assessed. Below 1200px there is no room for two columns, so they become tabs — the assessor
- * still has both, one at a time, rather than one buried under the other.
+ * It was a permanent 50/50 split, and that was the wrong trade. The F004 is the document being
+ * written — nineteen administrative rows, seven IMDRF grids, four criteria cards — and it was
+ * being written in half a column so a report the assessor needs in glances could sit open beside
+ * it forever. Now the form has the whole main column and the report comes over it when asked for.
+ * That is also what keeps 1.x and 2.x off the screen twice: those values are blended into sections
+ * 1 and 2 already, so the drawer is for the rest of the document.
  *
- * The tabs are two radios and CSS. No script: a page whose only interaction is "show me the other
- * pane" should not stop working because a bundle failed, and the radios sit outside the F004's own
- * form so choosing a tab can never submit an assessment.
+ * A checkbox opens it rather than a script. The drawer has to work for someone whose JavaScript
+ * never arrived, and the CSP rules out the inline handler the usual pattern reaches for. It sits
+ * outside the F004's own form and carries no name, so it is not a field of the assessment; the
+ * script only adds Escape, which is what anyone who has met a drawer tries first.
  *
  * The report is rendered through `ReportDocument`, the same component `/reports/:id` uses, so what
  * is being assessed cannot drift from what was shown.
@@ -58,65 +61,47 @@ export function Assessment1Page({
             {report.deviceName}
           </p>
         </div>
+        {/* A label, not a button: it drives the checkbox below, so it opens the drawer with or
+            without a script running. */}
+        <label for="a1-drawer" class="btn ghost a1-open">
+          The report
+        </label>
         <a href={`/reports/${report.id}`} class="btn ghost">
           ← Back to the report
         </a>
       </div>
 
       <div class="a1-work">
-        <input type="radio" name="a1-view" id="a1-form" class="a1-pick" checked />
-        <input type="radio" name="a1-view" id="a1-report" class="a1-pick" />
+        {/* No name, so it is never posted; outside the F004's form, so it is not its business. */}
+        <input type="checkbox" id="a1-drawer" class="a1-pick" data-a1-drawer />
 
-        <div class="a1-tabs">
-          <label for="a1-report">Report</label>
-          <label for="a1-form">Assessment</label>
-        </div>
+        <F004Form
+          reportId={report.id}
+          answers={answers}
+          device={device}
+          event={event}
+          assessorName={viewerName}
+          assessedOn={assessedOn}
+          submitted={submitted}
+          issues={issues}
+        />
 
-        <div class="a1-split">
-          <div class="a1-pane a1-report">
+        {/* Both siblings of the checkbox, which is what lets CSS alone open them. The scrim says
+            what it is rather than being an unlabelled patch of screen that happens to close
+            things — the sighted reader has the dimmed page to go on, everyone else has this. */}
+        <label for="a1-drawer" class="a1-scrim">
+          <span class="vh">Close the report</span>
+        </label>
+
+        <aside class="a1-drawer" aria-label="The report as filed">
+          <div class="a1-drawer-head">
             <h3>The report as filed</h3>
-            <ReportDocument report={report} />
+            <label for="a1-drawer" class="a1-drawer-close">
+              Close
+            </label>
           </div>
-
-          <div class="a1-pane a1-form">
-            <h3>Assessment 1 — F004</h3>
-
-            {/* Outside F004Form's own <form> on purpose: this is navigation, not a second form,
-                and a plain search input inside the F004's form would let Enter submit a draft
-                nobody asked to save. It never crosses that boundary. */}
-            <nav class="f4-jump" aria-label="Jump to a section of the F004">
-              <input
-                type="search"
-                class="f4-find"
-                placeholder="Find in this F004…"
-                aria-label="Find in this F004"
-                autocomplete="off"
-                data-f4-find
-              />
-              <div class="f4-jump-links">
-                <a href="#section-1">1 Admin</a>
-                <a href="#section-2">2 Event</a>
-                <a href="#section-3">3 IMDRF</a>
-                <a href="#section-4">4 Causality</a>
-                <a href="#section-5">5 Signal</a>
-                <a href="#section-6">6 Risk</a>
-                <a href="#section-7">7 Conclusion</a>
-                <a href="#section-8">8 Signature</a>
-              </div>
-            </nav>
-
-            <F004Form
-              reportId={report.id}
-              answers={answers}
-              device={device}
-              event={event}
-              assessorName={viewerName}
-              assessedOn={assessedOn}
-              submitted={submitted}
-              issues={issues}
-            />
-          </div>
-        </div>
+          <ReportDocument report={report} />
+        </aside>
       </div>
     </StaffShell>
   );

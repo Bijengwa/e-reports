@@ -26,41 +26,54 @@
   --orange-d: #8c3a0f;
   --orange-bg: #fdf0e8;
   --orange-deep: #c24e12;
+  /* The rule the orange door already draws round its own cards, named so the staff side can
+     borrow it when it shows something the reporter filled in. */
+  --orange-line: #f0cfb6;
   --flag: #a8341f;
   --flag-bg: #fbebe7;
 
   /*
-   * The F004's own colour pack: the paper's navy and gold, kept apart from the staff portal's
-   * green and the orange door's own palette above, the same way those two are kept apart from
-   * each other. Every F004 rule reaches for one of these rather than writing a hex of its own, so
-   * a colour used in one rule is guaranteed to be the same colour used in every other — one
-   * decision, not the dozen a scattered set of ad-hoc values would have quietly become.
+   * The F004's colour pack, pointed at the staff portal's own palette.
+   *
+   * It used to be navy and gold, and that was the mistake: an assessment opened inside the staff
+   * portal read as a second product sitting in the first, a document skin arguing with the green
+   * chrome all round it. The names stay — every F004 rule still reaches for a token rather than a
+   * hex of its own — but the values are the staff pack's now. Bars stay dark enough to read as a
+   * form; nothing else asks to be looked at twice.
+   *
+   * The one borrowed hue is the orange door's, and only where a value on this page genuinely came
+   * off the orange form. That is the page saying which half of it the reporter wrote.
    */
-  --f4-navy: #0b3b5c;
-  --f4-gold: #f5c542;
-  --f4-ink: #0b2a41;
-  --f4-ink-2: #1e3a5f;
-  --f4-accent-ink: #1f4a6e;
-  --f4-ink-3: #8a9eb0;
-  --f4-note-ink: #2d5a7a;
-  --f4-line: #e0e8f2;
-  --f4-line-2: #eaf0f6;
-  --f4-tint: #f5f9ff;
-  --f4-tint-2: #f2f6fc;
-  --f4-tint-3: #eef3fa;
-  --f4-field-bg: #fafcff;
-  --f4-field-border: #d0dcec;
-  --f4-pill-border: #d9e4ef;
-  --f4-guide-accent: #7fa3c4;
-  --f4-assessors-bg: #f8fafc;
-  --f4-assessors-border: #dde5ef;
-  --f4-divider: #cbd8e6;
-  --f4-tick-bg: #f5f8fe;
-  --f4-tick-on-bg: #dce8f5;
-  --f4-tick-locked-bg: #f4f7fc;
-  --f4-card-on-bg: #f0f6ff;
-  --f4-locked-bg: #f8fafd;
-  --f4-locked-border: #b8cde0;
+  --f4-bar: var(--green-d);
+  --f4-badge: var(--leaf);
+  --f4-ink: var(--ink);
+  --f4-ink-2: var(--ink-2);
+  --f4-accent-ink: var(--green-d);
+  --f4-ink-3: var(--ink-3);
+  --f4-note-ink: var(--ink-2);
+  --f4-line: var(--rule);
+  --f4-line-2: var(--rule);
+  --f4-tint: var(--green-bg);
+  --f4-tint-2: var(--paper);
+  --f4-tint-3: var(--green-bg);
+  --f4-field-bg: var(--card);
+  --f4-field-border: var(--rule-2);
+  --f4-pill-border: var(--rule);
+  --f4-guide-accent: var(--green);
+  --f4-assessors-bg: var(--paper);
+  --f4-assessors-border: var(--rule);
+  --f4-divider: var(--rule-2);
+  --f4-tick-bg: var(--paper);
+  --f4-tick-on-bg: var(--green-bg);
+  --f4-tick-locked-bg: var(--paper);
+  --f4-card-on-bg: var(--green-bg);
+  --f4-locked-bg: var(--paper);
+  --f4-locked-border: var(--rule-2);
+  /* A value the reporter supplied, wearing the surface it wore on the orange form. */
+  --f4-value-bg: var(--orange-bg);
+  --f4-value-ink: var(--orange-d);
+  --f4-value-border: var(--orange-line);
+  /* Severity, not theme: these four say how bad the event was and do not follow the portal. */
   --f4-risk-critical: #a02020;
   --f4-risk-high: #c95a1a;
   --f4-risk-medium: #d4a11e;
@@ -1564,61 +1577,78 @@ textarea[aria-invalid="true"] {
    text-field border would misshape them, not because they are styled differently on purpose. */
 .f4 input:not([type="radio"]):not([type="checkbox"]),
 .f4 textarea {
-  width: 100%; border: 1px solid var(--f4-field-border); border-radius: 8px; padding: 6px 10px;
-  font-family: inherit; font-size: 12.5px; background: var(--f4-field-bg);
+  width: 100%; border: 1px solid var(--f4-field-border); border-radius: var(--r); padding: 6px 10px;
+  font-family: inherit; font-size: 13px; background: var(--f4-field-bg);
 }
 .f4 textarea { resize: vertical; min-height: 50px; }
-.f4 input[type="radio"], .f4 input[type="checkbox"] { accent-color: var(--f4-navy); }
+.f4 input[type="radio"], .f4 input[type="checkbox"] { accent-color: var(--f4-bar); }
 
+/*
+ * The document masthead, and the page's own toolbar with it.
+ *
+ * Rendered outside the F004's <form> on purpose: it holds a search box, and a text input inside
+ * the real form would make Enter press the first submit button — which is Save draft. Nothing in
+ * here is a field of the assessment, so nothing is lost by keeping it out.
+ */
+.f4-doc-head {
+  background: var(--card); border: 1px solid var(--rule); border-radius: var(--r);
+  padding: 14px 16px; margin-bottom: 16px;
+}
 .f4-head {
   display: flex; gap: 18px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap;
-  border-bottom: 3px solid var(--f4-navy); padding: 2px 2px 16px; margin-bottom: 4px;
+  border-bottom: 1px solid var(--rule); padding-bottom: 12px;
 }
-.f4-authority { font-size: 11px; letter-spacing: 0.03em; color: var(--f4-ink-2); font-weight: 500; }
-.f4-authority + .f4-authority { font-weight: 700; }
-.f4-title { font-size: 16px; font-weight: 700; color: var(--f4-ink); margin-top: 5px; max-width: 46ch; line-height: 1.3; }
-.f4-stamp {
-  background: var(--f4-tint-3); border: 1px solid var(--f4-divider); border-radius: 40px;
-  padding: 7px 16px; font-size: 11px; font-weight: 600; color: var(--f4-ink-2);
-  text-align: right; white-space: nowrap;
-}
+.f4-authority { font-size: 11px; letter-spacing: 0.03em; color: var(--f4-ink-3); font-weight: 500; }
+.f4-authority + .f4-authority { font-weight: 600; color: var(--f4-ink-2); }
+.f4-title { font-size: 15px; font-weight: 600; color: var(--f4-ink); margin-top: 5px; max-width: 46ch; line-height: 1.35; }
+.f4-stamp { font-size: 11px; color: var(--f4-ink-3); text-align: right; white-space: nowrap; }
 
-/* The assessor strip: a pill, not a table row, so the two who have signed and the two who have
-   not read as one group rather than four cells that happen to share a border. */
+/* The assessor strip. A row of facts, on the same surface every other staff page states facts on. */
 .f4-assessors {
-  display: flex; flex-wrap: wrap; gap: 8px 30px;
-  background: var(--f4-assessors-bg); border: 1px solid var(--f4-assessors-border); border-radius: 40px;
-  padding: 10px 20px; margin: 4px 0 20px;
+  display: flex; flex-wrap: wrap; gap: 6px 26px;
+  border-bottom: 1px solid var(--rule); padding: 10px 0;
 }
 .f4-assessors > div { display: flex; gap: 6px; align-items: baseline; }
-.f4-k { font-size: 12px; font-weight: 600; color: var(--f4-accent-ink); }
-.f4-v { font-weight: 500; color: var(--f4-ink); }
-.f4-muted, .f4-muted .f4-v { opacity: 0.65; font-weight: 400; }
+.f4-k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--f4-ink-3); }
+.f4-v { font-weight: 600; color: var(--f4-ink); }
+.f4-muted, .f4-muted .f4-v { color: var(--f4-ink-3); font-weight: 400; }
 
-.f4-section { border: 1px solid var(--f4-line); border-radius: 14px; overflow: hidden; margin-bottom: 22px; break-inside: avoid; }
+.f4-section { border: 1px solid var(--f4-line); border-radius: var(--r); overflow: hidden; margin-bottom: 18px; break-inside: avoid; }
+/* Clears both sticky layers — the 56px staff title bar and the jump bar under it — so a jumped-to
+   green section title lands below them instead of behind them. */
+.f4-section { scroll-margin-top: 116px; }
 .f4-bar {
-  background: var(--f4-navy); color: #fff; padding: 10px 18px; font-weight: 600; font-size: 14px;
+  background: var(--f4-bar); color: #fff; padding: 9px 16px; font-weight: 600; font-size: 13px;
   display: flex; gap: 10px; align-items: center; letter-spacing: 0.01em;
 }
-/* Gold, not a tint of the bar itself — the number has to read as a mark on the bar, not as part
-   of its background, which is what a same-hue badge would do. */
+/* Light against the bar's dark green, so the number reads as a mark on it rather than as part of
+   its background — which is what a same-hue badge would have done. */
 .f4-bar-no {
-  background: var(--f4-gold); color: var(--f4-ink); padding: 2px 11px; border-radius: 30px;
+  background: var(--f4-badge); color: var(--green-d); padding: 1px 9px; border-radius: var(--r);
   font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
 }
 
 .f4-row {
   display: grid; grid-template-columns: 1.15fr 1fr; gap: 16px;
-  padding: 12px 18px; border-bottom: 1px solid var(--f4-line-2); break-inside: avoid;
+  padding: 12px 16px; border-bottom: 1px solid var(--f4-line-2); break-inside: avoid;
 }
 .f4-row:last-child { border-bottom: 0; }
 .f4-req { display: flex; gap: 10px; }
 .f4-comment { padding-left: 16px; border-left: 1px dashed var(--f4-divider); }
-.f4-no { color: var(--f4-navy); font-weight: 700; font-variant-numeric: tabular-nums; font-size: 12px; }
+.f4-no { color: var(--f4-accent-ink); font-weight: 700; font-variant-numeric: tabular-nums; font-size: 12px; }
 .f4-label { color: var(--f4-ink-2); font-size: 13px; }
+/*
+ * A value the reporter filed, wearing the orange form's own surface.
+ *
+ * This is the one place the staff page deliberately does not look like itself: an assessor
+ * scanning section 1 and 2 can see at a glance which lines came off the orange form and which are
+ * theirs to write, without reading either. "Not supplied" is not painted this way — an absence
+ * did not come from the reporter, and colouring it orange would claim it did.
+ */
 .f4-filled {
-  margin-top: 4px; font-weight: 500; background: var(--f4-tint-2); padding: 2px 11px;
-  border-radius: 16px; display: inline-block; word-break: break-word;
+  margin-top: 4px; font-weight: 500; display: inline-block; word-break: break-word;
+  background: var(--f4-value-bg); color: var(--f4-value-ink);
+  border: 1px solid var(--f4-value-border); border-radius: var(--r); padding: 2px 9px;
 }
 .f4-blank { margin-top: 4px; color: var(--f4-ink-3); font-style: italic; font-size: 12px; }
 
@@ -1626,16 +1656,15 @@ textarea[aria-invalid="true"] {
 .f4-block:last-child { border-bottom: 0; }
 .f4-blocktitle { font-weight: 700; color: var(--f4-ink); margin-bottom: 8px; }
 .f4-guide {
-  background: var(--f4-tint); border-left: 4px solid var(--f4-guide-accent); border-radius: 0 10px 10px 0;
+  background: var(--f4-tint); border-left: 3px solid var(--f4-guide-accent); border-radius: 0 var(--r) var(--r) 0;
   padding: 10px 14px; margin-bottom: 12px; font-size: 12.5px; color: var(--f4-ink-2);
 }
 .f4-guide-h { font-weight: 600; margin: 6px 0 2px; }
 .f4-guide ul { margin: 4px 0 8px 20px; }
 .f4-guide li { margin-bottom: 3px; }
-.f4-note {
-  color: var(--f4-note-ink); font-size: 11.5px; background: var(--f4-tint-3); padding: 3px 11px;
-  border-radius: 30px; display: inline-block; margin: 4px 0;
-}
+/* Plain muted text. It was a rounded chip, which made every aside on the page look like something
+   to click — the staff portal states an aside by saying it quietly, not by boxing it. */
+.f4-note { color: var(--f4-note-ink); font-size: 12px; display: block; margin: 4px 0; }
 
 /*
  * A single-choice question, read the way the paper reads one: a short vertical list, a radio
@@ -1652,17 +1681,17 @@ textarea[aria-invalid="true"] {
   background: none; padding: 0; border-radius: 0; display: inline; color: var(--f4-ink-3);
 }
 
-/* Pills, kept here for the eleven-action checklists (7.1 and its locked mirror at 7.2) only. A
-   dense grid of eleven short phrases reads better as compact chips than as a bare list; a
-   two-option yes/no does not, which is why the radio group above does not use these. */
+/* The eleven-action checklists (7.1 and its locked mirror at 7.2). Bordered rows on the staff
+   radius, not 30px chips: a dense grid of eleven phrases still needs its own edges to be scannable,
+   but it does not need to look like a filter bar. */
 .f4-ticks { display: flex; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 10px; }
-.f4-11 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 6px 14px; }
+.f4-11 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 6px 10px; }
 .f4-tick {
-  display: flex; align-items: baseline; gap: 6px; font-size: 13px;
-  background: var(--f4-tick-bg); border: 1px solid var(--f4-pill-border); border-radius: 30px;
-  padding: 5px 14px 5px 10px; cursor: pointer;
+  display: flex; align-items: baseline; gap: 8px; font-size: 13px;
+  background: var(--f4-tick-bg); border: 1px solid var(--f4-pill-border); border-radius: var(--r);
+  padding: 6px 12px; cursor: pointer;
 }
-.f4-tick.on { background: var(--f4-tick-on-bg); border-color: var(--f4-navy); }
+.f4-tick.on { background: var(--f4-tick-on-bg); border-color: var(--f4-bar); }
 .f4-tick-locked { background: var(--f4-tick-locked-bg); border-style: dashed; color: var(--f4-ink-3); cursor: default; }
 
 .f4-field { margin-bottom: 10px; }
@@ -1672,14 +1701,14 @@ textarea[aria-invalid="true"] {
 /* IMDRF: one group per f4-block, one sub-item per (a)/(b)/(c) inside it. */
 .f4-imdrf-item + .f4-imdrf-item { margin-top: 14px; }
 .f4-imdrf-h { font-weight: 600; color: var(--f4-ink); font-size: 12.5px; margin-bottom: 3px; }
-.f4-letter { color: var(--f4-navy); font-weight: 700; }
+.f4-letter { color: var(--f4-accent-ink); font-weight: 700; }
 
 .f4-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; }
 .f4-card {
-  border: 1px solid var(--f4-pill-border); border-radius: 12px; padding: 12px 14px; cursor: pointer;
+  border: 1px solid var(--f4-pill-border); border-radius: var(--r); padding: 12px 14px; cursor: pointer;
   background: var(--f4-field-bg); break-inside: avoid;
 }
-.f4-card.on { border-color: var(--f4-navy); background: var(--f4-card-on-bg); box-shadow: 0 0 0 1px var(--f4-navy); }
+.f4-card.on { border-color: var(--f4-bar); background: var(--f4-card-on-bg); box-shadow: inset 0 0 0 1px var(--f4-bar); }
 .f4-card-h { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
 .f4-card-c { font-size: 12.5px; color: var(--f4-ink-2); margin: 0; }
 ul.f4-card-c { padding-left: 18px; list-style: disc; }
@@ -1693,95 +1722,138 @@ ul.f4-card-c li { margin-bottom: 3px; }
 .f4-card.r-medium { border-left-color: var(--f4-risk-medium); }
 .f4-card.r-low { border-left-color: var(--f4-risk-low); }
 
-.f4-locked { background: var(--f4-locked-bg); border-top: 2px dashed var(--f4-locked-border); }
-.f4-pending {
-  display: inline-block; font-size: 12.5px; color: var(--f4-accent-ink); background: var(--f4-tint-3);
-  padding: 4px 14px; border-radius: 30px; margin-bottom: 12px;
-}
-.f4-sign { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; padding: 14px 18px; }
+.f4-locked { background: var(--f4-locked-bg); border-top: 1px dashed var(--f4-locked-border); }
+.f4-pending { display: block; font-size: 12px; color: var(--f4-ink-3); margin-bottom: 12px; }
+.f4-sign { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; padding: 14px 16px; }
 .f4-buttons {
-  display: flex; gap: 12px; margin: 22px 0 4px; justify-content: flex-end;
-  border-top: 1px solid var(--f4-assessors-border); padding-top: 18px;
+  display: flex; gap: 10px; margin: 18px 0 4px; justify-content: flex-end;
+  border-top: 1px solid var(--rule); padding-top: 16px;
 }
-.f4-buttons .btn { border-radius: 40px; padding: 9px 26px; }
-.f4-source { margin-top: 26px; }
-.f4-source summary { cursor: pointer; font-weight: 600; padding: 8px 0; }
 
-/* ---------- in-page jump nav + find (item 3) ---------- */
-/* Sticks just under the staff shell's own top bar (.top is 56px and already sticky at z-index
-   30), so the two never fight for the same strip of the viewport. */
+/* ---------- jump row + find ---------- */
+/*
+ * Sticky for the whole scroll. The F004 is eight sections and several screens long, and a way
+ * around it that scrolled off the top after the first one was a way around the masthead.
+ *
+ * Under the staff header, never over it: `.top` is sticky at z-index 30, so this sits at 20 —
+ * above the section bars, which are in normal flow, and below the header, which must stay the
+ * topmost thing on every page. The drawer and its scrim are higher again (55/60), so opening the
+ * report still covers this.
+ */
 .f4-jump {
-  position: sticky; top: 56px; z-index: 15;
-  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+  position: sticky; top: 56px; z-index: 20;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
   background: var(--card); border: 1px solid var(--rule); border-radius: var(--r);
   padding: 8px 12px; margin-bottom: 16px;
 }
-.f4-find {
-  flex: 0 0 200px; font-size: 12px; padding: 5px 12px;
-  border: 1px solid var(--rule); border-radius: 30px; background: var(--paper);
-}
-.f4-jump-links { display: flex; flex-wrap: wrap; gap: 3px 6px; }
+.f4-jump-links { display: flex; flex-wrap: wrap; gap: 4px; }
 .f4-jump-links a {
-  font-size: 12px; font-weight: 600; color: var(--f4-navy); text-decoration: none;
-  padding: 3px 9px; border-radius: 20px;
+  font-size: 12px; font-weight: 600; color: var(--f4-accent-ink); text-decoration: none;
+  padding: 3px 9px; border: 1px solid var(--rule); border-radius: var(--r); background: var(--paper);
 }
-.f4-jump-links a:hover, .f4-jump-links a:focus-visible { background: var(--f4-tint-3); outline: none; }
+.f4-jump-links a:hover, .f4-jump-links a:focus-visible {
+  background: var(--green-bg); border-color: var(--green); outline: none;
+}
 
-.f4-find-hit { background: var(--f4-tint-3); box-shadow: 0 0 0 2px var(--f4-gold); border-radius: 4px; }
-.f4-find-dim { opacity: 0.35; }
+.f4-find-wrap { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.f4-find { width: 190px; font-size: 12px; padding: 5px 10px; }
+.f4-find-count {
+  font-size: 11px; color: var(--f4-ink-3); font-variant-numeric: tabular-nums;
+  min-width: 6ch; text-align: right;
+}
+.f4-find-step {
+  border: 1px solid var(--rule); background: var(--card); border-radius: var(--r);
+  width: 26px; height: 26px; line-height: 1; cursor: pointer; color: var(--ink-2);
+}
+.f4-find-step:hover { background: var(--green-bg); border-color: var(--green); }
+.f4-find-step[disabled] { opacity: 0.4; cursor: default; }
+.f4-find-step[disabled]:hover { background: var(--card); border-color: var(--rule); }
+
+/* Every match is tinted; the one the reader is standing on also gets the ring, so Next has
+   somewhere visible to move to rather than just renumbering a counter. */
+.f4-find-hit { background: var(--green-bg); border-radius: 3px; }
+.f4-find-current { box-shadow: 0 0 0 2px var(--green); }
+.f4-find-dim { opacity: 0.4; }
 
 @media (max-width: 900px) {
   .f4-row, .f4-grid, .f4-11, .f4-sign { grid-template-columns: 1fr; }
   .f4-comment { padding-left: 0; border-left: 0; border-top: 1px dashed var(--f4-divider); padding-top: 8px; margin-top: 6px; }
+  .f4-find-wrap { margin-left: 0; width: 100%; }
+  .f4-find { flex: 1; width: auto; }
+  /* The bar wraps to two rows down here, so a jump has more sticky height to clear. */
+  .f4-section { scroll-margin-top: 168px; }
 }
 @media print {
-  .rail, .top, .f4-buttons, .f4-jump { display: none !important; }
+  .rail, .top, .f4-buttons, .f4-jump, .a1-open { display: none !important; }
   .f4-section, .f4-row, .f4-block, .f4-card { break-inside: avoid; }
 }
 
-/* ---------- assessment workspace: the report beside the form, tabs when narrow ---------- */
+/* ---------- assessment workspace: the F004 in full, the report in a drawer ---------- */
+/*
+ * It used to be a permanent 50/50 split, which meant the F004 — a document with nineteen
+ * administrative rows and seven IMDRF grids — was written in half a column for the sake of a
+ * report the assessor mostly needs in glances. So the form takes the whole main column and the
+ * report comes over it when asked for.
+ *
+ * A checkbox drives it rather than a script: the drawer has to open for someone whose JavaScript
+ * never arrived, and the CSP rules out the inline handler the usual pattern reaches for. It sits
+ * outside the F004's own form and carries no name, so it is not a field of the assessment.
+ */
 .a1-pick { position: absolute; opacity: 0; pointer-events: none; }
-.a1-tabs { display: none; }
-.a1-split {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
-  gap: 20px;
-  align-items: start;
-}
-.a1-pane > h3 {
-  font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em;
-  color: var(--ink-3); margin-bottom: 10px;
-}
-.a1-report { position: sticky; top: 20px; max-height: calc(100vh - 120px); overflow: auto; }
+.a1-open { cursor: pointer; }
 
-@media (max-width: 1200px) {
-  .a1-split { grid-template-columns: 1fr; }
-  .a1-report { position: static; max-height: none; overflow: visible; }
-  .a1-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
-  .a1-tabs label {
-    padding: 7px 14px; border: 1px solid var(--rule); border-radius: var(--r);
-    cursor: pointer; font-weight: 500; background: var(--card);
-  }
-  #a1-form:checked ~ .a1-tabs label[for="a1-form"],
-  #a1-report:checked ~ .a1-tabs label[for="a1-report"] {
-    background: var(--f4-navy); color: #fff; border-color: var(--f4-navy);
-  }
-  #a1-form:checked ~ .a1-split .a1-report { display: none; }
-  #a1-report:checked ~ .a1-split .a1-form { display: none; }
+.a1-drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(680px, 92vw);
+  background: var(--card); border-left: 1px solid var(--rule);
+  box-shadow: -8px 0 28px rgb(16 25 19 / 12%);
+  z-index: 60; overflow-y: auto; padding: 18px 20px 40px;
+  transform: translateX(100%); visibility: hidden;
+  transition: transform 0.18s ease, visibility 0.18s;
+}
+.a1-scrim {
+  position: fixed; inset: 0; background: rgb(16 25 19 / 34%);
+  z-index: 55; opacity: 0; visibility: hidden; transition: opacity 0.18s ease, visibility 0.18s;
+}
+
+/* Announced, not drawn. For a control whose appearance already says what it does to anyone who
+   can see it — the scrim behind the drawer being the first of them. */
+.vh {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+#a1-drawer:checked ~ .a1-drawer { transform: none; visibility: visible; }
+#a1-drawer:checked ~ .a1-scrim { opacity: 1; visibility: visible; }
+
+.a1-drawer-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  border-bottom: 1px solid var(--rule); padding-bottom: 10px; margin-bottom: 14px;
+}
+.a1-drawer-head h3 { font-size: 14px; font-weight: 600; }
+.a1-drawer-close {
+  border: 1px solid var(--rule); background: var(--card); border-radius: var(--r);
+  padding: 4px 12px; font-size: 12px; cursor: pointer; color: var(--ink-2);
+}
+.a1-drawer-close:hover { background: var(--green-bg); border-color: var(--green); }
+
+@media (prefers-reduced-motion: reduce) {
+  .a1-drawer, .a1-scrim { transition: none; }
 }
 
 /* ---------- section 1: number | requirement | value ---------- */
 .f4-fact {
   display: grid;
   grid-template-columns: 46px minmax(150px, 1fr) minmax(0, 1.4fr);
-  gap: 10px 12px; padding: 9px 18px 5px; align-items: start; break-inside: avoid;
+  gap: 10px 12px; padding: 9px 16px 5px; align-items: start; break-inside: avoid;
 }
+/* The same orange surface `.f4-filled` wears in section 2, for the same reason: this line came
+   off the reporter's form, and the assessor's own note sits under it as a plain staff input. */
 .f4-fact .f4-value {
-  font-weight: 500; background: var(--f4-tint-2); padding: 2px 11px; border-radius: 16px;
-  display: inline-block; width: fit-content; word-break: break-word;
+  font-weight: 500; display: inline-block; width: fit-content; word-break: break-word;
+  background: var(--f4-value-bg); color: var(--f4-value-ink);
+  border: 1px solid var(--f4-value-border); border-radius: var(--r); padding: 2px 9px;
 }
 .f4-fact .f4-blank { font-style: italic; color: var(--f4-ink-3); font-size: 12px; }
-.f4-note-line { padding: 0 18px 10px 74px; border-bottom: 1px solid var(--f4-line-2); }
+.f4-note-line { padding: 0 16px 10px 74px; border-bottom: 1px solid var(--f4-line-2); }
 .f4-note-line label { font-size: 11px; color: var(--f4-ink-3); }
 .f4-note-line input { font-size: 12px; padding: 5px 10px; }
 
@@ -1791,7 +1863,49 @@ ul.f4-card-c li { margin-bottom: 3px; }
   .f4-note-line { padding-left: 18px; }
 }
 
+/*
+ * My assessments: three filter tabs over one group at a time.
+ *
+ * Tabs, not chips that scroll: an Officer looking at what is waiting should not be scrolling past
+ * six finished assessments to find it. They are still plain links to the group ids, so the hash
+ * keeps working — /assessments#submitted opens Submitted, and the browser's back button steps
+ * between tabs the way it would between anchors.
+ *
+ * The filtering is `:target` and `:has()`. Where `:has()` is missing the tabs still navigate and
+ * the default group stays on screen, so the page degrades to two groups listed rather than to a
+ * blank one — which is why the default is a server-rendered class rather than a `:not(:target)`
+ * rule that would hide everything when nothing is selected.
+ */
+.mya-tabs {
+  display: flex; flex-wrap: wrap; gap: 2px;
+  border-bottom: 1px solid var(--rule); margin-bottom: 20px;
+}
+.mya-tabs a {
+  font-size: 13px; font-weight: 500; color: var(--ink-3); text-decoration: none;
+  padding: 8px 15px; margin-bottom: -1px; border-bottom: 2px solid transparent;
+}
+.mya-tabs a:hover { color: var(--ink); }
+.mya-tabs a:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+.mya-count { font-variant-numeric: tabular-nums; margin-left: 5px; opacity: 0.75; }
+
+/* The selected tab: filled underline in the portal's green, the other two left quiet. */
+.mya-tabs a.on,
+.mya-wrap:has(#not-started:target) .mya-tabs a[href="#not-started"],
+.mya-wrap:has(#in-progress:target) .mya-tabs a[href="#in-progress"],
+.mya-wrap:has(#submitted:target) .mya-tabs a[href="#submitted"] {
+  color: var(--green-d); font-weight: 600; border-bottom-color: var(--green);
+}
+/* Once the reader picks a tab, the server-rendered default stops being the selected one. */
+.mya-wrap:has(.mya:target) .mya-tabs a.on {
+  color: var(--ink-3); font-weight: 500; border-bottom-color: transparent;
+}
+.mya-wrap:has(.mya:target) .mya-tabs a.on:hover { color: var(--ink); }
+
 /* ---------- my assessments ---------- */
+.mya { display: none; scroll-margin-top: 72px; }
+.mya-default { display: block; }
+.mya:target { display: block; }
+.mya-wrap:has(.mya:target) .mya-default { display: none; }
 .mya + .mya { margin-top: 26px; }
 .mya h2 { font-size: 15px; font-weight: 600; }
 .mya > .hint { margin-bottom: 10px; }

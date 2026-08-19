@@ -229,11 +229,17 @@ export function F004Form({
   const risk = value(answers, "risk_level");
 
   return (
-    <form method="POST" action={`/reports/${reportId}/assessment-1`} class="f4">
-      {/* One disabled fieldset rather than a second, read-only rendering of the whole document.
-          A disabled control is not submitted, so a closed assessment cannot be edited by replaying
-          the form — and there is one copy of this markup to keep correct rather than two. */}
-      <fieldset disabled={submitted}>
+    <>
+      {/*
+       * The masthead sits outside the <form> below, and deliberately.
+       *
+       * It carries the find box, and a text input inside the real form would make Enter press the
+       * first submit button — which is Save draft. Nothing in this block is a field of the
+       * assessment: it is the document's letterhead, who is assessing it, and the way around the
+       * page. Moving it out costs the form nothing and buys a search box that cannot file
+       * anything.
+       */}
+      <div class="f4-doc-head">
         <div class="f4-head">
           <div>
             <div class="f4-authority">The United Republic of Tanzania · Ministry of Health</div>
@@ -273,366 +279,417 @@ export function F004Form({
             <span class="f4-v">—</span>
           </div>
         </div>
+      </div>
 
-        {issues.length > 0 && (
-          <div class="alert alert-error" role="alert">
-            <strong>This assessment cannot be submitted yet.</strong>
-            <ul>
-              {issues.map((issue) => (
-                <li safe>{issue.message}</li>
-              ))}
-            </ul>
-          </div>
-        )}
+      {/*
+       * A sibling of the masthead rather than a row inside it, because it sticks.
+       *
+       * `position: sticky` only travels within its own parent, and the masthead is a short card —
+       * a sticky row inside it would unstick the moment that card scrolled away, which is exactly
+       * what it did. Out here its parent is the page, so it stays under the staff header for the
+       * whole length of the form, which is the point of it on a document this long.
+       */}
+      <div class="f4-jump">
+        <nav class="f4-jump-links" aria-label="Jump to a section of the F004">
+          <a href="#section-1">1 Admin</a>
+          <a href="#section-2">2 Event</a>
+          <a href="#section-3">3 IMDRF</a>
+          <a href="#section-4">4 Causality</a>
+          <a href="#section-5">5 Signal</a>
+          <a href="#section-6">6 Risk</a>
+          <a href="#section-7">7 Conclusion</a>
+          <a href="#section-8">8 Signature</a>
+        </nav>
 
-        <section class="f4-section" id="section-1">
-          <Bar no="1" title="Administrative information — device information" />
-          {DEVICE_ROWS.map((row) => (
-            <FactRow
-              no={row.no}
-              label={row.label}
-              name={`c1_${row.key}`}
-              filled={device[row.key] ?? ""}
-              answers={answers}
-            />
-          ))}
-        </section>
+        {/* type="button" on both steppers as well as living outside the form: two reasons a click
+            here can never submit, rather than one. */}
+        <div class="f4-find-wrap">
+          <input
+            type="search"
+            class="f4-find"
+            placeholder="Find in this F004…"
+            aria-label="Find in this F004"
+            autocomplete="off"
+            data-f4-find
+          />
+          <span class="f4-find-count" data-f4-find-count aria-live="polite"></span>
+          <button type="button" class="f4-find-step" data-f4-find-prev aria-label="Previous match">
+            ↑
+          </button>
+          <button type="button" class="f4-find-step" data-f4-find-next aria-label="Next match">
+            ↓
+          </button>
+        </div>
+      </div>
 
-        <section class="f4-section" id="section-2">
-          <Bar no="2" title="Event / incident assessment" />
-          {EVENT_ROWS.map((row) => (
-            <RequirementRow
-              no={row.no}
-              label={row.label}
-              name={`c2_${row.key}`}
-              filled={event[row.key] ?? ""}
-              answers={answers}
-              rows={row.key === "description" ? 4 : 2}
-            />
-          ))}
-
-          <div class="f4-block">
-            <div class="f4-blocktitle">
-              <span class="f4-no">2.5</span> Determine the source of event / incident which has
-              occurred
-            </div>
-            <div class="f4-guide">
-              <p class="f4-guide-h">For a medical device</p>
+      <form method="POST" action={`/reports/${reportId}/assessment-1`} class="f4">
+        {/* One disabled fieldset rather than a second, read-only rendering of the whole document.
+            A disabled control is not submitted, so a closed assessment cannot be edited by
+            replaying the form — and there is one copy of this markup to keep correct, not two. */}
+        <fieldset disabled={submitted}>
+          {issues.length > 0 && (
+            <div class="alert alert-error" role="alert">
+              <strong>This assessment cannot be submitted yet.</strong>
               <ul>
-                {SOURCE_MD_GUIDANCE.map((line) => (
-                  <li safe>{line}</li>
-                ))}
-              </ul>
-              <p class="f4-guide-h">For In Vitro Diagnostics (IVDs)</p>
-              <ul>
-                {SOURCE_IVD_GUIDANCE.map((line) => (
-                  <li safe>{line}</li>
-                ))}
-              </ul>
-              <p class="f4-note" safe>
-                {SOURCE_NOTE}
-              </p>
-            </div>
-            {/* One category, not several: the form asks the assessor to select the source that
-                best describes the event, not to tick every one that might apply. */}
-            <Radios name="source_of_event" options={SOURCE_OPTIONS} answers={answers} />
-            <Comment name="c2_5" answers={answers} />
-          </div>
-
-          <div class="f4-block">
-            <div class="f4-blocktitle">
-              <span class="f4-no">2.6</span> Categorization of event / incident
-            </div>
-            <div class="f4-guide">
-              <p>A serious adverse event/incident is an event/incident that:</p>
-              <ul>
-                {SERIOUS_CRITERIA.map((line) => (
-                  <li safe>{line}</li>
+                {issues.map((issue) => (
+                  <li safe>{issue.message}</li>
                 ))}
               </ul>
             </div>
-            <Radios name="seriousness" options={SERIOUSNESS_OPTIONS} answers={answers} />
-            <Comment name="c2_6" answers={answers} />
-          </div>
+          )}
 
-          <div class="f4-block">
-            <div class="f4-blocktitle">
-              <span class="f4-no">2.7</span> <span safe>{PUBLIC_HEALTH_QUESTION}</span>
-            </div>
-            <Radios name="public_health" options={YES_NO} answers={answers} />
-            <Comment name="c2_7" answers={answers} />
-          </div>
-        </section>
+          <section class="f4-section" id="section-1">
+            <Bar no="1" title="Administrative information — device information" />
+            {DEVICE_ROWS.map((row) => (
+              <FactRow
+                no={row.no}
+                label={row.label}
+                name={`c1_${row.key}`}
+                filled={device[row.key] ?? ""}
+                answers={answers}
+              />
+            ))}
+          </section>
 
-        <section class="f4-section" id="section-3">
-          <Bar no="3" title="IMDRF category of the adverse incident / event" />
-          {IMDRF_GROUPS.map((group) => (
+          <section class="f4-section" id="section-2">
+            <Bar no="2" title="Event / incident assessment" />
+            {EVENT_ROWS.map((row) => (
+              <RequirementRow
+                no={row.no}
+                label={row.label}
+                name={`c2_${row.key}`}
+                filled={event[row.key] ?? ""}
+                answers={answers}
+                rows={row.key === "description" ? 4 : 2}
+              />
+            ))}
+
             <div class="f4-block">
               <div class="f4-blocktitle">
-                <span class="f4-no" safe>
-                  {group.no}
-                </span>{" "}
-                <span safe>{group.title}</span>
+                <span class="f4-no">2.5</span> Determine the source of event / incident which has
+                occurred
               </div>
+              <div class="f4-guide">
+                <p class="f4-guide-h">For a medical device</p>
+                <ul>
+                  {SOURCE_MD_GUIDANCE.map((line) => (
+                    <li safe>{line}</li>
+                  ))}
+                </ul>
+                <p class="f4-guide-h">For In Vitro Diagnostics (IVDs)</p>
+                <ul>
+                  {SOURCE_IVD_GUIDANCE.map((line) => (
+                    <li safe>{line}</li>
+                  ))}
+                </ul>
+                <p class="f4-note" safe>
+                  {SOURCE_NOTE}
+                </p>
+              </div>
+              {/* One category, not several: the form asks the assessor to select the source that
+                best describes the event, not to tick every one that might apply. */}
+              <Radios name="source_of_event" options={SOURCE_OPTIONS} answers={answers} />
+              <Comment name="c2_5" answers={answers} />
+            </div>
 
-              {group.items.map((item) => (
-                <div class="f4-imdrf-item">
-                  <div class="f4-imdrf-h">
-                    <span class="f4-letter" safe>{`(${item.letter})`}</span>{" "}
-                    <span safe>{item.title}</span>
-                  </div>
-                  <p class="f4-note" safe>
-                    {item.annex}
-                  </p>
-                  <div class="f4-grid">
-                    {[1, 2, 3]
-                      .filter((level) => level <= item.levels)
-                      .map((level) => (
-                        <div class="f4-field">
-                          <label for={`imdrf_${item.key}_l${level}`}>
-                            Preferred terminology level {String(level)}
-                          </label>
-                          <input
-                            id={`imdrf_${item.key}_l${level}`}
-                            name={`imdrf_${item.key}_l${level}`}
-                            value={value(answers, `imdrf_${item.key}_l${level}`)}
-                          />
-                        </div>
-                      ))}
-                    <div class="f4-field">
-                      <label for={`imdrf_${item.key}_code`}>Coding</label>
-                      <input
-                        id={`imdrf_${item.key}_code`}
-                        name={`imdrf_${item.key}_code`}
-                        value={value(answers, `imdrf_${item.key}_code`)}
-                      />
+            <div class="f4-block">
+              <div class="f4-blocktitle">
+                <span class="f4-no">2.6</span> Categorization of event / incident
+              </div>
+              <div class="f4-guide">
+                <p>A serious adverse event/incident is an event/incident that:</p>
+                <ul>
+                  {SERIOUS_CRITERIA.map((line) => (
+                    <li safe>{line}</li>
+                  ))}
+                </ul>
+              </div>
+              <Radios name="seriousness" options={SERIOUSNESS_OPTIONS} answers={answers} />
+              <Comment name="c2_6" answers={answers} />
+            </div>
+
+            <div class="f4-block">
+              <div class="f4-blocktitle">
+                <span class="f4-no">2.7</span> <span safe>{PUBLIC_HEALTH_QUESTION}</span>
+              </div>
+              <Radios name="public_health" options={YES_NO} answers={answers} />
+              <Comment name="c2_7" answers={answers} />
+            </div>
+          </section>
+
+          <section class="f4-section" id="section-3">
+            <Bar no="3" title="IMDRF category of the adverse incident / event" />
+            {IMDRF_GROUPS.map((group) => (
+              <div class="f4-block">
+                <div class="f4-blocktitle">
+                  <span class="f4-no" safe>
+                    {group.no}
+                  </span>{" "}
+                  <span safe>{group.title}</span>
+                </div>
+
+                {group.items.map((item) => (
+                  <div class="f4-imdrf-item">
+                    <div class="f4-imdrf-h">
+                      <span class="f4-letter" safe>{`(${item.letter})`}</span>{" "}
+                      <span safe>{item.title}</span>
+                    </div>
+                    <p class="f4-note" safe>
+                      {item.annex}
+                    </p>
+                    <div class="f4-grid">
+                      {[1, 2, 3]
+                        .filter((level) => level <= item.levels)
+                        .map((level) => (
+                          <div class="f4-field">
+                            <label for={`imdrf_${item.key}_l${level}`}>
+                              Preferred terminology level {String(level)}
+                            </label>
+                            <input
+                              id={`imdrf_${item.key}_l${level}`}
+                              name={`imdrf_${item.key}_l${level}`}
+                              value={value(answers, `imdrf_${item.key}_l${level}`)}
+                            />
+                          </div>
+                        ))}
+                      <div class="f4-field">
+                        <label for={`imdrf_${item.key}_code`}>Coding</label>
+                        <input
+                          id={`imdrf_${item.key}_code`}
+                          name={`imdrf_${item.key}_code`}
+                          value={value(answers, `imdrf_${item.key}_code`)}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ))}
-          <p class="f4-note" safe>
-            {IMDRF_NOTE}
-          </p>
-        </section>
-
-        <section class="f4-section" id="section-4">
-          <Bar no="4" title="Relationship / causality assessment" />
-
-          <div class="f4-block">
-            <div class="f4-blocktitle">
-              <span class="f4-no">4.1</span> Is the adverse event / incident expected or unexpected?
-            </div>
+                ))}
+              </div>
+            ))}
             <p class="f4-note" safe>
-              {EXPECTEDNESS_NOTE}
+              {IMDRF_NOTE}
             </p>
-            <Radios name="expectedness" options={EXPECTEDNESS_OPTIONS} answers={answers} />
-            <Comment name="c4_1" answers={answers} />
-          </div>
+          </section>
 
-          <div class="f4-block">
-            <div class="f4-blocktitle">
-              <span class="f4-no">4.2</span> Establish whether there is a link between the device
-              and the event
+          <section class="f4-section" id="section-4">
+            <Bar no="4" title="Relationship / causality assessment" />
+
+            <div class="f4-block">
+              <div class="f4-blocktitle">
+                <span class="f4-no">4.1</span> Is the adverse event / incident expected or
+                unexpected?
+              </div>
+              <p class="f4-note" safe>
+                {EXPECTEDNESS_NOTE}
+              </p>
+              <Radios name="expectedness" options={EXPECTEDNESS_OPTIONS} answers={answers} />
+              <Comment name="c4_1" answers={answers} />
             </div>
-            <div class="f4-cards">
-              {CAUSALITY_OPTIONS.map((option) => (
-                <label class={causality === option.value ? "f4-card on" : "f4-card"}>
+
+            <div class="f4-block">
+              <div class="f4-blocktitle">
+                <span class="f4-no">4.2</span> Establish whether there is a link between the device
+                and the event
+              </div>
+              <div class="f4-cards">
+                {CAUSALITY_OPTIONS.map((option) => (
+                  <label class={causality === option.value ? "f4-card on" : "f4-card"}>
+                    <div class="f4-card-h">
+                      <input
+                        type="radio"
+                        name="causality"
+                        value={option.value}
+                        checked={causality === option.value}
+                      />
+                      <b safe>{option.label}</b>
+                    </div>
+                    <ul class="f4-card-c">
+                      {option.criteria.map((line) => (
+                        <li safe>{line}</li>
+                      ))}
+                    </ul>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div class="f4-block">
+              <div class="f4-blocktitle">
+                <span class="f4-no">4.3</span> Discussion of causal relationship
+              </div>
+              <p class="f4-note" safe>
+                {CAUSALITY_DISCUSSION_NOTE}
+              </p>
+              <Comment name="c4_3" answers={answers} rows={5} label="Discussion" />
+            </div>
+          </section>
+
+          <section class="f4-section" id="section-5">
+            <Bar no="5" title="Signal detection" />
+            <div class="f4-block">
+              <div class="f4-guide">
+                <p>
+                  Assess whether the reported adverse event/incident represents a potential safety
+                  signal by considering the following criteria:
+                </p>
+                <ul>
+                  {SIGNAL_CRITERIA.map((line, index) => (
+                    <li>
+                      <strong>({LETTERS[index]})</strong> <span safe>{line}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p class="f4-note" safe>
+                  {SIGNAL_NOTE}
+                </p>
+              </div>
+              <Radios name="signal_status" options={SIGNAL_OPTIONS} answers={answers} />
+              <Comment name="c5" answers={answers} rows={4} />
+            </div>
+          </section>
+
+          <section class="f4-section" id="section-6">
+            <Bar no="6" title="Risk assessment" />
+            <p class="f4-note" safe>
+              {RISK_NOTE}
+            </p>
+            <div class="f4-cards f4-risk">
+              {RISK_OPTIONS.map((option) => (
+                <label
+                  class={
+                    risk === option.value
+                      ? `f4-card r-${option.value} on`
+                      : `f4-card r-${option.value}`
+                  }
+                >
                   <div class="f4-card-h">
                     <input
                       type="radio"
-                      name="causality"
+                      name="risk_level"
                       value={option.value}
-                      checked={causality === option.value}
+                      checked={risk === option.value}
                     />
                     <b safe>{option.label}</b>
                   </div>
-                  <ul class="f4-card-c">
-                    {option.criteria.map((line) => (
-                      <li safe>{line}</li>
-                    ))}
-                  </ul>
+                  <p class="f4-card-c" safe>
+                    {option.note}
+                  </p>
                 </label>
               ))}
-            </div>
-          </div>
-
-          <div class="f4-block">
-            <div class="f4-blocktitle">
-              <span class="f4-no">4.3</span> Discussion of causal relationship
             </div>
             <p class="f4-note" safe>
-              {CAUSALITY_DISCUSSION_NOTE}
+              {RISK_IVD_NOTE}
             </p>
-            <Comment name="c4_3" answers={answers} rows={5} label="Discussion" />
-          </div>
-        </section>
+            <Comment name="c6" answers={answers} />
+          </section>
 
-        <section class="f4-section" id="section-5">
-          <Bar no="5" title="Signal detection" />
-          <div class="f4-block">
-            <div class="f4-guide">
-              <p>
-                Assess whether the reported adverse event/incident represents a potential safety
-                signal by considering the following criteria:
-              </p>
-              <ul>
-                {SIGNAL_CRITERIA.map((line, index) => (
-                  <li>
-                    <strong>({LETTERS[index]})</strong> <span safe>{line}</span>
-                  </li>
+          <section class="f4-section" id="section-7">
+            <Bar no="7" title="Conclusion of assessment" />
+            <div class="f4-block">
+              <div class="f4-blocktitle">
+                <span class="f4-no">7.1</span> First assessor's recommendations and conclusion,
+                including proposed regulatory action(s)
+              </div>
+              <p class="f4-note">Possible risk mitigation action(s):</p>
+              <div class="f4-ticks f4-11">
+                {ACTIONS.map((action) => (
+                  <label
+                    class={
+                      list(answers, "actions").includes(action.value) ? "f4-tick on" : "f4-tick"
+                    }
+                  >
+                    <input
+                      type="checkbox"
+                      name="actions"
+                      value={action.value}
+                      checked={list(answers, "actions").includes(action.value)}
+                    />
+                    <span>
+                      <span class="f4-no" safe>
+                        {action.no}
+                      </span>{" "}
+                      <span safe>{action.label}</span>
+                    </span>
+                  </label>
                 ))}
-              </ul>
-              <p class="f4-note" safe>
-                {SIGNAL_NOTE}
-              </p>
+              </div>
+              <Comment name="conclusion" answers={answers} rows={6} label="Conclusion" />
             </div>
-            <Radios name="signal_status" options={SIGNAL_OPTIONS} answers={answers} />
-            <Comment name="c5" answers={answers} rows={4} />
-          </div>
-        </section>
 
-        <section class="f4-section" id="section-6">
-          <Bar no="6" title="Risk assessment" />
-          <p class="f4-note" safe>
-            {RISK_NOTE}
-          </p>
-          <div class="f4-cards f4-risk">
-            {RISK_OPTIONS.map((option) => (
-              <label
-                class={
-                  risk === option.value
-                    ? `f4-card r-${option.value} on`
-                    : `f4-card r-${option.value}`
-                }
-              >
-                <div class="f4-card-h">
-                  <input
-                    type="radio"
-                    name="risk_level"
-                    value={option.value}
-                    checked={risk === option.value}
-                  />
-                  <b safe>{option.label}</b>
-                </div>
-                <p class="f4-card-c" safe>
-                  {option.note}
-                </p>
-              </label>
-            ))}
-          </div>
-          <p class="f4-note" safe>
-            {RISK_IVD_NOTE}
-          </p>
-          <Comment name="c6" answers={answers} />
-        </section>
-
-        <section class="f4-section" id="section-7">
-          <Bar no="7" title="Conclusion of assessment" />
-          <div class="f4-block">
-            <div class="f4-blocktitle">
-              <span class="f4-no">7.1</span> First assessor's recommendations and conclusion,
-              including proposed regulatory action(s)
-            </div>
-            <p class="f4-note">Possible risk mitigation action(s):</p>
-            <div class="f4-ticks f4-11">
-              {ACTIONS.map((action) => (
-                <label
-                  class={list(answers, "actions").includes(action.value) ? "f4-tick on" : "f4-tick"}
-                >
-                  <input
-                    type="checkbox"
-                    name="actions"
-                    value={action.value}
-                    checked={list(answers, "actions").includes(action.value)}
-                  />
-                  <span>
-                    <span class="f4-no" safe>
-                      {action.no}
-                    </span>{" "}
-                    <span safe>{action.label}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-            <Comment name="conclusion" answers={answers} rows={6} label="Conclusion" />
-          </div>
-
-          {/* 7.2 belongs to the second assessor. Shown so the document is recognisably the whole
+            {/* 7.2 belongs to the second assessor. Shown so the document is recognisably the whole
               form — the same eleven actions and a conclusion box, laid out exactly as 7.1 is — but
               disabled and empty, and every control here carries no `name`. A disabled field is
               not submitted regardless, but omitting the name too means there is no field in this
               block the request body could ever carry a value under, whatever reaches the server. */}
-          <div class="f4-block f4-locked">
-            <div class="f4-blocktitle">
-              <span class="f4-no">7.2</span> Second assessor concluding remarks
+            <div class="f4-block f4-locked">
+              <div class="f4-blocktitle">
+                <span class="f4-no">7.2</span> Second assessor concluding remarks
+              </div>
+              <p class="f4-pending">Pending second assessor review</p>
+              <div class="f4-ticks f4-11">
+                {ACTIONS.map((action) => (
+                  <label class="f4-tick f4-tick-locked">
+                    <input type="checkbox" disabled />
+                    <span>
+                      <span class="f4-no" safe>
+                        {action.no}
+                      </span>{" "}
+                      <span safe>{action.label}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <div class="f4-field">
+                <textarea
+                  rows="3"
+                  disabled
+                  placeholder="(To be completed by the second assessor upon review)"
+                />
+              </div>
             </div>
-            <p class="f4-pending">Pending second assessor review</p>
-            <div class="f4-ticks f4-11">
-              {ACTIONS.map((action) => (
-                <label class="f4-tick f4-tick-locked">
-                  <input type="checkbox" disabled />
-                  <span>
-                    <span class="f4-no" safe>
-                      {action.no}
-                    </span>{" "}
-                    <span safe>{action.label}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-            <div class="f4-field">
-              <textarea
-                rows="3"
-                disabled
-                placeholder="(To be completed by the second assessor upon review)"
-              />
-            </div>
-          </div>
-        </section>
+          </section>
 
-        <section class="f4-section" id="section-8">
-          <Bar no="8" title="Signature" />
-          <div class="f4-sign">
-            <div class="f4-field">
-              <label for="signature">1st Assessor — type your name to sign</label>
-              <input
-                id="signature"
-                name="signature"
-                value={value(answers, "signature")}
-                placeholder={assessorName}
-                autocomplete="off"
-              />
-              <p class="f4-note">
-                Typed, not uploaded. It must match the name above, which is the account you are
-                signed in as.
-              </p>
+          <section class="f4-section" id="section-8">
+            <Bar no="8" title="Signature" />
+            <div class="f4-sign">
+              <div class="f4-field">
+                <label for="signature">1st Assessor — type your name to sign</label>
+                <input
+                  id="signature"
+                  name="signature"
+                  value={value(answers, "signature")}
+                  placeholder={assessorName}
+                  autocomplete="off"
+                />
+                <p class="f4-note">
+                  Typed, not uploaded. It must match the name above, which is the account you are
+                  signed in as.
+                </p>
+              </div>
+              <div class="f4-field f4-muted">
+                <label for="signature-2">2nd Assessor</label>
+                <input id="signature-2" value="" disabled placeholder="Not yet assessed" />
+              </div>
             </div>
-            <div class="f4-field f4-muted">
-              <label for="signature-2">2nd Assessor</label>
-              <input id="signature-2" value="" disabled placeholder="Not yet assessed" />
-            </div>
-          </div>
-        </section>
-      </fieldset>
+          </section>
+        </fieldset>
 
-      {submitted ? (
-        <p class="hint">
-          This assessment has been submitted and is now read-only. The report is with the second
-          assessor.
-        </p>
-      ) : (
-        <div class="bar f4-buttons">
-          <button type="submit" name="intent" value="save" class="btn ghost">
-            Save draft
-          </button>
-          <div class="sp"></div>
-          <button type="submit" name="intent" value="submit" class="btn">
-            Submit assessment
-          </button>
-        </div>
-      )}
-    </form>
+        {submitted ? (
+          <p class="hint">
+            This assessment has been submitted and is now read-only. The report is with the second
+            assessor.
+          </p>
+        ) : (
+          <div class="bar f4-buttons">
+            <button type="submit" name="intent" value="save" class="btn ghost">
+              Save draft
+            </button>
+            <div class="sp"></div>
+            <button type="submit" name="intent" value="submit" class="btn">
+              Submit assessment
+            </button>
+          </div>
+        )}
+      </form>
+    </>
   );
 }
