@@ -87,13 +87,22 @@ async function signedInAs(role: Role, name = "Grace Mollel"): Promise<string> {
  *
  * Seeded as the owner rather than through the form: this slice reads, and the write path is not
  * under test here.
+ *
+ * `status` and `agoHours` default to what the public form actually writes — `received`, just now —
+ * so the cases that predate the Officer's queue are untouched by their existence. The queue is
+ * ordered by `received_at`, and rows seeded in the same test can otherwise land close enough to
+ * share a timestamp, so a case about order has to space them rather than trust insert sequence.
  */
-async function seedReport(attrs: { number?: string } = {}): Promise<string> {
+async function seedReport(
+  attrs: { number?: string; status?: string; agoHours?: number } = {},
+): Promise<string> {
   const rows = await owner.db.execute(sql`
-    INSERT INTO reports (number, channel, severity, status, device_name, facility, reporter_name,
-                         form_version, payload)
+    INSERT INTO reports (number, channel, severity, status, received_at, device_name, facility,
+                         reporter_name, form_version, payload)
     VALUES (
-      ${attrs.number ?? NUMBER}, 'online_form', 'death', 'received', ${HOSTILE},
+      ${attrs.number ?? NUMBER}, 'online_form', 'death',
+      ${attrs.status ?? "received"}::report_status,
+      now() - make_interval(hours => ${attrs.agoHours ?? 0}), ${HOSTILE},
       'Muhimbili National Hospital', ${HOSTILE}, 'TMDA/DMD/MDV/F/001 Rev 06',
       ${JSON.stringify({ device_name: HOSTILE, events: ["death"], nested: { note: HOSTILE } })}::jsonb
     )
@@ -119,6 +128,22 @@ async function idOf(role: Role): Promise<string> {
 }
 
 const EVERY_ROLE: Role[] = ["administrator", "manager", "assessor"];
+
+/**
+ * The Received figure exactly as the stat prints it.
+ *
+ * Asserted as markup rather than by looking for the word: "Received" is also a status caption and
+ * the queue's own heading, so a bare `toContain("Received")` would pass on a page showing no
+ * figure at all — and the figure is the thing this slice added.
+ */
+function receivedStat(count: number): string {
+  return `<span class="eyebrow">Received</span><b>${count}</b>`;
+}
+
+/** Body rows of the one table on a page, the header row discounted. */
+function rowCount(body: string): number {
+  return (body.match(/<tr[ >]/g) ?? []).length - 1;
+}
 
 describe.skipIf(!INTEGRATION_ENABLED)("the register", () => {
   beforeEach(start);
@@ -246,13 +271,94 @@ describe.skipIf(!INTEGRATION_ENABLED)("the dashboard", () => {
     expect(officer).not.toContain("active accounts");
   });
 
-  it("tells a manager and an officer the truth about their own work", async () => {
-    const officer = (await get("/dashboard", await signedInAs("assessor"))).body;
-    const manager = (await get("/dashboard", await signedInAs("manager"))).body;
+  it("tells a manager the truth about their own work", async () => {
+    const body = (await get("/dashboard", await signedInAs("manager"))).body;
 
-    for (const body of [officer, manager]) {
-      expect(body).toContain("Your own work arrives in a later slice");
-      expect(body).not.toContain("Recent activity");
+    // Still the whole truth for a manager: nothing assigns work, and nothing here pretends to.
+    expect(body).toContain("Your own work arrives in a later slice");
+    expect(body).not.toContain("Recent activity");
+  });
+
+  it("tells an officer what is waiting instead of what is coming later", async () => {
+    await seedReport();
+
+    const body = (await get("/dashboard", await signedInAs("assessor"))).body;
+
+    expect(body).toContain(receivedStat(1));
+    expect(body).toContain("Received reports");
+    expect(body).toContain("Reports are not assigned yet");
+    // The sentence this replaced. An Officer now has a queue, so promising one later would be
+    // both stale and untrue.
+    expect(body).not.toContain("Your own work arrives in a later slice");
+    expect(body).not.toContain("Recent activity");
+  });
+
+  it("lists the waiting reports for an officer, each one openable", async () => {
+    const id = await seedReport();
+
+    const body = (await get("/dashboard", await signedInAs("assessor"))).body;
+
+    expect(body).toContain(NUMBER);
+    expect(body).toContain(`href="/reports/${id}"`);
+    expect(rowCount(body)).toBe(1);
+    // The device name reaches the dashboard, so the escaping the register does must hold here too.
+    expect(body).toContain("&lt;script");
+    expect(body).not.toContain("<script>alert(1)</script>");
+  });
+
+  it("keeps a report in another status out of both the figure and the list", async () => {
+    await seedReport({ number: "MD-AE/2026/0001" });
+    await seedReport({ number: "MD-AE/2026/0002", status: "first_assessment" });
+
+    const body = (await get("/dashboard", await signedInAs("assessor"))).body;
+
+    expect(body).toContain(receivedStat(1));
+    expect(body).toContain("MD-AE/2026/0001");
+    expect(body).not.toContain("MD-AE/2026/0002");
+    expect(rowCount(body)).toBe(1);
+  });
+
+  it("counts the whole queue while listing only the newest few", async () => {
+    // Seven waiting, spaced an hour apart: 0001 is the newest and 0007 the oldest.
+    for (let hours = 1; hours <= 7; hours += 1) {
+      await seedReport({ number: `MD-AE/2026/000${hours}`, agoHours: hours });
+    }
+
+    const body = (await get("/dashboard", await signedInAs("assessor"))).body;
+
+    // The figure is the queue; the list is the preview. Printing the list's length as the figure
+    // would tell an Officer five reports are waiting when seven are.
+    expect(body).toContain(receivedStat(7));
+    expect(rowCount(body)).toBe(5);
+
+    for (const number of ["MD-AE/2026/0001", "MD-AE/2026/0005"]) {
+      expect(body, number).toContain(number);
+    }
+    // Older than the five shown, so absent from the preview but counted in the seven.
+    for (const number of ["MD-AE/2026/0006", "MD-AE/2026/0007"]) {
+      expect(body, number).not.toContain(number);
+    }
+  });
+
+  it("says so plainly when nothing is waiting", async () => {
+    const body = (await get("/dashboard", await signedInAs("assessor"))).body;
+
+    expect(body).toContain(receivedStat(0));
+    expect(body).toContain("Nothing is waiting to be assessed.");
+    // No header over an empty body: that reads as a list that failed to load.
+    expect(body).not.toContain("<table");
+  });
+
+  it("gives the queue to nobody but an officer", async () => {
+    await seedReport();
+
+    const manager = (await get("/dashboard", await signedInAs("manager"))).body;
+    const admin = (await get("/dashboard", await signedInAs("administrator"))).body;
+
+    for (const body of [manager, admin]) {
+      expect(body).not.toContain("Received reports");
+      expect(body).not.toContain('<span class="eyebrow">Received</span>');
+      expect(body).not.toContain("Nothing is waiting to be assessed.");
     }
   });
 
@@ -264,6 +370,49 @@ describe.skipIf(!INTEGRATION_ENABLED)("the dashboard", () => {
     expect(body).toContain("Recent activity");
     expect(body).toContain("Signed in");
     expect(body).toContain('href="/activity"');
+  });
+});
+
+/**
+ * The closure this slice is about, and only that one.
+ *
+ * An Officer being refused `/users`, `/activity` and the account actions is already pinned in
+ * `staff-admin-tools.test.ts`, and repeating it here would mean two files to update the day one of
+ * those rules changes. What nothing pinned is the rule this slice leans on: reading a queue must
+ * not come with a way to act on it.
+ */
+describe.skipIf(!INTEGRATION_ENABLED)("what an Officer cannot do", () => {
+  beforeEach(start);
+
+  it("has no route that moves a report's status", async () => {
+    const id = await seedReport();
+    const cookie = await signedInAs("assessor");
+
+    // 404 because the route does not exist, not 403 because a guard turned it away. Asserted so
+    // that adding one has to walk past a failing test rather than arrive quietly.
+    for (const url of [`/reports/${id}`, `/reports/${id}/status`]) {
+      expect((await act(url, cookie)).statusCode, url).toBe(404);
+    }
+
+    const rows = await owner.db.execute(sql`SELECT status FROM reports WHERE id = ${id}`);
+    expect((rows[0] as { status: string }).status).toBe("received");
+  });
+
+  it("reads the register without being offered a way to change it", async () => {
+    const id = await seedReport();
+    const cookie = await signedInAs("assessor");
+
+    for (const url of ["/dashboard", "/reports", `/reports/${id}`]) {
+      const body = (await get(url, cookie)).body;
+
+      // The pages an Officer can reach carry no form that posts anywhere but sign-out. Nothing
+      // assigns, nothing submits an assessment, nothing takes a decision — this slice reads.
+      const posts = (body.match(/action="([^"]*)"/g) ?? []).filter(
+        (action) => !action.includes("/logout"),
+      );
+
+      expect(posts, url).toEqual([]);
+    }
   });
 });
 
