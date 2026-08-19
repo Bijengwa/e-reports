@@ -66,7 +66,20 @@ function day(value: Date): string {
 export type ReceivedRow = Pick<
   ReportRow,
   "id" | "number" | "receivedAt" | "deviceName" | "severity"
->;
+> & {
+  /**
+   * Whether this report is the reader's own to assess.
+   *
+   * The queue also carries orphans — reports filed while no assessor was active — and those are
+   * nobody's until something assigns them. Only a row already yours offers the way in.
+   */
+  mine: boolean;
+};
+
+/** Where an Officer opens the first assessment of a report that is theirs. */
+export function assessment1Href(reportId: string): string {
+  return `/reports/${reportId}/assessment-1`;
+}
 
 /**
  * A short list of reports, rendered the way the register renders them.
@@ -84,6 +97,7 @@ export function ReceivedRows({ reports }: { reports: ReceivedRow[] }): JSX.Eleme
           <th>Received</th>
           <th>Device</th>
           <th>Severity</th>
+          <th>Assessment</th>
         </tr>
       </thead>
       <tbody>
@@ -100,6 +114,15 @@ export function ReceivedRows({ reports }: { reports: ReceivedRow[] }): JSX.Eleme
               <span class={`tag ${severityTone(report.severity) === "caution" ? "warn" : ""}`}>
                 {caption(SEVERITY_LABELS, report.severity)}
               </span>
+            </td>
+            {/* An orphan is waiting for somebody to be given it; until then there is nothing to
+                open, and a link that answered 403 would be worse than no link. */}
+            <td>
+              {report.mine ? (
+                <a href={assessment1Href(report.id)}>Assessment 1</a>
+              ) : (
+                <span class="hint">Unassigned</span>
+              )}
             </td>
           </tr>
         ))}
@@ -274,44 +297,22 @@ export function sectionsOf(payload: unknown): ReportSection[] {
   return sections;
 }
 
-export type ReportPageProps = {
-  report: ReportDetail;
-  viewerRole: string;
-  /** The signed-in person, for the title bar. */
-  viewerName: string;
-};
-
 /**
- * One report, read-only.
+ * The report itself: the facts that were normalised out of it, then the document as submitted.
+ *
+ * Exported because the first assessment is read against this and must be reading the same thing.
+ * An assessor comparing a form to a summary rendered by different code is exactly the drift that
+ * makes two pages disagree about one report.
  *
  * Every value is escaped, the payload included. That matters more here than anywhere else in the
  * staff app: this document came from an anonymous public form, so it is the least trusted text in
  * the system, and it is rendered to the people who decide what happens next.
  */
-export function ReportPage({ report, viewerRole, viewerName }: ReportPageProps): JSX.Element {
+export function ReportDocument({ report }: { report: ReportDetail }): JSX.Element {
   const sections = sectionsOf(report.payload);
 
   return (
-    <StaffShell
-      title={`${report.number} — AE Reports`}
-      pageTitle={report.number}
-      role={viewerRole}
-      fullName={viewerName}
-      active="reports"
-    >
-      <div class="staff-head">
-        <div class="sp">
-          <h2 safe>{report.deviceName}</h2>
-          <p class="hint">
-            Received {day(report.receivedAt)} ·{" "}
-            <span safe>{caption(CHANNEL_LABELS, report.channel)}</span>
-          </p>
-        </div>
-        <a href="/reports" class="btn ghost">
-          ← Back to reports
-        </a>
-      </div>
-
+    <>
       <div class="card card-b report-facts">
         <dl>
           <dt>Severity</dt>
@@ -359,6 +360,59 @@ export function ReportPage({ report, viewerRole, viewerName }: ReportPageProps):
           </div>
         ))
       )}
+    </>
+  );
+}
+
+export type ReportPageProps = {
+  report: ReportDetail;
+  viewerRole: string;
+  /** The signed-in person, for the title bar. */
+  viewerName: string;
+  /**
+   * Whether this report is the reader's own first assessment to make.
+   *
+   * True only for the Officer it is assigned to. A manager, an administrator, another Officer and
+   * the Officer looking at an orphan all get the page without the way in, because the route
+   * behind that link would refuse them and a link that answers 403 is worse than no link.
+   */
+  canAssess: boolean;
+};
+
+/** One report, read-only. */
+export function ReportPage({
+  report,
+  viewerRole,
+  viewerName,
+  canAssess,
+}: ReportPageProps): JSX.Element {
+  return (
+    <StaffShell
+      title={`${report.number} — AE Reports`}
+      pageTitle={report.number}
+      role={viewerRole}
+      fullName={viewerName}
+      active="reports"
+    >
+      <div class="staff-head">
+        <div class="sp">
+          <h2 safe>{report.deviceName}</h2>
+          <p class="hint">
+            Received {day(report.receivedAt)} ·{" "}
+            <span safe>{caption(CHANNEL_LABELS, report.channel)}</span>
+          </p>
+        </div>
+        {canAssess && (
+          <a href={assessment1Href(report.id)} class="btn">
+            Assessment 1
+          </a>
+        )}
+        <a href="/reports" class="btn ghost">
+          ← Back to reports
+        </a>
+      </div>
+
+      <ReportDocument report={report} />
     </StaffShell>
   );
 }

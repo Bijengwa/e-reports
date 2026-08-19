@@ -89,6 +89,52 @@ async function renderReports(
  * make one. The route file having no INSERT or UPDATE in it is the honest form of that: migration
  * 0005 grants this role SELECT on `reports` and nothing else, so the database agrees.
  */
+/**
+ * One report in full, with the id of the Officer it belongs to.
+ *
+ * Exported because the assessment page reads the same row. Two queries for one report is how the
+ * page an Officer assesses stops matching the page they were shown.
+ *
+ * The assignee comes back beside the report rather than on it: `ReportDetail` is what a page
+ * prints, and who a report belongs to decides what a reader may do, not what they see.
+ */
+export async function loadReport(
+  app: FastifyInstance,
+  id: string,
+): Promise<{ report: ReportDetail; assessor1UserId: string | null } | null> {
+  // Left join, not inner: `entered_by_user_id` is null for everything the public door filed, and
+  // an inner join would quietly hide every one of those reports.
+  const rows = await app.db.execute(sql`
+    SELECT r.id, r.number, r.received_at, r.device_name, r.severity, r.status, r.channel,
+           r.facility, r.reporter_name, r.form_version, r.payload, r.assessor1_user_id,
+           u.full_name AS filled_by
+      FROM reports r
+      LEFT JOIN users u ON u.id = r.entered_by_user_id
+     WHERE r.id = ${id}
+  `);
+
+  if (rows.length === 0) return null;
+
+  const row = rows[0] as {
+    reporter_name: string | null;
+    form_version: string;
+    payload: unknown;
+    filled_by: string | null;
+    assessor1_user_id: string | null;
+  };
+
+  return {
+    report: {
+      ...toRow(rows[0]),
+      reporterName: row.reporter_name,
+      formVersion: row.form_version,
+      payload: row.payload,
+      filledBy: row.filled_by,
+    },
+    assessor1UserId: row.assessor1_user_id,
+  };
+}
+
 export async function reportsRoutes(app: FastifyInstance): Promise<void> {
   app.get("/reports", async (request, reply) => renderReports(app, request, reply, 200));
 
@@ -98,34 +144,19 @@ export async function reportsRoutes(app: FastifyInstance): Promise<void> {
     const target = ReportId.safeParse((request.params as { id: string }).id);
     if (!target.success) return renderReports(app, request, reply, 404, NOT_FOUND);
 
-    // Left join, not inner: `entered_by_user_id` is null for everything the public door filed,
-    // and an inner join would quietly hide every one of those reports.
-    const rows = await app.db.execute(sql`
-      SELECT r.id, r.number, r.received_at, r.device_name, r.severity, r.status, r.channel,
-             r.facility, r.reporter_name, r.form_version, r.payload, u.full_name AS filled_by
-        FROM reports r
-        LEFT JOIN users u ON u.id = r.entered_by_user_id
-       WHERE r.id = ${target.data}
-    `);
-
-    if (rows.length === 0) return renderReports(app, request, reply, 404, NOT_FOUND);
-
-    const row = rows[0] as {
-      reporter_name: string | null;
-      form_version: string;
-      payload: unknown;
-      filled_by: string | null;
-    };
-    const report: ReportDetail = {
-      ...toRow(rows[0]),
-      reporterName: row.reporter_name,
-      formVersion: row.form_version,
-      payload: row.payload,
-      filledBy: row.filled_by,
-    };
+    const found = await loadReport(app, target.data);
+    if (found === null) return renderReports(app, request, reply, 404, NOT_FOUND);
 
     return reply.html(
-      <ReportPage report={report} viewerRole={session.role} viewerName={session.fullName} />,
+      <ReportPage
+        report={found.report}
+        viewerRole={session.role}
+        viewerName={session.fullName}
+        // The way into the first assessment, drawn only for the Officer whose report it is. The
+        // route behind it makes the same test for itself — this decides whether a link appears,
+        // never whether the page may be opened.
+        canAssess={session.role === "assessor" && found.assessor1UserId === session.userId}
+      />,
     );
   });
 }

@@ -11,14 +11,15 @@ const RECENT_ACTIVITY = 5;
 /** Enough of the queue to see what is waiting, without becoming a second /reports. */
 const RECEIVED_PREVIEW = 5;
 
-/** The five columns the queue prints. `payload` is no more welcome here than in the register. */
-function toReceivedRow(row: unknown): ReceivedRow {
+/** The queue’s columns. `payload` is no more welcome here than in the register. */
+function toReceivedRow(row: unknown, viewerId: string): ReceivedRow {
   const report = row as {
     id: string;
     number: string;
     received_at: Date;
     device_name: string;
     severity: string;
+    assessor1_user_id: string | null;
   };
 
   return {
@@ -27,6 +28,9 @@ function toReceivedRow(row: unknown): ReceivedRow {
     receivedAt: report.received_at,
     deviceName: report.device_name,
     severity: report.severity,
+    // The queue holds the reader’s own reports and the orphans. Only the first are theirs to
+    // assess, and the row says which it is rather than the view guessing from a missing name.
+    mine: report.assessor1_user_id === viewerId,
   };
 }
 
@@ -68,7 +72,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
     // Cast to int because count() is bigint, which the driver hands back as a string.
     const queue = isOfficer
       ? await app.db.execute(sql`
-          SELECT id, number, received_at, device_name, severity,
+          SELECT id, number, received_at, device_name, severity, assessor1_user_id,
                  (count(*) OVER ())::int AS received
             FROM reports
            WHERE status = 'received'
@@ -83,7 +87,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
           // No rows is nothing waiting. The window count only exists on a row, so an empty result
           // has to say so here rather than be read off one.
           count: queue.length === 0 ? 0 : (queue[0] as { received: number }).received,
-          rows: queue.map(toReceivedRow),
+          rows: queue.map((row) => toReceivedRow(row, session.userId)),
         }
       : undefined;
 

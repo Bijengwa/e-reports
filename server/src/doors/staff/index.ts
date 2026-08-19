@@ -2,6 +2,7 @@ import rateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { constrainToHost } from "../host-scope.js";
 import { activityRoutes } from "./routes/activity.js";
+import { assessmentRoutes } from "./routes/assessment.js";
 import { changePasswordRoutes } from "./routes/change-password.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
 import { loginRoutes } from "./routes/login.js";
@@ -85,6 +86,10 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
         requireRole(registration, ["assessor"]);
 
         await registration.register(newReportRoutes);
+
+        // The first assessment of a report. Registered here because only an Officer may open one
+        // at all; which Officer is a question about the row, and the route asks it for itself.
+        await registration.register(assessmentRoutes);
       });
 
       await active.register(async (administration) => {
