@@ -490,6 +490,8 @@ describe.skipIf(!INTEGRATION_ENABLED)("the activity trail", () => {
     expect(forAssessor.body).not.toContain('href="/activity"');
     // Everyone still gets the rail itself, and the way out of it.
     expect(forAssessor.body).toContain('href="/dashboard"');
-    expect(forAssessor.body).toContain('action="/logout"');
+    // A link now, not a form: the rail asks before it ends the session, and /logout's own page
+    // carries the POST that does it.
+    expect(forAssessor.body).toContain('href="/logout"');
   });
 });

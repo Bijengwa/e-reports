@@ -480,6 +480,32 @@ describe.skipIf(!INTEGRATION_ENABLED)("session lifetime and sign-out", () => {
     expect((await get("/dashboard", cookie)).statusCode).toBe(302);
   });
 
+  it("asks before signing anyone out, and leaves the session alone while asking", async () => {
+    const { email } = await seedStaff({ mustChange: false });
+    const cookie = await signedInCookie(email);
+
+    const asked = await get("/logout", cookie);
+
+    expect(asked.statusCode).toBe(200);
+    expect(asked.body).toContain("Sign out?");
+    expect(asked.body).toContain("Grace Mollel");
+    // The question is a GET and changes nothing: the session survives being asked.
+    expect(await owner.db.execute(sql`SELECT id FROM sessions`)).toHaveLength(1);
+    expect((await get("/dashboard", cookie)).statusCode).toBe(200);
+  });
+
+  it("still asks a user who is held at the forced password change", async () => {
+    const { email } = await seedStaff({ mustChange: true });
+    const cookie = await signedInCookie(email);
+
+    const asked = await get("/logout", cookie);
+
+    // Someone who cannot get in must still be able to get out, and the confirmation is on that
+    // path — so it has to render one scope out from the rest of the app, as the POST does.
+    expect(asked.statusCode).toBe(200);
+    expect(asked.body).toContain("Sign out?");
+  });
+
   it("deletes the row on sign-out, not just the cookie", async () => {
     const { email } = await seedStaff({ mustChange: false });
     const cookie = await signedInCookie(email);

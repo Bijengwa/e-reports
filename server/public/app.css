@@ -750,6 +750,7 @@ textarea[aria-invalid="true"] {
 
 .rail-signout {
   display: flex;
+  text-decoration: none;
   align-items: center;
   gap: 10px;
   width: 100%;

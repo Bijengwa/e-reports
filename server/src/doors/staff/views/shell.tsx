@@ -204,15 +204,14 @@ export function StaffShell({
             )}
           </nav>
 
-          {/* A POST, not a link: signing out changes state, and a Lax cookie is withheld from a
-              cross-site POST, which is what stops another origin doing it for the user. */}
+          {/* A link, because this one asks first: /logout renders the confirmation and its own
+              form posts the answer. The state change is still a POST, so a Lax cookie is withheld
+              from a cross-site submission and another origin cannot sign the user out. */}
           <div class="rail-foot">
-            <form method="POST" action="/logout">
-              <button type="submit" class="rail-signout">
-                <IconSignOut />
-                <span class="rail-label">Sign out</span>
-              </button>
-            </form>
+            <a href="/logout" class="rail-signout">
+              <IconSignOut />
+              <span class="rail-label">Sign out</span>
+            </a>
 
             {/* The rail's own control, on the rail. Collapsing is something you do to this
                 column, so it belongs here rather than in the title bar — the bar's one button

@@ -1,5 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { destroySession, SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "../../../auth/session.js";
+import { currentSession } from "../session-guard.js";
+import { SignOutPage } from "../views/sign-out.js";
 
 /**
  * Sign out.
@@ -11,6 +13,12 @@ import { destroySession, SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "../../..
  * session behind for anyone who had already copied the token out of the browser.
  */
 export async function logoutRoutes(app: FastifyInstance): Promise<void> {
+  // Asks first. A GET changes nothing, so this is safe to link to from the rail, and the answer
+  // below is still a POST.
+  app.get("/logout", async (request, reply) =>
+    reply.html(<SignOutPage fullName={currentSession(request).fullName} />),
+  );
+
   app.post("/logout", async (request, reply) => {
     if (request.staffSessionToken) {
       await destroySession(app.db, request.staffSessionToken);
