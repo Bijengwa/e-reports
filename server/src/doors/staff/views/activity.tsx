@@ -133,6 +133,8 @@ export type ActivityPageProps = {
   entries: ActivityEntry[];
   /** The reader's own role, for the rail. */
   viewerRole: string;
+  /** The signed-in person, for the title bar. */
+  viewerName: string;
 };
 
 /**
@@ -143,12 +145,13 @@ export type ActivityPageProps = {
  * `after` are not selected, so no payload, no hash and no cookie can reach this page even if a
  * future action were careless about what it wrote there.
  */
-export function ActivityPage({ entries, viewerRole }: ActivityPageProps): JSX.Element {
+export function ActivityPage({ entries, viewerRole, viewerName }: ActivityPageProps): JSX.Element {
   return (
     <StaffShell
       title="Activity — AE Reports"
       pageTitle="Activity"
       role={viewerRole}
+      fullName={viewerName}
       active="activity"
     >
       <div class="staff-head">

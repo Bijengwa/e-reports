@@ -966,6 +966,78 @@ textarea[aria-invalid="true"] {
   }
 }
 
+/*
+ * The block at the top of a page: what this page is about, and its one action.
+ *
+ * Restored here after the rail rewrite dropped it -- without these rules the row was not a flex
+ * row at all, so a page's action button fell underneath its subtitle instead of sitting opposite.
+ * The h1 now lives in the title bar, so the heading styled here is the h2 a page uses for the
+ * thing it is showing.
+ */
+.staff-head {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.staff-head h2 {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.staff-head .hint {
+  margin-top: 3px;
+}
+
+.staff-foot {
+  margin-top: 20px;
+}
+
+/* ---------- who is signed in ---------- */
+/*
+ * Sits at the right of the title bar, which is why it must not wrap: the bar is a fixed 56px and
+ * a second line would be clipped. The role is a caption from ROLE_LABELS, never the enum value.
+ */
+.top-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  min-width: 0;
+  text-align: right;
+}
+
+.top-user .top-name {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 30ch;
+}
+
+.top-user .top-role {
+  display: block;
+  font-size: 11px;
+  color: var(--ink-3);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  /* On a phone the title has the better claim on the bar. */
+  .top-user {
+    display: none;
+  }
+}
+
 /* ---------- staff account list ---------- */
 /*
  * No `overflow: hidden` here, deliberately. It would clip the rounded corners neatly and also
@@ -1295,4 +1367,89 @@ textarea[aria-invalid="true"] {
   font-size: 15px;
   font-weight: 600;
   margin: 26px 0 12px;
+}
+
+/* ---------- the mark on the orange page ---------- */
+/*
+ * The public form is the one surface where the folder reads white on orange rather than green on
+ * paper. Same paths, a third palette — the reason the mark is one component.
+ */
+.orange-page .logo .body {
+  fill: #fff;
+}
+
+.orange-page .logo .cross {
+  fill: var(--orange-deep);
+}
+
+.orange-page .logo .doc {
+  stroke: #fbd9c4;
+}
+
+.orange-page .logo .tab {
+  fill: #fbd9c4;
+}
+
+.orange-page .otop .brand-text b {
+  color: #fff;
+}
+
+.orange-page .otop .brand-text > span {
+  color: #fbd9c4;
+}
+
+/* ---------- one report, by section ---------- */
+/*
+ * The submitted document, grouped the way the reporter filled it in. Each group is a section of
+ * the orange form and the captions are the form's own, so a reader compares the page against the
+ * paper form rather than against the column names.
+ */
+.report-group {
+  margin-bottom: 22px;
+}
+
+.report-group h3 {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.report-group dl {
+  display: grid;
+  grid-template-columns: minmax(180px, 34%) 1fr;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.report-group dt {
+  padding: 9px 12px;
+  color: var(--ink-2);
+  background: #fafcfa;
+  border-bottom: 1px solid var(--rule);
+}
+
+.report-group dd {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--rule);
+  min-height: 1lh;
+}
+
+.report-group dt:last-of-type,
+.report-group dd:last-of-type {
+  border-bottom: 0;
+}
+
+@media (max-width: 620px) {
+  .report-group dl {
+    grid-template-columns: 1fr;
+  }
+
+  .report-group dt {
+    border-bottom: 0;
+    padding-bottom: 0;
+    background: var(--card);
+  }
 }

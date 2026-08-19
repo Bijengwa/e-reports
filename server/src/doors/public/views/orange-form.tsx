@@ -25,6 +25,7 @@ import {
   translatorFor,
 } from "../../../i18n/index.js";
 import { MAX_ATTACHMENTS } from "../../../storage/index.js";
+import { BrandMark } from "../../../views/shared/brand-mark.js";
 import { Layout } from "../../../views/shared/layout.js";
 
 export type { Answers, Step };
@@ -315,6 +316,8 @@ export function OrangeFormPage(props: OrangeFormPageProps): JSX.Element {
       <Layout title={t("app.confirmTitle")} locale={locale}>
         <div class="orange-page">
           <header class="otop">
+            {/* The same mark the staff door renders, in the orange page's palette. */}
+            <BrandMark />
             <h1 safe>{t("app.heading")}</h1>
             <div class="sp"></div>
           </header>
@@ -361,6 +364,8 @@ export function OrangeFormPage(props: OrangeFormPageProps): JSX.Element {
           <CarriedAttachments attachments={attachments} />
 
           <header class="otop">
+            {/* The same mark the staff door renders, in the orange page's palette. */}
+            <BrandMark />
             <h1 safe>{t("app.heading")}</h1>
             <div class="sp"></div>
             <LanguageBar locale={locale} />

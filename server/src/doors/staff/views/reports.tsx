@@ -1,3 +1,5 @@
+import { STEP_FIELDS, STEPS } from "../../../domain/form-schema.js";
+import { type MessageKey, translatorFor } from "../../../i18n/index.js";
 import { StaffShell } from "./shell.js";
 
 /**
@@ -56,6 +58,8 @@ function day(value: Date): string {
 
 export type ReportsPageProps = {
   reports: ReportRow[];
+  /** The signed-in person, for the title bar. */
+  viewerName: string;
   /** A stale or malformed link, reported over the register it failed to reach. */
   error?: string;
   viewerRole: string;
@@ -67,9 +71,20 @@ export type ReportsPageProps = {
  * Every signed-in role sees the same rows. Nothing here assigns, opens an assessment or changes a
  * status — those need a decision about who may do them, and this slice does not make it.
  */
-export function ReportsPage({ reports, error, viewerRole }: ReportsPageProps): JSX.Element {
+export function ReportsPage({
+  reports,
+  error,
+  viewerRole,
+  viewerName,
+}: ReportsPageProps): JSX.Element {
   return (
-    <StaffShell title="Reports — AE Reports" pageTitle="Reports" role={viewerRole} active="reports">
+    <StaffShell
+      title="Reports — AE Reports"
+      pageTitle="Reports"
+      role={viewerRole}
+      fullName={viewerName}
+      active="reports"
+    >
       <div class="staff-head">
         <div class="sp">
           <p class="hint">
@@ -135,35 +150,76 @@ export type ReportDetail = ReportRow & {
 };
 
 /**
- * A stored answer, flattened to lines a page can print.
+ * The staff app reads English, whatever the reporter filled the form in.
  *
- * The payload is whatever the orange form wrote at submission time and is never migrated, so this
- * cannot assume a shape. It walks the value and produces label/value pairs; anything it does not
- * recognise is JSON-stringified rather than dropped, because a report is evidence and a field
- * silently missing from the page is worse than one that reads awkwardly.
+ * The payload stores field names, not captions, so the language of the page is a choice made here
+ * rather than one baked into the document. Staff pages are English throughout.
  */
-function flatten(value: unknown, prefix = ""): Array<[string, string]> {
-  if (value === null || value === undefined) return [[prefix, "—"]];
+const t = translatorFor("en");
 
-  if (Array.isArray(value)) {
-    if (value.length === 0) return [[prefix, "—"]];
-    return value.flatMap((item, index) =>
-      flatten(item, prefix ? `${prefix} [${index + 1}]` : `[${index + 1}]`),
-    );
+/** One answer as the page shows it. An empty string stays empty: absent is not the same as "no". */
+type Answer = { label: string; value: string };
+
+/**
+ * A submitted value as text.
+ *
+ * A checkbox group arrives as an array and is joined; anything else is stringified. Objects are
+ * JSON rather than "[object Object]" — the orange form does not nest today, and if it ever does,
+ * an ugly line is recoverable evidence where a blank one is lost evidence.
+ */
+function asText(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (Array.isArray(value)) return value.map(asText).filter(Boolean).join(", ");
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
+export type ReportSection = { title: string; answers: Answer[] };
+
+/**
+ * The document, grouped the way it was filled in.
+ *
+ * The groups and their order are the orange form's five steps, and every caption is the form's own
+ * label — both read from `form-schema` and the message table rather than restated here, so the
+ * page a reviewer reads matches the paper form they are checking it against. Nothing is invented:
+ * a field the payload does not carry is not shown, and one it carries empty is shown empty.
+ *
+ * Keys the schema does not know about are collected at the end rather than dropped. A report is
+ * evidence; a field silently missing from the page is worse than one with an unlovely name.
+ */
+export function sectionsOf(payload: unknown): ReportSection[] {
+  const answers = (payload ?? {}) as Record<string, unknown>;
+  const seen = new Set<string>();
+  const sections: ReportSection[] = [];
+
+  for (const step of STEPS) {
+    const rows: Answer[] = [];
+
+    for (const field of STEP_FIELDS[step]) {
+      if (!(field in answers)) continue;
+      seen.add(field);
+      rows.push({ label: t(`f.${field}` as MessageKey), value: asText(answers[field]) });
+    }
+
+    if (rows.length > 0) sections.push({ title: t(`step.${step}` as MessageKey), answers: rows });
   }
 
-  if (typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>);
-    if (entries.length === 0) return [[prefix, "—"]];
-    return entries.flatMap(([key, inner]) => flatten(inner, prefix ? `${prefix} · ${key}` : key));
+  const rest = Object.keys(answers).filter((key) => !seen.has(key));
+  if (rest.length > 0) {
+    sections.push({
+      title: "Other answers",
+      answers: rest.map((key) => ({ label: key, value: asText(answers[key]) })),
+    });
   }
 
-  return [[prefix, String(value)]];
+  return sections;
 }
 
 export type ReportPageProps = {
   report: ReportDetail;
   viewerRole: string;
+  /** The signed-in person, for the title bar. */
+  viewerName: string;
 };
 
 /**
@@ -173,14 +229,15 @@ export type ReportPageProps = {
  * staff app: this document came from an anonymous public form, so it is the least trusted text in
  * the system, and it is rendered to the people who decide what happens next.
  */
-export function ReportPage({ report, viewerRole }: ReportPageProps): JSX.Element {
-  const answers = flatten(report.payload);
+export function ReportPage({ report, viewerRole, viewerName }: ReportPageProps): JSX.Element {
+  const sections = sectionsOf(report.payload);
 
   return (
     <StaffShell
       title={`${report.number} — AE Reports`}
       pageTitle={report.number}
       role={viewerRole}
+      fullName={viewerName}
       active="reports"
     >
       <div class="staff-head">
@@ -192,7 +249,7 @@ export function ReportPage({ report, viewerRole }: ReportPageProps): JSX.Element
           </p>
         </div>
         <a href="/reports" class="btn ghost">
-          Back to reports
+          ← Back to reports
         </a>
       </div>
 
@@ -217,22 +274,23 @@ export function ReportPage({ report, viewerRole }: ReportPageProps): JSX.Element
 
       <h2 class="report-heading">Submitted answers</h2>
 
-      <table class="utable">
-        <thead>
-          <tr>
-            <th>Field</th>
-            <th>Answer</th>
-          </tr>
-        </thead>
-        <tbody>
-          {answers.map(([label, value]) => (
-            <tr>
-              <td safe>{label}</td>
-              <td safe>{value}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {sections.length === 0 ? (
+        <p class="hint">This report carries no submitted answers.</p>
+      ) : (
+        sections.map((section) => (
+          <div class="report-group">
+            <h3 safe>{section.title}</h3>
+            <dl>
+              {section.answers.map((answer) => (
+                <>
+                  <dt safe>{answer.label}</dt>
+                  <dd safe>{answer.value}</dd>
+                </>
+              ))}
+            </dl>
+          </div>
+        ))
+      )}
     </StaffShell>
   );
 }

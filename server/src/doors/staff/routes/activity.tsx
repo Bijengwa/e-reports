@@ -87,6 +87,12 @@ export async function activityRoutes(app: FastifyInstance): Promise<void> {
   app.get("/activity", async (request, reply) => {
     const entries = await loadActivity(app, ACTIVITY_LIMIT);
 
-    return reply.html(<ActivityPage entries={entries} viewerRole={currentSession(request).role} />);
+    return reply.html(
+      <ActivityPage
+        entries={entries}
+        viewerRole={currentSession(request).role}
+        viewerName={currentSession(request).fullName}
+      />,
+    );
   });
 }

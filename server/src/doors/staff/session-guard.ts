@@ -80,7 +80,12 @@ export function requireRole(app: FastifyInstance, roles: readonly StaffSession["
     if (!request.staffSession || !roles.includes(request.staffSession.role)) {
       // The refusal is rendered with the reader's own role, so the rail on that page offers what
       // they can reach rather than the entries they were just turned away from.
-      return reply.status(403).html(ForbiddenPage({ role: request.staffSession?.role }));
+      return reply.status(403).html(
+        ForbiddenPage({
+          role: request.staffSession?.role,
+          fullName: request.staffSession?.fullName,
+        }),
+      );
     }
   });
 }

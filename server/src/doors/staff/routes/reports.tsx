@@ -72,6 +72,7 @@ async function renderReports(
         reports={rows.map(toRow)}
         error={error}
         viewerRole={currentSession(request).role}
+        viewerName={currentSession(request).fullName}
       />,
     );
 }
@@ -114,6 +115,8 @@ export async function reportsRoutes(app: FastifyInstance): Promise<void> {
       payload: row.payload,
     };
 
-    return reply.html(<ReportPage report={report} viewerRole={session.role} />);
+    return reply.html(
+      <ReportPage report={report} viewerRole={session.role} viewerName={session.fullName} />,
+    );
   });
 }

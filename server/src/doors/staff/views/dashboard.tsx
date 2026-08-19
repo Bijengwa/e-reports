@@ -1,4 +1,3 @@
-import { roleLabel } from "../../../domain/roles.js";
 import { type ActivityEntry, ActivityTable } from "./activity.js";
 import { StaffShell } from "./shell.js";
 
@@ -32,15 +31,13 @@ export function DashboardPage({
   recent,
 }: DashboardPageProps): JSX.Element {
   return (
-    <StaffShell title="AE Reports — Staff" pageTitle="Dashboard" role={role} active="dashboard">
-      <div class="staff-head">
-        <div class="sp">
-          <p class="hint">
-            Signed in as <strong safe>{fullName}</strong> (<span safe>{roleLabel(role)}</span>)
-          </p>
-        </div>
-      </div>
-
+    <StaffShell
+      title="AE Reports — Staff"
+      pageTitle="Dashboard"
+      role={role}
+      fullName={fullName}
+      active="dashboard"
+    >
       <div class="stats">
         <div class="stat">
           <span class="eyebrow">Reports</span>
@@ -57,8 +54,10 @@ export function DashboardPage({
         )}
       </div>
 
-      <p class="hint dash-note">
-        <a href="/reports">Open the reports list</a>
+      <p class="dash-note">
+        <a href="/reports" class="btn">
+          Open the reports list
+        </a>
       </p>
 
       {activeStaff === undefined && (

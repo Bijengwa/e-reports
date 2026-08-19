@@ -121,7 +121,16 @@ async function renderUsers(
   const session = currentSession(request);
   const users = await loadStaffUsers(app, session.userId);
 
-  reply.status(status).html(<UsersPage users={users} error={error} viewerRole={session.role} />);
+  reply
+    .status(status)
+    .html(
+      <UsersPage
+        users={users}
+        error={error}
+        viewerRole={session.role}
+        viewerName={session.fullName}
+      />,
+    );
 }
 
 /**
@@ -136,7 +145,12 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
   app.get("/users", async (request, reply) => renderUsers(app, request, reply, 200));
 
   app.get("/users/new", async (request, reply) =>
-    reply.html(<NewUserPage viewerRole={currentSession(request).role} />),
+    reply.html(
+      <NewUserPage
+        viewerRole={currentSession(request).role}
+        viewerName={currentSession(request).fullName}
+      />,
+    ),
   );
 
   app.post("/users/new", async (request, reply) => {
@@ -146,7 +160,14 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
     if (!parsed.success) {
       return reply
         .status(422)
-        .html(<NewUserPage error={INVALID} viewerRole={session.role} {...echoed(request.body)} />);
+        .html(
+          <NewUserPage
+            error={INVALID}
+            viewerRole={session.role}
+            viewerName={session.fullName}
+            {...echoed(request.body)}
+          />,
+        );
     }
 
     const { email, name, role } = parsed.data;
@@ -192,6 +213,7 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
               name={name}
               role={role}
               viewerRole={session.role}
+              viewerName={session.fullName}
             />,
           );
       }
@@ -208,6 +230,7 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
         role={role}
         password={password}
         viewerRole={session.role}
+        viewerName={session.fullName}
       />,
     );
   });
@@ -281,6 +304,7 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
         fullName={outcome.fullName}
         password={password}
         viewerRole={session.role}
+        viewerName={session.fullName}
       />,
     );
   });

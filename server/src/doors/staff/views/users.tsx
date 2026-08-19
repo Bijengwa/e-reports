@@ -49,6 +49,8 @@ export type UsersPageProps = {
    * to stop being true.
    */
   viewerRole: string;
+  /** The signed-in person, for the title bar. */
+  viewerName: string;
 };
 
 /**
@@ -58,12 +60,13 @@ export type UsersPageProps = {
  * once, and is unrecoverable afterwards — a list that could show it again would make it a
  * standing credential rather than a handover.
  */
-export function UsersPage({ users, error, viewerRole }: UsersPageProps): JSX.Element {
+export function UsersPage({ users, error, viewerRole, viewerName }: UsersPageProps): JSX.Element {
   return (
     <StaffShell
       title="Staff accounts — AE Reports"
       pageTitle="Staff accounts"
       role={viewerRole}
+      fullName={viewerName}
       active="users"
     >
       <div class="staff-head">
@@ -170,6 +173,8 @@ export type NewUserPageProps = {
   role?: AssignableRole | undefined;
   /** The reader's own role, for the rail. See `UsersPageProps`. */
   viewerRole: string;
+  /** The signed-in person, for the title bar. */
+  viewerName: string;
 };
 
 /**
@@ -186,12 +191,14 @@ export function NewUserPage({
   name,
   role,
   viewerRole,
+  viewerName,
 }: NewUserPageProps): JSX.Element {
   return (
     <StaffShell
       title="Add a staff account — AE Reports"
       pageTitle="Add a staff account"
       role={viewerRole}
+      fullName={viewerName}
       active="users"
     >
       <div class="staff-narrow">
@@ -273,6 +280,8 @@ export type UserCreatedPageProps = {
   password: string;
   /** The reader's own role, for the rail. See `UsersPageProps`. */
   viewerRole: string;
+  /** The signed-in person, for the title bar. */
+  viewerName: string;
 };
 
 /**
@@ -290,12 +299,14 @@ export function UserCreatedPage({
   role,
   password,
   viewerRole,
+  viewerName,
 }: UserCreatedPageProps): JSX.Element {
   return (
     <StaffShell
       title="Account created — AE Reports"
       pageTitle="Account created"
       role={viewerRole}
+      fullName={viewerName}
       active="users"
     >
       <div class="staff-narrow">
@@ -338,6 +349,8 @@ export type PasswordResetPageProps = {
   password: string;
   /** The reader's own role, for the rail. See `UsersPageProps`. */
   viewerRole: string;
+  /** The signed-in person, for the title bar. */
+  viewerName: string;
 };
 
 /**
@@ -352,12 +365,14 @@ export function PasswordResetPage({
   fullName,
   password,
   viewerRole,
+  viewerName,
 }: PasswordResetPageProps): JSX.Element {
   return (
     <StaffShell
       title="Password reset — AE Reports"
       pageTitle="Password reset"
       role={viewerRole}
+      fullName={viewerName}
       active="users"
     >
       <div class="staff-narrow">

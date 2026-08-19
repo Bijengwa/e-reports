@@ -3,6 +3,8 @@ import { StaffShell } from "./shell.js";
 export type ForbiddenPageProps = {
   /** The reader's role, so the rail offers them what they can actually reach. */
   role?: string | undefined;
+  /** The signed-in person, for the title bar. */
+  fullName?: string | undefined;
 };
 
 /**
@@ -21,9 +23,14 @@ export type ForbiddenPageProps = {
  * dashboard prints the reader's own — and a bare refusal only sends someone to ask a colleague
  * what they were supposed to click.
  */
-export function ForbiddenPage({ role }: ForbiddenPageProps = {}): JSX.Element {
+export function ForbiddenPage({ role, fullName }: ForbiddenPageProps = {}): JSX.Element {
   return (
-    <StaffShell title="Not permitted — AE Reports" pageTitle="Not permitted" role={role}>
+    <StaffShell
+      title="Not permitted — AE Reports"
+      pageTitle="Not permitted"
+      role={role}
+      fullName={fullName}
+    >
       <div class="staff-head">
         <div class="sp">
           <p class="eyebrow">403</p>

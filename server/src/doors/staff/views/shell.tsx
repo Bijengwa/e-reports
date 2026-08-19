@@ -1,4 +1,5 @@
 import type { Children } from "@kitajs/html";
+import { roleLabel } from "../../../domain/roles.js";
 import { BrandMark } from "../../../views/shared/brand-mark.js";
 import { Layout } from "../../../views/shared/layout.js";
 
@@ -20,6 +21,14 @@ export type StaffShellProps = {
    * without a session has no role to give. A missing role is read as "not an administrator".
    */
   role?: string | undefined;
+  /**
+   * The signed-in person, shown at the right of the title bar.
+   *
+   * Optional for the same reason `role` is: the 403 page can be rendered on the one branch that
+   * has no session to name. Every page reached with one passes it, so the reader can see which
+   * account they are acting as without a sentence in the page saying so.
+   */
+  fullName?: string | undefined;
   /** Which entry is the page being shown, so the rail can mark it. */
   active?: "dashboard" | "reports" | "users" | "activity";
   children?: Children;
@@ -136,6 +145,7 @@ export function StaffShell({
   title,
   pageTitle,
   role,
+  fullName,
   active,
   children,
 }: StaffShellProps): JSX.Element {
@@ -238,6 +248,21 @@ export function StaffShell({
             </button>
 
             <h1 safe>{pageTitle}</h1>
+
+            {fullName && (
+              <span class="top-user">
+                <span>
+                  <span class="top-name" safe>
+                    {fullName}
+                  </span>
+                  {role && (
+                    <span class="top-role" safe>
+                      {roleLabel(role)}
+                    </span>
+                  )}
+                </span>
+              </span>
+            )}
           </header>
 
           <main class="staff-main">{children}</main>
