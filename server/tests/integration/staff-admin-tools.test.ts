@@ -463,8 +463,9 @@ describe.skipIf(!INTEGRATION_ENABLED)("the activity trail", () => {
 
     const body = (await get("/activity", admin.cookie)).body;
 
-    // One header row plus at most two hundred entries.
-    expect((body.match(/<tr>/g) ?? []).length).toBe(201);
+    // One header row plus at most two hundred entries. Counting the opening tag rather than a
+    // bare `<tr>`, because every entry row now carries a tone class.
+    expect((body.match(/<tr[ >]/g) ?? []).length).toBe(201);
   });
 
   it("refuses a manager and an assessor", async () => {

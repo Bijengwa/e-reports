@@ -1,3 +1,4 @@
+import { roleLabel } from "../../../domain/roles.js";
 import { StaffShell } from "./shell.js";
 
 export type DashboardPageProps = {
@@ -18,7 +19,7 @@ export function DashboardPage({ fullName, role }: DashboardPageProps): JSX.Eleme
       <div class="staff-head">
         <div class="sp">
           <p class="hint">
-            Signed in as <strong safe>{fullName}</strong> (<span safe>{role}</span>)
+            Signed in as <strong safe>{fullName}</strong> (<span safe>{roleLabel(role)}</span>)
           </p>
         </div>
       </div>

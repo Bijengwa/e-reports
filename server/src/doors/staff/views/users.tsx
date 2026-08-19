@@ -1,3 +1,4 @@
+import { roleLabel } from "../../../domain/roles.js";
 import { StaffShell } from "./shell.js";
 
 /** The roles an administrator may hand out. Never `administrator`. */
@@ -102,7 +103,7 @@ export function UsersPage({ users, error, viewerRole }: UsersPageProps): JSX.Ele
                 {user.isSelf && <span class="tag muted">You</span>}
               </td>
               <td safe>{user.email}</td>
-              <td safe>{user.role}</td>
+              <td safe>{roleLabel(user.role)}</td>
               <td>
                 {user.isActive ? (
                   <span class="tag">Active</span>
@@ -243,7 +244,7 @@ export function NewUserPage({
                 </option>
                 {ASSIGNABLE_ROLES.map((assignable) => (
                   <option value={assignable} selected={role === assignable}>
-                    {assignable === "manager" ? "Manager" : "Assessor"}
+                    {roleLabel(assignable)}
                   </option>
                 ))}
               </select>
@@ -303,7 +304,7 @@ export function UserCreatedPage({
             <p class="eyebrow">Account created</p>
             <h2 safe>{fullName}</h2>
             <p class="hint">
-              <span safe>{email}</span> · <span safe>{role}</span>
+              <span safe>{email}</span> · <span safe>{roleLabel(role)}</span>
             </p>
           </div>
         </div>

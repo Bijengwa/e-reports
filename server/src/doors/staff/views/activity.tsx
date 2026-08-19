@@ -1,3 +1,4 @@
+import { roleLabel } from "../../../domain/roles.js";
 import { StaffShell } from "./shell.js";
 
 /**
@@ -12,14 +13,34 @@ import { StaffShell } from "./shell.js";
  * cannot answer.
  */
 export const ACTIVITY_ACTIONS = {
-  "user.bootstrap_created": "First administrator created",
-  "user.created": "Account created",
-  "user.signed_in": "Signed in",
-  "user.password_changed": "Password changed",
-  "user.password_reset": "Password reset",
-  "user.deactivated": "Account deactivated",
-  "user.reactivated": "Account reactivated",
+  "user.bootstrap_created": { label: "First administrator created", tone: "safe" },
+  "user.created": { label: "Account created", tone: "safe" },
+  "user.signed_in": { label: "Signed in", tone: "safe" },
+  "user.password_changed": { label: "Password changed", tone: "safe" },
+  "user.reactivated": { label: "Account reactivated", tone: "safe" },
+  "user.password_reset": { label: "Password reset", tone: "caution" },
+  "user.deactivated": { label: "Account deactivated", tone: "caution" },
 } as const;
+
+/**
+ * How an entry reads at a glance, from the action and nothing else.
+ *
+ * Two tones, and neither of them is red. `caution` marks the two actions that take an account
+ * away from its owner — a reset and a deactivation — because those are the ones an auditor scans
+ * for. It does not mean anything went wrong: both are ordinary administration, and both are
+ * things somebody should be able to account for afterwards.
+ *
+ * There is deliberately no third, alarming tone. `audit_log` records actions that succeeded, so
+ * there is nothing in it to colour that way: a refused sign-in and a 403 are never written here,
+ * and inventing a row to carry that colour would be inventing evidence.
+ */
+function toneOf(action: string): string {
+  return ACTIVITY_ACTIONS[action as keyof typeof ACTIVITY_ACTIONS]?.tone ?? "safe";
+}
+
+function labelOf(action: string): string {
+  return ACTIVITY_ACTIONS[action as keyof typeof ACTIVITY_ACTIONS]?.label ?? action;
+}
 
 /** Newest first, and only this many. A trail nobody can page through is one nobody reads. */
 export const ACTIVITY_LIMIT = 200;
@@ -35,6 +56,8 @@ export type ActivityEntry = {
    */
   actorName: string | null;
   actorEmail: string | null;
+  /** The actor's role at the time the page is read, not at the time of the action. */
+  actorRole: string | null;
   /** Null only if the account behind the entry has gone. Nothing deletes users today. */
   targetName: string | null;
   targetEmail: string | null;
@@ -80,13 +103,14 @@ export function ActivityPage({ entries, viewerRole }: ActivityPageProps): JSX.El
           <tr>
             <th>When (UTC)</th>
             <th>Actor</th>
+            <th>Role</th>
             <th>Action</th>
             <th>Target</th>
           </tr>
         </thead>
         <tbody>
           {entries.map((entry) => (
-            <tr>
+            <tr class={`tone-${toneOf(entry.action)}`}>
               <td>{when(entry.at)}</td>
               <td>
                 {entry.actorName ? (
@@ -100,9 +124,14 @@ export function ActivityPage({ entries, viewerRole }: ActivityPageProps): JSX.El
                   <span class="hint">System (CLI)</span>
                 )}
               </td>
-              <td safe>
-                {ACTIVITY_ACTIONS[entry.action as keyof typeof ACTIVITY_ACTIONS] ?? entry.action}
+              <td>
+                {entry.actorRole ? (
+                  <span safe>{roleLabel(entry.actorRole)}</span>
+                ) : (
+                  <span class="hint">—</span>
+                )}
               </td>
+              <td safe>{labelOf(entry.action)}</td>
               <td>
                 {entry.targetName ? (
                   <>

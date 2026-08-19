@@ -40,6 +40,7 @@ export async function activityRoutes(app: FastifyInstance): Promise<void> {
              a.action,
              actor.full_name  AS actor_name,
              actor.email      AS actor_email,
+             actor.role       AS actor_role,
              target.full_name AS target_name,
              target.email     AS target_email
         FROM audit_log AS a
@@ -59,6 +60,7 @@ export async function activityRoutes(app: FastifyInstance): Promise<void> {
         action: string;
         actor_name: string | null;
         actor_email: string | null;
+        actor_role: string | null;
         target_name: string | null;
         target_email: string | null;
       };
@@ -68,6 +70,7 @@ export async function activityRoutes(app: FastifyInstance): Promise<void> {
         action: entry.action,
         actorName: entry.actor_name,
         actorEmail: entry.actor_email,
+        actorRole: entry.actor_role,
         targetName: entry.target_name,
         targetEmail: entry.target_email,
       };

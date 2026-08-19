@@ -1226,3 +1226,18 @@ textarea[aria-invalid="true"] {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+
+/* ---------- activity row tones ---------- */
+/*
+ * Two tones, set by the action alone. `caution` marks the two actions that take an account away
+ * from its owner; it does not mean anything went wrong, only that somebody should be able to
+ * account for it. There is no third, alarming tone, because audit_log holds actions that
+ * succeeded — a refused sign-in and a 403 are never written to it.
+ */
+.utable tr.tone-safe td {
+  background: #f6fbf7;
+}
+
+.utable tr.tone-caution td {
+  background: var(--orange-bg);
+}
