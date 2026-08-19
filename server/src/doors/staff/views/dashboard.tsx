@@ -57,6 +57,10 @@ export function DashboardPage({
         )}
       </div>
 
+      <p class="hint dash-note">
+        <a href="/reports">Open the reports list</a>
+      </p>
+
       {activeStaff === undefined && (
         <p class="hint dash-note">
           Your own work arrives in a later slice. Until reports are assigned, everyone sees the same

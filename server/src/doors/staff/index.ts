@@ -6,6 +6,7 @@ import { changePasswordRoutes } from "./routes/change-password.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
 import { loginRoutes } from "./routes/login.js";
 import { logoutRoutes } from "./routes/logout.js";
+import { reportsRoutes } from "./routes/reports.js";
 import { usersRoutes } from "./routes/users.js";
 import { requirePasswordChanged, requireRole, requireSession } from "./session-guard.js";
 
@@ -66,6 +67,10 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
       requirePasswordChanged(active);
 
       await active.register(dashboardRoutes);
+
+      // Every signed-in role, so it sits here rather than in the administrator scope below. An
+      // administrator's extra powers are over accounts, not over who may read a report.
+      await active.register(reportsRoutes);
 
       await active.register(async (administration) => {
         // Narrower still: creating staff accounts is the administrator's alone. A manager or

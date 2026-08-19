@@ -1278,3 +1278,21 @@ textarea[aria-invalid="true"] {
   font-size: 15px;
   font-weight: 600;
 }
+
+/* ---------- one report ---------- */
+.report-facts dl {
+  display: grid;
+  grid-template-columns: minmax(110px, auto) 1fr;
+  gap: 7px 18px;
+  font-size: 13px;
+}
+
+.report-facts dt {
+  color: var(--ink-3);
+}
+
+.report-heading {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 26px 0 12px;
+}

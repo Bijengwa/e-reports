@@ -21,7 +21,7 @@ export type StaffShellProps = {
    */
   role?: string | undefined;
   /** Which entry is the page being shown, so the rail can mark it. */
-  active?: "dashboard" | "users" | "activity";
+  active?: "dashboard" | "reports" | "users" | "activity";
   children?: Children;
 };
 
@@ -33,6 +33,17 @@ function IconDashboard(): JSX.Element {
       <rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5" />
       <rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5" />
       <rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5" />
+    </svg>
+  );
+}
+
+function IconReports(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M6 3h8l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+      <path d="M14 3v5h5" />
+      <path d="M9 13h6" />
+      <path d="M9 17h4" />
     </svg>
   );
 }
@@ -148,6 +159,17 @@ export function StaffShell({
             >
               <IconDashboard />
               <span class="rail-label">Dashboard</span>
+            </a>
+
+            {/* Everyone's, because everyone may read the register. What differs by role is what
+                a person may do with a report, and this slice gives nobody anything to do. */}
+            <a
+              href="/reports"
+              class={active === "reports" ? "on" : ""}
+              aria-current={active === "reports" ? "page" : undefined}
+            >
+              <IconReports />
+              <span class="rail-label">Reports</span>
             </a>
 
             {isAdministrator && (
