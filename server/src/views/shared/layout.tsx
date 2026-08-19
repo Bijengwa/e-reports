@@ -15,6 +15,14 @@ export type LayoutProps = {
    * would find nothing to do — the orange form's markup is unchanged by this prop existing.
    */
   passwordToggle?: boolean;
+  /**
+   * Load the staff rail's script, which is the one script here that must not be deferred.
+   *
+   * It restores the collapsed rail before the first paint; deferring it would show the rail wide
+   * and then snap it shut on every page load. Opt-in for the same reason as `passwordToggle`: a
+   * page without a rail must not be made to fetch it.
+   */
+  railScript?: boolean;
   children?: Children;
 };
 
@@ -30,6 +38,7 @@ export function Layout({
   locale,
   bodyClass,
   passwordToggle,
+  railScript,
   children,
 }: LayoutProps): JSX.Element {
   return (
@@ -40,6 +49,9 @@ export function Layout({
         <meta name="referrer" content="same-origin" />
         <title>{title}</title>
         <link rel="stylesheet" href="/assets/app.css" />
+        {/* Deliberately not deferred — it has to run before the rail is painted. It is a few
+            hundred bytes and sets one class on <html>. */}
+        {railScript && <script src="/assets/rail.js"></script>}
         {/* Enhancement only — the form works with this blocked, because every rule it applies is
             also enforced server-side. Served from our own origin to satisfy the CSP. */}
         <script src="/assets/orange-form.js" defer></script>

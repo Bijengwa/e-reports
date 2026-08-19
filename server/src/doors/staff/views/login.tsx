@@ -1,5 +1,5 @@
+import { BrandMark } from "../../../views/shared/brand-mark.js";
 import { Layout } from "../../../views/shared/layout.js";
-import { Logo } from "../../../views/shared/logo.js";
 
 export type LoginPageProps = {
   error?: string;
@@ -23,11 +23,8 @@ export function LoginPage({ error, publicFormUrl }: LoginPageProps): JSX.Element
     <Layout title="Staff sign in — AE Reports" locale="en" bodyClass="staff-login" passwordToggle>
       <div class="login-card">
         <div class="login-header">
-          <div class="auth-logo">
-            <Logo />
-          </div>
-          <h1>AE Reports</h1>
-          <p>Medical Device Vigilance — TMDA Staff Portal</p>
+          <BrandMark />
+          <h1>Staff sign in</h1>
         </div>
 
         {error && (

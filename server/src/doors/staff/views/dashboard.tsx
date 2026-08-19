@@ -14,10 +14,9 @@ export type DashboardPageProps = {
  */
 export function DashboardPage({ fullName, role }: DashboardPageProps): JSX.Element {
   return (
-    <StaffShell title="AE Reports — Staff" role={role} active="dashboard">
+    <StaffShell title="AE Reports — Staff" pageTitle="Dashboard" role={role} active="dashboard">
       <div class="staff-head">
         <div class="sp">
-          <h1>Dashboard</h1>
           <p class="hint">
             Signed in as <strong safe>{fullName}</strong> (<span safe>{role}</span>)
           </p>

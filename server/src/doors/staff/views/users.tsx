@@ -59,10 +59,14 @@ export type UsersPageProps = {
  */
 export function UsersPage({ users, error, viewerRole }: UsersPageProps): JSX.Element {
   return (
-    <StaffShell title="Staff accounts — AE Reports" role={viewerRole} active="users">
+    <StaffShell
+      title="Staff accounts — AE Reports"
+      pageTitle="Staff accounts"
+      role={viewerRole}
+      active="users"
+    >
       <div class="staff-head">
         <div class="sp">
-          <h1>Staff accounts</h1>
           <p class="hint">
             {users.length} account{users.length === 1 ? "" : "s"}
           </p>
@@ -183,11 +187,15 @@ export function NewUserPage({
   viewerRole,
 }: NewUserPageProps): JSX.Element {
   return (
-    <StaffShell title="Add a staff account — AE Reports" role={viewerRole} active="users">
+    <StaffShell
+      title="Add a staff account — AE Reports"
+      pageTitle="Add a staff account"
+      role={viewerRole}
+      active="users"
+    >
       <div class="staff-narrow">
         <div class="staff-head">
           <div class="sp">
-            <h1>Add a staff account</h1>
             <p class="hint">
               A one-time password is generated here and shown once. The user must replace it at
               first sign-in.
@@ -283,12 +291,17 @@ export function UserCreatedPage({
   viewerRole,
 }: UserCreatedPageProps): JSX.Element {
   return (
-    <StaffShell title="Account created — AE Reports" role={viewerRole} active="users">
+    <StaffShell
+      title="Account created — AE Reports"
+      pageTitle="Account created"
+      role={viewerRole}
+      active="users"
+    >
       <div class="staff-narrow">
         <div class="staff-head">
           <div class="sp">
             <p class="eyebrow">Account created</p>
-            <h1 safe>{fullName}</h1>
+            <h2 safe>{fullName}</h2>
             <p class="hint">
               <span safe>{email}</span> · <span safe>{role}</span>
             </p>
@@ -340,12 +353,17 @@ export function PasswordResetPage({
   viewerRole,
 }: PasswordResetPageProps): JSX.Element {
   return (
-    <StaffShell title="Password reset — AE Reports" role={viewerRole} active="users">
+    <StaffShell
+      title="Password reset — AE Reports"
+      pageTitle="Password reset"
+      role={viewerRole}
+      active="users"
+    >
       <div class="staff-narrow">
         <div class="staff-head">
           <div class="sp">
             <p class="eyebrow">Password reset</p>
-            <h1 safe>{fullName}</h1>
+            <h2 safe>{fullName}</h2>
             <p class="hint" safe>
               {email}
             </p>

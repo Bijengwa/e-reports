@@ -48,7 +48,10 @@ describe("door isolation", () => {
     const res = await app.inject({ url: "/", headers: { host: config.STAFF_HOST } });
 
     expect(res.statusCode).toBe(200);
-    expect(res.body).toContain("TMDA Staff Portal");
+    // The sign-in card's wording comes from BrandMark, which the rail renders too. Asserting on
+    // it here is deliberate: if that one component changes, this says so rather than letting the
+    // two doors quietly disagree about what the product is called.
+    expect(res.body).toContain("TMDA · Device vigilance");
   });
 
   it("points the staff login across to the public door by absolute origin", async () => {

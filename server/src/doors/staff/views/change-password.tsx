@@ -1,6 +1,6 @@
 import { MIN_PASSWORD_LENGTH } from "../../../auth/password.js";
+import { BrandMark } from "../../../views/shared/brand-mark.js";
 import { Layout } from "../../../views/shared/layout.js";
-import { Logo } from "../../../views/shared/logo.js";
 
 export type ChangePasswordPageProps = {
   error?: string;
@@ -19,9 +19,7 @@ export function ChangePasswordPage({ error, isForced }: ChangePasswordPageProps)
     <Layout title="Change Password — AE Reports" locale="en" bodyClass="staff-login" passwordToggle>
       <div class="login-card">
         <div class="login-header">
-          <div class="auth-logo">
-            <Logo />
-          </div>
+          <BrandMark />
           <h1>Change Password</h1>
           {isForced ? (
             <p>You must set a new password before continuing.</p>

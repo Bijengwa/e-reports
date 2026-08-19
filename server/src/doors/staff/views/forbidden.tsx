@@ -23,11 +23,10 @@ export type ForbiddenPageProps = {
  */
 export function ForbiddenPage({ role }: ForbiddenPageProps = {}): JSX.Element {
   return (
-    <StaffShell title="Not permitted — AE Reports" role={role}>
+    <StaffShell title="Not permitted — AE Reports" pageTitle="Not permitted" role={role}>
       <div class="staff-head">
         <div class="sp">
           <p class="eyebrow">403</p>
-          <h1>Not permitted</h1>
           <p class="hint">Only an administrator can manage staff accounts.</p>
         </div>
       </div>

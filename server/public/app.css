@@ -678,130 +678,259 @@ textarea[aria-invalid="true"] {
  */
 .staff {
   background: var(--paper);
+}
+
+/*
+ * A row, not a stack. The rail is a column beside the page at every width — below 900px it slides
+ * over the page as a drawer rather than becoming a strip above it, because a horizontal bar of
+ * links is a different component that happens to fit, not a smaller sidebar.
+ */
+.shell {
+  display: flex;
   min-height: 100vh;
 }
 
 /*
- * The rail and the page beside it. A grid rather than a fixed-position aside, so the rail's own
- * height is the row height and a long page scrolls the document rather than a nested box.
+ * Sticky at full viewport height, so the rail stays put while the page scrolls. Its own nav is
+ * the part that scrolls if the list ever outgrows the screen.
  */
-.staff-app {
-  display: grid;
-  grid-template-columns: 212px 1fr;
-  min-height: 100vh;
-}
-
 .rail {
+  width: 238px;
+  flex: none;
+  background: var(--green-d);
+  color: #c9dace;
   display: flex;
   flex-direction: column;
-  background: var(--green-d);
-  padding: 22px 14px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  z-index: 60;
 }
 
-.rail-brand {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 0 8px 18px;
-  margin-bottom: 6px;
-  border-bottom: 1px solid rgb(255 255 255 / 12%);
-}
-
-.rail-name {
-  display: block;
-  color: #fff;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
-}
-
-.rail-sub {
-  display: block;
-  font-size: 11px;
-  color: #7fa48b;
-  margin-top: 1px;
+.rail .brand {
+  padding: 15px 16px 14px;
+  border-bottom: 1px solid #1b5231;
+  overflow: hidden;
 }
 
 .rail-nav {
-  list-style: none;
+  padding: 11px;
   flex: 1;
+  overflow: auto;
 }
 
 .rail-nav a {
-  display: block;
-  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 11px;
   margin-bottom: 2px;
   border-radius: var(--r);
-  color: rgb(255 255 255 / 78%);
-  font-size: 13px;
+  color: #a9c4b1;
   text-decoration: none;
+  font-size: 13.5px;
+  white-space: nowrap;
 }
 
 .rail-nav a:hover {
-  background: rgb(255 255 255 / 8%);
+  background: #14522b;
   color: #fff;
 }
 
-/* The page you are on, marked for sighted readers; aria-current carries it to everyone else. */
 .rail-nav a.on {
-  background: var(--green-h);
+  background: #1e6b39;
   color: #fff;
   font-weight: 500;
 }
 
-.rail-out {
-  padding-top: 14px;
-  border-top: 1px solid rgb(255 255 255 / 12%);
+.rail-foot {
+  padding: 11px;
+  border-top: 1px solid #1b5231;
 }
 
 .rail-signout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   width: 100%;
-  padding: 8px 10px;
-  border: 1px solid rgb(255 255 255 / 22%);
+  padding: 8px 11px;
+  border: 0;
   border-radius: var(--r);
   background: transparent;
-  color: rgb(255 255 255 / 82%);
-  font-size: 13px;
+  color: #a9c4b1;
+  font-size: 13.5px;
   font-weight: 500;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .rail-signout:hover {
-  background: rgb(255 255 255 / 10%);
+  background: #14522b;
   color: #fff;
 }
 
+/* One rule for every icon in the rail and the title bar. */
+.rail-nav svg,
+.rail-signout svg,
+.top-burger svg,
+.rail-collapse svg {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+ * Exactly 56px, and `flex: none` is the half that enforces it. A min-height would let the bar
+ * grow the moment anything inside it wrapped, which is why the bar carries the page title alone.
+ */
+.top {
+  height: 56px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 18px;
+  background: var(--card);
+  border-bottom: 1px solid var(--rule);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+
+.top h1 {
+  flex: 1;
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.top-burger,
+.rail-collapse {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+
+.top-burger:hover,
+.rail-collapse:hover {
+  background: #eef2ee;
+  color: var(--ink);
+}
+
+/* The drawer's control. Above 900px the rail is always on screen, so it has nothing to do. */
+.top-burger {
+  display: none;
+}
+
 .staff-main {
-  max-width: 920px;
-  padding: 30px 26px 56px;
+  max-width: 1100px;
+  padding: 24px 22px 52px;
 }
 
 .staff-narrow {
   max-width: 560px;
 }
 
-.staff-head {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  margin-bottom: 20px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid var(--rule);
+/* Covers the page while the drawer is open; `hidden` on the element keeps it inert until then. */
+.scrim {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgb(12 59 30 / 50%);
+  z-index: 50;
 }
 
-.staff-head h1 {
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+/* ---------- the collapsed rail ---------- */
+/*
+ * Only meaningful while the rail is a column. Below 900px it is a drawer, and a 64px drawer would
+ * be a worse version of the thing the drawer exists to replace — so these rules are scoped away
+ * from that width entirely rather than undone one by one.
+ */
+@media (min-width: 901px) {
+  :root.rail-collapsed .rail {
+    width: 64px;
+  }
+
+  :root.rail-collapsed .rail-label,
+  :root.rail-collapsed .brand-text {
+    display: none;
+  }
+
+  :root.rail-collapsed .rail-nav a,
+  :root.rail-collapsed .rail-signout,
+  :root.rail-collapsed .brand-mark {
+    justify-content: center;
+    gap: 0;
+  }
+
+  :root.rail-collapsed .rail .brand {
+    padding-left: 0;
+    padding-right: 0;
+  }
 }
 
-.staff-head .hint {
-  margin-top: 3px;
+/* ---------- the rail as a drawer ---------- */
+@media (max-width: 900px) {
+  .rail {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    height: 100%;
+    transform: translateX(-100%);
+    transition: transform 0.18s ease;
+  }
+
+  :root.rail-open .rail {
+    transform: none;
+  }
+
+  :root.rail-open .scrim {
+    display: block;
+  }
+
+  .top-burger {
+    display: grid;
+  }
+
+  /* Collapsing has no meaning once the rail is off-canvas. */
+  .rail-collapse {
+    display: none;
+  }
+
+  .staff-main {
+    padding: 20px 16px 44px;
+  }
 }
 
-.staff-foot {
-  margin-top: 20px;
+@media (prefers-reduced-motion: reduce) {
+  .rail {
+    transition: none;
+  }
 }
 
 /* ---------- staff account list ---------- */
@@ -834,7 +963,8 @@ textarea[aria-invalid="true"] {
   /* The header alone. Freezing a first data row as well would hide a real record behind a
      heading and make the count on the page disagree with what is readable. */
   position: sticky;
-  top: 0;
+  /* Clears the title bar rather than sliding under it: the bar is sticky at 0 and 56px tall. */
+  top: 56px;
   z-index: 1;
 }
 
@@ -924,46 +1054,6 @@ textarea[aria-invalid="true"] {
   margin: 8px 0 10px;
 }
 
-@media (max-width: 760px) {
-  /* The rail becomes a strip across the top; a 212px column on a phone leaves nothing beside it. */
-  .staff-app {
-    grid-template-columns: 1fr;
-  }
-
-  .rail {
-    flex-direction: row;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 10px;
-    padding: 12px 16px;
-  }
-
-  .rail-brand {
-    padding: 0;
-    margin: 0;
-    border-bottom: 0;
-  }
-
-  .rail-nav {
-    display: flex;
-    gap: 4px;
-    flex: 1;
-  }
-
-  .rail-nav a {
-    margin-bottom: 0;
-  }
-
-  .rail-out {
-    padding-top: 0;
-    border-top: 0;
-  }
-
-  .staff-main {
-    padding: 22px 16px 44px;
-  }
-}
-
 @media (max-width: 620px) {
   /* The list is wider than a phone; scrolling it beats stacking six columns into unreadable rows. */
   .utable {
@@ -1012,13 +1102,49 @@ textarea[aria-invalid="true"] {
   fill: var(--green-d);
 }
 
-.auth-logo {
-  margin-bottom: 12px;
+/*
+ * The brand block: mark, name, and the line under it. One component renders this in the rail and
+ * on both auth cards, so the only thing that differs between them is the palette `on-dark` picks.
+ */
+.brand-mark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 
-.auth-logo .logo {
-  width: 34px;
-  height: 34px;
+.brand-text b {
+  display: block;
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.brand-text > span {
+  display: block;
+  font-size: 11px;
+  color: var(--ink-3);
+  margin-top: 1px;
+  white-space: nowrap;
+}
+
+.on-dark .brand-text b {
+  color: #fff;
+}
+
+.on-dark .brand-text > span {
+  color: #7fa48b;
+}
+
+.login-header .brand-mark {
+  margin-bottom: 16px;
+}
+
+.login-header .logo {
+  width: 32px;
+  height: 32px;
 }
 
 /* ---------- show / hide a password ---------- */

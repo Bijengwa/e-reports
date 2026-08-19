@@ -61,10 +61,14 @@ export type ActivityPageProps = {
  */
 export function ActivityPage({ entries, viewerRole }: ActivityPageProps): JSX.Element {
   return (
-    <StaffShell title="Activity — AE Reports" role={viewerRole} active="activity">
+    <StaffShell
+      title="Activity — AE Reports"
+      pageTitle="Activity"
+      role={viewerRole}
+      active="activity"
+    >
       <div class="staff-head">
         <div class="sp">
-          <h1>Activity</h1>
           <p class="hint">
             Account actions, newest first. The most recent {ACTIVITY_LIMIT} are shown.
           </p>
