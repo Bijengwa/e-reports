@@ -60,5 +60,8 @@ export function openApp(): DatabaseHandle {
  * TRUNCATE. CASCADE is needed because sessions and audit_log both reference users.
  */
 export async function truncateAll(owner: Database): Promise<void> {
-  await owner.execute(sql`TRUNCATE users, sessions, audit_log RESTART IDENTITY CASCADE`);
+  // `reports` is in the list because the reports suite seeds one. It cascades to assessments and
+  // attachments, so a seeded report cannot outlive the file that made it and turn up in another
+  // suite's count.
+  await owner.execute(sql`TRUNCATE users, sessions, audit_log, reports RESTART IDENTITY CASCADE`);
 }
