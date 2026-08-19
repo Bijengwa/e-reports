@@ -104,6 +104,25 @@ export const reports = pgTable(
     /** Set when an assessor keys in a report that arrived by email or on paper. */
     enteredByUserId: uuid("entered_by_user_id").references(() => users.id),
 
+    /**
+     * The Officer this report is waiting on, chosen when it was filed.
+     *
+     * Null means nobody could be chosen — no active assessor existed at intake — and the report
+     * is an orphan waiting for one. Deliberately not `NOT NULL`: refusing a vigilance report
+     * because the office is unstaffed would lose the report, which is the one outcome worse than
+     * an unassigned one.
+     *
+     * Distinct from `entered_by_user_id` above, which records who typed a report in. The typist
+     * and the assessor are often the same person and never mean the same thing, so both columns
+     * exist and neither is derived from the other.
+     *
+     * `assessments.ordinal = 1` names the same person once an F004 exists. Nothing writes that
+     * table yet; whatever does must read this column rather than choose again.
+     */
+    assessor1UserId: uuid("assessor1_user_id").references(() => users.id),
+    /** When the choice was made. Null exactly when `assessor1_user_id` is. */
+    assessor1AssignedAt: timestamp("assessor1_assigned_at", { withTimezone: true }),
+
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -111,6 +130,10 @@ export const reports = pgTable(
     index("reports_status_idx").on(t.status),
     index("reports_received_at_idx").on(t.receivedAt),
     index("reports_severity_idx").on(t.severity),
+    // Serves the workload count the assignment runs for every candidate on every intake: how many
+    // open reports are this Officer's. Both columns in this order, because the count filters on
+    // the Officer first and the two open statuses second.
+    index("reports_assessor1_status_idx").on(t.assessor1UserId, t.status),
   ],
 );
 

@@ -112,6 +112,69 @@ export function validateSubmission(answers: Answers): ValidationResult {
   return { ok: false, errors: result.error.issues.map((issue) => issue.message) };
 }
 
+/**
+ * Arbitrary but permanent, and deliberately not the bootstrap key.
+ *
+ * Two unrelated races must not share a lock, or one would serialise the other for nothing.
+ * Changing this reopens the race it exists to close, because two processes holding different keys
+ * do not exclude one another.
+ */
+export const ASSIGNMENT_LOCK_KEY = 7_312_884_501n;
+
+/**
+ * The handle `db.transaction` hands its callback, which is not the same type as the database.
+ *
+ * Derived rather than named directly, so it follows the driver instead of having to be corrected
+ * when drizzle changes it. Taking this rather than `Database` is what stops the pick below being
+ * callable outside the transaction that locks for it.
+ */
+type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+
+/**
+ * Who should assess this report first.
+ *
+ * The least loaded active Officer, where load is the reports already theirs that nobody has
+ * finished with — `received` and `first_assessment`. Ties go to whoever has waited longest for
+ * work, and then to the lowest id so the answer is never arbitrary.
+ *
+ * "Waited longest" is the *latest* time each candidate was given something, oldest first, with
+ * never-assigned ahead of everyone. Taking the oldest of their open assignments instead would be
+ * null for every candidate whenever the queue is clear, collapsing every tie onto the lowest id
+ * and funnelling a promptly-worked queue to one Officer forever.
+ *
+ * Whoever typed the report in is not treated differently. An Officer transcribing an emailed form
+ * competes on the same terms as everyone else: this is a split of work, and making the typist
+ * more or less likely to own what they typed would be a policy nobody asked for.
+ *
+ * Managers and administrators are not candidates. The filter is the assessor role, so there is no
+ * exclusion clause anyone could forget to keep in step with the roles.
+ *
+ * Returns null when there is no active assessor at all — the report is still filed.
+ */
+async function pickFirstAssessor(tx: Transaction): Promise<string | null> {
+  const rows = await tx.execute(sql`
+    SELECT u.id
+      FROM users u
+     WHERE u.role = 'assessor'
+       AND u.is_active
+     ORDER BY (
+               SELECT count(*)
+                 FROM reports r
+                WHERE r.assessor1_user_id = u.id
+                  AND r.status IN ('received', 'first_assessment')
+             ) ASC,
+             (
+               SELECT max(r.assessor1_assigned_at)
+                 FROM reports r
+                WHERE r.assessor1_user_id = u.id
+             ) ASC NULLS FIRST,
+             u.id ASC
+     LIMIT 1
+  `);
+
+  return rows.length === 0 ? null : (rows[0] as { id: string }).id;
+}
+
 /** How a report reached us, and who keyed it in if it did not arrive by itself. */
 export type Filing = {
   /** Defaults to `online_form`: the public door files what a reporter typed, unattended. */
@@ -166,6 +229,14 @@ export async function storeReport(
 
     const number = formatReportNumber(year, counter.issued);
 
+    // Held until this transaction ends, and taken before the workload is counted rather than
+    // after. Two filings landing together would otherwise both read the same counts, both decide
+    // the same Officer is the least loaded, and both hand it to them — the count each read was
+    // true when it was read and stale by the time it was used.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(${ASSIGNMENT_LOCK_KEY})`);
+
+    const assessor1UserId = await pickFirstAssessor(tx);
+
     const [row] = await tx
       .insert(reports)
       .values({
@@ -180,6 +251,11 @@ export async function storeReport(
         // normalized columns above do not carry.
         payload: submission,
         enteredByUserId,
+        // Set on the insert, never by a later UPDATE. That is not a stylistic preference: the
+        // application's database role holds INSERT on this table and not UPDATE, so a report is
+        // assigned as it is written or it is an orphan waiting for a route that can reassign it.
+        assessor1UserId,
+        assessor1AssignedAt: assessor1UserId === null ? null : now,
       })
       .returning({ id: reports.id });
 

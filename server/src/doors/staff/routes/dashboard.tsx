@@ -53,19 +53,26 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
 
     const recent = isAdministrator ? await loadActivity(app, RECENT_ACTIVITY) : [];
 
-    // The Officer's queue: what has arrived and had nothing done to it. Fetched for an Officer
-    // alone, on the same argument as the administrator's extras above.
+    // The Officer's queue: what has arrived, has had nothing done to it, and is theirs to do.
+    // Fetched for an Officer alone, on the same argument as the administrator's extras above.
     //
-    // One query rather than a count and a list. A window function is computed before LIMIT, so the
-    // figure and the rows come off one scan of one snapshot and cannot disagree — two statements
-    // could print "seven waiting" over six rows if a report arrived between them. Cast to int
-    // because count() is bigint, which the driver hands back as a string.
+    // Theirs, plus the orphans. A report filed while no assessor was active carries no assignee,
+    // and showing it to nobody would leave it waiting on a route that does not exist yet — so
+    // every Officer sees it and whoever picks it up has it. What is assigned to a colleague is
+    // that colleague's queue and stays off this page.
+    //
+    // One query rather than a count and a list. A window function is computed before LIMIT, so
+    // the figure and the rows come off one scan of one snapshot and cannot disagree — two
+    // statements could print "seven waiting" over six rows if a report arrived between them. The
+    // count sits inside this WHERE, so the figure counts exactly the reports the list draws from.
+    // Cast to int because count() is bigint, which the driver hands back as a string.
     const queue = isOfficer
       ? await app.db.execute(sql`
           SELECT id, number, received_at, device_name, severity,
                  (count(*) OVER ())::int AS received
             FROM reports
            WHERE status = 'received'
+             AND (assessor1_user_id = ${session.userId} OR assessor1_user_id IS NULL)
            ORDER BY received_at DESC, number DESC
            LIMIT ${RECEIVED_PREVIEW}
         `)
