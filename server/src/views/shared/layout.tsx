@@ -23,6 +23,13 @@ export type LayoutProps = {
    * page without a rail must not be made to fetch it.
    */
   railScript?: boolean;
+  /**
+   * Load the F004 find-in-page enhancement.
+   *
+   * Opt-in for the same reason `passwordToggle` is: a page carrying no `[data-f4-find]` input
+   * must not be made to fetch a script that would find nothing to attach to.
+   */
+  f4Find?: boolean;
   children?: Children;
 };
 
@@ -39,6 +46,7 @@ export function Layout({
   bodyClass,
   passwordToggle,
   railScript,
+  f4Find,
   children,
 }: LayoutProps): JSX.Element {
   return (
@@ -58,6 +66,10 @@ export function Layout({
         {/* Also enhancement only, and also served from our own origin to satisfy the CSP. The
             field works without it; the script only ever changes the input's `type`. */}
         {passwordToggle && <script src="/assets/password-toggle.js" defer></script>}
+        {/* Enhancement only, and the reason it can be: highlighting a heading is not something a
+            reader needs to be told happened, so a browser that blocks this leaves the page
+            exactly as readable as it was. Served from our own origin to satisfy the CSP. */}
+        {f4Find && <script src="/assets/f4-find.js" defer></script>}
       </head>
       <body class={bodyClass ?? ""}>{children}</body>
     </html>

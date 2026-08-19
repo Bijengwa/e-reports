@@ -28,6 +28,43 @@
   --orange-deep: #c24e12;
   --flag: #a8341f;
   --flag-bg: #fbebe7;
+
+  /*
+   * The F004's own colour pack: the paper's navy and gold, kept apart from the staff portal's
+   * green and the orange door's own palette above, the same way those two are kept apart from
+   * each other. Every F004 rule reaches for one of these rather than writing a hex of its own, so
+   * a colour used in one rule is guaranteed to be the same colour used in every other — one
+   * decision, not the dozen a scattered set of ad-hoc values would have quietly become.
+   */
+  --f4-navy: #0b3b5c;
+  --f4-gold: #f5c542;
+  --f4-ink: #0b2a41;
+  --f4-ink-2: #1e3a5f;
+  --f4-accent-ink: #1f4a6e;
+  --f4-ink-3: #8a9eb0;
+  --f4-note-ink: #2d5a7a;
+  --f4-line: #e0e8f2;
+  --f4-line-2: #eaf0f6;
+  --f4-tint: #f5f9ff;
+  --f4-tint-2: #f2f6fc;
+  --f4-tint-3: #eef3fa;
+  --f4-field-bg: #fafcff;
+  --f4-field-border: #d0dcec;
+  --f4-pill-border: #d9e4ef;
+  --f4-guide-accent: #7fa3c4;
+  --f4-assessors-bg: #f8fafc;
+  --f4-assessors-border: #dde5ef;
+  --f4-divider: #cbd8e6;
+  --f4-tick-bg: #f5f8fe;
+  --f4-tick-on-bg: #dce8f5;
+  --f4-tick-locked-bg: #f4f7fc;
+  --f4-card-on-bg: #f0f6ff;
+  --f4-locked-bg: #f8fafd;
+  --f4-locked-border: #b8cde0;
+  --f4-risk-critical: #a02020;
+  --f4-risk-high: #c95a1a;
+  --f4-risk-medium: #d4a11e;
+  --f4-risk-low: #3f7e5a;
   --r: 5px;
   --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
@@ -1527,138 +1564,178 @@ textarea[aria-invalid="true"] {
    text-field border would misshape them, not because they are styled differently on purpose. */
 .f4 input:not([type="radio"]):not([type="checkbox"]),
 .f4 textarea {
-  width: 100%; border: 1px solid #d0dcec; border-radius: 8px; padding: 6px 10px;
-  font-family: inherit; font-size: 12.5px; background: #fafcff;
+  width: 100%; border: 1px solid var(--f4-field-border); border-radius: 8px; padding: 6px 10px;
+  font-family: inherit; font-size: 12.5px; background: var(--f4-field-bg);
 }
 .f4 textarea { resize: vertical; min-height: 50px; }
-.f4 input[type="radio"], .f4 input[type="checkbox"] { accent-color: #0b3b5c; }
+.f4 input[type="radio"], .f4 input[type="checkbox"] { accent-color: var(--f4-navy); }
 
 .f4-head {
   display: flex; gap: 18px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap;
-  border-bottom: 3px solid #0b3b5c; padding: 2px 2px 16px; margin-bottom: 4px;
+  border-bottom: 3px solid var(--f4-navy); padding: 2px 2px 16px; margin-bottom: 4px;
 }
-.f4-authority { font-size: 11px; letter-spacing: 0.03em; color: #1e3a5f; font-weight: 500; }
+.f4-authority { font-size: 11px; letter-spacing: 0.03em; color: var(--f4-ink-2); font-weight: 500; }
 .f4-authority + .f4-authority { font-weight: 700; }
-.f4-title { font-size: 16px; font-weight: 700; color: #0b2a41; margin-top: 5px; max-width: 46ch; line-height: 1.3; }
+.f4-title { font-size: 16px; font-weight: 700; color: var(--f4-ink); margin-top: 5px; max-width: 46ch; line-height: 1.3; }
 .f4-stamp {
-  background: #eef3f9; border: 1px solid #cbd8e6; border-radius: 40px;
-  padding: 7px 16px; font-size: 11px; font-weight: 600; color: #1a405b; text-align: right; white-space: nowrap;
+  background: var(--f4-tint-3); border: 1px solid var(--f4-divider); border-radius: 40px;
+  padding: 7px 16px; font-size: 11px; font-weight: 600; color: var(--f4-ink-2);
+  text-align: right; white-space: nowrap;
 }
 
 /* The assessor strip: a pill, not a table row, so the two who have signed and the two who have
    not read as one group rather than four cells that happen to share a border. */
 .f4-assessors {
   display: flex; flex-wrap: wrap; gap: 8px 30px;
-  background: #f8fafc; border: 1px solid #dde5ef; border-radius: 40px;
+  background: var(--f4-assessors-bg); border: 1px solid var(--f4-assessors-border); border-radius: 40px;
   padding: 10px 20px; margin: 4px 0 20px;
 }
 .f4-assessors > div { display: flex; gap: 6px; align-items: baseline; }
-.f4-k { font-size: 12px; font-weight: 600; color: #1f4a6e; }
-.f4-v { font-weight: 500; color: #0b2a41; }
+.f4-k { font-size: 12px; font-weight: 600; color: var(--f4-accent-ink); }
+.f4-v { font-weight: 500; color: var(--f4-ink); }
 .f4-muted, .f4-muted .f4-v { opacity: 0.65; font-weight: 400; }
 
-.f4-section { border: 1px solid #e0e8f2; border-radius: 14px; overflow: hidden; margin-bottom: 22px; break-inside: avoid; }
+.f4-section { border: 1px solid var(--f4-line); border-radius: 14px; overflow: hidden; margin-bottom: 22px; break-inside: avoid; }
 .f4-bar {
-  background: #0b3b5c; color: #fff; padding: 10px 18px; font-weight: 600; font-size: 14px;
+  background: var(--f4-navy); color: #fff; padding: 10px 18px; font-weight: 600; font-size: 14px;
   display: flex; gap: 10px; align-items: center; letter-spacing: 0.01em;
 }
 /* Gold, not a tint of the bar itself — the number has to read as a mark on the bar, not as part
    of its background, which is what a same-hue badge would do. */
 .f4-bar-no {
-  background: #f5c542; color: #0b2a41; padding: 2px 11px; border-radius: 30px;
+  background: var(--f4-gold); color: var(--f4-ink); padding: 2px 11px; border-radius: 30px;
   font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
 }
 
 .f4-row {
   display: grid; grid-template-columns: 1.15fr 1fr; gap: 16px;
-  padding: 12px 18px; border-bottom: 1px solid #eaf0f6; break-inside: avoid;
+  padding: 12px 18px; border-bottom: 1px solid var(--f4-line-2); break-inside: avoid;
 }
 .f4-row:last-child { border-bottom: 0; }
 .f4-req { display: flex; gap: 10px; }
-.f4-comment { padding-left: 16px; border-left: 1px dashed #cbd8e6; }
-.f4-no { color: #0b3b5c; font-weight: 700; font-variant-numeric: tabular-nums; font-size: 12px; }
-.f4-label { color: #1e3a5f; font-size: 13px; }
+.f4-comment { padding-left: 16px; border-left: 1px dashed var(--f4-divider); }
+.f4-no { color: var(--f4-navy); font-weight: 700; font-variant-numeric: tabular-nums; font-size: 12px; }
+.f4-label { color: var(--f4-ink-2); font-size: 13px; }
 .f4-filled {
-  margin-top: 4px; font-weight: 500; background: #f2f6fc; padding: 2px 11px;
+  margin-top: 4px; font-weight: 500; background: var(--f4-tint-2); padding: 2px 11px;
   border-radius: 16px; display: inline-block; word-break: break-word;
 }
-.f4-blank { margin-top: 4px; color: #8a9eb0; font-style: italic; font-size: 12px; }
+.f4-blank { margin-top: 4px; color: var(--f4-ink-3); font-style: italic; font-size: 12px; }
 
-.f4-block { padding: 14px 18px; border-bottom: 1px solid #eaf0f6; break-inside: avoid; }
+.f4-block { padding: 14px 18px; border-bottom: 1px solid var(--f4-line-2); break-inside: avoid; }
 .f4-block:last-child { border-bottom: 0; }
-.f4-blocktitle { font-weight: 700; color: #0b2a41; margin-bottom: 8px; }
+.f4-blocktitle { font-weight: 700; color: var(--f4-ink); margin-bottom: 8px; }
 .f4-guide {
-  background: #f5f9ff; border-left: 4px solid #7fa3c4; border-radius: 0 10px 10px 0;
-  padding: 10px 14px; margin-bottom: 12px; font-size: 12.5px; color: #1a3d57;
+  background: var(--f4-tint); border-left: 4px solid var(--f4-guide-accent); border-radius: 0 10px 10px 0;
+  padding: 10px 14px; margin-bottom: 12px; font-size: 12.5px; color: var(--f4-ink-2);
 }
 .f4-guide-h { font-weight: 600; margin: 6px 0 2px; }
 .f4-guide ul { margin: 4px 0 8px 20px; }
 .f4-guide li { margin-bottom: 3px; }
 .f4-note {
-  color: #2d5a7a; font-size: 11.5px; background: #ecf3fa; padding: 3px 11px;
+  color: var(--f4-note-ink); font-size: 11.5px; background: var(--f4-tint-3); padding: 3px 11px;
   border-radius: 30px; display: inline-block; margin: 4px 0;
 }
 
-/* Pills, not checklist rows: the paper's ticks read as small marks beside a line of text, and a
-   full-width bordered row for each one overstates a single tick the way a table would. */
+/*
+ * A single-choice question, read the way the paper reads one: a short vertical list, a radio
+ * beside each line, the chosen one told apart by the mark in the circle. No pill, no card — this
+ * is for the questions the form settles in one line (2.5, 2.6, 2.7, 4.1, 5), not the two it gives
+ * pages of criteria to, which stay cards below.
+ */
+.f4-radio-group { display: flex; flex-direction: column; gap: 7px; margin: 2px 0 10px; }
+.f4-radio-row { display: flex; align-items: baseline; gap: 8px; font-size: 13px; cursor: pointer; }
+.f4-radio-row b { font-weight: 600; color: var(--f4-ink); }
+/* The description after an option's own name reads as an aside, not as a second heading, so it
+   drops the pill chrome `.f4-note` carries everywhere else and sits as plain muted text instead. */
+.f4-radio-row .f4-note {
+  background: none; padding: 0; border-radius: 0; display: inline; color: var(--f4-ink-3);
+}
+
+/* Pills, kept here for the eleven-action checklists (7.1 and its locked mirror at 7.2) only. A
+   dense grid of eleven short phrases reads better as compact chips than as a bare list; a
+   two-option yes/no does not, which is why the radio group above does not use these. */
 .f4-ticks { display: flex; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 10px; }
 .f4-11 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 6px 14px; }
 .f4-tick {
   display: flex; align-items: baseline; gap: 6px; font-size: 13px;
-  background: #f5f8fe; border: 1px solid #d9e4ef; border-radius: 30px; padding: 5px 14px 5px 10px;
-  cursor: pointer;
+  background: var(--f4-tick-bg); border: 1px solid var(--f4-pill-border); border-radius: 30px;
+  padding: 5px 14px 5px 10px; cursor: pointer;
 }
-.f4-tick.on { background: #dce8f5; border-color: #2f6b9b; }
-.f4-tick-locked { background: #f4f7fc; border-style: dashed; color: #8a9eb0; cursor: default; }
+.f4-tick.on { background: var(--f4-tick-on-bg); border-color: var(--f4-navy); }
+.f4-tick-locked { background: var(--f4-tick-locked-bg); border-style: dashed; color: var(--f4-ink-3); cursor: default; }
 
 .f4-field { margin-bottom: 10px; }
-.f4-field label { display: block; font-size: 12px; font-weight: 500; color: #1f4a6e; margin-bottom: 3px; }
+.f4-field label { display: block; font-size: 12px; font-weight: 500; color: var(--f4-accent-ink); margin-bottom: 3px; }
 .f4-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin-top: 6px; }
 
 /* IMDRF: one group per f4-block, one sub-item per (a)/(b)/(c) inside it. */
 .f4-imdrf-item + .f4-imdrf-item { margin-top: 14px; }
-.f4-imdrf-h { font-weight: 600; color: #0b2a41; font-size: 12.5px; margin-bottom: 3px; }
-.f4-letter { color: #0b3b5c; font-weight: 700; }
+.f4-imdrf-h { font-weight: 600; color: var(--f4-ink); font-size: 12.5px; margin-bottom: 3px; }
+.f4-letter { color: var(--f4-navy); font-weight: 700; }
 
 .f4-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; }
 .f4-card {
-  border: 1px solid #d9e4ef; border-radius: 12px; padding: 12px 14px; cursor: pointer;
-  background: #fafcff; break-inside: avoid;
+  border: 1px solid var(--f4-pill-border); border-radius: 12px; padding: 12px 14px; cursor: pointer;
+  background: var(--f4-field-bg); break-inside: avoid;
 }
-.f4-card.on { border-color: #0b3b5c; background: #f0f6ff; box-shadow: 0 0 0 1px #0b3b5c; }
+.f4-card.on { border-color: var(--f4-navy); background: var(--f4-card-on-bg); box-shadow: 0 0 0 1px var(--f4-navy); }
 .f4-card-h { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
-.f4-card-c { font-size: 12.5px; color: #1f405b; margin: 0; }
+.f4-card-c { font-size: 12.5px; color: var(--f4-ink-2); margin: 0; }
 ul.f4-card-c { padding-left: 18px; list-style: disc; }
 ul.f4-card-c li { margin-bottom: 3px; }
 
 /* The left accent is the only cue that survives a glance: critical/high/medium/low in one colour
    sweep, matched to the severity so red reads as the worst outcome without reading the label. */
 .f4-risk .f4-card { border-left-width: 6px; }
-.f4-card.r-critical { border-left-color: #a02020; }
-.f4-card.r-high { border-left-color: #c95a1a; }
-.f4-card.r-medium { border-left-color: #d4a11e; }
-.f4-card.r-low { border-left-color: #3f7e5a; }
+.f4-card.r-critical { border-left-color: var(--f4-risk-critical); }
+.f4-card.r-high { border-left-color: var(--f4-risk-high); }
+.f4-card.r-medium { border-left-color: var(--f4-risk-medium); }
+.f4-card.r-low { border-left-color: var(--f4-risk-low); }
 
-.f4-locked { background: #f8fafd; border-top: 2px dashed #b8cde0; }
+.f4-locked { background: var(--f4-locked-bg); border-top: 2px dashed var(--f4-locked-border); }
 .f4-pending {
-  display: inline-block; font-size: 12.5px; color: #1f4a6e; background: #eef3fa;
+  display: inline-block; font-size: 12.5px; color: var(--f4-accent-ink); background: var(--f4-tint-3);
   padding: 4px 14px; border-radius: 30px; margin-bottom: 12px;
 }
 .f4-sign { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; padding: 14px 18px; }
 .f4-buttons {
   display: flex; gap: 12px; margin: 22px 0 4px; justify-content: flex-end;
-  border-top: 1px solid #dde5ef; padding-top: 18px;
+  border-top: 1px solid var(--f4-assessors-border); padding-top: 18px;
 }
 .f4-buttons .btn { border-radius: 40px; padding: 9px 26px; }
 .f4-source { margin-top: 26px; }
 .f4-source summary { cursor: pointer; font-weight: 600; padding: 8px 0; }
 
+/* ---------- in-page jump nav + find (item 3) ---------- */
+/* Sticks just under the staff shell's own top bar (.top is 56px and already sticky at z-index
+   30), so the two never fight for the same strip of the viewport. */
+.f4-jump {
+  position: sticky; top: 56px; z-index: 15;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+  background: var(--card); border: 1px solid var(--rule); border-radius: var(--r);
+  padding: 8px 12px; margin-bottom: 16px;
+}
+.f4-find {
+  flex: 0 0 200px; font-size: 12px; padding: 5px 12px;
+  border: 1px solid var(--rule); border-radius: 30px; background: var(--paper);
+}
+.f4-jump-links { display: flex; flex-wrap: wrap; gap: 3px 6px; }
+.f4-jump-links a {
+  font-size: 12px; font-weight: 600; color: var(--f4-navy); text-decoration: none;
+  padding: 3px 9px; border-radius: 20px;
+}
+.f4-jump-links a:hover, .f4-jump-links a:focus-visible { background: var(--f4-tint-3); outline: none; }
+
+.f4-find-hit { background: var(--f4-tint-3); box-shadow: 0 0 0 2px var(--f4-gold); border-radius: 4px; }
+.f4-find-dim { opacity: 0.35; }
+
 @media (max-width: 900px) {
   .f4-row, .f4-grid, .f4-11, .f4-sign { grid-template-columns: 1fr; }
-  .f4-comment { padding-left: 0; border-left: 0; border-top: 1px dashed #cbd8e6; padding-top: 8px; margin-top: 6px; }
+  .f4-comment { padding-left: 0; border-left: 0; border-top: 1px dashed var(--f4-divider); padding-top: 8px; margin-top: 6px; }
 }
 @media print {
-  .rail, .top, .f4-buttons { display: none !important; }
+  .rail, .top, .f4-buttons, .f4-jump { display: none !important; }
   .f4-section, .f4-row, .f4-block, .f4-card { break-inside: avoid; }
 }
 
@@ -1687,7 +1764,7 @@ ul.f4-card-c li { margin-bottom: 3px; }
   }
   #a1-form:checked ~ .a1-tabs label[for="a1-form"],
   #a1-report:checked ~ .a1-tabs label[for="a1-report"] {
-    background: #0b3b5c; color: #fff; border-color: #0b3b5c;
+    background: var(--f4-navy); color: #fff; border-color: var(--f4-navy);
   }
   #a1-form:checked ~ .a1-split .a1-report { display: none; }
   #a1-report:checked ~ .a1-split .a1-form { display: none; }
@@ -1700,12 +1777,12 @@ ul.f4-card-c li { margin-bottom: 3px; }
   gap: 10px 12px; padding: 9px 18px 5px; align-items: start; break-inside: avoid;
 }
 .f4-fact .f4-value {
-  font-weight: 500; background: #f2f6fc; padding: 2px 11px; border-radius: 16px;
+  font-weight: 500; background: var(--f4-tint-2); padding: 2px 11px; border-radius: 16px;
   display: inline-block; width: fit-content; word-break: break-word;
 }
-.f4-fact .f4-blank { font-style: italic; color: #8a9eb0; font-size: 12px; }
-.f4-note-line { padding: 0 18px 10px 74px; border-bottom: 1px solid #eaf0f6; }
-.f4-note-line label { font-size: 11px; color: #7c8fa3; }
+.f4-fact .f4-blank { font-style: italic; color: var(--f4-ink-3); font-size: 12px; }
+.f4-note-line { padding: 0 18px 10px 74px; border-bottom: 1px solid var(--f4-line-2); }
+.f4-note-line label { font-size: 11px; color: var(--f4-ink-3); }
 .f4-note-line input { font-size: 12px; padding: 5px 10px; }
 
 @media (max-width: 900px) {

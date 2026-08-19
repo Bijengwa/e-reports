@@ -49,6 +49,7 @@ export function Assessment1Page({
       role={viewerRole}
       fullName={viewerName}
       active="assessments"
+      f4Find
     >
       <div class="staff-head">
         <div class="sp">
@@ -79,6 +80,31 @@ export function Assessment1Page({
 
           <div class="a1-pane a1-form">
             <h3>Assessment 1 — F004</h3>
+
+            {/* Outside F004Form's own <form> on purpose: this is navigation, not a second form,
+                and a plain search input inside the F004's form would let Enter submit a draft
+                nobody asked to save. It never crosses that boundary. */}
+            <nav class="f4-jump" aria-label="Jump to a section of the F004">
+              <input
+                type="search"
+                class="f4-find"
+                placeholder="Find in this F004…"
+                aria-label="Find in this F004"
+                autocomplete="off"
+                data-f4-find
+              />
+              <div class="f4-jump-links">
+                <a href="#section-1">1 Admin</a>
+                <a href="#section-2">2 Event</a>
+                <a href="#section-3">3 IMDRF</a>
+                <a href="#section-4">4 Causality</a>
+                <a href="#section-5">5 Signal</a>
+                <a href="#section-6">6 Risk</a>
+                <a href="#section-7">7 Conclusion</a>
+                <a href="#section-8">8 Signature</a>
+              </div>
+            </nav>
+
             <F004Form
               reportId={report.id}
               answers={answers}

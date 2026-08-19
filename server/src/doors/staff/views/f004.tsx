@@ -160,6 +160,12 @@ function FactRow({
   );
 }
 
+/**
+ * A single-choice question, the way the paper puts one: a short vertical list of options, a radio
+ * beside each, the chosen one told apart by the mark in the circle rather than by a coloured box
+ * around the whole row. No pill, no card — those are for the two questions the form itself gives
+ * pages of criteria to (causality, risk); this is for the ones it settles in one line.
+ */
 function Radios({
   name,
   options,
@@ -172,9 +178,9 @@ function Radios({
   const chosen = value(answers, name);
 
   return (
-    <div class="f4-ticks">
+    <div class="f4-radio-group">
       {options.map((option) => (
-        <label class={chosen === option.value ? "f4-tick on" : "f4-tick"}>
+        <label class="f4-radio-row">
           <input type="radio" name={name} value={option.value} checked={chosen === option.value} />
           <span>
             <b safe>{option.label}</b>
@@ -279,7 +285,7 @@ export function F004Form({
           </div>
         )}
 
-        <section class="f4-section">
+        <section class="f4-section" id="section-1">
           <Bar no="1" title="Administrative information — device information" />
           {DEVICE_ROWS.map((row) => (
             <FactRow
@@ -292,7 +298,7 @@ export function F004Form({
           ))}
         </section>
 
-        <section class="f4-section">
+        <section class="f4-section" id="section-2">
           <Bar no="2" title="Event / incident assessment" />
           {EVENT_ROWS.map((row) => (
             <RequirementRow
@@ -358,7 +364,7 @@ export function F004Form({
           </div>
         </section>
 
-        <section class="f4-section">
+        <section class="f4-section" id="section-3">
           <Bar no="3" title="IMDRF category of the adverse incident / event" />
           {IMDRF_GROUPS.map((group) => (
             <div class="f4-block">
@@ -411,7 +417,7 @@ export function F004Form({
           </p>
         </section>
 
-        <section class="f4-section">
+        <section class="f4-section" id="section-4">
           <Bar no="4" title="Relationship / causality assessment" />
 
           <div class="f4-block">
@@ -463,7 +469,7 @@ export function F004Form({
           </div>
         </section>
 
-        <section class="f4-section">
+        <section class="f4-section" id="section-5">
           <Bar no="5" title="Signal detection" />
           <div class="f4-block">
             <div class="f4-guide">
@@ -487,7 +493,7 @@ export function F004Form({
           </div>
         </section>
 
-        <section class="f4-section">
+        <section class="f4-section" id="section-6">
           <Bar no="6" title="Risk assessment" />
           <p class="f4-note" safe>
             {RISK_NOTE}
@@ -522,7 +528,7 @@ export function F004Form({
           <Comment name="c6" answers={answers} />
         </section>
 
-        <section class="f4-section">
+        <section class="f4-section" id="section-7">
           <Bar no="7" title="Conclusion of assessment" />
           <div class="f4-block">
             <div class="f4-blocktitle">
@@ -586,7 +592,7 @@ export function F004Form({
           </div>
         </section>
 
-        <section class="f4-section">
+        <section class="f4-section" id="section-8">
           <Bar no="8" title="Signature" />
           <div class="f4-sign">
             <div class="f4-field">

@@ -503,6 +503,7 @@ export function validateForSubmit(answers: F004Answers, assessorName: string): I
   required("seriousness", "2.6 Categorization of the event/incident is required.");
   required("expectedness", "4.1 Expected or unexpected is required.");
   required("causality", "4.2 Causal association category is required.");
+  required("signal_status", "5 Whether this is a potential safety signal is required.");
   required("risk_level", "6 Risk assessment is required.");
   required("conclusion", "7.1 Conclusion and recommendations are required.");
 

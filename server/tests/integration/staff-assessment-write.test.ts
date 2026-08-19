@@ -131,6 +131,10 @@ function completeAssessment(signature: string, over: Record<string, string> = {}
     seriousness: "serious",
     expectedness: "unexpected",
     causality: "probable",
+    // Section 5 is now required too — locked in the same commit that restyled it away from pill
+    // chrome. A fixture built before that commit would otherwise silently describe an incomplete
+    // submission and every "complete" case here would 422.
+    signal_status: "signal",
     risk_level: "high",
     conclusion: "Recommend risk communication and enhanced monitoring.",
     signature,

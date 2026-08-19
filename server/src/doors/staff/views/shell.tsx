@@ -31,6 +31,13 @@ export type StaffShellProps = {
   fullName?: string | undefined;
   /** Which entry is the page being shown, so the rail can mark it. */
   active?: "dashboard" | "assessments" | "reports" | "new-report" | "users" | "activity";
+  /**
+   * Load the F004 find-in-page enhancement.
+   *
+   * Opt-in for the same reason `passwordToggle` is: a page with no find box on it must not be
+   * made to fetch the script that would find nothing to attach to.
+   */
+  f4Find?: boolean;
   children?: Children;
 };
 
@@ -168,6 +175,7 @@ export function StaffShell({
   role,
   fullName,
   active,
+  f4Find,
   children,
 }: StaffShellProps): JSX.Element {
   const isAdministrator = role === "administrator";
@@ -175,7 +183,7 @@ export function StaffShell({
   const isOfficer = role === "assessor";
 
   return (
-    <Layout title={title} locale="en" bodyClass="staff" railScript>
+    <Layout title={title} locale="en" bodyClass="staff" railScript f4Find={f4Find}>
       <div class="shell">
         {/* `on-dark` is what recolours the mark for the rail: white folder, green cross. The
             paths are the same ones the sign-in card renders. */}
