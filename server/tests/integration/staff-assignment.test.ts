@@ -428,21 +428,25 @@ describe.skipIf(!INTEGRATION_ENABLED)("the first assessment doorway", () => {
     expect((await get(`/reports/${row.id}`, manager.cookie)).body).not.toContain(href);
   });
 
-  it("is a page to read, with nothing on it that submits", async () => {
+  it("posts to itself and to nowhere else", async () => {
     const officer = await signedInAs("assessor", "Asha Mrema");
     await fileAtThePublicDoor();
     const row = await onlyReport();
 
     const body = (await get(`/reports/${row.id}/assessment-1`, officer.cookie)).body;
 
-    // The same sweep the register is held to: sign-out is the only thing that posts. No F004
-    // write path, no status change, nothing that could move a report by being clicked.
+    // The F004 arrived, so this page now has exactly one form: its own. The sweep is narrowed to
+    // that and no further — sign-out, the assessment itself, and nothing that could move a report
+    // to another status or another person by being clicked.
     const posts = (body.match(/action="([^"]*)"/g) ?? []).filter(
       (action) => !action.includes("/logout"),
     );
-    expect(posts).toEqual([]);
-    // And the second assessor's section is not here at all.
-    expect(body).not.toContain("Assessment 2");
-    expect(body).not.toContain("7.2");
+    expect(posts).toEqual([`action="/reports/${row.id}/assessment-1"`]);
+    // The second assessor's section is present as the closed part of the document it is, and
+    // carries nothing to fill in on their behalf.
+    expect(body).toContain("Second assessor concluding remarks");
+    expect(body).not.toContain('name="conclusion_2"');
+    expect(body).toContain('id="signature-2"');
+    expect(body).toContain("disabled");
   });
 });
