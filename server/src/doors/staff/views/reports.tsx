@@ -199,6 +199,13 @@ export type ReportDetail = ReportRow & {
   formVersion: string;
   /** The immutable submission snapshot. Rendered as text, never interpreted. */
   payload: unknown;
+  /**
+   * The staff member who keyed it in, or null when the public filed it themselves.
+   *
+   * Who typed it, not who is handling it. Nothing is assigned yet and this line must not be read
+   * as saying otherwise — which is why it reads "Filled by" and appears only when somebody did.
+   */
+  filledBy: string | null;
 };
 
 /**
@@ -318,6 +325,15 @@ export function ReportPage({ report, viewerRole, viewerName }: ReportPageProps):
 
           <dt>Reporter</dt>
           <dd safe>{report.reporterName ?? "—"}</dd>
+
+          {/* Omitted rather than dashed when nobody keyed it in. An empty "Filled by" would be a
+              field the reader has to interpret; its absence says the public filed it directly. */}
+          {report.filledBy !== null && (
+            <>
+              <dt>Filled by</dt>
+              <dd safe>{report.filledBy}</dd>
+            </>
+          )}
 
           <dt>Form</dt>
           <dd safe>{report.formVersion}</dd>

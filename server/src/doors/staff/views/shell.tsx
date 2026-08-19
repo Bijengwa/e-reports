@@ -30,7 +30,7 @@ export type StaffShellProps = {
    */
   fullName?: string | undefined;
   /** Which entry is the page being shown, so the rail can mark it. */
-  active?: "dashboard" | "reports" | "users" | "activity";
+  active?: "dashboard" | "reports" | "new-report" | "users" | "activity";
   children?: Children;
 };
 
@@ -53,6 +53,17 @@ function IconReports(): JSX.Element {
       <path d="M14 3v5h5" />
       <path d="M9 13h6" />
       <path d="M9 17h4" />
+    </svg>
+  );
+}
+
+function IconNewReport(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M6 3h8l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+      <path d="M14 3v5h5" />
+      <path d="M12 12v6" />
+      <path d="M9 15h6" />
     </svg>
   );
 }
@@ -150,6 +161,8 @@ export function StaffShell({
   children,
 }: StaffShellProps): JSX.Element {
   const isAdministrator = role === "administrator";
+  // The enum, not the caption. The rail is drawn from what the column stores.
+  const isOfficer = role === "assessor";
 
   return (
     <Layout title={title} locale="en" bodyClass="staff" railScript>
@@ -181,6 +194,20 @@ export function StaffShell({
               <IconReports />
               <span class="rail-label">Reports</span>
             </a>
+
+            {/* The Officer's, because registering a report that arrived by email is the Officer's
+                work. Presentation only, as above: `requireRole` refuses the route whatever the
+                rail shows, and the two agree so that no link answers 403 when clicked. */}
+            {isOfficer && (
+              <a
+                href="/reports/new"
+                class={active === "new-report" ? "on" : ""}
+                aria-current={active === "new-report" ? "page" : undefined}
+              >
+                <IconNewReport />
+                <span class="rail-label">New report</span>
+              </a>
+            )}
 
             {isAdministrator && (
               <>

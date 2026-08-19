@@ -112,19 +112,43 @@ export function validateSubmission(answers: Answers): ValidationResult {
   return { ok: false, errors: result.error.issues.map((issue) => issue.message) };
 }
 
+/** How a report reached us, and who keyed it in if it did not arrive by itself. */
+export type Filing = {
+  /** Defaults to `online_form`: the public door files what a reporter typed, unattended. */
+  channel?: "online_form" | "email" | "hard_copy";
+  /**
+   * The staff member who transcribed it. Null for anything the public filed.
+   *
+   * Who typed it, not who owns it. Nothing assigns work yet, and this column must not quietly
+   * become the thing that does — an Officer transcribing a report is not thereby its assessor.
+   */
+  enteredByUserId?: string | null;
+  now?: Date;
+};
+
 /**
- * Store one public submission and return the number the reporter should keep.
+ * Store one submission and return the row it became.
  *
  * Everything happens in a single transaction: the counter increment, the report row and the audit
  * entry stand or fall together, so a failure part way through cannot burn a report number or
  * leave a report nobody can trace.
+ *
+ * `status` is never named here. The column defaults to `received`, so a report filed at either
+ * door lands in the same pool, and the one way to file something already assessed would be to add
+ * a line to this function.
+ *
+ * The id comes back as well as the number because a staff filer is sent to the report they just
+ * created, and looking it up again by number would be a second query for what this one knows.
  */
 export async function storeReport(
   db: Database,
   submission: Submission,
   files: readonly AttachmentInput[] = [],
-  now: Date = new Date(),
-): Promise<string> {
+  filing: Filing = {},
+): Promise<{ id: string; number: string }> {
+  const now = filing.now ?? new Date();
+  const channel = filing.channel ?? "online_form";
+  const enteredByUserId = filing.enteredByUserId ?? null;
   const year = now.getUTCFullYear();
 
   return db.transaction(async (tx) => {
@@ -146,7 +170,7 @@ export async function storeReport(
       .insert(reports)
       .values({
         number,
-        channel: "online_form",
+        channel,
         severity: severityOf(submission.event_type),
         deviceName: submission.device_name,
         facility: submission.facility_address,
@@ -155,6 +179,7 @@ export async function storeReport(
         // The immutable snapshot of exactly what was submitted, including fields the
         // normalized columns above do not carry.
         payload: submission,
+        enteredByUserId,
       })
       .returning({ id: reports.id });
 
@@ -176,14 +201,15 @@ export async function storeReport(
     }
 
     await tx.insert(auditLog).values({
-      // Null actor: the public door is anonymous by design.
-      actorUserId: null,
+      // Null actor when the public door filed it: that door is anonymous by design. A staff
+      // filing names the Officer who typed it, which is the whole reason the trail exists.
+      actorUserId: enteredByUserId,
       action: "report.submitted",
       entityType: "report",
       entityId: row.id,
-      after: { number, channel: "online_form" },
+      after: { number, channel },
     });
 
-    return number;
+    return { id: row.id, number };
   });
 }

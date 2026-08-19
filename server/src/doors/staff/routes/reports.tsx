@@ -98,21 +98,30 @@ export async function reportsRoutes(app: FastifyInstance): Promise<void> {
     const target = ReportId.safeParse((request.params as { id: string }).id);
     if (!target.success) return renderReports(app, request, reply, 404, NOT_FOUND);
 
+    // Left join, not inner: `entered_by_user_id` is null for everything the public door filed,
+    // and an inner join would quietly hide every one of those reports.
     const rows = await app.db.execute(sql`
-      SELECT id, number, received_at, device_name, severity, status, channel, facility,
-             reporter_name, form_version, payload
-        FROM reports
-       WHERE id = ${target.data}
+      SELECT r.id, r.number, r.received_at, r.device_name, r.severity, r.status, r.channel,
+             r.facility, r.reporter_name, r.form_version, r.payload, u.full_name AS filled_by
+        FROM reports r
+        LEFT JOIN users u ON u.id = r.entered_by_user_id
+       WHERE r.id = ${target.data}
     `);
 
     if (rows.length === 0) return renderReports(app, request, reply, 404, NOT_FOUND);
 
-    const row = rows[0] as { reporter_name: string | null; form_version: string; payload: unknown };
+    const row = rows[0] as {
+      reporter_name: string | null;
+      form_version: string;
+      payload: unknown;
+      filled_by: string | null;
+    };
     const report: ReportDetail = {
       ...toRow(rows[0]),
       reporterName: row.reporter_name,
       formVersion: row.form_version,
       payload: row.payload,
+      filledBy: row.filled_by,
     };
 
     return reply.html(

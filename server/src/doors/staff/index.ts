@@ -6,6 +6,7 @@ import { changePasswordRoutes } from "./routes/change-password.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
 import { loginRoutes } from "./routes/login.js";
 import { logoutRoutes } from "./routes/logout.js";
+import { newReportRoutes } from "./routes/new-report.js";
 import { reportsRoutes } from "./routes/reports.js";
 import { usersRoutes } from "./routes/users.js";
 import { requirePasswordChanged, requireRole, requireSession } from "./session-guard.js";
@@ -71,6 +72,20 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
       // Every signed-in role, so it sits here rather than in the administrator scope below. An
       // administrator's extra powers are over accounts, not over who may read a report.
       await active.register(reportsRoutes);
+
+      await active.register(async (registration) => {
+        // Narrower, and in the other direction from the scope below: registering a report that
+        // arrived by email is the Officer's work, so an administrator is refused it exactly as a
+        // manager is. Being able to create staff accounts is not a licence to file a vigilance
+        // record, and the row records who typed it.
+        //
+        // `/reports/new` and `/reports/:id` sit in different scopes on purpose. A static segment
+        // beats a parameter in Fastify's router, so the address is not ambiguous — but the two
+        // pages answer to different people, and that is why they are registered apart.
+        requireRole(registration, ["assessor"]);
+
+        await registration.register(newReportRoutes);
+      });
 
       await active.register(async (administration) => {
         // Narrower still: creating staff accounts is the administrator's alone. A manager or

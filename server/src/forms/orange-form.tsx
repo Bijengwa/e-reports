@@ -11,22 +11,13 @@ import {
   STEPS,
   type Step,
   value,
-} from "../../../domain/form-schema.js";
-import {
-  localPhoneDigits,
-  PHONE_COUNTRY_CODE,
-  PHONE_LOCAL_PATTERN,
-} from "../../../domain/phone.js";
-import { FORM_VERSION } from "../../../domain/reports.js";
-import {
-  type Locale,
-  type MessageKey,
-  type Translate,
-  translatorFor,
-} from "../../../i18n/index.js";
-import { MAX_ATTACHMENTS } from "../../../storage/index.js";
-import { BrandMark } from "../../../views/shared/brand-mark.js";
-import { Layout } from "../../../views/shared/layout.js";
+} from "../domain/form-schema.js";
+import { localPhoneDigits, PHONE_COUNTRY_CODE, PHONE_LOCAL_PATTERN } from "../domain/phone.js";
+import { FORM_VERSION } from "../domain/reports.js";
+import { type Locale, type MessageKey, type Translate, translatorFor } from "../i18n/index.js";
+import { MAX_ATTACHMENTS } from "../storage/index.js";
+import { BrandMark } from "../views/shared/brand-mark.js";
+import { Layout } from "../views/shared/layout.js";
 
 export type { Answers, Step };
 export { FIRST_STEP, LAST_STEP, STEP_FIELDS };
@@ -274,6 +265,24 @@ export type OrangeFormPageProps = {
   reportNumber?: string;
   locale?: Locale;
   attachments?: readonly CarriedAttachment[];
+  /**
+   * Where the wizard posts. Defaults to the public door's own address.
+   *
+   * This and the two below are the whole of what made this page the public door's. The five steps,
+   * their fields, their rules and their dependencies come from `form-schema` and are the same form
+   * whoever fills it in — so an Officer transcribing a report that arrived by email reads exactly
+   * what the reporter read, which is the point of transcribing it.
+   */
+  action?: string;
+  /**
+   * Whether to offer EN/SW. The staff portal is English only, so it does not.
+   *
+   * A language bar there would be a control that changes nothing: the pages around it are not
+   * translated, and the Officer is transcribing a document, not filing their own.
+   */
+  languages?: boolean;
+  /** A way out, for a door whose form page carries no rail. Omitted when there is nowhere to go. */
+  exitHref?: string;
 };
 
 function LanguageBar({ locale }: { locale: Locale }): JSX.Element {
@@ -357,7 +366,12 @@ export function OrangeFormPage(props: OrangeFormPageProps): JSX.Element {
   return (
     <Layout title={t("app.formTitle")} locale={locale}>
       <div class="orange-page">
-        <form method="POST" action="/orange-form" enctype={enctype} data-orange-form>
+        <form
+          method="POST"
+          action={props.action ?? "/orange-form"}
+          enctype={enctype}
+          data-orange-form
+        >
           <input type="hidden" name="step" value={String(currentStep)} />
           <input type="hidden" name="locale" value={locale} />
           <CarriedAnswers answers={answers} step={currentStep} />
@@ -368,7 +382,14 @@ export function OrangeFormPage(props: OrangeFormPageProps): JSX.Element {
             <BrandMark />
             <h1 safe>{t("app.heading")}</h1>
             <div class="sp"></div>
-            <LanguageBar locale={locale} />
+            {/* English literal, and deliberately so: `exitHref` is the staff door's, and the staff
+                portal is English only. Nothing bilingual reaches this branch. */}
+            {props.exitHref && (
+              <a href={props.exitHref} class="btn ghost">
+                Cancel
+              </a>
+            )}
+            {(props.languages ?? true) && <LanguageBar locale={locale} />}
           </header>
 
           <div class="obody">
