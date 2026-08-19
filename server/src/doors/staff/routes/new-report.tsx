@@ -1,4 +1,6 @@
+import type { Children } from "@kitajs/html";
 import type { FastifyInstance } from "fastify";
+import type { StaffSession } from "../../../auth/session.js";
 import {
   type Issue,
   LAST_STEP,
@@ -7,7 +9,7 @@ import {
   type Step,
 } from "../../../domain/form-schema.js";
 import { storeReport } from "../../../domain/reports.js";
-import { FIRST_STEP, MAX_UPLOAD_MB, OrangeFormPage } from "../../../forms/orange-form.js";
+import { FIRST_STEP, MAX_UPLOAD_MB, OrangeForm } from "../../../forms/orange-form.js";
 import {
   advance,
   carriedAttachments,
@@ -17,9 +19,38 @@ import {
 import { t } from "../../../i18n/index.js";
 import { MAX_ATTACHMENTS } from "../../../storage/index.js";
 import { currentSession } from "../session-guard.js";
+import { StaffShell } from "../views/shell.js";
 
 /** Where the staff wizard posts, and the address the rail's entry points at. */
 const ACTION = "/reports/new";
+
+/**
+ * The staff door's chrome around the form.
+ *
+ * The same shell `/reports` and `/dashboard` render, so the Officer keeps their rail — with "New
+ * report" marked as the page they are on — and the form is content in the main pane rather than a
+ * page that replaced the portal. Every branch of the POST renders through here too, so a 422 on
+ * step three does not throw the Officer out of the application they are working in.
+ */
+function NewReportPage({
+  session,
+  children,
+}: {
+  session: StaffSession;
+  children?: Children;
+}): JSX.Element {
+  return (
+    <StaffShell
+      title="New report — AE Reports"
+      pageTitle="New report"
+      role={session.role}
+      fullName={session.fullName}
+      active="new-report"
+    >
+      {children}
+    </StaffShell>
+  );
+}
 
 /**
  * Registering a report that arrived by email.
@@ -39,17 +70,15 @@ const ACTION = "/reports/new";
  * refused both the page and the submission by the guard rather than by a check written here.
  */
 export async function newReportRoutes(app: FastifyInstance): Promise<void> {
-  app.get(ACTION, async (_request, reply) =>
-    reply.html(
-      <OrangeFormPage
-        step={FIRST_STEP}
-        locale="en"
-        action={ACTION}
-        languages={false}
-        exitHref="/reports"
-      />,
-    ),
-  );
+  app.get(ACTION, async (request, reply) => {
+    const session = currentSession(request);
+
+    return reply.html(
+      <NewReportPage session={session}>
+        <OrangeForm step={FIRST_STEP} locale="en" action={ACTION} languages={false} embedded />
+      </NewReportPage>,
+    );
+  });
 
   app.post(ACTION, async (request, reply) => {
     const session = currentSession(request);
@@ -70,17 +99,19 @@ export async function newReportRoutes(app: FastifyInstance): Promise<void> {
 
     /** Re-render some step, carrying everything the Officer has keyed in so far. */
     const page = (target: Step, issues: readonly Issue[] = [], notice = uploadNotice) => (
-      <OrangeFormPage
-        step={target}
-        answers={answers}
-        issues={issues}
-        locale="en"
-        attachments={attachments}
-        notice={notice}
-        action={ACTION}
-        languages={false}
-        exitHref="/reports"
-      />
+      <NewReportPage session={session}>
+        <OrangeForm
+          step={target}
+          answers={answers}
+          issues={issues}
+          locale="en"
+          attachments={attachments}
+          notice={notice}
+          action={ACTION}
+          languages={false}
+          embedded
+        />
+      </NewReportPage>
     );
 
     const turn = advance(step, action, answers);

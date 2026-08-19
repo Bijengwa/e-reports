@@ -340,6 +340,24 @@ textarea:focus-visible,
   min-height: 100vh;
 }
 
+/* The same form, embedded in the staff main pane instead of standing as a page.
+   Everything that makes it the orange form is kept -- the warm paper, the banners, the step tabs,
+   the field styling -- because an Officer transcribing a report should be reading the document the
+   reporter filled in. What goes is only what belongs to a page: the full viewport height, and the
+   centring of a body that now sits inside one that is already centred. */
+.orange-page.is-embedded {
+  min-height: 0;
+  border: 1px solid #f0cfb6;
+  border-radius: var(--r);
+  overflow: hidden;
+}
+
+.orange-page.is-embedded .obody {
+  padding: 18px;
+  margin: 0;
+  max-width: none;
+}
+
 .orange-page .otop {
   background: var(--orange);
   color: #fff;
