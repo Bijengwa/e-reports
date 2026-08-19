@@ -76,11 +76,26 @@ function IconMenu(): JSX.Element {
   );
 }
 
+/**
+ * Both directions are rendered and CSS shows one.
+ *
+ * The alternative is the script rewriting the button's contents on every toggle, which would put
+ * the arrow's meaning in two places — the markup and the handler — and let them disagree.
+ */
 function IconCollapse(): JSX.Element {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <path d="M10 4v16" />
+    <svg class="when-open" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M14 7l-5 5 5 5" />
+      <path d="M19 4v16" />
+    </svg>
+  );
+}
+
+function IconExpand(): JSX.Element {
+  return (
+    <svg class="when-collapsed" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M10 7l5 5-5 5" />
+      <path d="M5 4v16" />
     </svg>
   );
 }
@@ -166,6 +181,22 @@ export function StaffShell({
                 <span class="rail-label">Sign out</span>
               </button>
             </form>
+
+            {/* The rail's own control, on the rail. Collapsing is something you do to this
+                column, so it belongs here rather than in the title bar — the bar's one button
+                is the drawer's, and only exists at widths where the rail is off-canvas. */}
+            <button
+              type="button"
+              class="rail-collapse"
+              data-rail-collapse
+              aria-controls="rail"
+              aria-expanded="true"
+              aria-label="Collapse the sidebar"
+            >
+              <IconCollapse />
+              <IconExpand />
+              <span class="rail-label">Collapse</span>
+            </button>
           </div>
         </aside>
 
@@ -185,17 +216,6 @@ export function StaffShell({
             </button>
 
             <h1 safe>{pageTitle}</h1>
-
-            <button
-              type="button"
-              class="rail-collapse"
-              data-rail-collapse
-              aria-controls="rail"
-              aria-expanded="true"
-              aria-label="Collapse the sidebar"
-            >
-              <IconCollapse />
-            </button>
           </header>
 
           <main class="staff-main">{children}</main>

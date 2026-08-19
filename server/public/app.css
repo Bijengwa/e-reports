@@ -769,11 +769,37 @@ textarea[aria-invalid="true"] {
   color: #fff;
 }
 
+.rail-collapse {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 2px;
+  padding: 8px 11px;
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: #7fa48b;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.rail-collapse:hover {
+  background: #14522b;
+  color: #fff;
+}
+
+/* Expanded is the default, so the arrow that means "collapse" is the one on show. */
+.rail-collapse .when-collapsed {
+  display: none;
+}
+
 /* One rule for every icon in the rail and the title bar. */
 .rail-nav svg,
 .rail-signout svg,
-.top-burger svg,
-.rail-collapse svg {
+.rail-collapse svg,
+.top-burger svg {
   width: 17px;
   height: 17px;
   flex: none;
@@ -820,9 +846,13 @@ textarea[aria-invalid="true"] {
   text-overflow: ellipsis;
 }
 
-.top-burger,
-.rail-collapse {
-  display: grid;
+/*
+ * The title bar's only control, and the drawer's. Hidden above 900px, where the rail is always
+ * on screen and there is nothing for it to open. Collapsing is a separate job with its own
+ * control, on the rail.
+ */
+.top-burger {
+  display: none;
   place-items: center;
   width: 32px;
   height: 32px;
@@ -835,15 +865,9 @@ textarea[aria-invalid="true"] {
   cursor: pointer;
 }
 
-.top-burger:hover,
-.rail-collapse:hover {
+.top-burger:hover {
   background: #eef2ee;
   color: var(--ink);
-}
-
-/* The drawer's control. Above 900px the rail is always on screen, so it has nothing to do. */
-.top-burger {
-  display: none;
 }
 
 .staff-main {
@@ -882,9 +906,18 @@ textarea[aria-invalid="true"] {
 
   :root.rail-collapsed .rail-nav a,
   :root.rail-collapsed .rail-signout,
+  :root.rail-collapsed .rail-collapse,
   :root.rail-collapsed .brand-mark {
     justify-content: center;
     gap: 0;
+  }
+
+  :root.rail-collapsed .rail-collapse .when-open {
+    display: none;
+  }
+
+  :root.rail-collapsed .rail-collapse .when-collapsed {
+    display: block;
   }
 
   :root.rail-collapsed .rail .brand {
@@ -917,7 +950,7 @@ textarea[aria-invalid="true"] {
     display: grid;
   }
 
-  /* Collapsing has no meaning once the rail is off-canvas. */
+  /* Collapsing has no meaning once the rail is off-canvas: the drawer is already hidden. */
   .rail-collapse {
     display: none;
   }
