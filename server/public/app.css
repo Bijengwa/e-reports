@@ -1343,11 +1343,13 @@ textarea[aria-invalid="true"] {
   margin-bottom: 18px;
 }
 
-.dash-recent {
+.dash-recent,
+.dash-queue {
   margin-top: 26px;
 }
 
-.dash-recent h2 {
+.dash-recent h2,
+.dash-queue h2 {
   font-size: 15px;
   font-weight: 600;
 }

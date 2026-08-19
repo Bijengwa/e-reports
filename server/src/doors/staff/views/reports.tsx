@@ -56,6 +56,58 @@ function day(value: Date): string {
   return new Date(value).toISOString().slice(0, 10);
 }
 
+/**
+ * A report as a short list needs it: what it is, when it landed, and how badly it went.
+ *
+ * Narrower than `ReportRow` on purpose, and the query behind it selects exactly these. Status is
+ * the same word on every row of a queue built by filtering on status, and channel and facility are
+ * what the register is for.
+ */
+export type ReceivedRow = Pick<
+  ReportRow,
+  "id" | "number" | "receivedAt" | "deviceName" | "severity"
+>;
+
+/**
+ * A short list of reports, rendered the way the register renders them.
+ *
+ * Exported so the dashboard prints the number, the date and the severity tag through this code
+ * rather than its own. Two pages captioning the same enum separately is how one of them ends up
+ * printing `life_threatening` — the argument `ROLE_LABELS` makes, one level up.
+ */
+export function ReceivedRows({ reports }: { reports: ReceivedRow[] }): JSX.Element {
+  return (
+    <table class="utable">
+      <thead>
+        <tr>
+          <th>Number</th>
+          <th>Received</th>
+          <th>Device</th>
+          <th>Severity</th>
+        </tr>
+      </thead>
+      <tbody>
+        {reports.map((report) => (
+          <tr>
+            <td>
+              <a href={`/reports/${report.id}`} safe>
+                {report.number}
+              </a>
+            </td>
+            <td>{day(report.receivedAt)}</td>
+            <td safe>{report.deviceName}</td>
+            <td>
+              <span class={`tag ${severityTone(report.severity) === "caution" ? "warn" : ""}`}>
+                {caption(SEVERITY_LABELS, report.severity)}
+              </span>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 export type ReportsPageProps = {
   reports: ReportRow[];
   /** The signed-in person, for the title bar. */
