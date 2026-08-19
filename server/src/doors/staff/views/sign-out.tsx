@@ -33,7 +33,7 @@ export function SignOutPage({ fullName }: SignOutPageProps): JSX.Element {
 
         <form method="POST" action="/logout">
           <div class="bar">
-            <button type="submit" class="btn">
+            <button type="submit" class="btn danger">
               Sign out
             </button>
             {/* Back to where they were going, not to the page they came from: a referrer is the

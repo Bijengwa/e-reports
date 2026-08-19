@@ -85,5 +85,26 @@
     document.addEventListener("keydown", function (event) {
       if (event.key === "Escape" && root.classList.contains("rail-open")) setOpen(false);
     });
+
+    /*
+     * Sign out asks first.
+     *
+     * The link already points at a page that asks, so this only upgrades the question to a dialog
+     * on the page the user is already looking at. If `showModal` is missing -- an old browser --
+     * the click is left alone and the navigation happens, which is the same question either way.
+     */
+    var signout = document.querySelector("[data-signout]");
+    var dialog = document.querySelector("[data-signout-dialog]");
+
+    if (signout && dialog && typeof dialog.showModal === "function") {
+      signout.addEventListener("click", function (event) {
+        // Let a middle-click or a modified click open the fallback page in the usual way.
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) return;
+
+        event.preventDefault();
+        setOpen(false);
+        dialog.showModal();
+      });
+    }
   });
 })();

@@ -490,8 +490,23 @@ describe.skipIf(!INTEGRATION_ENABLED)("the activity trail", () => {
     expect(forAssessor.body).not.toContain('href="/activity"');
     // Everyone still gets the rail itself, and the way out of it.
     expect(forAssessor.body).toContain('href="/dashboard"');
-    // A link now, not a form: the rail asks before it ends the session, and /logout's own page
-    // carries the POST that does it.
+    // A link the script turns into a dialog. The href matters on its own: with scripting off it
+    // still reaches a page that asks, so the control is never dead.
     expect(forAssessor.body).toContain('href="/logout"');
+    expect(forAssessor.body).toContain("data-signout");
+  });
+
+  it("carries the sign-out confirmation on the page, with a destructive-looking answer", async () => {
+    const { cookie } = await signedInAs("manager");
+
+    const body = (await get("/dashboard", cookie)).body;
+
+    // Rendered closed — <dialog> hides itself — so nothing flashes before the script runs.
+    expect(body).toContain("data-signout-dialog");
+    expect(body).toContain("Sign out?");
+    // Ending a session is not the app's "go on" action, so its button is not the green one.
+    expect(body).toContain('class="btn danger"');
+    // Cancel closes the dialog without submitting, which needs no script of its own.
+    expect(body).toContain('formmethod="dialog"');
   });
 });

@@ -1454,3 +1454,54 @@ textarea[aria-invalid="true"] {
     background: var(--card);
   }
 }
+
+/* ---------- a confirmation on the page ---------- */
+/*
+ * Opened with showModal(), which is what gives the backdrop, the focus trap and Escape-to-close
+ * without writing any of them. Closed is the element's own default, so nothing here has to hide
+ * it and no page flashes the dialog before the script runs.
+ */
+.modal {
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  padding: 22px 24px;
+  max-width: 400px;
+  width: calc(100% - 32px);
+  background: var(--card);
+  color: var(--ink);
+}
+
+.modal::backdrop {
+  background: rgb(12 59 30 / 45%);
+}
+
+.modal h2 {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.modal .hint {
+  margin-top: 5px;
+}
+
+.modal-actions {
+  margin-top: 20px;
+  justify-content: flex-end;
+}
+
+/*
+ * The destructive answer, in the palette the form already uses for a problem. Green is this app's
+ * "go on" colour, and ending a session is not that -- the button that does it should not look like
+ * the button that saves a report.
+ */
+.btn.danger {
+  background: var(--flag);
+  border-color: var(--flag);
+  color: #fff;
+}
+
+.btn.danger:hover {
+  background: #8d2b19;
+  border-color: #8d2b19;
+}

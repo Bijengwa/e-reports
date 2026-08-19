@@ -204,11 +204,12 @@ export function StaffShell({
             )}
           </nav>
 
-          {/* A link, because this one asks first: /logout renders the confirmation and its own
-              form posts the answer. The state change is still a POST, so a Lax cookie is withheld
-              from a cross-site submission and another origin cannot sign the user out. */}
+          {/* A link, and the script turns it into the dialog below. The href is the point: with
+              scripting off it still goes somewhere that asks the question, so the control is never
+              dead. Either way the state change is a POST, so a Lax cookie is withheld from a
+              cross-site submission and another origin cannot sign the user out. */}
           <div class="rail-foot">
-            <a href="/logout" class="rail-signout">
+            <a href="/logout" class="rail-signout" data-signout>
               <IconSignOut />
               <span class="rail-label">Sign out</span>
             </a>
@@ -270,6 +271,34 @@ export function StaffShell({
         {/* Hidden until the drawer opens. `hidden` rather than a class, so it is inert to
             assistive tech as well as invisible. */}
         <div class="scrim" data-rail-scrim hidden></div>
+
+        {/*
+          Closed until the script opens it with showModal(), which is what buys the backdrop, the
+          focus trap and Escape-to-close without writing any of them. Rendered on every page rather
+          than fetched, so the question costs nothing when it is asked.
+
+          Cancel is `formmethod="dialog"`: inside the POST form, that button closes the dialog
+          instead of submitting it, so dismissing needs no script of its own.
+        */}
+        <dialog class="modal" data-signout-dialog aria-labelledby="signout-title">
+          <h2 id="signout-title">Sign out?</h2>
+          {fullName ? (
+            <p class="hint">
+              You are signed in as <strong safe>{fullName}</strong>.
+            </p>
+          ) : (
+            <p class="hint">This will end your session.</p>
+          )}
+
+          <form method="POST" action="/logout" class="bar modal-actions">
+            <button type="submit" formmethod="dialog" class="btn ghost">
+              Stay signed in
+            </button>
+            <button type="submit" class="btn danger">
+              Sign out
+            </button>
+          </form>
+        </dialog>
       </div>
     </Layout>
   );
