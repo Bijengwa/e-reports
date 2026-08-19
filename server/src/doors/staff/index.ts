@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { constrainToHost } from "../host-scope.js";
 import { activityRoutes } from "./routes/activity.js";
 import { assessmentRoutes } from "./routes/assessment.js";
+import { myAssessmentsRoutes } from "./routes/assessments.js";
 import { changePasswordRoutes } from "./routes/change-password.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
 import { loginRoutes } from "./routes/login.js";
@@ -86,6 +87,10 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
         requireRole(registration, ["assessor"]);
 
         await registration.register(newReportRoutes);
+
+        // An Officer's own assigned work. Here rather than beside the register because it is one
+        // person's list, and nobody but an assessor has one.
+        await registration.register(myAssessmentsRoutes);
 
         // The first assessment of a report. Registered here because only an Officer may open one
         // at all; which Officer is a question about the row, and the route asks it for itself.

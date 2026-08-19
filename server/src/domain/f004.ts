@@ -98,22 +98,30 @@ export function prefillDeviceRows(payload: unknown, report: ReportFacts): Record
     chosen === "Others" || chosen === "Other" ? text(answers, field) : chosen;
 
   return {
-    brand_name: text(answers, "brand_name"),
-    common_name: text(answers, "common_name") || text(answers, "device_name"),
+    // The orange form asks for a full name and, separately, a brand and a common name. A reporter
+    // who filled only the first left the brand empty, which is why this falls back to it: the
+    // device has a name on the paper and the assessment must show it.
+    brand_name: text(answers, "brand_name") || text(answers, "device_name"),
+    // The common name and nothing else. Falling back to the full name would print one string on
+    // both 1.1 and 1.2 and call it a common name it never was.
+    common_name: text(answers, "common_name"),
     device_type: "",
     size: text(answers, "size"),
     batch_serial: joined([text(answers, "batch_number"), text(answers, "serial_number")]),
     manufacturing_date: text(answers, "manufacturing_date"),
     expiry_date: text(answers, "expiry_date"),
     manufacturer: text(answers, "manufacturer"),
-    supplier: joined([text(answers, "supplier"), text(answers, "source")]),
+    // The supplier alone. The source field answers a different question -- where the device came
+    // from -- and appending it would put an answer under a heading that did not ask for it.
+    supplier: text(answers, "supplier"),
     registration_number: "",
     device_class: "",
     device_status: text(answers, "status"),
     duration: orOther("duration_other", text(answers, "duration")),
     reporter: joined([
       text(answers, "reporter_name") || (report.reporterName ?? ""),
-      text(answers, "reporter_type"),
+      text(answers, "facility_address"),
+      text(answers, "location"),
       text(answers, "phone"),
       text(answers, "email"),
     ]),
@@ -124,6 +132,8 @@ export function prefillDeviceRows(payload: unknown, report: ReportFacts): Record
     ]),
     report_date: text(answers, "report_date"),
     received_at: new Date(report.receivedAt).toISOString().slice(0, 10),
+    // Left blank rather than defaulted to Initial. The orange form does not ask, and a report
+    // that is in fact a follow-up would be mislabelled by a default nobody chose.
     report_stage: "",
   };
 }
@@ -152,7 +162,7 @@ export function prefillEventRows(payload: unknown): Record<string, string> {
 
   return {
     description: joined([text(answers, "incident_narrative"), text(answers, "event_narrative")]),
-    onset_date: text(answers, "incident_date") || text(answers, "event_date"),
+    onset_date: text(answers, "event_date") || text(answers, "incident_date"),
     devices: text(answers, "devices_involved"),
     users: text(answers, "users_involved"),
   };

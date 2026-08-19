@@ -111,6 +111,51 @@ function RequirementRow({
   );
 }
 
+/**
+ * Section 1 as the paper reads: the number, what is required, and what was filed.
+ *
+ * A comment box on all nineteen rows turned the administrative section into a wall of empty
+ * textareas an assessor scrolled past. The value is the point of these rows; a note is the
+ * exception, so it is one line and says it is optional.
+ */
+function FactRow({
+  no,
+  label,
+  name,
+  filled,
+  answers,
+}: {
+  no: string;
+  label: string;
+  name: string;
+  filled: string;
+  answers: F004Answers;
+}): JSX.Element {
+  return (
+    <>
+      <div class="f4-fact">
+        <span class="f4-no" safe>
+          {no}
+        </span>
+        <span class="f4-label" safe>
+          {label}
+        </span>
+        {filled === "" ? (
+          <span class="f4-blank">Not supplied by the reporter</span>
+        ) : (
+          <span class="f4-value" safe>
+            {filled}
+          </span>
+        )}
+      </div>
+      <div class="f4-note-line">
+        <label for={name}>Assessor note (optional)</label>
+        <input id={name} name={name} value={value(answers, name)} />
+      </div>
+    </>
+  );
+}
+
 function Ticks({
   name,
   options,
@@ -260,12 +305,8 @@ export function F004Form({
 
         <section class="f4-section">
           <Bar no="1" title="Administrative information — device information" />
-          <div class="f4-colheads">
-            <span>Requirements</span>
-            <span>Comments</span>
-          </div>
           {DEVICE_ROWS.map((row) => (
-            <RequirementRow
+            <FactRow
               no={row.no}
               label={row.label}
               name={`c1_${row.key}`}

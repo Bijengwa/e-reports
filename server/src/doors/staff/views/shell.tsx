@@ -30,7 +30,7 @@ export type StaffShellProps = {
    */
   fullName?: string | undefined;
   /** Which entry is the page being shown, so the rail can mark it. */
-  active?: "dashboard" | "reports" | "new-report" | "users" | "activity";
+  active?: "dashboard" | "assessments" | "reports" | "new-report" | "users" | "activity";
   children?: Children;
 };
 
@@ -53,6 +53,16 @@ function IconReports(): JSX.Element {
       <path d="M14 3v5h5" />
       <path d="M9 13h6" />
       <path d="M9 17h4" />
+    </svg>
+  );
+}
+
+function IconAssessments(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M5 4h11l4 4v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" />
+      <path d="M15 4v5h5" />
+      <path d="M8 14l2.5 2.5L16 11" />
     </svg>
   );
 }
@@ -198,6 +208,19 @@ export function StaffShell({
             {/* The Officer's, because registering a report that arrived by email is the Officer's
                 work. Presentation only, as above: `requireRole` refuses the route whatever the
                 rail shows, and the two agree so that no link answers 403 when clicked. */}
+            {/* An Officer's own work, which nobody else has: a manager and an administrator are
+                never assigned a report, so the page would be empty for them and is refused them. */}
+            {isOfficer && (
+              <a
+                href="/assessments"
+                class={active === "assessments" ? "on" : ""}
+                aria-current={active === "assessments" ? "page" : undefined}
+              >
+                <IconAssessments />
+                <span class="rail-label">My assessments</span>
+              </a>
+            )}
+
             {isOfficer && (
               <a
                 href="/reports/new"

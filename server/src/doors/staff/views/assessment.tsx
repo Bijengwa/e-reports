@@ -19,12 +19,17 @@ export type Assessment1PageProps = {
 /**
  * The first assessment of one report: the F004, and the report it is about.
  *
- * Both on one page, the form first and the submitted document under it, because an assessor is
- * comparing one against the other. The report is rendered through `ReportDocument`, the same
- * component `/reports/:id` uses, so what is being assessed cannot drift from what was shown.
+ * Both at once, because assessing is comparing one against the other. Given the width they sit
+ * side by side with the report sticky, so scrolling the form does not scroll away the thing being
+ * assessed. Below 1200px there is no room for two columns, so they become tabs — the assessor
+ * still has both, one at a time, rather than one buried under the other.
  *
- * Inside `StaffShell` like every other staff page: the rail stays, and this is somewhere in the
- * portal rather than a form that replaced it.
+ * The tabs are two radios and CSS. No script: a page whose only interaction is "show me the other
+ * pane" should not stop working because a bundle failed, and the radios sit outside the F004's own
+ * form so choosing a tab can never submit an assessment.
+ *
+ * The report is rendered through `ReportDocument`, the same component `/reports/:id` uses, so what
+ * is being assessed cannot drift from what was shown.
  */
 export function Assessment1Page({
   report,
@@ -43,7 +48,7 @@ export function Assessment1Page({
       pageTitle="Assessment 1"
       role={viewerRole}
       fullName={viewerName}
-      active="reports"
+      active="assessments"
     >
       <div class="staff-head">
         <div class="sp">
@@ -57,21 +62,36 @@ export function Assessment1Page({
         </a>
       </div>
 
-      <F004Form
-        reportId={report.id}
-        answers={answers}
-        device={device}
-        event={event}
-        assessorName={viewerName}
-        assessedOn={assessedOn}
-        submitted={submitted}
-        issues={issues}
-      />
+      <div class="a1-work">
+        <input type="radio" name="a1-view" id="a1-form" class="a1-pick" checked />
+        <input type="radio" name="a1-view" id="a1-report" class="a1-pick" />
 
-      <details class="f4-source">
-        <summary>The report as it was submitted</summary>
-        <ReportDocument report={report} />
-      </details>
+        <div class="a1-tabs">
+          <label for="a1-report">Report</label>
+          <label for="a1-form">Assessment</label>
+        </div>
+
+        <div class="a1-split">
+          <div class="a1-pane a1-report">
+            <h3>The report as filed</h3>
+            <ReportDocument report={report} />
+          </div>
+
+          <div class="a1-pane a1-form">
+            <h3>Assessment 1 — F004</h3>
+            <F004Form
+              reportId={report.id}
+              answers={answers}
+              device={device}
+              event={event}
+              assessorName={viewerName}
+              assessedOn={assessedOn}
+              submitted={submitted}
+              issues={issues}
+            />
+          </div>
+        </div>
+      </div>
     </StaffShell>
   );
 }
