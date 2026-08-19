@@ -1241,3 +1241,40 @@ textarea[aria-invalid="true"] {
 .utable tr.tone-caution td {
   background: var(--orange-bg);
 }
+
+/* ---------- dashboard ---------- */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.stat {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  padding: 14px 16px;
+}
+
+.stat b {
+  display: block;
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin: 4px 0 1px;
+}
+
+.dash-note {
+  margin-bottom: 18px;
+}
+
+.dash-recent {
+  margin-top: 26px;
+}
+
+.dash-recent h2 {
+  font-size: 15px;
+  font-weight: 600;
+}

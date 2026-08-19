@@ -33,9 +33,8 @@ const ACTIVITY_ACTION_LIST = sql.join(
  * payload — the same argument that keeps `password_hash` out of the users list. Actor and target
  * are read by joining `users`, not by trusting anything an action recorded about itself.
  */
-export async function activityRoutes(app: FastifyInstance): Promise<void> {
-  app.get("/activity", async (request, reply) => {
-    const rows = await app.db.execute(sql`
+export async function loadActivity(app: FastifyInstance, limit: number): Promise<ActivityEntry[]> {
+  const rows = await app.db.execute(sql`
       SELECT a.at,
              a.action,
              actor.full_name  AS actor_name,
@@ -51,30 +50,42 @@ export async function activityRoutes(app: FastifyInstance): Promise<void> {
        WHERE a.entity_type = 'user'
          AND a.action IN (${ACTIVITY_ACTION_LIST})
        ORDER BY a.at DESC, a.id DESC
-       LIMIT ${ACTIVITY_LIMIT}
-    `);
+       LIMIT ${limit}
+  `);
 
-    const entries = rows.map((row): ActivityEntry => {
-      const entry = row as {
-        at: Date;
-        action: string;
-        actor_name: string | null;
-        actor_email: string | null;
-        actor_role: string | null;
-        target_name: string | null;
-        target_email: string | null;
-      };
+  return rows.map((row): ActivityEntry => {
+    const entry = row as {
+      at: Date;
+      action: string;
+      actor_name: string | null;
+      actor_email: string | null;
+      actor_role: string | null;
+      target_name: string | null;
+      target_email: string | null;
+    };
 
-      return {
-        at: entry.at,
-        action: entry.action,
-        actorName: entry.actor_name,
-        actorEmail: entry.actor_email,
-        actorRole: entry.actor_role,
-        targetName: entry.target_name,
-        targetEmail: entry.target_email,
-      };
-    });
+    return {
+      at: entry.at,
+      action: entry.action,
+      actorName: entry.actor_name,
+      actorEmail: entry.actor_email,
+      actorRole: entry.actor_role,
+      targetName: entry.target_name,
+      targetEmail: entry.target_email,
+    };
+  });
+}
+
+/**
+ * The trail, for administrators.
+ *
+ * Registered in the administrator-only scope, so a manager or officer is refused by the guard
+ * before this file is reached. Every administrator sees the same rows: a trail that is filtered
+ * per reader is not one an auditor can rely on.
+ */
+export async function activityRoutes(app: FastifyInstance): Promise<void> {
+  app.get("/activity", async (request, reply) => {
+    const entries = await loadActivity(app, ACTIVITY_LIMIT);
 
     return reply.html(<ActivityPage entries={entries} viewerRole={currentSession(request).role} />);
   });

@@ -68,6 +68,67 @@ function when(value: Date): string {
   return new Date(value).toISOString().slice(0, 16).replace("T", " ");
 }
 
+/**
+ * The rows themselves, shared with the dashboard's recent-activity panel.
+ *
+ * Extracted so the five entries on the dashboard cannot drift from the two hundred here: same
+ * captions, same tones, same escaping, decided once.
+ */
+export function ActivityTable({ entries }: { entries: ActivityEntry[] }): JSX.Element {
+  return (
+    <table class="utable">
+      <thead>
+        <tr>
+          <th>When (UTC)</th>
+          <th>Actor</th>
+          <th>Role</th>
+          <th>Action</th>
+          <th>Target</th>
+        </tr>
+      </thead>
+      <tbody>
+        {entries.map((entry) => (
+          <tr class={`tone-${toneOf(entry.action)}`}>
+            <td>{when(entry.at)}</td>
+            <td>
+              {entry.actorName ? (
+                <>
+                  <span safe>{entry.actorName}</span>
+                  <span class="hint block" safe>
+                    {entry.actorEmail ?? ""}
+                  </span>
+                </>
+              ) : (
+                <span class="hint">System (CLI)</span>
+              )}
+            </td>
+            <td>
+              {entry.actorRole ? (
+                <span safe>{roleLabel(entry.actorRole)}</span>
+              ) : (
+                <span class="hint">—</span>
+              )}
+            </td>
+            <td safe>{labelOf(entry.action)}</td>
+            <td>
+              {entry.targetName ? (
+                <>
+                  <span safe>{entry.targetName}</span>
+                  <span class="hint block" safe>
+                    {entry.targetEmail ?? ""}
+                  </span>
+                </>
+              ) : (
+                <span class="hint">—</span>
+              )}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 export type ActivityPageProps = {
   entries: ActivityEntry[];
   /** The reader's own role, for the rail. */
@@ -98,56 +159,7 @@ export function ActivityPage({ entries, viewerRole }: ActivityPageProps): JSX.El
         </div>
       </div>
 
-      <table class="utable">
-        <thead>
-          <tr>
-            <th>When (UTC)</th>
-            <th>Actor</th>
-            <th>Role</th>
-            <th>Action</th>
-            <th>Target</th>
-          </tr>
-        </thead>
-        <tbody>
-          {entries.map((entry) => (
-            <tr class={`tone-${toneOf(entry.action)}`}>
-              <td>{when(entry.at)}</td>
-              <td>
-                {entry.actorName ? (
-                  <>
-                    <span safe>{entry.actorName}</span>
-                    <span class="hint block" safe>
-                      {entry.actorEmail ?? ""}
-                    </span>
-                  </>
-                ) : (
-                  <span class="hint">System (CLI)</span>
-                )}
-              </td>
-              <td>
-                {entry.actorRole ? (
-                  <span safe>{roleLabel(entry.actorRole)}</span>
-                ) : (
-                  <span class="hint">—</span>
-                )}
-              </td>
-              <td safe>{labelOf(entry.action)}</td>
-              <td>
-                {entry.targetName ? (
-                  <>
-                    <span safe>{entry.targetName}</span>
-                    <span class="hint block" safe>
-                      {entry.targetEmail ?? ""}
-                    </span>
-                  </>
-                ) : (
-                  <span class="hint">—</span>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <ActivityTable entries={entries} />
 
       {entries.length === 0 && <p class="hint staff-foot">Nothing recorded yet.</p>}
     </StaffShell>
