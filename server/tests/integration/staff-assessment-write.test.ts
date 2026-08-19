@@ -214,6 +214,35 @@ describe.skipIf(!INTEGRATION_ENABLED)("opening the F004", () => {
     expect(res.body).not.toContain('name="c7_2"');
   });
 
+  it("offers jump targets for all eight sections", async () => {
+    const { officer, report } = await assigned();
+
+    const body = (await get(`/reports/${report.id}/assessment-1`, officer.cookie)).body;
+
+    for (let n = 1; n <= 8; n += 1) {
+      expect(body, `#section-${n}`).toContain(`href="#section-${n}"`);
+      expect(body, `id="section-${n}"`).toContain(`id="section-${n}"`);
+    }
+    // Navigation, not part of the F004's own document: it has to appear before the form starts,
+    // or a reader tabbing through the page would meet the assessment before the way around it.
+    expect(body.indexOf('class="f4-jump"')).toBeLessThan(body.indexOf("<form"));
+  });
+
+  it("carries no name= attribute anywhere inside 7.2", async () => {
+    const { officer, report } = await assigned();
+
+    const body = (await get(`/reports/${report.id}/assessment-1`, officer.cookie)).body;
+
+    // Broader than checking a couple of guessed field names: nothing in this block may ever be
+    // able to post a value, whatever a future edit to 7.2's markup ends up calling its fields.
+    const start = body.indexOf("Second assessor concluding remarks");
+    const end = body.indexOf("</section>", start);
+    expect(start).toBeGreaterThan(-1);
+
+    const block = body.slice(start, end);
+    expect(block).not.toMatch(/name="/);
+  });
+
   it("prefills 1.1 from the reporter's full name when no brand was given", async () => {
     const { officer, report } = await assigned();
 
@@ -316,6 +345,28 @@ describe.skipIf(!INTEGRATION_ENABLED)("saving a draft", () => {
     expect(await assessmentCount()).toBe(1);
     expect((await assessments())[0].conclusion).toBe("Second thoughts.");
   });
+
+  it("saves with section 5 left blank, and does not submit", async () => {
+    const { officer, report } = await assigned();
+
+    // Everything else a submission would need, deliberately with no signal_status: a draft is
+    // allowed to be as incomplete as the assessor left it, section 5 included.
+    const res = await post(`/reports/${report.id}/assessment-1`, officer.cookie, {
+      intent: "save",
+      seriousness: "serious",
+      expectedness: "unexpected",
+      causality: "probable",
+      risk_level: "high",
+      conclusion: "Still thinking about this one.",
+    });
+
+    expect(res.statusCode).toBe(302);
+
+    const [row] = await assessments();
+    expect(row.payload.signal_status ?? "").toBe("");
+    expect(row.submitted_at).toBeNull();
+    expect((await theReport()).status).toBe("first_assessment");
+  });
 });
 
 describe.skipIf(!INTEGRATION_ENABLED)("submitting", () => {
@@ -341,6 +392,61 @@ describe.skipIf(!INTEGRATION_ENABLED)("submitting", () => {
     expect(row.submitted_at).toBeNull();
     expect(row.conclusion).toBe("Draft.");
     expect((await theReport()).status).toBe("first_assessment");
+  });
+
+  it("refuses a submission missing only section 5, and leaves nothing sent", async () => {
+    const { officer, report } = await assigned();
+
+    const res = await post(
+      `/reports/${report.id}/assessment-1`,
+      officer.cookie,
+      completeAssessment(officer.name, { signal_status: "" }),
+    );
+
+    expect(res.statusCode).toBe(422);
+    expect(res.body).toContain("potential safety signal");
+
+    // Nothing was written at all here — this is the first thing this officer has done to the
+    // report, so there is no earlier draft to be "still" anything. A row existing at all, or the
+    // status having moved even one step, would both be the route acting on a rejected submission.
+    expect(await assessmentCount()).toBe(0);
+    const after = await theReport();
+    expect(after.status).toBe("received");
+    expect(after.status).not.toBe("awaiting_second_assessor");
+  });
+
+  it("accepts 'potential safety signal' as a complete submission", async () => {
+    const { officer, report } = await assigned();
+
+    const res = await post(
+      `/reports/${report.id}/assessment-1`,
+      officer.cookie,
+      completeAssessment(officer.name, { signal_status: "signal" }),
+    );
+
+    expect(res.statusCode).toBe(302);
+    expect((await theReport()).status).toBe("awaiting_second_assessor");
+
+    const [row] = await assessments();
+    expect(row.payload.signal_status).toBe("signal");
+    expect(row.submitted_at).not.toBeNull();
+  });
+
+  it("accepts 'not a signal at this stage' as a complete submission", async () => {
+    const { officer, report } = await assigned();
+
+    const res = await post(
+      `/reports/${report.id}/assessment-1`,
+      officer.cookie,
+      completeAssessment(officer.name, { signal_status: "not_signal" }),
+    );
+
+    expect(res.statusCode).toBe(302);
+    expect((await theReport()).status).toBe("awaiting_second_assessor");
+
+    const [row] = await assessments();
+    expect(row.payload.signal_status).toBe("not_signal");
+    expect(row.submitted_at).not.toBeNull();
   });
 
   it("refuses a signature that is not the assessor's own name", async () => {
