@@ -140,7 +140,6 @@ function receivedStat(count: number): string {
   return `<span class="eyebrow">Received</span><b>${count}</b>`;
 }
 
-
 /** Body rows of the one table on a page, the header row discounted. */
 function rowCount(body: string): number {
   return (body.match(/<tr[ >]/g) ?? []).length - 1;

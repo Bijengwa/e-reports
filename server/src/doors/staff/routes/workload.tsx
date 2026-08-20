@@ -1,13 +1,26 @@
 import { sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
+import { z } from "zod";
+import { reportStatus } from "../../../db/schema/index.js";
 import { currentSession } from "../session-guard.js";
-import { BUCKETS, WorkloadPage, type WorkloadRow } from "../views/workload.js";
+import { WorkloadPage, type WorkloadRow } from "../views/workload.js";
 
-/** Newest first, and only this many, on the same argument as the register's own limit. */
+/** Newest first, and only this many, on the same argument as `REPORTS_LIMIT` and `ACTIVITY_LIMIT`. */
 const WORKLOAD_LIMIT = 200;
 
-/** The statuses this page will filter by, which are the buckets it draws. */
-const FILTERABLE = new Set(BUCKETS.map((bucket) => bucket.status));
+/**
+ * The filter, validated against the column it filters on.
+ *
+ * Read from `reportStatus.enumValues` rather than from the page's own six cards: what may be
+ * filtered by is a question about `reports.status`, so taking the answer from the schema means the
+ * two cannot drift apart — a status added to the enum is filterable the day it exists, and a card
+ * removed from the page does not silently narrow what an address may ask for.
+ *
+ * Parsed with zod because that is how every other input in this app is checked, from the sign-in
+ * body to a report id in a path. The value only ever reaches the query as a bound parameter, so
+ * this is not what stops an injection; it is what stops a mistyped address becoming a 500.
+ */
+const StatusFilter = z.enum(reportStatus.enumValues);
 
 function toRow(row: unknown): WorkloadRow {
   const report = row as {
@@ -53,9 +66,11 @@ export async function workloadRoutes(app: FastifyInstance): Promise<void> {
     const session = currentSession(request);
 
     // An unknown status is not an error and not an empty page: it is simply not a filter, so the
-    // reader gets the whole pipeline rather than a 404 over a mistyped address.
-    const asked = (request.query as { status?: unknown }).status;
-    const selected = typeof asked === "string" && FILTERABLE.has(asked) ? asked : null;
+    // reader gets the whole pipeline rather than a 404 over a mistyped address. That is the same
+    // answer `/reports` gives a stale link — the register, not a page of its own — and it means a
+    // hand-edited address degrades to the honest view instead of to an error naming the column.
+    const asked = StatusFilter.safeParse((request.query as { status?: unknown }).status);
+    const selected = asked.success ? asked.data : null;
 
     const totals = await app.db.execute(sql`
       SELECT status::text AS status, count(*)::int AS count FROM reports GROUP BY status

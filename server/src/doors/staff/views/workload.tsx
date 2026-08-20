@@ -1,4 +1,4 @@
-import { SEVERITY_LABELS, severityTone, STATUS_LABELS } from "./reports.js";
+import { SEVERITY_LABELS, STATUS_LABELS, severityTone } from "./reports.js";
 import { StaffShell } from "./shell.js";
 
 /**
@@ -90,6 +90,12 @@ export function WorkloadPage({
 }: WorkloadPageProps): JSX.Element {
   const shown = selected === null ? undefined : BUCKETS.find((b) => b.status === selected);
 
+  // Filtering is validated against the schema enum, which may one day carry a status this page
+  // draws no card for. Falling back to "All reports" there would head a filtered list with the
+  // one caption that is certainly wrong, so the status' own label answers instead.
+  const heading =
+    selected === null ? "All reports" : (shown?.label ?? STATUS_LABELS[selected] ?? selected);
+
   return (
     <StaffShell
       title="Workload — AE Reports"
@@ -128,7 +134,7 @@ export function WorkloadPage({
 
       <div class="staff-head">
         <div class="sp">
-          <h2 safe>{shown === undefined ? "All reports" : shown.label}</h2>
+          <h2 safe>{heading}</h2>
           <p class="hint">
             {rows.length} report{rows.length === 1 ? "" : "s"}, newest first
           </p>
@@ -173,7 +179,10 @@ export function WorkloadPage({
                 <td>{day(row.receivedAt)}</td>
                 <td safe>{row.deviceName}</td>
                 <td>
-                  <span class={`tag ${severityTone(row.severity) === "caution" ? "warn" : ""}`} safe>
+                  <span
+                    class={`tag ${severityTone(row.severity) === "caution" ? "warn" : ""}`}
+                    safe
+                  >
                     {SEVERITY_LABELS[row.severity] ?? row.severity}
                   </span>
                 </td>

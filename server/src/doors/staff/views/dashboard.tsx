@@ -69,7 +69,6 @@ export function DashboardPage({
             <span class="hint">active accounts</span>
           </div>
         )}
-
       </div>
 
       <p class="dash-note">
