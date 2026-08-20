@@ -1,5 +1,74 @@
-import { type ReceivedRow, ReceivedRows } from "./reports.js";
+import {
+  day,
+  type ReceivedRow,
+  ReceivedRows,
+  SEVERITY_LABELS,
+  STATUS_LABELS,
+  severityTone,
+} from "./reports.js";
 import { StaffShell } from "./shell.js";
+
+/**
+ * A report this Officer holds as second assessor.
+ *
+ * Narrower than `ReceivedRow`: no `mine`, because that flag decides whether to offer the first
+ * assessment's page and this is not the Officer who writes that one. It carries `status` instead,
+ * which is what says how far the report has travelled since it was handed over.
+ */
+export type SecondAssessmentRow = {
+  id: string;
+  number: string;
+  receivedAt: Date;
+  deviceName: string;
+  severity: string;
+  status: string;
+};
+
+/**
+ * The second assessor's work, listed but not yet openable as a form.
+ *
+ * Every row opens the report itself. Writing a second assessment is a page that does not exist
+ * yet, and a link to one would answer 404 — so this lists what has been handed to the Officer and
+ * says plainly that the form is still to come, rather than implying an action it cannot offer.
+ */
+function SecondAssessmentRows({ reports }: { reports: SecondAssessmentRow[] }): JSX.Element {
+  return (
+    <table class="utable">
+      <thead>
+        <tr>
+          <th>Number</th>
+          <th>Received</th>
+          <th>Device</th>
+          <th>Severity</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {reports.map((report) => (
+          <tr>
+            <td>
+              <a href={`/reports/${report.id}`} safe>
+                {report.number}
+              </a>
+            </td>
+            <td>{day(report.receivedAt)}</td>
+            <td safe>{report.deviceName}</td>
+            <td>
+              <span class={`tag ${severityTone(report.severity) === "caution" ? "warn" : ""}`} safe>
+                {SEVERITY_LABELS[report.severity] ?? report.severity}
+              </span>
+            </td>
+            <td>
+              <span class="tag muted" safe>
+                {STATUS_LABELS[report.status] ?? report.status}
+              </span>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
 
 /** One group of the Officer's work, with the sentence to print when it is empty. */
 type Group = {
@@ -25,6 +94,8 @@ export type MyAssessmentsPageProps = {
   notStarted: ReceivedRow[];
   inProgress: ReceivedRow[];
   submitted: ReceivedRow[];
+  /** Reports a manager has handed to this Officer as second assessor. */
+  secondAssessment: SecondAssessmentRow[];
 };
 
 function Section({ group }: { group: Group }): JSX.Element {
@@ -62,8 +133,9 @@ export function MyAssessmentsPage({
   notStarted,
   inProgress,
   submitted,
+  secondAssessment,
 }: MyAssessmentsPageProps): JSX.Element {
-  const total = notStarted.length + inProgress.length + submitted.length;
+  const total = notStarted.length + inProgress.length + submitted.length + secondAssessment.length;
 
   return (
     <StaffShell
@@ -104,6 +176,9 @@ export function MyAssessmentsPage({
           <a href="#submitted">
             Submitted <span class="mya-count">{submitted.length}</span>
           </a>
+          <a href="#second-assessment">
+            Second assessment <span class="mya-count">{secondAssessment.length}</span>
+          </a>
         </nav>
 
         <Section
@@ -136,6 +211,23 @@ export function MyAssessmentsPage({
             rows: submitted,
           }}
         />
+
+        {/* The fourth group is the other side of this Officer's work: reports a manager has handed
+            them to review, rather than ones they were given at intake. Its own group rather than a
+            state of the three above, because those three describe one report's journey through
+            the first assessment and this is a different job on a different report. */}
+        <div class="mya" id="second-assessment">
+          <h2>Second assessment</h2>
+          <p class="hint">
+            A manager has assigned you as second assessor. The form for writing one arrives in a
+            later release; until then these open as the report.
+          </p>
+          {secondAssessment.length === 0 ? (
+            <p class="hint">Nothing has been assigned to you for a second assessment.</p>
+          ) : (
+            <SecondAssessmentRows reports={secondAssessment} />
+          )}
+        </div>
       </div>
     </StaffShell>
   );

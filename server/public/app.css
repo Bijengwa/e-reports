@@ -1935,7 +1935,8 @@ ul.f4-card-c li { margin-bottom: 3px; }
 .mya-tabs a.on,
 .mya-wrap:has(#not-started:target) .mya-tabs a[href="#not-started"],
 .mya-wrap:has(#in-progress:target) .mya-tabs a[href="#in-progress"],
-.mya-wrap:has(#submitted:target) .mya-tabs a[href="#submitted"] {
+.mya-wrap:has(#submitted:target) .mya-tabs a[href="#submitted"],
+.mya-wrap:has(#second-assessment:target) .mya-tabs a[href="#second-assessment"] {
   color: var(--green-d); font-weight: 600; border-bottom-color: var(--green);
 }
 /* Once the reader picks In progress or Submitted, the server-rendered default tab
@@ -1943,11 +1944,13 @@ ul.f4-card-c li { margin-bottom: 3px; }
    leave `a.on` painted — un-marking it whenever *any* group is `:target` is the
    same specificity trap as hiding `.mya-default` below. */
 .mya-wrap:has(#in-progress:target) .mya-tabs a.on,
-.mya-wrap:has(#submitted:target) .mya-tabs a.on {
+.mya-wrap:has(#submitted:target) .mya-tabs a.on,
+.mya-wrap:has(#second-assessment:target) .mya-tabs a.on {
   color: var(--ink-3); font-weight: 500; border-bottom-color: transparent;
 }
 .mya-wrap:has(#in-progress:target) .mya-tabs a.on:hover,
-.mya-wrap:has(#submitted:target) .mya-tabs a.on:hover { color: var(--ink); }
+.mya-wrap:has(#submitted:target) .mya-tabs a.on:hover,
+.mya-wrap:has(#second-assessment:target) .mya-tabs a.on:hover { color: var(--ink); }
 
 /* ---------- my assessments ---------- */
 .mya { display: none; scroll-margin-top: 72px; }

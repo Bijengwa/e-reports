@@ -127,6 +127,9 @@ export async function loadReport(
   report: ReportDetail;
   assessor1UserId: string | null;
   assessor2UserId: string | null;
+  /** Who holds each half of the review, for the page that says so. Null when nobody does yet. */
+  assessor1Name: string | null;
+  assessor2Name: string | null;
   assessment1: Assessment1Read | null;
 } | null> {
   // Left joins throughout: `entered_by_user_id` is null for everything the public door filed,
@@ -139,12 +142,14 @@ export async function loadReport(
            r.assessor2_user_id,
            u.full_name AS filled_by,
            a1.full_name AS assessor1_name,
+           a2.full_name AS assessor2_name,
            asm.payload AS assessment1_payload,
            asm.conclusion AS assessment1_conclusion,
            asm.submitted_at AS assessment1_submitted_at
       FROM reports r
       LEFT JOIN users u ON u.id = r.entered_by_user_id
       LEFT JOIN users a1 ON a1.id = r.assessor1_user_id
+      LEFT JOIN users a2 ON a2.id = r.assessor2_user_id
       LEFT JOIN assessments asm ON asm.report_id = r.id AND asm.ordinal = 1
      WHERE r.id = ${id}
   `);
@@ -159,6 +164,7 @@ export async function loadReport(
     assessor1_user_id: string | null;
     assessor2_user_id: string | null;
     assessor1_name: string | null;
+    assessor2_name: string | null;
     assessment1_payload: unknown;
     assessment1_conclusion: string | null;
     assessment1_submitted_at: Date | null;
@@ -184,6 +190,8 @@ export async function loadReport(
     },
     assessor1UserId: row.assessor1_user_id,
     assessor2UserId: row.assessor2_user_id,
+    assessor1Name: row.assessor1_name,
+    assessor2Name: row.assessor2_name,
     assessment1,
   };
 }
@@ -240,6 +248,8 @@ export async function reportsRoutes(app: FastifyInstance): Promise<void> {
         // route behind it makes the same test for itself — this decides whether a link appears,
         // never whether the page may be opened.
         canAssess={session.role === "assessor" && found.assessor1UserId === session.userId}
+        assessor1Name={found.assessor1Name}
+        assessor2Name={found.assessor2Name}
         assessment1Review={assessment1Review}
         secondAssessorPicker={secondAssessorPicker}
       />,

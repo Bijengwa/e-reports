@@ -401,6 +401,9 @@ export type ReportPageProps = {
    * behind that link would refuse them and a link that answers 403 is worse than no link.
    */
   canAssess: boolean;
+  /** Who holds each half of the review. Null until intake, or a manager, has named them. */
+  assessor1Name?: string | null;
+  assessor2Name?: string | null;
   /**
    * The first assessment, read-only, for a manager reviewing what the first Officer submitted.
    *
@@ -424,6 +427,8 @@ export function ReportPage({
   viewerRole,
   viewerName,
   canAssess,
+  assessor1Name,
+  assessor2Name,
   assessment1Review,
   secondAssessorPicker,
 }: ReportPageProps): JSX.Element {
@@ -454,6 +459,20 @@ export function ReportPage({
       </div>
 
       <ReportDocument report={report} />
+
+      {/* Who the report is with, named rather than left to be inferred from the status. A manager
+          who has just assigned a second assessor is told here that it took, and everyone else can
+          see who holds the report without opening the register. */}
+      <div class="card card-b">
+        <h2 class="report-heading">Assessors</h2>
+        <dl>
+          <dt>First assessor</dt>
+          <dd safe>{assessor1Name ?? "Not assigned"}</dd>
+
+          <dt>Second assessor</dt>
+          <dd safe>{assessor2Name ?? "Not assigned"}</dd>
+        </dl>
+      </div>
 
       {assessment1Review && (
         <div class="card card-b">

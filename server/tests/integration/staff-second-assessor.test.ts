@@ -344,6 +344,81 @@ describe.skipIf(!INTEGRATION_ENABLED)("the manager's pipeline", () => {
   });
 });
 
+describe.skipIf(!INTEGRATION_ENABLED)("what the assignment hands over", () => {
+  beforeEach(start);
+
+  it("puts the report on the second assessor's own work list, and nobody else's", async () => {
+    const { manager, officer, other, report } = await waiting();
+
+    // Before: it is the first assessor's submitted work, and nothing of the second's.
+    const beforeOther = (await get("/assessments", other.cookie)).body;
+    expect(beforeOther).not.toContain(report.number);
+    expect(beforeOther).toContain("Nothing has been assigned to you for a second assessment.");
+
+    await assign(report, manager.cookie, other.id);
+
+    const afterOther = (await get("/assessments", other.cookie)).body;
+    expect(afterOther).toContain(report.number);
+    expect(afterOther).toContain("Second assessment");
+    expect(afterOther).not.toContain("Nothing has been assigned to you for a second assessment.");
+
+    // The first assessor still has it, still listed as sent on rather than as theirs to review.
+    const afterFirst = (await get("/assessments", officer.cookie)).body;
+    expect(afterFirst).toContain(report.number);
+    expect(afterFirst).toContain("Nothing has been assigned to you for a second assessment.");
+
+    // A colleague who was named neither sees nothing of it.
+    const stranger = await signedInAs("assessor", "Chausiku Njau");
+    expect((await get("/assessments", stranger.cookie)).body).not.toContain(report.number);
+  });
+
+  it("does not offer the second assessor the first assessment's page", async () => {
+    const { manager, other, report } = await waiting();
+
+    await assign(report, manager.cookie, other.id);
+
+    const body = (await get("/assessments", other.cookie)).body;
+
+    // Their row opens the report, not a form that is not theirs to write — and the route agrees.
+    expect(body).toContain(`href="/reports/${report.id}"`);
+    expect(body).not.toContain(`href="/reports/${report.id}/assessment-1"`);
+    expect((await get(`/reports/${report.id}/assessment-1`, other.cookie)).statusCode).toBe(403);
+  });
+
+  it("names both assessors on the report for the manager to read back", async () => {
+    const { manager, officer, other, report } = await waiting();
+
+    const before = (await get(`/reports/${report.id}`, manager.cookie)).body;
+    expect(before).toContain("First assessor");
+    expect(before).toContain(officer.name);
+    // Nobody holds the second half yet, and the page says so rather than leaving it blank.
+    expect(before).toContain("Not assigned");
+
+    await assign(report, manager.cookie, other.id);
+
+    const after = (await get(`/reports/${report.id}`, manager.cookie)).body;
+    expect(after).toContain("Second assessor");
+    expect(after).toContain(other.name);
+    expect(after).not.toContain("Not assigned");
+  });
+
+  it("offers the manager the way in from the bucket that is waiting on them", async () => {
+    const { manager, other, report } = await waiting();
+
+    const waitingBucket = (await get("/workload?status=awaiting_second_assessor", manager.cookie))
+      .body;
+    expect(waitingBucket).toContain("Assign A2");
+    expect(waitingBucket).toContain(`href="/reports/${report.id}"`);
+
+    await assign(report, manager.cookie, other.id);
+
+    // Once named, the row states who rather than offering the way in again.
+    const secondBucket = (await get("/workload?status=second_assessment", manager.cookie)).body;
+    expect(secondBucket).toContain(`A2: ${other.name}`);
+    expect(secondBucket).not.toContain("Assign A2");
+  });
+});
+
 describe.skipIf(!INTEGRATION_ENABLED)("assigning one", () => {
   beforeEach(start);
 

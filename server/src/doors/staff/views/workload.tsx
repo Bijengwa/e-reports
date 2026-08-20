@@ -71,11 +71,21 @@ function Assessors({ row }: { row: WorkloadRow }): JSX.Element {
   return (
     <>
       <span safe>{`A1: ${row.assessor1Name}`}</span>
-      {row.assessor2Name !== null && (
+      {row.assessor2Name !== null ? (
         <>
           <br />
           <span safe>{`A2: ${row.assessor2Name}`}</span>
         </>
+      ) : (
+        // The way into the one thing this bucket is waiting on the manager for. It is a link to
+        // the report, where the picker lives and where the rules about who may be named are
+        // enforced — not a control that assigns from here, which would have to repeat them.
+        row.status === "awaiting_second_assessor" && (
+          <>
+            <br />
+            <a href={`/reports/${row.id}`}>Assign A2</a>
+          </>
+        )
       )}
     </>
   );
