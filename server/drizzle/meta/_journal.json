@@ -64,6 +64,13 @@
       "when": 1787495359000,
       "tag": "0008_assessment_write_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787581759000,
+      "tag": "0009_assign_second_assessor",
+      "breakpoints": true
     }
   ]
 }

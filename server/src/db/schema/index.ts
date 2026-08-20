@@ -123,6 +123,14 @@ export const reports = pgTable(
     /** When the choice was made. Null exactly when `assessor1_user_id` is. */
     assessor1AssignedAt: timestamp("assessor1_assigned_at", { withTimezone: true }),
 
+    /**
+     * The Officer named as second assessor. Null until the first assessment is submitted and the
+     * report reaches `awaiting_second_assessor` — nothing chooses this column at intake.
+     */
+    assessor2UserId: uuid("assessor2_user_id").references(() => users.id),
+    /** When the choice was made. Null exactly when `assessor2_user_id` is. */
+    assessor2AssignedAt: timestamp("assessor2_assigned_at", { withTimezone: true }),
+
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -134,6 +142,7 @@ export const reports = pgTable(
     // open reports are this Officer's. Both columns in this order, because the count filters on
     // the Officer first and the two open statuses second.
     index("reports_assessor1_status_idx").on(t.assessor1UserId, t.status),
+    index("reports_assessor2_status_idx").on(t.assessor2UserId, t.status),
   ],
 );
 
