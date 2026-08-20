@@ -1,55 +1,6 @@
 import { type ActivityEntry, ActivityTable } from "./activity.js";
-import { day, type ReceivedRow, ReceivedRows, SEVERITY_LABELS, severityTone } from "./reports.js";
+import { type ReceivedRow, ReceivedRows } from "./reports.js";
 import { StaffShell } from "./shell.js";
-
-/** A row of the manager's queue: what it is, when it landed. No `mine` — nothing is assigned. */
-export type AwaitingSecondRow = {
-  id: string;
-  number: string;
-  receivedAt: Date;
-  deviceName: string;
-  severity: string;
-};
-
-/**
- * The manager's queue, read-only.
- *
- * Every row opens the report itself rather than an assessment — a manager does not have one to
- * open, first or second, and a link to `/reports/:id/assessment-1` here would be a route this
- * role is refused the moment it followed it.
- */
-export function AwaitingSecondRows({ reports }: { reports: AwaitingSecondRow[] }): JSX.Element {
-  return (
-    <table class="utable">
-      <thead>
-        <tr>
-          <th>Number</th>
-          <th>Received</th>
-          <th>Device</th>
-          <th>Severity</th>
-        </tr>
-      </thead>
-      <tbody>
-        {reports.map((report) => (
-          <tr>
-            <td>
-              <a href={`/reports/${report.id}`} safe>
-                {report.number}
-              </a>
-            </td>
-            <td>{day(report.receivedAt)}</td>
-            <td safe>{report.deviceName}</td>
-            <td>
-              <span class={`tag ${severityTone(report.severity) === "caution" ? "warn" : ""}`}>
-                {SEVERITY_LABELS[report.severity] ?? report.severity}
-              </span>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
 
 export type DashboardPageProps = {
   fullName: string;
@@ -66,14 +17,6 @@ export type DashboardPageProps = {
    * every other role, whose dashboard does not run the query behind it.
    */
   received?: { count: number; rows: ReceivedRow[] } | undefined;
-  /**
-   * Managers only: reports with a submitted first assessment and no second assessor yet.
-   *
-   * Newest first — the manager wants what just landed, unlike the Officer's queue above which
-   * sorts oldest first for the tie-break the assignment rule reads. Undefined for every other
-   * role, whose dashboard does not run the query behind it.
-   */
-  awaitingSecondAssessor?: { count: number; rows: AwaitingSecondRow[] } | undefined;
   /** Administrators only. Empty for anyone else, whose dashboard carries no trail. */
   recent: ActivityEntry[];
 };
@@ -83,8 +26,10 @@ export type DashboardPageProps = {
  *
  * An administrator gets the two figures they are accountable for and the last few things that
  * happened. An Officer gets what is waiting — the size of the received queue and the newest of it,
- * which is the nearest thing to "your work" that is true before anything assigns it. A manager
- * gets the size of the queue waiting for a second assessor, on the same argument.
+ * which is the nearest thing to "your work" that is true before anything assigns it.
+ *
+ * No manager branch: a manager is redirected to `/workload`, which is about the whole pipeline
+ * rather than the one bucket of it this page used to show them.
  */
 export function DashboardPage({
   fullName,
@@ -92,7 +37,6 @@ export function DashboardPage({
   reportCount,
   activeStaff,
   received,
-  awaitingSecondAssessor,
   recent,
 }: DashboardPageProps): JSX.Element {
   return (
@@ -126,13 +70,6 @@ export function DashboardPage({
           </div>
         )}
 
-        {awaitingSecondAssessor !== undefined && (
-          <div class="stat">
-            <span class="eyebrow">Awaiting second assessor</span>
-            <b>{awaitingSecondAssessor.count}</b>
-            <span class="hint">first assessment submitted</span>
-          </div>
-        )}
       </div>
 
       <p class="dash-note">
@@ -148,12 +85,6 @@ export function DashboardPage({
         </p>
       )}
 
-      {awaitingSecondAssessor !== undefined && (
-        <p class="hint dash-note">
-          These reports have a submitted first assessment and are waiting for a second assessor.
-        </p>
-      )}
-
       {received !== undefined && (
         <div class="dash-queue">
           <h2>Received reports</h2>
@@ -164,20 +95,6 @@ export function DashboardPage({
             <p class="hint">Nothing is waiting to be assessed.</p>
           ) : (
             <ReceivedRows reports={received.rows} />
-          )}
-        </div>
-      )}
-
-      {awaitingSecondAssessor !== undefined && (
-        <div class="dash-queue">
-          <h2>Awaiting second assessor</h2>
-
-          {/* Same honesty as the Officer's queue above: an empty body under a header would read as
-              a list that failed to load rather than a queue that is genuinely clear. */}
-          {awaitingSecondAssessor.count === 0 ? (
-            <p class="hint">Nothing is waiting for a second assessor.</p>
-          ) : (
-            <AwaitingSecondRows reports={awaitingSecondAssessor.rows} />
           )}
         </div>
       )}

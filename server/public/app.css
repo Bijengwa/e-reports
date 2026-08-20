@@ -1407,6 +1407,44 @@ textarea[aria-invalid="true"] {
   margin: 4px 0 1px;
 }
 
+/* ---------- the workload pipeline ---------- */
+/*
+ * The six buckets are links, not buttons: each is a GET of this page filtered to one status, so a
+ * card has to read as a card and behave as a link — no underline, the page's own ink, and a
+ * pressed state the chosen one keeps while its rows are on screen.
+ */
+.stats-pick {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.stat-pick {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.stat-pick:hover {
+  border-color: var(--green);
+}
+
+.stat-pick.on {
+  border-color: var(--green);
+  background: var(--leaf-bg);
+}
+
+.stat-pick .eyebrow {
+  display: block;
+  line-height: 1.35;
+}
+
+.stat-icon {
+  display: block;
+  font-size: 17px;
+  line-height: 1;
+  margin-bottom: 7px;
+}
+
 .dash-note {
   margin-bottom: 18px;
 }

@@ -254,10 +254,17 @@ function assignment(row: Row) {
   };
 }
 
-describe.skipIf(!INTEGRATION_ENABLED)("the manager's queue", () => {
+/** A bucket's figure on the workload page, asserted as markup so a bare label cannot satisfy it. */
+function bucketStat(label: string, count: number): string {
+  return `<span class="eyebrow">${label}</span><b>${count}</b>`;
+}
+
+const ASSIGN_A2 = "Waiting on you — assign A2";
+
+describe.skipIf(!INTEGRATION_ENABLED)("the manager's pipeline", () => {
   beforeEach(start);
 
-  it("lists only what is waiting for a second assessor, newest first", async () => {
+  it("counts every bucket and lists them all, newest first", async () => {
     const manager = await signedInAs("manager", "Mgr");
 
     await seedReport({
@@ -274,40 +281,65 @@ describe.skipIf(!INTEGRATION_ENABLED)("the manager's queue", () => {
     await seedReport({ number: "MD-AE/2026/8004", status: "first_assessment" });
     await seedReport({ number: "MD-AE/2026/8005", status: "second_assessment" });
 
-    const body = (await get("/dashboard", manager.cookie)).body;
+    const body = (await get("/workload", manager.cookie)).body;
 
-    expect(body).toContain("MD-AE/2026/8001");
-    expect(body).toContain("MD-AE/2026/8002");
-    // The queue is one status and no other. A report still being worked on, and one already handed
-    // over, are both somebody else's business.
-    expect(body).not.toContain("MD-AE/2026/8003");
-    expect(body).not.toContain("MD-AE/2026/8004");
-    expect(body).not.toContain("MD-AE/2026/8005");
+    // Unfiltered, so every bucket's reports are listed and every bucket's figure is its own.
+    for (const number of ["8001", "8002", "8003", "8004", "8005"]) {
+      expect(body, number).toContain(`MD-AE/2026/${number}`);
+    }
+    expect(body).toContain(bucketStat(ASSIGN_A2, 2));
+    expect(body).toContain(bucketStat("Not started", 1));
+    expect(body).toContain(bucketStat("Closed", 0));
 
-    expect(body).toContain('<span class="eyebrow">Awaiting second assessor</span><b>2</b>');
     // Newest first: the later arrival is printed above the earlier one.
     expect(body.indexOf("MD-AE/2026/8002")).toBeLessThan(body.indexOf("MD-AE/2026/8001"));
   });
 
-  it("says so plainly when nothing is waiting", async () => {
+  it("narrows to one bucket when a card is followed", async () => {
+    const manager = await signedInAs("manager", "Mgr");
+
+    await seedReport({ number: "MD-AE/2026/8011", status: "awaiting_second_assessor" });
+    await seedReport({ number: "MD-AE/2026/8012", status: "received" });
+
+    const body = (await get("/workload?status=awaiting_second_assessor", manager.cookie)).body;
+
+    expect(body).toContain("MD-AE/2026/8011");
+    expect(body).not.toContain("MD-AE/2026/8012");
+    // The figures still count the whole register, so the bucket filtered out keeps its own.
+    expect(body).toContain(bucketStat("Not started", 1));
+    // The chosen card is marked, and offers the way back out.
+    expect(body).toContain('aria-current="true"');
+    expect(body).toContain('href="/workload"');
+  });
+
+  it("says so plainly when a bucket is empty", async () => {
     const manager = await signedInAs("manager", "Mgr");
     await seedReport({ number: "MD-AE/2026/8010", status: "received" });
 
-    const body = (await get("/dashboard", manager.cookie)).body;
+    const body = (await get("/workload?status=awaiting_second_assessor", manager.cookie)).body;
 
-    expect(body).toContain('<span class="eyebrow">Awaiting second assessor</span><b>0</b>');
-    expect(body).toContain("Nothing is waiting for a second assessor.");
+    expect(body).toContain(bucketStat(ASSIGN_A2, 0));
+    expect(body).toContain("No reports are in this stage right now.");
+    // No header over an empty body: that reads as a list that failed to load.
+    expect(body).not.toContain("<table");
   });
 
-  it("does not put this queue on an Officer's dashboard", async () => {
+  it("keeps the pipeline to the manager, and this queue off an Officer's dashboard", async () => {
     const officer = await signedInAs("assessor", "Asha Mrema");
+    const admin = await signedInAs("administrator", "Adm");
     await seedReport({ number: "MD-AE/2026/8020", status: "awaiting_second_assessor" });
 
-    const body = (await get("/dashboard", officer.cookie)).body;
+    // Refused by the scope the route is registered in, exactly as the assign POST is.
+    for (const [who, staff] of [
+      ["an Officer", officer],
+      ["an administrator", admin],
+    ] as const) {
+      expect((await get("/workload", staff.cookie)).statusCode, who).toBe(403);
+    }
 
-    expect(body).not.toContain("Awaiting second assessor");
+    const body = (await get("/dashboard", officer.cookie)).body;
     expect(body).not.toContain("MD-AE/2026/8020");
-    // Their own queue is untouched by this slice.
+    // Their own queue is untouched by the pipeline moving off the dashboard.
     expect(body).toContain('<span class="eyebrow">Received</span>');
   });
 });
@@ -357,16 +389,23 @@ describe.skipIf(!INTEGRATION_ENABLED)("assigning one", () => {
     expect(entry.after.assessor2UserId).toBe(other.id);
   });
 
-  it("takes the report off the queue and the picker off the page", async () => {
+  it("moves the report to the next bucket and takes the picker off the page", async () => {
     const { manager, other, report } = await waiting();
 
-    expect((await get("/dashboard", manager.cookie)).body).toContain(report.number);
+    const before = await get("/workload?status=awaiting_second_assessor", manager.cookie);
+    expect(before.body).toContain(report.number);
 
     await assign(report, manager.cookie, other.id);
 
-    const dashboard = (await get("/dashboard", manager.cookie)).body;
-    expect(dashboard).not.toContain(report.number);
-    expect(dashboard).toContain('<span class="eyebrow">Awaiting second assessor</span><b>0</b>');
+    // Out of the bucket it was in, and counted in the one it moved to.
+    const waitingBucket = (await get("/workload?status=awaiting_second_assessor", manager.cookie))
+      .body;
+    expect(waitingBucket).not.toContain(report.number);
+    expect(waitingBucket).toContain(bucketStat(ASSIGN_A2, 0));
+
+    const secondBucket = (await get("/workload?status=second_assessment", manager.cookie)).body;
+    expect(secondBucket).toContain(report.number);
+    expect(secondBucket).toContain(bucketStat("In progress — second assessment", 1));
 
     // The report is no longer waiting, so there is nothing left to pick.
     const detail = (await get(`/reports/${report.id}`, manager.cookie)).body;

@@ -245,7 +245,9 @@ describe.skipIf(!INTEGRATION_ENABLED)("deactivating and reactivating", () => {
     await act(`/users/${target.id}/deactivate`, admin.cookie);
     await act(`/users/${target.id}/reactivate`, admin.cookie);
 
-    expect((await get("/dashboard", await cookieFor(target.email))).statusCode).toBe(200);
+    // `/workload` rather than `/dashboard`: the target is a manager, and a manager's dashboard is
+    // now a redirect to their own page — a 302 would prove nothing about being let back in.
+    expect((await get("/workload", await cookieFor(target.email))).statusCode).toBe(200);
   });
 
   it("records both directions with the administrator as actor", async () => {
@@ -499,7 +501,9 @@ describe.skipIf(!INTEGRATION_ENABLED)("the activity trail", () => {
   it("carries the sign-out confirmation on the page", async () => {
     const { cookie } = await signedInAs("manager");
 
-    const body = (await get("/dashboard", cookie)).body;
+    // The manager's own landing page, since their dashboard is now a redirect to it. The dialog
+    // is the shell's, so any page carrying the rail would do; this is the one they actually see.
+    const body = (await get("/workload", cookie)).body;
 
     // Rendered closed — <dialog> hides itself — so nothing flashes before the script runs.
     expect(body).toContain("data-signout-dialog");

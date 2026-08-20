@@ -300,9 +300,14 @@ describe.skipIf(!INTEGRATION_ENABLED)("who is offered the form", () => {
 
     expect((await get("/dashboard", officer.cookie)).body).toContain('href="/reports/new"');
 
-    for (const role of ["manager", "administrator"] as const) {
+    // Each role asked on the page it actually lands on: a manager's dashboard is now a redirect to
+    // their own workload page, so asking them for the rail here would hand back an empty body.
+    for (const [role, landing] of [
+      ["manager", "/workload"],
+      ["administrator", "/dashboard"],
+    ] as const) {
       const staff = await signedInAs(role);
-      const body = (await get("/dashboard", staff.cookie)).body;
+      const body = (await get(landing, staff.cookie)).body;
 
       expect(body, role).not.toContain('href="/reports/new"');
       // Still signed in, and still given the rail they are entitled to.

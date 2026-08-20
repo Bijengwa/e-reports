@@ -140,10 +140,6 @@ function receivedStat(count: number): string {
   return `<span class="eyebrow">Received</span><b>${count}</b>`;
 }
 
-/** The manager's own figure, asserted as markup for the same reason `receivedStat` is. */
-function awaitingSecondStat(count: number): string {
-  return `<span class="eyebrow">Awaiting second assessor</span><b>${count}</b>`;
-}
 
 /** Body rows of the one table on a page, the header row discounted. */
 function rowCount(body: string): number {
@@ -252,8 +248,10 @@ describe.skipIf(!INTEGRATION_ENABLED)("the register", () => {
   });
 
   it("offers Reports in the rail to every role", async () => {
+    // Asked of the register itself rather than the dashboard: every role can open this one, and a
+    // manager's dashboard is now a redirect to their own page.
     for (const role of EVERY_ROLE) {
-      const body = (await get("/dashboard", await signedInAs(role))).body;
+      const body = (await get("/reports", await signedInAs(role))).body;
 
       expect(body, role).toContain('href="/reports"');
     }
@@ -276,30 +274,14 @@ describe.skipIf(!INTEGRATION_ENABLED)("the dashboard", () => {
     expect(officer).not.toContain("active accounts");
   });
 
-  it("gives a manager the queue waiting for a second assessor", async () => {
-    await seedReport({ number: "MD-AE/2026/0042", status: "awaiting_second_assessor" });
-    // A report nobody has finished a first assessment on is not this queue's business.
-    await seedReport({ number: "MD-AE/2026/0043", status: "received" });
+  it("sends a manager to their own page rather than showing them this one", async () => {
+    const res = await get("/dashboard", await signedInAs("manager"));
 
-    const body = (await get("/dashboard", await signedInAs("manager"))).body;
-
-    expect(body).toContain(awaitingSecondStat(1));
-    expect(body).toContain("Awaiting second assessor");
-    expect(body).toContain("MD-AE/2026/0042");
-    expect(body).not.toContain("MD-AE/2026/0043");
-    // The sentence this replaced. A manager now has a queue, so promising one later would be both
-    // stale and untrue — the same argument the Officer's case below already makes.
-    expect(body).not.toContain("Your own work arrives in a later slice");
-    expect(body).not.toContain("Recent activity");
-  });
-
-  it("says so plainly when nothing waits on a manager", async () => {
-    const body = (await get("/dashboard", await signedInAs("manager"))).body;
-
-    expect(body).toContain(awaitingSecondStat(0));
-    expect(body).toContain("Nothing is waiting for a second assessor.");
-    // No header over an empty body, on the same argument as the Officer's empty queue.
-    expect(body).not.toContain("<table");
+    // Sign-in and the forced password change both land every role here, so the redirect is what
+    // keeps a manager off a page their own rail no longer links to. What `/workload` then shows
+    // them is `staff-second-assessor`'s to pin, not this suite's.
+    expect(res.statusCode).toBe(302);
+    expect(res.headers.location).toBe("/workload");
   });
 
   it("tells an officer what is waiting instead of what is coming later", async () => {
@@ -375,14 +357,15 @@ describe.skipIf(!INTEGRATION_ENABLED)("the dashboard", () => {
   it("gives the queue to nobody but an officer", async () => {
     await seedReport();
 
-    const manager = (await get("/dashboard", await signedInAs("manager"))).body;
+    // A manager never reaches this page at all, so the queue cannot be on it for them. Asserted as
+    // the redirect rather than as an absent string, which an empty body would satisfy by accident.
+    expect((await get("/dashboard", await signedInAs("manager"))).statusCode).toBe(302);
+
     const admin = (await get("/dashboard", await signedInAs("administrator"))).body;
 
-    for (const body of [manager, admin]) {
-      expect(body).not.toContain("Received reports");
-      expect(body).not.toContain('<span class="eyebrow">Received</span>');
-      expect(body).not.toContain("Nothing is waiting to be assessed.");
-    }
+    expect(admin).not.toContain("Received reports");
+    expect(admin).not.toContain('<span class="eyebrow">Received</span>');
+    expect(admin).not.toContain("Nothing is waiting to be assessed.");
   });
 
   it("shows an administrator the last few things that happened", async () => {

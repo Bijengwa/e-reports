@@ -30,7 +30,14 @@ export type StaffShellProps = {
    */
   fullName?: string | undefined;
   /** Which entry is the page being shown, so the rail can mark it. */
-  active?: "dashboard" | "assessments" | "reports" | "new-report" | "users" | "activity";
+  active?:
+    | "dashboard"
+    | "workload"
+    | "assessments"
+    | "reports"
+    | "new-report"
+    | "users"
+    | "activity";
   /**
    * Load the F004 find-in-page enhancement.
    *
@@ -181,6 +188,7 @@ export function StaffShell({
   const isAdministrator = role === "administrator";
   // The enum, not the caption. The rail is drawn from what the column stores.
   const isOfficer = role === "assessor";
+  const isManager = role === "manager";
 
   return (
     <Layout title={title} locale="en" bodyClass="staff" railScript f4Find={f4Find}>
@@ -193,14 +201,29 @@ export function StaffShell({
           </div>
 
           <nav class="rail-nav" aria-label="Staff navigation">
-            <a
-              href="/dashboard"
-              class={active === "dashboard" ? "on" : ""}
-              aria-current={active === "dashboard" ? "page" : undefined}
-            >
-              <IconDashboard />
-              <span class="rail-label">Dashboard</span>
-            </a>
+            {/* A manager's landing page is the pipeline, not the dashboard: the dashboard told
+                them the size of the register and one of their six buckets, and the workload page
+                tells them all six. The other roles keep the dashboard, which is still about
+                their own work. Presentation only — `requireRole` decides what opens. */}
+            {isManager ? (
+              <a
+                href="/workload"
+                class={active === "workload" ? "on" : ""}
+                aria-current={active === "workload" ? "page" : undefined}
+              >
+                <IconDashboard />
+                <span class="rail-label">Workload</span>
+              </a>
+            ) : (
+              <a
+                href="/dashboard"
+                class={active === "dashboard" ? "on" : ""}
+                aria-current={active === "dashboard" ? "page" : undefined}
+              >
+                <IconDashboard />
+                <span class="rail-label">Dashboard</span>
+              </a>
+            )}
 
             {/* Everyone's, because everyone may read the register. What differs by role is what
                 a person may do with a report, and this slice gives nobody anything to do. */}

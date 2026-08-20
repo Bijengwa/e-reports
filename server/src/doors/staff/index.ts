@@ -12,6 +12,7 @@ import { logoutRoutes } from "./routes/logout.js";
 import { newReportRoutes } from "./routes/new-report.js";
 import { reportsRoutes } from "./routes/reports.js";
 import { usersRoutes } from "./routes/users.js";
+import { workloadRoutes } from "./routes/workload.js";
 import { requirePasswordChanged, requireRole, requireSession } from "./session-guard.js";
 
 export type StaffDoorOptions = {
@@ -103,6 +104,10 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
         // second assessor is the manager's alone, and an administrator's business here is
         // unchanged by this slice, exactly as `reportsRoutes`'s own comment already argues.
         requireRole(management, ["manager"]);
+
+        // Where a manager lands and works: the whole pipeline, six buckets deep. It replaces the
+        // dashboard for this role, which showed them one of those six and nothing about the rest.
+        await management.register(workloadRoutes);
 
         await management.register(assignSecondAssessorRoutes);
       });

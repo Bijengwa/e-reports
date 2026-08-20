@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { currentSession } from "../session-guard.js";
-import { type AwaitingSecondRow, DashboardPage } from "../views/dashboard.js";
+import { DashboardPage } from "../views/dashboard.js";
 import type { ReceivedRow } from "../views/reports.js";
 import { loadActivity } from "./activity.js";
 
@@ -34,29 +34,16 @@ function toReceivedRow(row: unknown, viewerId: string): ReceivedRow {
   };
 }
 
-/** The manager's queue holds no per-report ownership, so it carries none of `mine`'s reasoning. */
-function toAwaitingSecondRow(row: unknown): AwaitingSecondRow {
-  const report = row as {
-    id: string;
-    number: string;
-    received_at: Date;
-    device_name: string;
-    severity: string;
-  };
-
-  return {
-    id: report.id,
-    number: report.number,
-    receivedAt: report.received_at,
-    deviceName: report.device_name,
-    severity: report.severity,
-  };
-}
-
 /** Registered in the innermost scope, so both guards have already run by the time this answers. */
 export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
   app.get("/dashboard", async (request, reply) => {
     const session = currentSession(request);
+
+    // A manager's landing page is `/workload` now, and this one has nothing left to tell them.
+    // Redirected rather than left to render: sign-in and the forced password change both send
+    // every role here, so without this a manager would land on a page their own rail no longer
+    // links to. `/workload` is registered in the manager scope, so this cannot send anyone else.
+    if (session.role === "manager") return reply.redirect("/workload", 302);
     const isAdministrator = session.role === "administrator";
     // The enum, not the caption. `assessor` is what the column stores; "Officer" is what the page
     // calls it, and a branch written against the caption would break the day the caption changes.
@@ -110,30 +97,6 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         }
       : undefined;
 
-    const isManager = session.role === "manager";
-
-    // The manager's queue: everything with a submitted first assessment and nobody yet named for
-    // the second. Newest first, on the same argument as the Officer's queue above — a manager
-    // reviewing this figure wants what just landed, not what has waited longest.
-    const awaitingSecond = isManager
-      ? await app.db.execute(sql`
-          SELECT id, number, received_at, device_name, severity,
-                 (count(*) OVER ())::int AS waiting
-            FROM reports
-           WHERE status = 'awaiting_second_assessor'
-           ORDER BY received_at DESC, number DESC
-           LIMIT ${RECEIVED_PREVIEW}
-        `)
-      : [];
-
-    const awaitingSecondAssessor = isManager
-      ? {
-          count:
-            awaitingSecond.length === 0 ? 0 : (awaitingSecond[0] as { waiting: number }).waiting,
-          rows: awaitingSecond.map(toAwaitingSecondRow),
-        }
-      : undefined;
-
     return reply.html(
       <DashboardPage
         fullName={session.fullName}
@@ -141,7 +104,6 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         reportCount={reportCount}
         activeStaff={activeStaff}
         received={received}
-        awaitingSecondAssessor={awaitingSecondAssessor}
         recent={recent}
       />,
     );
