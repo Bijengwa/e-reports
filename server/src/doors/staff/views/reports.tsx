@@ -466,6 +466,9 @@ export function ReportPage({
             assessorName={assessment1Review.assessorName}
             assessedOn={assessment1Review.submittedOn}
             submitted
+            // Not this reader's document to write, whatever its state: the manager reads the
+            // finished F004 here and never posts one, so the page carries no form for it.
+            readOnly
             issues={[]}
           />
         </div>

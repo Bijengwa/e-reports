@@ -1,3 +1,4 @@
+import type { Children } from "@kitajs/html";
 import {
   ACTIONS,
   CAUSALITY_DISCUSSION_NOTE,
@@ -57,8 +58,43 @@ export type F004FormProps = {
   assessedOn: string;
   /** Once submitted the document is closed: everything disabled, and the buttons gone. */
   submitted: boolean;
+  /**
+   * Rendered as a record to be read, never as a form to be filled in.
+   *
+   * A submitted assessment is already this, so `submitted` implies it. The flag exists for the
+   * reader who is not its author and never could be — the manager reviewing a finished F004 on
+   * `/reports/:id` — where "closed because it is finished" and "closed because it is not yours"
+   * are different reasons for the same rendering.
+   */
+  readOnly?: boolean;
   issues: readonly Issue[];
 };
+
+/**
+ * The document's outer element: a real form only when there is something to post.
+ *
+ * A disabled fieldset already submits nothing, but a `<form>` that can never be used is still a
+ * POST target advertised on the page, and on the manager's report it advertised a route that
+ * answers 403. Read-only means no form element at all, so what the page offers and what the
+ * reader may do are the same list.
+ */
+function Sheet({
+  locked,
+  reportId,
+  children,
+}: {
+  locked: boolean;
+  reportId: string;
+  children?: Children;
+}): JSX.Element {
+  if (locked) return <div class="f4">{children}</div>;
+
+  return (
+    <form method="POST" action={`/reports/${reportId}/assessment-1`} class="f4">
+      {children}
+    </form>
+  );
+}
 
 function Bar({ no, title }: { no: string; title: string }): JSX.Element {
   return (
@@ -223,10 +259,14 @@ export function F004Form({
   assessorName,
   assessedOn,
   submitted,
+  readOnly,
   issues,
 }: F004FormProps): JSX.Element {
   const causality = value(answers, "causality");
   const risk = value(answers, "risk_level");
+  // Submitted is one way to be closed and not being its author is the other, and the document is
+  // rendered the same for both.
+  const locked = submitted || readOnly === true;
 
   return (
     <>
@@ -322,11 +362,11 @@ export function F004Form({
         </div>
       </div>
 
-      <form method="POST" action={`/reports/${reportId}/assessment-1`} class="f4">
+      <Sheet locked={locked} reportId={reportId}>
         {/* One disabled fieldset rather than a second, read-only rendering of the whole document.
             A disabled control is not submitted, so a closed assessment cannot be edited by
             replaying the form — and there is one copy of this markup to keep correct, not two. */}
-        <fieldset disabled={submitted}>
+        <fieldset disabled={locked}>
           {issues.length > 0 && (
             <div class="alert alert-error" role="alert">
               <strong>This assessment cannot be submitted yet.</strong>
@@ -679,17 +719,20 @@ export function F004Form({
             assessor.
           </p>
         ) : (
-          <div class="bar f4-buttons">
-            <button type="submit" name="intent" value="save" class="btn ghost">
-              Save draft
-            </button>
-            <div class="sp"></div>
-            <button type="submit" name="intent" value="submit" class="btn">
-              Submit assessment
-            </button>
-          </div>
+          // Only ever reached on the live path, where `Sheet` is a real form for these to submit.
+          !locked && (
+            <div class="bar f4-buttons">
+              <button type="submit" name="intent" value="save" class="btn ghost">
+                Save draft
+              </button>
+              <div class="sp"></div>
+              <button type="submit" name="intent" value="submit" class="btn">
+                Submit assessment
+              </button>
+            </div>
+          )
         )}
-      </form>
+      </Sheet>
     </>
   );
 }

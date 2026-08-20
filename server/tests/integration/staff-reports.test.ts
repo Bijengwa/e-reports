@@ -140,6 +140,11 @@ function receivedStat(count: number): string {
   return `<span class="eyebrow">Received</span><b>${count}</b>`;
 }
 
+/** The manager's own figure, asserted as markup for the same reason `receivedStat` is. */
+function awaitingSecondStat(count: number): string {
+  return `<span class="eyebrow">Awaiting second assessor</span><b>${count}</b>`;
+}
+
 /** Body rows of the one table on a page, the header row discounted. */
 function rowCount(body: string): number {
   return (body.match(/<tr[ >]/g) ?? []).length - 1;
@@ -271,12 +276,30 @@ describe.skipIf(!INTEGRATION_ENABLED)("the dashboard", () => {
     expect(officer).not.toContain("active accounts");
   });
 
-  it("tells a manager the truth about their own work", async () => {
+  it("gives a manager the queue waiting for a second assessor", async () => {
+    await seedReport({ number: "MD-AE/2026/0042", status: "awaiting_second_assessor" });
+    // A report nobody has finished a first assessment on is not this queue's business.
+    await seedReport({ number: "MD-AE/2026/0043", status: "received" });
+
     const body = (await get("/dashboard", await signedInAs("manager"))).body;
 
-    // Still the whole truth for a manager: nothing assigns work, and nothing here pretends to.
-    expect(body).toContain("Your own work arrives in a later slice");
+    expect(body).toContain(awaitingSecondStat(1));
+    expect(body).toContain("Awaiting second assessor");
+    expect(body).toContain("MD-AE/2026/0042");
+    expect(body).not.toContain("MD-AE/2026/0043");
+    // The sentence this replaced. A manager now has a queue, so promising one later would be both
+    // stale and untrue — the same argument the Officer's case below already makes.
+    expect(body).not.toContain("Your own work arrives in a later slice");
     expect(body).not.toContain("Recent activity");
+  });
+
+  it("says so plainly when nothing waits on a manager", async () => {
+    const body = (await get("/dashboard", await signedInAs("manager"))).body;
+
+    expect(body).toContain(awaitingSecondStat(0));
+    expect(body).toContain("Nothing is waiting for a second assessor.");
+    // No header over an empty body, on the same argument as the Officer's empty queue.
+    expect(body).not.toContain("<table");
   });
 
   it("tells an officer what is waiting instead of what is coming later", async () => {
