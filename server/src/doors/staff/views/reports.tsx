@@ -477,19 +477,18 @@ export function ReportPage({
           {secondAssessorPicker.length === 0 ? (
             <p class="hint">No active Officers are available to assign.</p>
           ) : (
-            <div class="bar">
-              <select aria-label="Second assessor">
+            <form method="POST" action={`/reports/${report.id}/assign-assessor-2`} class="bar">
+              <select name="assessor_id" aria-label="Second assessor">
                 {secondAssessorPicker.map((option) => (
                   <option value={option.id} safe>
                     {option.fullName}
                   </option>
                 ))}
               </select>
-              {/* type="button", and outside any form: nothing here can be submitted yet. */}
-              <button type="button" class="btn" disabled>
+              <button type="submit" class="btn">
                 Assign
               </button>
-            </div>
+            </form>
           )}
         </div>
       )}

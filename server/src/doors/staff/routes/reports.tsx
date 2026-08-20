@@ -126,6 +126,7 @@ export async function loadReport(
 ): Promise<{
   report: ReportDetail;
   assessor1UserId: string | null;
+  assessor2UserId: string | null;
   assessment1: Assessment1Read | null;
 } | null> {
   // Left joins throughout: `entered_by_user_id` is null for everything the public door filed,
@@ -135,6 +136,7 @@ export async function loadReport(
   const rows = await app.db.execute(sql`
     SELECT r.id, r.number, r.received_at, r.device_name, r.severity, r.status, r.channel,
            r.facility, r.reporter_name, r.form_version, r.payload, r.assessor1_user_id,
+           r.assessor2_user_id,
            u.full_name AS filled_by,
            a1.full_name AS assessor1_name,
            asm.payload AS assessment1_payload,
@@ -155,6 +157,7 @@ export async function loadReport(
     payload: unknown;
     filled_by: string | null;
     assessor1_user_id: string | null;
+    assessor2_user_id: string | null;
     assessor1_name: string | null;
     assessment1_payload: unknown;
     assessment1_conclusion: string | null;
@@ -180,6 +183,7 @@ export async function loadReport(
       filledBy: row.filled_by,
     },
     assessor1UserId: row.assessor1_user_id,
+    assessor2UserId: row.assessor2_user_id,
     assessment1,
   };
 }

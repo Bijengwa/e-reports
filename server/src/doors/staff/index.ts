@@ -4,6 +4,7 @@ import { constrainToHost } from "../host-scope.js";
 import { activityRoutes } from "./routes/activity.js";
 import { assessmentRoutes } from "./routes/assessment.js";
 import { myAssessmentsRoutes } from "./routes/assessments.js";
+import { assignSecondAssessorRoutes } from "./routes/assign-second-assessor.js";
 import { changePasswordRoutes } from "./routes/change-password.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
 import { loginRoutes } from "./routes/login.js";
@@ -95,6 +96,15 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
         // The first assessment of a report. Registered here because only an Officer may open one
         // at all; which Officer is a question about the row, and the route asks it for itself.
         await registration.register(assessmentRoutes);
+      });
+
+      await active.register(async (management) => {
+        // Narrower again, and beside the administrator's scope rather than inside it: naming a
+        // second assessor is the manager's alone, and an administrator's business here is
+        // unchanged by this slice, exactly as `reportsRoutes`'s own comment already argues.
+        requireRole(management, ["manager"]);
+
+        await management.register(assignSecondAssessorRoutes);
       });
 
       await active.register(async (administration) => {
