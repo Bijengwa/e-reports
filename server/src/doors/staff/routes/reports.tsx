@@ -1,8 +1,16 @@
 import { sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
+import type { F004Answers } from "../../../domain/f004.js";
+import { prefillDeviceRows, prefillEventRows } from "../../../domain/f004.js";
 import { currentSession } from "../session-guard.js";
-import { type ReportDetail, ReportPage, type ReportRow, ReportsPage } from "../views/reports.js";
+import {
+  type AssessorOption,
+  type ReportDetail,
+  ReportPage,
+  type ReportRow,
+  ReportsPage,
+} from "../views/reports.js";
 
 /** Newest first, and only this many, on the same argument as the activity trail. */
 const REPORTS_LIMIT = 200;
@@ -98,18 +106,44 @@ async function renderReports(
  * The assignee comes back beside the report rather than on it: `ReportDetail` is what a page
  * prints, and who a report belongs to decides what a reader may do, not what they see.
  */
+/**
+ * The first assessment, read back for the manager's benefit — never for editing.
+ *
+ * Present only once ordinal 1 is actually submitted. A draft in progress is the first assessor's
+ * unfinished work, not a record for anyone else to read yet, on the same argument `assessment.tsx`
+ * already makes for not writing a half-finished one under their name.
+ */
+export type Assessment1Read = {
+  assessorName: string;
+  answers: F004Answers;
+  conclusion: string | null;
+  submittedOn: string;
+};
+
 export async function loadReport(
   app: FastifyInstance,
   id: string,
-): Promise<{ report: ReportDetail; assessor1UserId: string | null } | null> {
-  // Left join, not inner: `entered_by_user_id` is null for everything the public door filed, and
-  // an inner join would quietly hide every one of those reports.
+): Promise<{
+  report: ReportDetail;
+  assessor1UserId: string | null;
+  assessment1: Assessment1Read | null;
+} | null> {
+  // Left joins throughout: `entered_by_user_id` is null for everything the public door filed,
+  // `assessor1_user_id` is null for an orphan, and the assessment itself does not exist until the
+  // first assessor has saved a draft — an inner join on any of the three would quietly hide rows
+  // that belong on this page.
   const rows = await app.db.execute(sql`
     SELECT r.id, r.number, r.received_at, r.device_name, r.severity, r.status, r.channel,
            r.facility, r.reporter_name, r.form_version, r.payload, r.assessor1_user_id,
-           u.full_name AS filled_by
+           u.full_name AS filled_by,
+           a1.full_name AS assessor1_name,
+           asm.payload AS assessment1_payload,
+           asm.conclusion AS assessment1_conclusion,
+           asm.submitted_at AS assessment1_submitted_at
       FROM reports r
       LEFT JOIN users u ON u.id = r.entered_by_user_id
+      LEFT JOIN users a1 ON a1.id = r.assessor1_user_id
+      LEFT JOIN assessments asm ON asm.report_id = r.id AND asm.ordinal = 1
      WHERE r.id = ${id}
   `);
 
@@ -121,7 +155,21 @@ export async function loadReport(
     payload: unknown;
     filled_by: string | null;
     assessor1_user_id: string | null;
+    assessor1_name: string | null;
+    assessment1_payload: unknown;
+    assessment1_conclusion: string | null;
+    assessment1_submitted_at: Date | null;
   };
+
+  const assessment1: Assessment1Read | null =
+    row.assessment1_submitted_at === null
+      ? null
+      : {
+          assessorName: row.assessor1_name ?? "",
+          answers: (row.assessment1_payload ?? {}) as F004Answers,
+          conclusion: row.assessment1_conclusion,
+          submittedOn: new Date(row.assessment1_submitted_at).toISOString().slice(0, 10),
+        };
 
   return {
     report: {
@@ -132,6 +180,7 @@ export async function loadReport(
       filledBy: row.filled_by,
     },
     assessor1UserId: row.assessor1_user_id,
+    assessment1,
   };
 }
 
@@ -147,6 +196,37 @@ export async function reportsRoutes(app: FastifyInstance): Promise<void> {
     const found = await loadReport(app, target.data);
     if (found === null) return renderReports(app, request, reply, 404, NOT_FOUND);
 
+    // The manager's read of the first assessment, and the picker beside it, are both scoped to
+    // the manager role alone — an assessor already has their own assessment-1 page for this, and
+    // an administrator's business here is unchanged by this slice.
+    const isManager = session.role === "manager";
+
+    const assessment1Review =
+      isManager && found.assessment1 !== null
+        ? {
+            ...found.assessment1,
+            device: prefillDeviceRows(found.report.payload, found.report),
+            event: prefillEventRows(found.report.payload),
+          }
+        : undefined;
+
+    // The picker is offered only once there is a second assessment to hand off to someone: the
+    // report has reached the status that means so, and the first assessment behind it is actually
+    // submitted rather than a draft the guard above already refused to surface.
+    const canPickSecondAssessor =
+      isManager && found.report.status === "awaiting_second_assessor" && found.assessment1 !== null;
+
+    const secondAssessorPicker: AssessorOption[] | undefined = canPickSecondAssessor
+      ? (
+          await app.db.execute(
+            sql`SELECT id, full_name FROM users WHERE role = 'assessor' AND is_active ORDER BY full_name`,
+          )
+        ).map((r) => {
+          const u = r as { id: string; full_name: string };
+          return { id: u.id, fullName: u.full_name };
+        })
+      : undefined;
+
     return reply.html(
       <ReportPage
         report={found.report}
@@ -156,6 +236,8 @@ export async function reportsRoutes(app: FastifyInstance): Promise<void> {
         // route behind it makes the same test for itself — this decides whether a link appears,
         // never whether the page may be opened.
         canAssess={session.role === "assessor" && found.assessor1UserId === session.userId}
+        assessment1Review={assessment1Review}
+        secondAssessorPicker={secondAssessorPicker}
       />,
     );
   });

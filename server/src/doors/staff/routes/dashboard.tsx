@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { currentSession } from "../session-guard.js";
-import { DashboardPage } from "../views/dashboard.js";
+import { type AwaitingSecondRow, DashboardPage } from "../views/dashboard.js";
 import type { ReceivedRow } from "../views/reports.js";
 import { loadActivity } from "./activity.js";
 
@@ -31,6 +31,25 @@ function toReceivedRow(row: unknown, viewerId: string): ReceivedRow {
     // The queue holds the reader’s own reports and the orphans. Only the first are theirs to
     // assess, and the row says which it is rather than the view guessing from a missing name.
     mine: report.assessor1_user_id === viewerId,
+  };
+}
+
+/** The manager's queue holds no per-report ownership, so it carries none of `mine`'s reasoning. */
+function toAwaitingSecondRow(row: unknown): AwaitingSecondRow {
+  const report = row as {
+    id: string;
+    number: string;
+    received_at: Date;
+    device_name: string;
+    severity: string;
+  };
+
+  return {
+    id: report.id,
+    number: report.number,
+    receivedAt: report.received_at,
+    deviceName: report.device_name,
+    severity: report.severity,
   };
 }
 
@@ -91,6 +110,30 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         }
       : undefined;
 
+    const isManager = session.role === "manager";
+
+    // The manager's queue: everything with a submitted first assessment and nobody yet named for
+    // the second. Newest first, on the same argument as the Officer's queue above — a manager
+    // reviewing this figure wants what just landed, not what has waited longest.
+    const awaitingSecond = isManager
+      ? await app.db.execute(sql`
+          SELECT id, number, received_at, device_name, severity,
+                 (count(*) OVER ())::int AS waiting
+            FROM reports
+           WHERE status = 'awaiting_second_assessor'
+           ORDER BY received_at DESC, number DESC
+           LIMIT ${RECEIVED_PREVIEW}
+        `)
+      : [];
+
+    const awaitingSecondAssessor = isManager
+      ? {
+          count:
+            awaitingSecond.length === 0 ? 0 : (awaitingSecond[0] as { waiting: number }).waiting,
+          rows: awaitingSecond.map(toAwaitingSecondRow),
+        }
+      : undefined;
+
     return reply.html(
       <DashboardPage
         fullName={session.fullName}
@@ -98,6 +141,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         reportCount={reportCount}
         activeStaff={activeStaff}
         received={received}
+        awaitingSecondAssessor={awaitingSecondAssessor}
         recent={recent}
       />,
     );

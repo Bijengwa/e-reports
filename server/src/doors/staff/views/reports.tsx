@@ -1,5 +1,7 @@
+import type { F004Answers } from "../../../domain/f004.js";
 import { STEP_FIELDS, STEPS } from "../../../domain/form-schema.js";
 import { type MessageKey, translatorFor } from "../../../i18n/index.js";
+import { F004Form } from "./f004.js";
 import { StaffShell } from "./shell.js";
 
 /**
@@ -35,8 +37,13 @@ function caption(labels: Record<string, string>, value: string): string {
   return labels[value] ?? value;
 }
 
-/** Death and life-threatening are the two an officer should see without reading the row. */
-function severityTone(severity: string): string {
+/**
+ * Death and life-threatening are the two an officer should see without reading the row.
+ *
+ * Exported on the same argument as `SEVERITY_LABELS` beside it: two rows tagging the same
+ * severity a different colour is how a queue starts contradicting the register it is drawn from.
+ */
+export function severityTone(severity: string): string {
   return severity === "death" || severity === "life_threatening" ? "caution" : "safe";
 }
 
@@ -52,7 +59,8 @@ export type ReportRow = {
   facility: string | null;
 };
 
-function day(value: Date): string {
+/** Exported for the same reason `severityTone` is: one date format for every queue in the app. */
+export function day(value: Date): string {
   return new Date(value).toISOString().slice(0, 10);
 }
 
@@ -364,6 +372,22 @@ export function ReportDocument({ report }: { report: ReportDetail }): JSX.Elemen
   );
 }
 
+/** One candidate for the second-assessor picker: enough to name them, nothing to act on yet. */
+export type AssessorOption = { id: string; fullName: string };
+
+/**
+ * The first assessment, as the manager's copy of this page reads it: the F004's own answers,
+ * already submitted, with nothing left to fill in.
+ */
+export type Assessment1ReviewProps = {
+  assessorName: string;
+  answers: F004Answers;
+  conclusion: string | null;
+  submittedOn: string;
+  device: Record<string, string>;
+  event: Record<string, string>;
+};
+
 export type ReportPageProps = {
   report: ReportDetail;
   viewerRole: string;
@@ -377,6 +401,21 @@ export type ReportPageProps = {
    * behind that link would refuse them and a link that answers 403 is worse than no link.
    */
   canAssess: boolean;
+  /**
+   * The first assessment, read-only, for a manager reviewing what the first Officer submitted.
+   *
+   * Undefined for every other role, and undefined for a manager too until ordinal 1 is actually
+   * submitted — a draft in progress is not this page's to show.
+   */
+  assessment1Review?: Assessment1ReviewProps;
+  /**
+   * Who a manager could hand the second assessment to. Present only once the report is waiting
+   * for one and the first assessment behind it is submitted; undefined otherwise.
+   *
+   * Naming this is all the page does with it — there is no form here, and no route to post to
+   * yet. Picking one is a later slice's work.
+   */
+  secondAssessorPicker?: AssessorOption[];
 };
 
 /** One report, read-only. */
@@ -385,6 +424,8 @@ export function ReportPage({
   viewerRole,
   viewerName,
   canAssess,
+  assessment1Review,
+  secondAssessorPicker,
 }: ReportPageProps): JSX.Element {
   return (
     <StaffShell
@@ -413,6 +454,45 @@ export function ReportPage({
       </div>
 
       <ReportDocument report={report} />
+
+      {assessment1Review && (
+        <div class="card card-b">
+          <h2 class="report-heading">First assessment</h2>
+          <F004Form
+            reportId={report.id}
+            answers={assessment1Review.answers}
+            device={assessment1Review.device}
+            event={assessment1Review.event}
+            assessorName={assessment1Review.assessorName}
+            assessedOn={assessment1Review.submittedOn}
+            submitted
+            issues={[]}
+          />
+        </div>
+      )}
+
+      {secondAssessorPicker && (
+        <div class="card card-b">
+          <h2 class="report-heading">Assign second assessor</h2>
+          {secondAssessorPicker.length === 0 ? (
+            <p class="hint">No active Officers are available to assign.</p>
+          ) : (
+            <div class="bar">
+              <select aria-label="Second assessor">
+                {secondAssessorPicker.map((option) => (
+                  <option value={option.id} safe>
+                    {option.fullName}
+                  </option>
+                ))}
+              </select>
+              {/* type="button", and outside any form: nothing here can be submitted yet. */}
+              <button type="button" class="btn" disabled>
+                Assign
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </StaffShell>
   );
 }
