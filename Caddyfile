@@ -1,0 +1,67 @@
+# LAN development access for the two doors.
+#
+# Why a proxy rather than binding the app to 0.0.0.0 and browsing to its IP:
+#
+#   1. The session cookie is `__Host-ae_session`, and the `__Host-` prefix obliges the browser to
+#      refuse it unless the response came over HTTPS. Browsers make one exception, `localhost`,
+#      which a LAN address is not — so over plain http://192.168.x.x the cookie is dropped and
+#      sign-in silently fails. `src/auth/session.ts` sets `secure: true` unconditionally and says
+#      why; this keeps that promise instead of weakening it for development.
+#
+#   2. The public and staff doors are told apart by hostname, not by path — `constrainToHost` puts
+#      a Host constraint on every route. A bare IP matches neither door, so every address 404s.
+#      Two names are needed whatever the transport is.
+#
+# So Caddy terminates TLS with its own locally-trusted CA and forwards to the app, which keeps
+# listening on loopback. The app is never itself exposed to the network: only this proxy is.
+#
+# There is no CORS configuration here or in the app, and none is needed. Every page is rendered by
+# the server and posted back to its own origin, so the browser makes no cross-origin request —
+# adding `Access-Control-Allow-*` would grant something nothing asks for.
+#
+# The LAN address is deliberately absent from this file. Caddy binds every interface by default,
+# and which address that is on any given day is a property of the network, not of the repository.
+#
+# ---------------------------------------------------------------------------------------------
+# Setup, once:
+#
+#   1. server/.env — the app must expect the names the browser will send:
+#        STAFF_HOST=staff.ereports.lan
+#        PUBLIC_HOST=public.ereports.lan
+#      (no port: this proxy answers on 443, so the Host header carries no port either)
+#
+#   2. On every device that will browse, including this one, point both names at this machine's
+#      LAN address in the hosts file:
+#        192.168.137.39  staff.ereports.lan public.ereports.lan
+#      Windows: C:\Windows\System32\drivers\etc\hosts   ·   macOS/Linux: /etc/hosts
+#
+#   3. Trust Caddy's local CA on each browsing device, or the browser will warn and — because the
+#      cookie is Secure — refuse to keep the session:
+#        caddy trust
+#      On a phone, install the root certificate from Caddy's data directory manually.
+#
+# Run:
+#   caddy run --config Caddyfile        (from the repository root, as administrator: port 443)
+#   pnpm -C server run dev              (in another terminal; stays on 127.0.0.1:3100)
+#
+# Then browse to https://staff.ereports.lan
+# ---------------------------------------------------------------------------------------------
+
+{
+	# Caddy's own CA rather than a public one: these names exist only on this network and no public
+	# issuer could ever validate them.
+	local_certs
+}
+
+staff.ereports.lan, public.ereports.lan {
+	tls internal
+
+	# Host is forwarded unchanged, which is the whole point: the app reads it to decide which door
+	# the request reached. Caddy adds X-Forwarded-Proto so the app can tell the browser's transport
+	# was HTTPS even though this last hop is plaintext loopback.
+	reverse_proxy 127.0.0.1:3100
+
+	log {
+		level INFO
+	}
+}

@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "e-reports-server",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["-C", "server", "run", "dev"],
+      "port": 3100,
+      "url": "http://staff.localhost:3100"
+    }
+  ]
+}
