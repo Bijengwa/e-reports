@@ -67,6 +67,19 @@ export type F004FormProps = {
    * are different reasons for the same rendering.
    */
   readOnly?: boolean;
+  /** The manager's notes per section, keyed "1"…"8". Absent on the Officer's live form. */
+  sectionComments?: Record<string, SectionComment[]>;
+  /** Where a note on a given section is posted. Absent means the form draws no comment UI. */
+  commentAction?: (section: string) => string;
+  /**
+   * Leave 7.2 and the second signature out of the document entirely.
+   *
+   * For the one page that renders this form above a live section 7.2 — the second assessor's own.
+   * There the placeholder block would be a second, disabled copy of the box they are being asked
+   * to fill in, immediately above the real one, and a form that shows a field twice is a form
+   * whose reader has to work out which of the two counts.
+   */
+  omitSecond?: boolean;
   issues: readonly Issue[];
 };
 
@@ -96,14 +109,196 @@ function Sheet({
   );
 }
 
-function Bar({ no, title }: { no: string; title: string }): JSX.Element {
+/**
+ * Section 7.2 and the second signature: the same eleven actions and the same conclusion box as
+ * 7.1, laid out the way the paper lays them out, under names of their own.
+ *
+ * Here rather than beside either page that draws it, because both do: the second assessor writes
+ * it, and the manager reads it back once it is in. One copy of the markup is what keeps the record
+ * the manager reads identical to the form the Officer filled.
+ *
+ * `locked` renders the submitted record — every control disabled, which is what stops a closed
+ * assessment being edited by replaying the form, exactly as the document above it does.
+ */
+export function F004Second({
+  answers,
+  signedOn,
+  locked,
+}: {
+  answers: F004Answers;
+  signedOn: string;
+  locked?: boolean;
+}): JSX.Element {
+  const chosen = list(answers, "actions_2");
+
   return (
-    <div class="f4-bar">
-      <span class="f4-bar-no" safe>
-        {no}
-      </span>
-      <span safe>{title}</span>
+    <div class="f4-section">
+      <div class="f4-block">
+        <p class="f4-note">Possible risk mitigation action(s):</p>
+        <div class="f4-ticks f4-11">
+          {ACTIONS.map((action) => (
+            <label class={chosen.includes(action.value) ? "f4-tick on" : "f4-tick"}>
+              <input
+                type="checkbox"
+                name="actions_2"
+                value={action.value}
+                checked={chosen.includes(action.value)}
+                disabled={locked}
+              />
+              <span>
+                <span class="f4-no" safe>
+                  {action.no}
+                </span>{" "}
+                <span safe>{action.label}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+
+        <div class="f4-comment">
+          <label class="vh" for="conclusion_2">
+            Concluding remarks
+          </label>
+          <textarea
+            id="conclusion_2"
+            name="conclusion_2"
+            rows="6"
+            placeholder="Concluding remarks"
+            disabled={locked}
+            safe
+          >
+            {value(answers, "conclusion_2")}
+          </textarea>
+        </div>
+      </div>
+
+      <div class="f4-block">
+        <div class="f4-sign">
+          <div class="f4-field">
+            <label for="signature_2">2nd Assessor — type your name to sign</label>
+            <input
+              id="signature_2"
+              name="signature_2"
+              value={value(answers, "signature_2")}
+              autocomplete="off"
+              disabled={locked}
+            />
+            <p class="f4-note">
+              Typed, not uploaded. It must match the name above, which is the account you are signed
+              in as.
+            </p>
+          </div>
+          <div class="f4-field f4-muted">
+            <label for="assessed-on-2">Date</label>
+            <input id="assessed-on-2" value={signedOn} disabled />
+          </div>
+        </div>
+      </div>
     </div>
+  );
+}
+
+/** One manager note against one section, as the thread prints it. */
+export type SectionComment = {
+  author: string;
+  body: string;
+  /** Already formatted for reading — the view does no date arithmetic. */
+  at: string;
+};
+
+/** The speech-bubble, drawn to the same contract as the rail's icons and the tab bars'. */
+function IconComment(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-4.6A8 8 0 0 1 11 4h2a8 8 0 0 1 8 8z" />
+    </svg>
+  );
+}
+
+/**
+ * The comments on one section, folded away until asked for.
+ *
+ * A `<details>` rather than a script: this door renders on the server and the drawer on the
+ * assessment page is already a checkbox, so a panel that opens without JavaScript is the house
+ * pattern rather than a compromise. It also keeps the count readable while the panel is shut,
+ * which is what a manager scanning eight sections actually wants.
+ *
+ * Rendered only where `action` is given — the manager's read of a submitted assessment. On the
+ * Officer's own live form there is no action and this draws nothing at all, so the form they fill
+ * in is unchanged.
+ */
+function SectionComments({
+  no,
+  comments,
+  action,
+}: {
+  no: string;
+  comments: readonly SectionComment[];
+  action: string;
+}): JSX.Element {
+  return (
+    <details class="f4-notes">
+      <summary>
+        <IconComment />
+        <span>
+          {comments.length} {comments.length === 1 ? "comment" : "comments"}
+        </span>
+      </summary>
+
+      {comments.length > 0 && (
+        <ol class="f4-note-list">
+          {comments.map((comment) => (
+            <li>
+              <div class="f4-note-who">
+                <b safe>{comment.author}</b>
+                <span class="hint" safe>
+                  {comment.at}
+                </span>
+              </div>
+              <p safe>{comment.body}</p>
+            </li>
+          ))}
+        </ol>
+      )}
+
+      {/* Outside the F004's own form — a form cannot nest — and posting to its own address, so a
+          comment on section 3 can only ever be a comment on section 3. */}
+      <form method="POST" action={action} class="f4-note-write">
+        <label class="vh" for={`note-${no}`}>
+          Comment on section {no}
+        </label>
+        <textarea id={`note-${no}`} name="body" rows="2" placeholder="Write a comment…"></textarea>
+        <button type="submit" class="btn btn-sm">
+          Send
+        </button>
+      </form>
+    </details>
+  );
+}
+
+function Bar({
+  no,
+  title,
+  comments,
+  action,
+}: {
+  no: string;
+  title: string;
+  comments?: readonly SectionComment[];
+  action?: string;
+}): JSX.Element {
+  return (
+    <>
+      <div class="f4-bar">
+        <span class="f4-bar-no" safe>
+          {no}
+        </span>
+        <span safe>{title}</span>
+      </div>
+      {action !== undefined && (
+        <SectionComments no={no} comments={comments ?? []} action={action} />
+      )}
+    </>
   );
 }
 
@@ -115,6 +310,7 @@ function RequirementRow({
   filled,
   answers,
   rows,
+  locked,
 }: {
   no: string;
   label: string;
@@ -122,6 +318,7 @@ function RequirementRow({
   filled: string;
   answers: F004Answers;
   rows?: number;
+  locked: boolean;
 }): JSX.Element {
   return (
     <div class="f4-row">
@@ -143,7 +340,7 @@ function RequirementRow({
         </div>
       </div>
       <div class="f4-comment">
-        <textarea name={name} rows={String(rows ?? 2)} placeholder="Comment" safe>
+        <textarea name={name} rows={String(rows ?? 2)} placeholder="Comment" disabled={locked} safe>
           {value(answers, name)}
         </textarea>
       </div>
@@ -164,12 +361,14 @@ function FactRow({
   name,
   filled,
   answers,
+  locked,
 }: {
   no: string;
   label: string;
   name: string;
   filled: string;
   answers: F004Answers;
+  locked: boolean;
 }): JSX.Element {
   return (
     <>
@@ -190,7 +389,7 @@ function FactRow({
       </div>
       <div class="f4-note-line">
         <label for={name}>Assessor note (optional)</label>
-        <input id={name} name={name} value={value(answers, name)} />
+        <input id={name} name={name} value={value(answers, name)} disabled={locked} />
       </div>
     </>
   );
@@ -206,10 +405,12 @@ function Radios({
   name,
   options,
   answers,
+  locked,
 }: {
   name: string;
   options: readonly { value: string; label: string; note?: string }[];
   answers: F004Answers;
+  locked: boolean;
 }): JSX.Element {
   const chosen = value(answers, name);
 
@@ -217,7 +418,13 @@ function Radios({
     <div class="f4-radio-group">
       {options.map((option) => (
         <label class="f4-radio-row">
-          <input type="radio" name={name} value={option.value} checked={chosen === option.value} />
+          <input
+            type="radio"
+            name={name}
+            value={option.value}
+            checked={chosen === option.value}
+            disabled={locked}
+          />
           <span>
             <b safe>{option.label}</b>
             {option.note && <span class="f4-note" safe>{` — ${option.note}`}</span>}
@@ -233,18 +440,20 @@ function Comment({
   answers,
   rows = 3,
   label = "Comment",
+  locked,
 }: {
   name: string;
   answers: F004Answers;
   rows?: number;
   label?: string;
+  locked: boolean;
 }): JSX.Element {
   return (
     <div class="f4-field">
       <label for={name} safe>
         {label}
       </label>
-      <textarea id={name} name={name} rows={String(rows)} safe>
+      <textarea id={name} name={name} rows={String(rows)} disabled={locked} safe>
         {value(answers, name)}
       </textarea>
     </div>
@@ -260,6 +469,9 @@ export function F004Form({
   assessedOn,
   submitted,
   readOnly,
+  sectionComments,
+  commentAction,
+  omitSecond,
   issues,
 }: F004FormProps): JSX.Element {
   const causality = value(answers, "causality");
@@ -363,10 +575,10 @@ export function F004Form({
       </div>
 
       <Sheet locked={locked} reportId={reportId}>
-        {/* One disabled fieldset rather than a second, read-only rendering of the whole document.
-            A disabled control is not submitted, so a closed assessment cannot be edited by
-            replaying the form — and there is one copy of this markup to keep correct, not two. */}
-        <fieldset disabled={locked}>
+        {/* One fieldset keeps the document grouped, but the lock is applied to the assessment
+            controls themselves. Section comments are live manager controls and must not inherit a
+            disabled ancestor. */}
+        <fieldset>
           {issues.length > 0 && (
             <div class="alert alert-error" role="alert">
               <strong>This assessment cannot be submitted yet.</strong>
@@ -379,7 +591,12 @@ export function F004Form({
           )}
 
           <section class="f4-section" id="section-1">
-            <Bar no="1" title="Administrative information — device information" />
+            <Bar
+              no="1"
+              title="Administrative information — device information"
+              comments={sectionComments?.["1"]}
+              action={commentAction?.("1")}
+            />
             {DEVICE_ROWS.map((row) => (
               <FactRow
                 no={row.no}
@@ -387,12 +604,18 @@ export function F004Form({
                 name={`c1_${row.key}`}
                 filled={device[row.key] ?? ""}
                 answers={answers}
+                locked={locked}
               />
             ))}
           </section>
 
           <section class="f4-section" id="section-2">
-            <Bar no="2" title="Event / incident assessment" />
+            <Bar
+              no="2"
+              title="Event / incident assessment"
+              comments={sectionComments?.["2"]}
+              action={commentAction?.("2")}
+            />
             {EVENT_ROWS.map((row) => (
               <RequirementRow
                 no={row.no}
@@ -401,6 +624,7 @@ export function F004Form({
                 filled={event[row.key] ?? ""}
                 answers={answers}
                 rows={row.key === "description" ? 4 : 2}
+                locked={locked}
               />
             ))}
 
@@ -428,8 +652,13 @@ export function F004Form({
               </div>
               {/* One category, not several: the form asks the assessor to select the source that
                 best describes the event, not to tick every one that might apply. */}
-              <Radios name="source_of_event" options={SOURCE_OPTIONS} answers={answers} />
-              <Comment name="c2_5" answers={answers} />
+              <Radios
+                name="source_of_event"
+                options={SOURCE_OPTIONS}
+                answers={answers}
+                locked={locked}
+              />
+              <Comment name="c2_5" answers={answers} locked={locked} />
             </div>
 
             <div class="f4-block">
@@ -444,21 +673,31 @@ export function F004Form({
                   ))}
                 </ul>
               </div>
-              <Radios name="seriousness" options={SERIOUSNESS_OPTIONS} answers={answers} />
-              <Comment name="c2_6" answers={answers} />
+              <Radios
+                name="seriousness"
+                options={SERIOUSNESS_OPTIONS}
+                answers={answers}
+                locked={locked}
+              />
+              <Comment name="c2_6" answers={answers} locked={locked} />
             </div>
 
             <div class="f4-block">
               <div class="f4-blocktitle">
                 <span class="f4-no">2.7</span> <span safe>{PUBLIC_HEALTH_QUESTION}</span>
               </div>
-              <Radios name="public_health" options={YES_NO} answers={answers} />
-              <Comment name="c2_7" answers={answers} />
+              <Radios name="public_health" options={YES_NO} answers={answers} locked={locked} />
+              <Comment name="c2_7" answers={answers} locked={locked} />
             </div>
           </section>
 
           <section class="f4-section" id="section-3">
-            <Bar no="3" title="IMDRF category of the adverse incident / event" />
+            <Bar
+              no="3"
+              title="IMDRF category of the adverse incident / event"
+              comments={sectionComments?.["3"]}
+              action={commentAction?.("3")}
+            />
             {IMDRF_GROUPS.map((group) => (
               <div class="f4-block">
                 <div class="f4-blocktitle">
@@ -489,6 +728,7 @@ export function F004Form({
                               id={`imdrf_${item.key}_l${level}`}
                               name={`imdrf_${item.key}_l${level}`}
                               value={value(answers, `imdrf_${item.key}_l${level}`)}
+                              disabled={locked}
                             />
                           </div>
                         ))}
@@ -498,6 +738,7 @@ export function F004Form({
                           id={`imdrf_${item.key}_code`}
                           name={`imdrf_${item.key}_code`}
                           value={value(answers, `imdrf_${item.key}_code`)}
+                          disabled={locked}
                         />
                       </div>
                     </div>
@@ -511,7 +752,12 @@ export function F004Form({
           </section>
 
           <section class="f4-section" id="section-4">
-            <Bar no="4" title="Relationship / causality assessment" />
+            <Bar
+              no="4"
+              title="Relationship / causality assessment"
+              comments={sectionComments?.["4"]}
+              action={commentAction?.("4")}
+            />
 
             <div class="f4-block">
               <div class="f4-blocktitle">
@@ -521,8 +767,13 @@ export function F004Form({
               <p class="f4-note" safe>
                 {EXPECTEDNESS_NOTE}
               </p>
-              <Radios name="expectedness" options={EXPECTEDNESS_OPTIONS} answers={answers} />
-              <Comment name="c4_1" answers={answers} />
+              <Radios
+                name="expectedness"
+                options={EXPECTEDNESS_OPTIONS}
+                answers={answers}
+                locked={locked}
+              />
+              <Comment name="c4_1" answers={answers} locked={locked} />
             </div>
 
             <div class="f4-block">
@@ -539,6 +790,7 @@ export function F004Form({
                         name="causality"
                         value={option.value}
                         checked={causality === option.value}
+                        disabled={locked}
                       />
                       <b safe>{option.label}</b>
                     </div>
@@ -559,12 +811,17 @@ export function F004Form({
               <p class="f4-note" safe>
                 {CAUSALITY_DISCUSSION_NOTE}
               </p>
-              <Comment name="c4_3" answers={answers} rows={5} label="Discussion" />
+              <Comment name="c4_3" answers={answers} rows={5} label="Discussion" locked={locked} />
             </div>
           </section>
 
           <section class="f4-section" id="section-5">
-            <Bar no="5" title="Signal detection" />
+            <Bar
+              no="5"
+              title="Signal detection"
+              comments={sectionComments?.["5"]}
+              action={commentAction?.("5")}
+            />
             <div class="f4-block">
               <div class="f4-guide">
                 <p>
@@ -582,13 +839,23 @@ export function F004Form({
                   {SIGNAL_NOTE}
                 </p>
               </div>
-              <Radios name="signal_status" options={SIGNAL_OPTIONS} answers={answers} />
-              <Comment name="c5" answers={answers} rows={4} />
+              <Radios
+                name="signal_status"
+                options={SIGNAL_OPTIONS}
+                answers={answers}
+                locked={locked}
+              />
+              <Comment name="c5" answers={answers} rows={4} locked={locked} />
             </div>
           </section>
 
           <section class="f4-section" id="section-6">
-            <Bar no="6" title="Risk assessment" />
+            <Bar
+              no="6"
+              title="Risk assessment"
+              comments={sectionComments?.["6"]}
+              action={commentAction?.("6")}
+            />
             <p class="f4-note" safe>
               {RISK_NOTE}
             </p>
@@ -607,6 +874,7 @@ export function F004Form({
                       name="risk_level"
                       value={option.value}
                       checked={risk === option.value}
+                      disabled={locked}
                     />
                     <b safe>{option.label}</b>
                   </div>
@@ -619,11 +887,16 @@ export function F004Form({
             <p class="f4-note" safe>
               {RISK_IVD_NOTE}
             </p>
-            <Comment name="c6" answers={answers} />
+            <Comment name="c6" answers={answers} locked={locked} />
           </section>
 
           <section class="f4-section" id="section-7">
-            <Bar no="7" title="Conclusion of assessment" />
+            <Bar
+              no="7"
+              title="Conclusion of assessment"
+              comments={sectionComments?.["7"]}
+              action={commentAction?.("7")}
+            />
             <div class="f4-block">
               <div class="f4-blocktitle">
                 <span class="f4-no">7.1</span> First assessor's recommendations and conclusion,
@@ -642,6 +915,7 @@ export function F004Form({
                       name="actions"
                       value={action.value}
                       checked={list(answers, "actions").includes(action.value)}
+                      disabled={locked}
                     />
                     <span>
                       <span class="f4-no" safe>
@@ -652,7 +926,13 @@ export function F004Form({
                   </label>
                 ))}
               </div>
-              <Comment name="conclusion" answers={answers} rows={6} label="Conclusion" />
+              <Comment
+                name="conclusion"
+                answers={answers}
+                rows={6}
+                label="Conclusion"
+                locked={locked}
+              />
             </div>
 
             {/* 7.2 belongs to the second assessor. Shown so the document is recognisably the whole
@@ -660,36 +940,43 @@ export function F004Form({
               disabled and empty, and every control here carries no `name`. A disabled field is
               not submitted regardless, but omitting the name too means there is no field in this
               block the request body could ever carry a value under, whatever reaches the server. */}
-            <div class="f4-block f4-locked">
-              <div class="f4-blocktitle">
-                <span class="f4-no">7.2</span> Second assessor concluding remarks
+            {!omitSecond && (
+              <div class="f4-block f4-locked">
+                <div class="f4-blocktitle">
+                  <span class="f4-no">7.2</span> Second assessor concluding remarks
+                </div>
+                <p class="f4-pending">Pending second assessor review</p>
+                <div class="f4-ticks f4-11">
+                  {ACTIONS.map((action) => (
+                    <label class="f4-tick f4-tick-locked">
+                      <input type="checkbox" disabled />
+                      <span>
+                        <span class="f4-no" safe>
+                          {action.no}
+                        </span>{" "}
+                        <span safe>{action.label}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                <div class="f4-field">
+                  <textarea
+                    rows="3"
+                    disabled
+                    placeholder="(To be completed by the second assessor upon review)"
+                  />
+                </div>
               </div>
-              <p class="f4-pending">Pending second assessor review</p>
-              <div class="f4-ticks f4-11">
-                {ACTIONS.map((action) => (
-                  <label class="f4-tick f4-tick-locked">
-                    <input type="checkbox" disabled />
-                    <span>
-                      <span class="f4-no" safe>
-                        {action.no}
-                      </span>{" "}
-                      <span safe>{action.label}</span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-              <div class="f4-field">
-                <textarea
-                  rows="3"
-                  disabled
-                  placeholder="(To be completed by the second assessor upon review)"
-                />
-              </div>
-            </div>
+            )}
           </section>
 
           <section class="f4-section" id="section-8">
-            <Bar no="8" title="Signature" />
+            <Bar
+              no="8"
+              title="Signature"
+              comments={sectionComments?.["8"]}
+              action={commentAction?.("8")}
+            />
             <div class="f4-sign">
               <div class="f4-field">
                 <label for="signature">1st Assessor — type your name to sign</label>
@@ -699,16 +986,19 @@ export function F004Form({
                   value={value(answers, "signature")}
                   placeholder={assessorName}
                   autocomplete="off"
+                  disabled={locked}
                 />
                 <p class="f4-note">
                   Typed, not uploaded. It must match the name above, which is the account you are
                   signed in as.
                 </p>
               </div>
-              <div class="f4-field f4-muted">
-                <label for="signature-2">2nd Assessor</label>
-                <input id="signature-2" value="" disabled placeholder="Not yet assessed" />
-              </div>
+              {!omitSecond && (
+                <div class="f4-field f4-muted">
+                  <label for="signature-2">2nd Assessor</label>
+                  <input id="signature-2" value="" disabled placeholder="Not yet assessed" />
+                </div>
+              )}
             </div>
           </section>
         </fieldset>

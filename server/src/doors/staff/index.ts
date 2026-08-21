@@ -3,6 +3,8 @@ import type { FastifyInstance } from "fastify";
 import { constrainToHost } from "../host-scope.js";
 import { activityRoutes } from "./routes/activity.js";
 import { assessmentRoutes } from "./routes/assessment.js";
+import { assessmentCommentRoutes } from "./routes/assessment-comments.js";
+import { assessmentReviewRoutes } from "./routes/assessment-review.js";
 import { myAssessmentsRoutes } from "./routes/assessments.js";
 import { assignSecondAssessorRoutes } from "./routes/assign-second-assessor.js";
 import { changePasswordRoutes } from "./routes/change-password.js";
@@ -108,6 +110,14 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
         // Where a manager lands and works: the whole pipeline, six buckets deep. It replaces the
         // dashboard for this role, which showed them one of those six and nothing about the rest.
         await management.register(workloadRoutes);
+
+        // The manager's review of a submitted first assessment, beside the handover it precedes.
+        // Same scope and same reason: reviewing an Officer's assessment is the manager's alone.
+        await management.register(assessmentReviewRoutes);
+
+        // The manager's notes against individual sections of that assessment, beside the one
+        // verdict `assessmentReviewRoutes` stores about the whole of it.
+        await management.register(assessmentCommentRoutes);
 
         await management.register(assignSecondAssessorRoutes);
       });

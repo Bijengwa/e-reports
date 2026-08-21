@@ -71,6 +71,20 @@
       "when": 1787581759000,
       "tag": "0009_assign_second_assessor",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787668159000,
+      "tag": "0010_manager_review_comment",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1787754559000,
+      "tag": "0011_assessment_section_comments",
+      "breakpoints": true
     }
   ]
 }

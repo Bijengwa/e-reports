@@ -1,7 +1,7 @@
 import type { F004Answers } from "../../../domain/f004.js";
 import { STEP_FIELDS, STEPS } from "../../../domain/form-schema.js";
 import { type MessageKey, translatorFor } from "../../../i18n/index.js";
-import { F004Form } from "./f004.js";
+import { F004Form, F004Second, type SectionComment } from "./f004.js";
 import { StaffShell } from "./shell.js";
 
 /**
@@ -376,6 +376,47 @@ export function ReportDocument({ report }: { report: ReportDetail }): JSX.Elemen
 export type AssessorOption = { id: string; fullName: string };
 
 /**
+ * A manager's review of one assessment, as a page prints it.
+ *
+ * The reviewer's name and the day, never their id: who reviewed an assessment is a fact the page
+ * states, and the row's own key is not the reader's business.
+ */
+export type ManagerReviewNote = { text: string; byName: string; on: string };
+
+/**
+ * A saved manager review, wherever it is read.
+ *
+ * One component because two pages show it — the manager's own report page and the second
+ * assessor's assessment page — and a review that reads differently depending on who opened it is
+ * two records pretending to be one. The heading is passed in rather than fixed, because those two
+ * readers need to be told different things about the same text: whose it is, or which assessment
+ * it is about.
+ */
+export function ManagerReviewBlock({
+  review,
+  heading,
+}: {
+  review: ManagerReviewNote;
+  heading: string;
+}): JSX.Element {
+  return (
+    <>
+      <h2 class="report-heading" safe>
+        {heading}
+      </h2>
+      <div class="review">
+        <p class="hint">
+          <span safe>{review.byName}</span> · <span safe>{review.on}</span>
+        </p>
+        <p class="review-text" safe>
+          {review.text}
+        </p>
+      </div>
+    </>
+  );
+}
+
+/**
  * The first assessment, as the manager's copy of this page reads it: the F004's own answers,
  * already submitted, with nothing left to fill in.
  */
@@ -386,6 +427,11 @@ export type Assessment1ReviewProps = {
   submittedOn: string;
   device: Record<string, string>;
   event: Record<string, string>;
+  /** The manager's notes per section, keyed "1"…"8", and where a new one is posted. */
+  sectionComments?: Record<string, SectionComment[]>;
+  commentAction?: (section: string) => string;
+  /** What the manager has already written about it, if anything. */
+  managerComment: ManagerReviewNote | null;
 };
 
 export type ReportPageProps = {
@@ -401,6 +447,22 @@ export type ReportPageProps = {
    * behind that link would refuse them and a link that answers 403 is worse than no link.
    */
   canAssess: boolean;
+  /**
+   * The same, for the second assessment: true only for the Officer a manager named as second.
+   *
+   * A separate flag rather than a widened `canAssess`, because the two lead to different pages
+   * and the reader who may open one is never the reader who may open the other.
+   */
+  canAssess2?: boolean;
+  /**
+   * Whether to offer the manager's review box.
+   *
+   * True only for a manager, and only over a submitted first assessment. The route behind the box
+   * makes the same test — this decides whether the control is drawn, never whether it may be used.
+   */
+  canComment?: boolean;
+  /** A refused action, re-rendered over the page it was refused on. */
+  error?: string;
   /** Who holds each half of the review. Null until intake, or a manager, has named them. */
   assessor1Name?: string | null;
   assessor2Name?: string | null;
@@ -414,11 +476,24 @@ export type ReportPageProps = {
   /**
    * Who a manager could hand the second assessment to. Present only once the report is waiting
    * for one and the first assessment behind it is submitted; undefined otherwise.
-   *
-   * Naming this is all the page does with it — there is no form here, and no route to post to
-   * yet. Picking one is a later slice's work.
    */
   secondAssessorPicker?: AssessorOption[];
+  /**
+   * The second assessment, once it is submitted — never a draft.
+   *
+   * Present makes the difference between "7.2 is pending" and "here is what the second assessor
+   * concluded", and the page must not say the first while the second is true. A draft stays out:
+   * it is that Officer's unfinished work, on the same argument ordinal 1 is withheld until it is
+   * submitted.
+   */
+  assessment2Review?: Assessment2ReviewProps;
+};
+
+/** The second assessment as a finished record: 7.2, its signature, and the day it was signed. */
+export type Assessment2ReviewProps = {
+  assessorName: string;
+  answers: F004Answers;
+  submittedOn: string;
 };
 
 /** One report, read-only. */
@@ -427,10 +502,14 @@ export function ReportPage({
   viewerRole,
   viewerName,
   canAssess,
+  canAssess2,
+  canComment,
+  error,
   assessor1Name,
   assessor2Name,
   assessment1Review,
   secondAssessorPicker,
+  assessment2Review,
 }: ReportPageProps): JSX.Element {
   return (
     <StaffShell
@@ -440,17 +519,31 @@ export function ReportPage({
       fullName={viewerName}
       active="reports"
     >
+      {/*
+       * The page's own top bar carries the assignment, beside the two actions that were already
+       * there. Who holds each half of the review reads on the same line as the rest of the
+       * report's facts, because that is where this page has always said what a report is — a card
+       * of its own would have been a second place to look for one line of text.
+       */}
       <div class="staff-head">
         <div class="sp">
           <h2 safe>{report.deviceName}</h2>
           <p class="hint">
             Received {day(report.receivedAt)} ·{" "}
-            <span safe>{caption(CHANNEL_LABELS, report.channel)}</span>
+            <span safe>{caption(CHANNEL_LABELS, report.channel)}</span> ·{" "}
+            <span safe>{`A1: ${assessor1Name ?? "not assigned"}`}</span> ·{" "}
+            <span safe>{`A2: ${assessor2Name ?? "not assigned"}`}</span>
           </p>
         </div>
+
         {canAssess && (
           <a href={assessment1Href(report.id)} class="btn">
             Assessment 1
+          </a>
+        )}
+        {canAssess2 && (
+          <a href={`/reports/${report.id}/assessment-2`} class="btn">
+            Assessment 2
           </a>
         )}
         <a href="/reports" class="btn ghost">
@@ -458,24 +551,22 @@ export function ReportPage({
         </a>
       </div>
 
+      {error && (
+        <div class="alert alert-error" role="alert" safe>
+          {error}
+        </div>
+      )}
+
       <ReportDocument report={report} />
 
-      {/* Who the report is with, named rather than left to be inferred from the status. A manager
-          who has just assigned a second assessor is told here that it took, and everyone else can
-          see who holds the report without opening the register. */}
-      <div class="card card-b">
-        <h2 class="report-heading">Assessors</h2>
-        <dl>
-          <dt>First assessor</dt>
-          <dd safe>{assessor1Name ?? "Not assigned"}</dd>
-
-          <dt>Second assessor</dt>
-          <dd safe>{assessor2Name ?? "Not assigned"}</dd>
-        </dl>
-      </div>
-
+      {/*
+       * The rest of the page is the manager's work on this report, in the order the process does
+       * it: read the first assessment, write a review of it, then hand it to a second Officer.
+       * The picker used to sit in the top bar, above the assessment it is a decision about; it is
+       * here now so that a manager scrolling down meets the three steps in the order they happen.
+       */}
       {assessment1Review && (
-        <div class="card card-b">
+        <>
           <h2 class="report-heading">First assessment</h2>
           <F004Form
             reportId={report.id}
@@ -488,16 +579,83 @@ export function ReportPage({
             // Not this reader's document to write, whatever its state: the manager reads the
             // finished F004 here and never posts one, so the page carries no form for it.
             readOnly
+            // Once 7.2 is actually in, it is rendered below with what the second assessor wrote.
+            // Leaving the placeholder here as well would have the page say "pending" directly
+            // above the finished thing.
+            sectionComments={assessment1Review.sectionComments}
+            commentAction={assessment1Review.commentAction}
+            omitSecond={assessment2Review !== undefined}
             issues={[]}
           />
-        </div>
+
+          {assessment1Review.managerComment && (
+            <ManagerReviewBlock
+              review={assessment1Review.managerComment}
+              heading="Manager review"
+            />
+          )}
+
+          {canComment && (
+            <form
+              method="POST"
+              action={`/reports/${report.id}/assessment-1/comment`}
+              class="review-form"
+            >
+              <div class="f">
+                <label for="manager-comment">
+                  {assessment1Review.managerComment
+                    ? "Replace your review of this assessment"
+                    : "Your review of this assessment"}
+                </label>
+                <textarea
+                  id="manager-comment"
+                  name="comment"
+                  rows="4"
+                  class="short"
+                  placeholder="What the second assessor should know before starting."
+                  safe
+                >
+                  {assessment1Review.managerComment?.text ?? ""}
+                </textarea>
+              </div>
+              <div class="bar">
+                <div class="sp"></div>
+                <button type="submit" class="btn">
+                  {assessment1Review.managerComment ? "Update review" : "Save review"}
+                </button>
+              </div>
+            </form>
+          )}
+        </>
       )}
 
+      {/* What the second assessor concluded, once they have. Read-only for everyone here — the
+          Officer who wrote it has their own page, and nobody else may write 7.2 at all. */}
+      {assessment2Review && (
+        <>
+          <h2 class="report-heading">Second assessment</h2>
+          <p class="hint">
+            <span safe>{assessment2Review.assessorName}</span> ·{" "}
+            <span safe>{assessment2Review.submittedOn}</span>
+          </p>
+          <div class="f4">
+            <F004Second
+              answers={assessment2Review.answers}
+              signedOn={assessment2Review.submittedOn}
+              locked
+            />
+          </div>
+        </>
+      )}
+
+      {/* Drawn only when the report is waiting for a second assessor and the first assessment
+          behind it is submitted. The route makes the same test for itself, so this decides
+          whether the control appears, never whether the assignment may be made. */}
       {secondAssessorPicker && (
-        <div class="card card-b">
-          <h2 class="report-heading">Assign second assessor</h2>
+        <>
+          <h2 class="report-heading">Second assessment</h2>
           {secondAssessorPicker.length === 0 ? (
-            <p class="hint">No active Officers are available to assign.</p>
+            <p class="hint">No eligible Officer is free to take the second assessment.</p>
           ) : (
             <form method="POST" action={`/reports/${report.id}/assign-assessor-2`} class="bar">
               <select name="assessor_id" aria-label="Second assessor">
@@ -508,11 +666,11 @@ export function ReportPage({
                 ))}
               </select>
               <button type="submit" class="btn">
-                Assign
+                Assign second assessor
               </button>
             </form>
           )}
-        </div>
+        </>
       )}
     </StaffShell>
   );

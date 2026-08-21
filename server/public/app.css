@@ -1409,41 +1409,13 @@ textarea[aria-invalid="true"] {
 
 /* ---------- the workload pipeline ---------- */
 /*
- * The six buckets are links, not buttons: each is a GET of this page filtered to one status, so a
- * card has to read as a card and behave as a link — no underline, the page's own ink, and a
- * pressed state the chosen one keeps while its rows are on screen.
+ * The six buckets are one flat bar, not six tiles: they are a filter over the list below, and a
+ * filter reads as a row of tabs. The rules live with `.mya-tabs` further down, which is the same
+ * bar the Officer's own page draws — one set of declarations, two names, so the two cannot drift.
+ *
+ * Still links rather than buttons: each is a GET of this page filtered to one status, which is
+ * what lets a filtered pipeline be bookmarked and reloaded.
  */
-.stats-pick {
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-}
-
-.stat-pick {
-  display: block;
-  color: inherit;
-  text-decoration: none;
-  transition: border-color 0.12s, background 0.12s;
-}
-
-.stat-pick:hover {
-  border-color: var(--green);
-}
-
-.stat-pick.on {
-  border-color: var(--green);
-  background: var(--leaf-bg);
-}
-
-.stat-pick .eyebrow {
-  display: block;
-  line-height: 1.35;
-}
-
-.stat-icon {
-  display: block;
-  font-size: 17px;
-  line-height: 1;
-  margin-bottom: 7px;
-}
 
 .dash-note {
   margin-bottom: 18px;
@@ -1476,6 +1448,33 @@ textarea[aria-invalid="true"] {
   font-size: 15px;
   font-weight: 600;
   margin: 26px 0 12px;
+}
+
+/*
+ * The manager's review of an assessment: a rule and the words, not a card.
+ *
+ * It sits between the assessment it is about and the handover it precedes, and the page already
+ * has two heavy blocks either side of it. A border on one edge is enough to say "this is somebody
+ * speaking about the document above" without adding a third framed box to scroll past.
+ */
+.review {
+  border-left: 3px solid var(--rule-2);
+  padding: 2px 0 2px 14px;
+  margin-bottom: 18px;
+}
+
+.review .hint {
+  margin-bottom: 4px;
+}
+
+/* The manager typed paragraphs; nothing else in the string is markup, so this is all it needs. */
+.review-text {
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+.review-form {
+  margin-bottom: 22px;
 }
 
 /* ---------- the mark on the orange page ---------- */
@@ -1665,6 +1664,44 @@ textarea[aria-invalid="true"] {
   background: var(--f4-badge); color: var(--green-d); padding: 1px 9px; border-radius: var(--r);
   font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
 }
+
+/* ---------- the manager's notes on a section ---------- */
+/*
+ * A strip under the section bar, not a card: the F004 is a document, and eight boxes down its
+ * length would compete with it for the reader's attention. Shut, it is one quiet line carrying a
+ * count; open, it is the thread and a box to add to it.
+ *
+ * `<details>` rather than a script, on the same argument the report drawer's checkbox makes: this
+ * door renders on the server, and a panel that opens with no JavaScript is the house pattern.
+ */
+.f4-notes {
+  border-bottom: 1px solid var(--rule);
+  background: var(--card);
+}
+.f4-notes > summary {
+  display: flex; align-items: center; gap: 7px; cursor: pointer;
+  padding: 6px 16px; font-size: 12px; color: var(--ink-3);
+  list-style: none;
+}
+.f4-notes > summary::-webkit-details-marker { display: none; }
+.f4-notes > summary:hover { color: var(--ink); }
+.f4-notes > summary:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+.f4-notes[open] > summary { color: var(--green-d); font-weight: 600; }
+/* currentcolor again, so the bubble follows the row it sits on rather than needing its own rule. */
+.f4-notes svg {
+  width: 14px; height: 14px; flex: none;
+  fill: none; stroke: currentcolor; stroke-width: 1.7;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+.f4-note-list { list-style: none; margin: 0; padding: 0 16px 4px; }
+.f4-note-list li { padding: 7px 0; border-top: 1px solid var(--rule); }
+.f4-note-list li:first-child { border-top: 0; }
+.f4-note-who { display: flex; gap: 8px; align-items: baseline; font-size: 12.5px; }
+.f4-note-list p { font-size: 13px; margin-top: 2px; white-space: pre-wrap; }
+
+.f4-note-write { display: flex; gap: 8px; align-items: flex-start; padding: 0 16px 10px; }
+.f4-note-write textarea { flex: 1; min-width: 0; font-size: 13px; }
 
 .f4-row {
   display: grid; grid-template-columns: 1.15fr 1fr; gap: 16px;
@@ -1919,20 +1956,41 @@ ul.f4-card-c li { margin-bottom: 3px; }
  * default, now also `:target`) blanks the panel. In progress and Submitted were never the default,
  * so they were not caught.
  */
-.mya-tabs {
+/* One bar, two pages: the Officer's four states and the manager's six buckets are the same
+   control over the same kind of list, so they share these declarations rather than each keeping
+   a copy that could drift. */
+.mya-tabs,
+.wl-tabs {
   display: flex; flex-wrap: wrap; gap: 2px;
   border-bottom: 1px solid var(--rule); margin-bottom: 20px;
 }
-.mya-tabs a {
+.mya-tabs a,
+.wl-tabs a {
+  display: inline-flex; align-items: center; gap: 7px;
   font-size: 13px; font-weight: 500; color: var(--ink-3); text-decoration: none;
   padding: 8px 15px; margin-bottom: -1px; border-bottom: 2px solid transparent;
 }
-.mya-tabs a:hover { color: var(--ink); }
-.mya-tabs a:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
-.mya-count { font-variant-numeric: tabular-nums; margin-left: 5px; opacity: 0.75; }
+/* No colour of its own: `currentcolor` means the active tab's green reaches the icon through the
+   same rule that paints the label, rather than through a second one naming the icon. */
+.mya-tabs a svg,
+.wl-tabs a svg {
+  width: 15px; height: 15px; flex: none;
+  fill: none; stroke: currentcolor; stroke-width: 1.7;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.mya-tabs a:hover,
+.wl-tabs a:hover { color: var(--ink); }
+.mya-tabs a:focus-visible,
+.wl-tabs a:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+.mya-count,
+.wl-count { font-variant-numeric: tabular-nums; margin-left: 5px; opacity: 0.75; }
 
-/* The selected tab: filled underline in the portal's green, the other two left quiet. */
+/* The selected tab: filled underline in the portal's green, the others left quiet. The workload
+   bar marks its own chosen bucket server-side with the same `.on`, so it needs nothing further —
+   its filter is a query parameter rather than a `:target`, and none of the `:has()` rules below
+   can match it. */
 .mya-tabs a.on,
+.wl-tabs a.on,
 .mya-wrap:has(#not-started:target) .mya-tabs a[href="#not-started"],
 .mya-wrap:has(#in-progress:target) .mya-tabs a[href="#in-progress"],
 .mya-wrap:has(#submitted:target) .mya-tabs a[href="#submitted"],

@@ -177,6 +177,22 @@ export const assessments = pgTable(
     conclusion: text("conclusion"),
     /** Null means still a draft. */
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
+
+    /**
+     * The manager's review of this assessment.
+     *
+     * Here rather than in a table of its own because the row already says which report and which
+     * assessment: (report_id, ordinal) is unique, so a review cannot be attached to the wrong half
+     * of a report's two assessments. Ordinal 2 carries the same three columns, which is the
+     * manager's later review of the second assessment.
+     *
+     * The three move together, and `managerCommentAt` is the one that means "reviewed" — the text
+     * is never read without it.
+     */
+    managerComment: text("manager_comment"),
+    managerCommentBy: uuid("manager_comment_by").references(() => users.id),
+    managerCommentAt: timestamp("manager_comment_at", { withTimezone: true }),
+
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -184,6 +200,42 @@ export const assessments = pgTable(
     // "The second assessor must differ from the first" is a domain rule, not expressible here.
     uniqueIndex("assessments_report_ordinal_uq").on(t.reportId, t.ordinal),
     index("assessments_assessor_idx").on(t.assessorId),
+  ],
+);
+
+/**
+ * The manager's comments on individual sections of one assessment.
+ *
+ * A table where `managerComment` above is three columns, and for the opposite reason: that stores
+ * one verdict about a whole assessment and this stores a list about its parts. Both are wanted —
+ * the overall review is what the manager concluded, these are their notes in the margin.
+ *
+ * Keyed on the assessment row itself rather than on (report_id, ordinal), which the unique index
+ * above already resolves to exactly this row. Which report a comment belongs to is a join away
+ * and is never stored a second time where the two could disagree.
+ *
+ * `section` is text rather than an enum: the eight the F004 exposes are a property of a form
+ * version, not of the database, and the route is what holds the list of what may be written.
+ */
+export const assessmentComments = pgTable(
+  "assessment_comments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    assessmentId: uuid("assessment_id")
+      .notNull()
+      .references(() => assessments.id, { onDelete: "cascade" }),
+    /** Which part of the form. `"1"` … `"8"`, the F004's own section numbers. */
+    section: text("section").notNull(),
+    authorUserId: uuid("author_user_id")
+      .notNull()
+      .references(() => users.id),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // Both reads this feature makes — the count beside every bar, and one section's thread — filter
+    // on the assessment then the section, and want the oldest first.
+    index("assessment_comments_assessment_section_idx").on(t.assessmentId, t.section, t.createdAt),
   ],
 );
 
