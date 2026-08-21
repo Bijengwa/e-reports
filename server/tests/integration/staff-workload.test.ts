@@ -132,7 +132,7 @@ async function seedReport(over: {
 
 /** A bucket's figure, asserted as markup so a bare label elsewhere on the page cannot satisfy it. */
 function bucketStat(label: string, count: number): string {
-  return `<span class="eyebrow">${label}</span><b>${count}</b>`;
+  return `<span>${label}</span> <span class="wl-count">${count}</span>`;
 }
 
 /** Body rows of the one table on the page, the header row discounted. */
@@ -305,11 +305,11 @@ describe.skipIf(!INTEGRATION_ENABLED)("the figures", () => {
     const body = (await get("/workload", manager.cookie)).body;
 
     expect(body).toContain(bucketStat("Not started", 3));
-    expect(body).toContain(bucketStat("Waiting on you — assign A2", 1));
+    expect(body).toContain(bucketStat("Assign A2", 1));
     expect(body).toContain(bucketStat("Closed", 1));
     // A bucket nothing is in is drawn as zero rather than left off the page.
-    expect(body).toContain(bucketStat("In progress — first assessment", 0));
-    expect(body).toContain(bucketStat("Waiting on you — decision", 0));
+    expect(body).toContain(bucketStat("First assessment", 0));
+    expect(body).toContain(bucketStat("Decision", 0));
   });
 
   it("keeps the figures whole while the list is filtered", async () => {
@@ -335,10 +335,10 @@ describe.skipIf(!INTEGRATION_ENABLED)("the figures", () => {
 
     for (const label of [
       "Not started",
-      "In progress — first assessment",
-      "Waiting on you — assign A2",
-      "In progress — second assessment",
-      "Waiting on you — decision",
+      "First assessment",
+      "Assign A2",
+      "Second assessment",
+      "Decision",
       "Closed",
     ]) {
       expect(body, label).toContain(bucketStat(label, 0));
