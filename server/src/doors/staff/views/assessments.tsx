@@ -9,6 +9,56 @@ import {
 import { StaffShell } from "./shell.js";
 
 /**
+ * The four tab icons, drawn the way the rail draws its own.
+ *
+ * Same contract as `shell.tsx`'s set and no other: a 24-unit box, no `fill`, and no colour of
+ * their own — `stroke: currentcolor` in the stylesheet means each one is painted by whatever the
+ * tab's text colour already is, so the active tab's green reaches the icon without a second rule
+ * naming it. `aria-hidden` because the label beside it already says the word.
+ *
+ * Local to this page rather than exported from the shell: those are the rail's, sized and placed
+ * by rail rules, and one shared set would have to answer to both.
+ */
+function IconNotStarted(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M6 3h8l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+      <path d="M14 3v5h5" />
+    </svg>
+  );
+}
+
+function IconInProgress(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17v3z" />
+      <path d="M14.5 7.5l3 3" />
+    </svg>
+  );
+}
+
+function IconSubmitted(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M5 4h11l4 4v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" />
+      <path d="M15 4v5h5" />
+      <path d="M8 14l2.5 2.5L16 11" />
+    </svg>
+  );
+}
+
+function IconSecondAssessment(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <circle cx="9" cy="8" r="3.4" />
+      <path d="M2.6 20a6.4 6.4 0 0 1 12.8 0" />
+      <path d="M16.2 5.2a3.4 3.4 0 0 1 0 5.8" />
+      <path d="M17.8 14.4A6.4 6.4 0 0 1 21.4 20" />
+    </svg>
+  );
+}
+
+/**
  * A report this Officer holds as second assessor.
  *
  * Narrower than `ReceivedRow`: no `mine`, because that flag decides whether to offer the first
@@ -25,11 +75,16 @@ export type SecondAssessmentRow = {
 };
 
 /**
- * The second assessor's work, listed but not yet openable as a form.
+ * The second assessor's work, and the way into each piece of it.
  *
- * Every row opens the report itself. Writing a second assessment is a page that does not exist
- * yet, and a link to one would answer 404 — so this lists what has been handed to the Officer and
- * says plainly that the form is still to come, rather than implying an action it cannot offer.
+ * The number opens the report and the action opens the second assessment, which is the same pair
+ * the first assessor's rows offer one ordinal along. The route behind the action asks the row
+ * whether this Officer is its second assessor, so the link decides what is drawn and never what
+ * may be opened.
+ *
+ * The action is offered on every row in this group rather than on those in a particular status: a
+ * report is in this list exactly because a manager named this Officer as its second assessor, and
+ * that assignment is what the page behind it checks.
  */
 function SecondAssessmentRows({ reports }: { reports: SecondAssessmentRow[] }): JSX.Element {
   return (
@@ -41,6 +96,7 @@ function SecondAssessmentRows({ reports }: { reports: SecondAssessmentRow[] }): 
           <th>Device</th>
           <th>Severity</th>
           <th>Status</th>
+          <th>Assessment</th>
         </tr>
       </thead>
       <tbody>
@@ -62,6 +118,11 @@ function SecondAssessmentRows({ reports }: { reports: SecondAssessmentRow[] }): 
               <span class="tag muted" safe>
                 {STATUS_LABELS[report.status] ?? report.status}
               </span>
+            </td>
+            <td>
+              <a href={`/reports/${report.id}/assessment-2`} class="btn ghost btn-sm">
+                Assessment 2
+              </a>
             </td>
           </tr>
         ))}
@@ -168,16 +229,28 @@ export function MyAssessmentsPage({
       <div class="mya-wrap">
         <nav class="mya-tabs" aria-label="Filter by state">
           <a href="#not-started" class="on">
-            Not started <span class="mya-count">{notStarted.length}</span>
+            <IconNotStarted />
+            <span>
+              Not started <span class="mya-count">{notStarted.length}</span>
+            </span>
           </a>
           <a href="#in-progress">
-            In progress <span class="mya-count">{inProgress.length}</span>
+            <IconInProgress />
+            <span>
+              In progress <span class="mya-count">{inProgress.length}</span>
+            </span>
           </a>
           <a href="#submitted">
-            Submitted <span class="mya-count">{submitted.length}</span>
+            <IconSubmitted />
+            <span>
+              Submitted <span class="mya-count">{submitted.length}</span>
+            </span>
           </a>
           <a href="#second-assessment">
-            Second assessment <span class="mya-count">{secondAssessment.length}</span>
+            <IconSecondAssessment />
+            <span>
+              Second assessment <span class="mya-count">{secondAssessment.length}</span>
+            </span>
           </a>
         </nav>
 

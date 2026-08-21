@@ -16,6 +16,20 @@ export const F004_VERSION = "TMDA/DMD/MDV/F/004 Rev 05";
 /** 1 = first assessment. The second assessor's is ordinal 2 and is not written here. */
 export const FIRST_ASSESSMENT = 1;
 
+/**
+ * The eight sections the F004 is divided into, as the document itself numbers them.
+ *
+ * The one list of what a comment may be attached to. The form renders these as `id="section-N"`
+ * anchors and the comment route accepts these and nothing else, so "that section does not exist"
+ * is answered from the document rather than from a second list that could fall behind it.
+ *
+ * Sub-blocks — 2.5, 4.1, 7.1 — are deliberately not here. They carry no stable anchor yet, and
+ * `assessment_comments.section` is text precisely so adding them later changes what this list
+ * says without migrating anything already written.
+ */
+export const F004_SECTION_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8"] as const;
+export const SECOND_ASSESSMENT = 2;
+
 export type F004Answers = Record<string, string | string[]>;
 
 export function value(answers: F004Answers, field: string): string {
@@ -551,9 +565,19 @@ export const F004_FIELDS: readonly string[] = [
   "signature",
 ];
 
-/** Keep what the form owns and drop the rest, so the payload is the document and nothing else. */
-export function collect(fields: Record<string, string | string[]>): F004Answers {
-  const owned = new Set(F004_FIELDS);
+/**
+ * Every field the second assessment owns: section 7.2 and the second assessor's signature.
+ *
+ * Named apart from 7.1's `actions`, `conclusion` and `signature` rather than reusing those under a
+ * different ordinal. A report's two assessments are two rows read onto one page, and a shared name
+ * is all it would take for the second assessor's remarks to render as the first's — different
+ * names make that mix-up inexpressible rather than merely avoided.
+ */
+export const F004_SECOND_FIELDS: readonly string[] = ["actions_2", "conclusion_2", "signature_2"];
+
+/** Keep what the named set owns and drop the rest, so a payload is the document and nothing else. */
+function keep(fields: Record<string, string | string[]>, names: readonly string[]): F004Answers {
+  const owned = new Set(names);
   const answers: F004Answers = {};
 
   for (const [name, raw] of Object.entries(fields)) {
@@ -561,4 +585,48 @@ export function collect(fields: Record<string, string | string[]>): F004Answers 
   }
 
   return answers;
+}
+
+/** The first assessment's own fields, and no others. */
+export function collect(fields: Record<string, string | string[]>): F004Answers {
+  return keep(fields, F004_FIELDS);
+}
+
+/**
+ * The second assessment's own fields, and no others.
+ *
+ * Deliberately not a superset of `collect`: the second assessor is not writing the first
+ * assessor's document, so a body carrying `conclusion` or `signature` — hand-edited, or replayed
+ * from the page above — reaches the stored payload with neither.
+ */
+export function collectSecond(fields: Record<string, string | string[]>): F004Answers {
+  return keep(fields, F004_SECOND_FIELDS);
+}
+
+/**
+ * What a second submission must carry.
+ *
+ * The same shape of rule as `validateForSubmit`, over the second assessor's half: the concluding
+ * remarks the rest of the process reads, and the signature that makes it their finding rather than
+ * an anonymous one. The eleven actions are optional here exactly as they are in 7.1 — a second
+ * assessor who proposes no new action has still concluded.
+ */
+export function validateSecondForSubmit(answers: F004Answers, assessorName: string): Issue[] {
+  const issues: Issue[] = [];
+
+  if (value(answers, "conclusion_2").trim() === "") {
+    issues.push({ field: "conclusion_2", message: "7.2 Concluding remarks are required." });
+  }
+
+  const signature = value(answers, "signature_2").trim();
+  if (signature === "") {
+    issues.push({ field: "signature_2", message: "Sign by typing your name to confirm." });
+  } else if (signature.toLowerCase() !== assessorName.trim().toLowerCase()) {
+    issues.push({
+      field: "signature_2",
+      message: `The signature must be your own name, exactly as "${assessorName}".`,
+    });
+  }
+
+  return issues;
 }

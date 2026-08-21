@@ -256,10 +256,10 @@ function assignment(row: Row) {
 
 /** A bucket's figure on the workload page, asserted as markup so a bare label cannot satisfy it. */
 function bucketStat(label: string, count: number): string {
-  return `<span class="eyebrow">${label}</span><b>${count}</b>`;
+  return `<span>${label}</span> <span class="wl-count">${count}</span>`;
 }
 
-const ASSIGN_A2 = "Waiting on you — assign A2";
+const ASSIGN_A2 = "Assign A2";
 
 describe.skipIf(!INTEGRATION_ENABLED)("the manager's pipeline", () => {
   beforeEach(start);
@@ -344,6 +344,118 @@ describe.skipIf(!INTEGRATION_ENABLED)("the manager's pipeline", () => {
   });
 });
 
+describe.skipIf(!INTEGRATION_ENABLED)("who the picker offers", () => {
+  beforeEach(start);
+
+  /** The ids the picker actually offers, read out of the rendered menu. */
+  function offered(body: string): string[] {
+    const select = body.match(/<select name="assessor_id"[^>]*>([\s\S]*?)<\/select>/);
+    if (select === null) return [];
+    return [...select[1].matchAll(/value="([^"]+)"/g)].map((m) => m[1]);
+  }
+
+  /** The page's top bar alone, which ends where the report's own document begins. */
+  function topBar(body: string): string {
+    return body.slice(body.indexOf('<div class="staff-head">'), body.indexOf("report-facts"));
+  }
+
+  it("offers the other active Officers", async () => {
+    const { manager, other, report } = await waiting();
+    const third = await signedInAs("assessor", "Chausiku Njau");
+
+    const options = offered((await get(`/reports/${report.id}`, manager.cookie)).body);
+
+    expect(options).toContain(other.id);
+    expect(options).toContain(third.id);
+  });
+
+  it("never offers the first assessor of that report", async () => {
+    const { manager, officer, other, report } = await waiting();
+
+    const body = (await get(`/reports/${report.id}`, manager.cookie)).body;
+
+    // The one rule this list exists to respect: one report is reviewed by two people. Offering the
+    // first assessor would offer an assignment the POST refuses, and a control that can only
+    // produce a refusal is worse than no control.
+    expect(offered(body)).not.toContain(officer.id);
+    expect(offered(body)).toContain(other.id);
+    expect(body).not.toContain(`value="${officer.id}"`);
+  });
+
+  it("offers nobody who is not an active Officer", async () => {
+    const { manager, report } = await waiting();
+    const otherManager = await signedInAs("manager", "Second Mgr");
+    const admin = await signedInAs("administrator", "Adm");
+    const dormant = await inactiveAssessor();
+
+    const options = offered((await get(`/reports/${report.id}`, manager.cookie)).body);
+
+    for (const [who, id] of [
+      ["a manager", otherManager.id],
+      ["an administrator", admin.id],
+      ["a deactivated Officer", dormant],
+      ["the manager reading the page", manager.id],
+    ] as const) {
+      expect(options, who).not.toContain(id);
+    }
+  });
+
+  it("says so plainly when excluding the first assessor leaves nobody", async () => {
+    // The only active Officer on the system is the one who wrote the first assessment, so the
+    // exclusion empties the list — and the page says that rather than drawing an empty menu.
+    const manager = await signedInAs("manager", "Mgr");
+    const officer = await signedInAs("assessor", "Asha Mrema");
+
+    await fileAtThePublicDoor();
+    const filed = await onlyReport();
+    expect(filed.assessor1_user_id).toBe(officer.id);
+
+    const submitted = await post(
+      `/reports/${filed.id}/assessment-1`,
+      officer.cookie,
+      completeAssessment(officer.name),
+    );
+    expect(submitted.statusCode).toBe(302);
+
+    const body = (await get(`/reports/${filed.id}`, manager.cookie)).body;
+
+    expect(body).toContain("No eligible Officer is free to take the second assessment.");
+    expect(body).not.toContain('name="assessor_id"');
+  });
+
+  /**
+   * The assignment used to sit in the page's top bar. It sits below the first assessment now, and
+   * below the manager's review of it, because those are the two things a manager does before
+   * deciding who to hand the report to — and a control for the third step read above the first.
+   *
+   * What has not changed is that it is still a heading and a bar, like the assessment above it,
+   * rather than a framed card of its own.
+   */
+  it("puts the assignment after the assessment and its review, still without a card", async () => {
+    const { manager, report } = await waiting();
+
+    const body = (await get(`/reports/${report.id}`, manager.cookie)).body;
+
+    const assessment = body.indexOf("First assessment");
+    const review = body.indexOf(`/reports/${report.id}/assessment-1/comment`);
+    const assign = body.indexOf(`/reports/${report.id}/assign-assessor-2`);
+
+    expect(assessment).toBeGreaterThan(-1);
+    expect(review).toBeGreaterThan(assessment);
+    expect(assign).toBeGreaterThan(review);
+
+    // The same plain bar the rest of the door uses for a row of controls.
+    expect(body).toContain(
+      `<form method="POST" action="/reports/${report.id}/assign-assessor-2" class="bar">`,
+    );
+
+    // Both assessors still read on the top bar's own hint line, beside the report's other facts.
+    const head = topBar(body);
+    expect(head).toContain("A1:");
+    expect(head).toContain("A2: not assigned");
+  });
+});
+
 describe.skipIf(!INTEGRATION_ENABLED)("what the assignment hands over", () => {
   beforeEach(start);
 
@@ -389,33 +501,35 @@ describe.skipIf(!INTEGRATION_ENABLED)("what the assignment hands over", () => {
     const { manager, officer, other, report } = await waiting();
 
     const before = (await get(`/reports/${report.id}`, manager.cookie)).body;
-    expect(before).toContain("First assessor");
-    expect(before).toContain(officer.name);
-    // Nobody holds the second half yet, and the page says so rather than leaving it blank.
-    expect(before).toContain("Not assigned");
+    expect(before).toContain(`A1: ${officer.name}`);
+    // Nobody holds the second half yet, and the top bar says so rather than leaving it blank.
+    expect(before).toContain("A2: not assigned");
 
     await assign(report, manager.cookie, other.id);
 
     const after = (await get(`/reports/${report.id}`, manager.cookie)).body;
-    expect(after).toContain("Second assessor");
-    expect(after).toContain(other.name);
-    expect(after).not.toContain("Not assigned");
+    expect(after).toContain(`A1: ${officer.name}`);
+    expect(after).toContain(`A2: ${other.name}`);
+    expect(after).not.toContain("A2: not assigned");
   });
 
   it("offers the manager the way in from the bucket that is waiting on them", async () => {
     const { manager, other, report } = await waiting();
 
+    // The row's own link, matched as the anchor rather than as the bare words: "Assign A2" is
+    // also the caption of the bucket's tab, which is on the page whatever the rows say.
+    const rowLink = `<a href="/reports/${report.id}">Assign A2</a>`;
+
     const waitingBucket = (await get("/workload?status=awaiting_second_assessor", manager.cookie))
       .body;
-    expect(waitingBucket).toContain("Assign A2");
-    expect(waitingBucket).toContain(`href="/reports/${report.id}"`);
+    expect(waitingBucket).toContain(rowLink);
 
     await assign(report, manager.cookie, other.id);
 
     // Once named, the row states who rather than offering the way in again.
     const secondBucket = (await get("/workload?status=second_assessment", manager.cookie)).body;
     expect(secondBucket).toContain(`A2: ${other.name}`);
-    expect(secondBucket).not.toContain("Assign A2");
+    expect(secondBucket).not.toContain(rowLink);
   });
 });
 
@@ -480,7 +594,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("assigning one", () => {
 
     const secondBucket = (await get("/workload?status=second_assessment", manager.cookie)).body;
     expect(secondBucket).toContain(report.number);
-    expect(secondBucket).toContain(bucketStat("In progress — second assessment", 1));
+    expect(secondBucket).toContain(bucketStat("Second assessment", 1));
 
     // The report is no longer waiting, so there is nothing left to pick.
     const detail = (await get(`/reports/${report.id}`, manager.cookie)).body;
@@ -661,7 +775,14 @@ describe.skipIf(!INTEGRATION_ENABLED)("who may reach it at all", () => {
 describe.skipIf(!INTEGRATION_ENABLED)("what the page offers", () => {
   beforeEach(start);
 
-  it("posts to the assignment route and to nowhere else", async () => {
+  /**
+   * The whole of what this page lets a manager do, enumerated rather than sampled.
+   *
+   * Two forms now, where there was one: the review of the first assessment and the handover that
+   * follows it. Listing them in order is the cheapest way to catch a third arriving unnoticed —
+   * and the order is itself the rule, since a manager reviews before handing on.
+   */
+  it("posts to the review and the assignment, and to nowhere else", async () => {
     const { manager, report } = await waiting();
 
     const body = (await get(`/reports/${report.id}`, manager.cookie)).body;
@@ -669,7 +790,21 @@ describe.skipIf(!INTEGRATION_ENABLED)("what the page offers", () => {
     const posts = (body.match(/action="([^"]*)"/g) ?? []).filter(
       (action) => !action.includes("/logout"),
     );
-    expect(posts).toEqual([`action="/reports/${report.id}/assign-assessor-2"`]);
+
+    // The overall review, the assignment, and one note box per section of the F004 — eight of
+    // those, each posting only to its own section, which is what stops a comment written against
+    // section 3 landing anywhere else.
+    const sections = ["1", "2", "3", "4", "5", "6", "7", "8"].map(
+      (no) => `action="/reports/${report.id}/assessment-1/sections/${no}/comments"`,
+    );
+
+    expect([...posts].sort()).toEqual(
+      [
+        `action="/reports/${report.id}/assessment-1/comment"`,
+        `action="/reports/${report.id}/assign-assessor-2"`,
+        ...sections,
+      ].sort(),
+    );
   });
 });
 
