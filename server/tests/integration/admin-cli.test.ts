@@ -80,28 +80,40 @@ describe.skipIf(!INTEGRATION_ENABLED)("createAdmin", () => {
     expect(rows[0]).toMatchObject({ email: "admin@tmda.go.tz", full_name: "First Admin" });
   });
 
-  it("refuses the second bootstrap and adds no row", async () => {
+  it("creates a second administrator", async () => {
     await createAdmin(app.db, { email: "first@tmda.go.tz", name: "First Admin" });
+
     const second = await createAdmin(app.db, { email: "second@tmda.go.tz", name: "Second Admin" });
 
-    expect(second).toMatchObject({
-      status: "refused",
-      message: "An administrator already exists. Bootstrap is closed.",
-    });
-    expect(await administratorCount(owner.db)).toBe(1);
+    expect(second.status).toBe("ok");
+    expect(await administratorCount(owner.db)).toBe(2);
   });
 
-  it("refuses when an administrator exists alongside other users", async () => {
+  it("refuses the third and adds no row", async () => {
+    await createAdmin(app.db, { email: "first@tmda.go.tz", name: "First Admin" });
+    await createAdmin(app.db, { email: "second@tmda.go.tz", name: "Second Admin" });
+
+    const third = await createAdmin(app.db, { email: "third@tmda.go.tz", name: "Third Admin" });
+
+    expect(third).toMatchObject({
+      status: "refused",
+      message: "The administrator limit of 2 is already reached.",
+    });
+    expect(await administratorCount(owner.db)).toBe(2);
+  });
+
+  it("counts only administrators toward the limit", async () => {
     await seedUser(owner.db, { email: "manager@tmda.go.tz", role: "manager" });
+    await seedUser(owner.db, { email: "officer@tmda.go.tz", role: "assessor" });
     await createAdmin(app.db, { email: "admin@tmda.go.tz", name: "First Admin" });
 
-    const again = await createAdmin(app.db, { email: "other@tmda.go.tz", name: "Other" });
+    const second = await createAdmin(app.db, { email: "other@tmda.go.tz", name: "Other" });
 
-    expect(again.status).toBe("refused");
-    expect(await administratorCount(owner.db)).toBe(1);
+    expect(second.status).toBe("ok");
+    expect(await administratorCount(owner.db)).toBe(2);
   });
 
-  it("reports a taken email distinctly from a closed bootstrap", async () => {
+  it("reports a taken email distinctly from a reached limit", async () => {
     await seedUser(owner.db, { email: "taken@tmda.go.tz", role: "assessor" });
 
     const result = await createAdmin(app.db, { email: "taken@tmda.go.tz", name: "First Admin" });
@@ -153,15 +165,34 @@ describe.skipIf(!INTEGRATION_ENABLED)("createAdmin concurrency", () => {
     await truncateAll(owner.db);
   });
 
-  it("lets exactly one of two concurrent bootstraps win", async () => {
+  it("lets both concurrent creations win while the limit has room for two", async () => {
     const results = await Promise.all([
       createAdmin(first.db, { email: "one@tmda.go.tz", name: "One" }),
       createAdmin(second.db, { email: "two@tmda.go.tz", name: "Two" }),
     ]);
 
+    expect(results.filter((r) => r.status === "ok")).toHaveLength(2);
+    expect(await administratorCount(owner.db)).toBe(2);
+  });
+
+  /**
+   * The case the lock exists for.
+   *
+   * With one administrator already stored, both transactions read a count of 1 unless something
+   * serializes them — the counting subquery takes no lock, so under READ COMMITTED they would
+   * both see room and store a third.
+   */
+  it("lets exactly one of two concurrent creations win at the limit", async () => {
+    await createAdmin(first.db, { email: "one@tmda.go.tz", name: "One" });
+
+    const results = await Promise.all([
+      createAdmin(first.db, { email: "two@tmda.go.tz", name: "Two" }),
+      createAdmin(second.db, { email: "three@tmda.go.tz", name: "Three" }),
+    ]);
+
     expect(results.filter((r) => r.status === "ok")).toHaveLength(1);
     expect(results.filter((r) => r.status === "refused")).toHaveLength(1);
-    expect(await administratorCount(owner.db)).toBe(1);
+    expect(await administratorCount(owner.db)).toBe(2);
   });
 
   it("uses the shared lock key rather than a repeated literal", () => {

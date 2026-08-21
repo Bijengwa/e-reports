@@ -1,13 +1,13 @@
 import { loadConfig } from "../config.js";
 import { createDatabase } from "../db/client.js";
-import { createAdmin } from "./create-admin.js";
+import { createAdmin, MAX_ADMINISTRATORS } from "./create-admin.js";
 import { resetPassword } from "./reset-password.js";
 import type { CommandResult } from "./result.js";
 
 const HELP = `AE Reports staff account tool.
 
   create          --email=<address> --name="<full name>"
-                  Creates the first administrator. Refuses once one exists.
+                  Creates an administrator. Refuses once ${MAX_ADMINISTRATORS} exist.
 
   reset-password  --email=<address>
                   Issues a new temporary password and ends that user's sessions.
@@ -16,9 +16,14 @@ Both print a temporary password once, to stdout. It stops working as soon as the
 user sets their own. Read it, deliver it, do not store it.
 
 Anyone who can run these commands can already reach the database directly, so
-they are a break-glass tool, not a privilege boundary. The guard on 'create'
-prevents accidents -- running it twice, or two operators at once -- not an
-operator holding DATABASE_URL.
+they are a break-glass tool, not a privilege boundary. The limit on 'create'
+prevents accidents -- running it once too often, or two operators at once --
+not an operator holding DATABASE_URL.
+
+This is the only way an administrator account is made or recovered. The staff
+site never creates one, and it refuses to reset or deactivate one, so an
+administrator locked out of their own account is a job for 'reset-password'
+here.
 
 Exit codes: 0 success, 1 refused, 2 invalid input, 3 unexpected failure.
 `;

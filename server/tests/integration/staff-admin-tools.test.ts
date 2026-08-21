@@ -303,6 +303,58 @@ describe.skipIf(!INTEGRATION_ENABLED)("what an administrator may not do", () => 
     expect(list.body).toContain(`/users/${target.id}/reset`);
   });
 
+  /**
+   * The rule a second administrator makes necessary.
+   *
+   * Resetting a colleague's password hands the resetter a credential they can sign in with, so an
+   * administrator able to reset another one can simply become them. Deactivating is the same power
+   * pointed the other way. Neither is a thing this door offers about an administrator — recovering
+   * one is a break-glass job for whoever holds DATABASE_URL.
+   */
+  it("refuses to reset or deactivate another administrator", async () => {
+    const admin = await signedInAs("administrator");
+    const other = await signedInAs("administrator", "Second Admin");
+
+    const reset = await act(`/users/${other.id}/reset`, admin.cookie);
+    const off = await act(`/users/${other.id}/deactivate`, admin.cookie);
+
+    expect(reset.statusCode).toBe(403);
+    expect(off.statusCode).toBe(403);
+
+    const rows = await owner.db.execute(sql`
+      SELECT is_active, must_change_password FROM users WHERE id = ${other.id}
+    `);
+    expect(rows[0]).toMatchObject({ is_active: true, must_change_password: false });
+    // The refusal evicted nobody: the other administrator is still signed in.
+    expect(await sessionsOf(other.id)).toHaveLength(1);
+  });
+
+  it("refuses to reactivate an administrator, leaving that to the command line", async () => {
+    const admin = await signedInAs("administrator");
+    const other = await seed("administrator", "Second Admin");
+    await owner.db.execute(sql`UPDATE users SET is_active = false WHERE id = ${other.id}`);
+
+    const on = await act(`/users/${other.id}/reactivate`, admin.cookie);
+
+    expect(on.statusCode).toBe(403);
+
+    const rows = await owner.db.execute(sql`SELECT is_active FROM users WHERE id = ${other.id}`);
+    expect(rows[0]).toMatchObject({ is_active: false });
+  });
+
+  it("offers no buttons on another administrator's row", async () => {
+    const admin = await signedInAs("administrator");
+    const other = await seed("administrator", "Second Admin");
+    const target = await seed("manager");
+
+    const list = await get("/users", admin.cookie);
+
+    expect(list.body).not.toContain(`/users/${other.id}/reset`);
+    expect(list.body).not.toContain(`/users/${other.id}/deactivate`);
+    // A manager's row still carries them, so the absence above is about the role, not the layout.
+    expect(list.body).toContain(`/users/${target.id}/reset`);
+  });
+
   it("refuses to reset a deactivated account, as the CLI does", async () => {
     const admin = await signedInAs("administrator");
     const target = await seed("assessor");

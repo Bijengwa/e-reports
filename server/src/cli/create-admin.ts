@@ -11,6 +11,18 @@ import type { CommandResult } from "./result.js";
  */
 export const ADMIN_BOOTSTRAP_LOCK_KEY = 4_170_825_113n;
 
+/**
+ * How many administrators may exist at once.
+ *
+ * Two, so the office is never one forgotten password away from having nobody who can add staff.
+ * No more than two, because each one is another account that can create staff and reset anyone's
+ * credentials, and the point of a limit is that the number of those accounts is known.
+ *
+ * A constant rather than configuration, deliberately: an environment variable would let the limit
+ * differ between staging and production, and the safe number is not a deployment decision.
+ */
+export const MAX_ADMINISTRATORS = 2;
+
 const InputSchema = z.object({
   // Normalized before validation and before the unique index sees it. Without this,
   // A@tmda.go.tz and a@tmda.go.tz become two rows and 23505 never fires.
@@ -19,11 +31,12 @@ const InputSchema = z.object({
 });
 
 /**
- * Creates the first administrator, once.
+ * Creates an administrator, up to `MAX_ADMINISTRATORS`.
  *
- * `INSERT ... WHERE NOT EXISTS` is not race-free on its own: under READ COMMITTED the subquery
- * takes no lock, because there is no row to lock. The advisory lock is what closes that window,
- * and it is released when the transaction ends.
+ * The counting subquery is not race-free on its own: under READ COMMITTED it takes no lock, so
+ * two processes at the limit would both read the same count, both find room, and store one more
+ * administrator than the limit allows. The advisory lock is what closes that window, and it is
+ * released when the transaction ends.
  */
 export async function createAdmin(
   db: Database,
@@ -45,14 +58,14 @@ export async function createAdmin(
       const inserted = await tx.execute(sql`
         INSERT INTO users (email, full_name, role, password_hash, must_change_password, is_active)
         SELECT ${email}, ${name}, 'administrator', ${passwordHash}, true, true
-        WHERE NOT EXISTS (SELECT 1 FROM users WHERE role = 'administrator')
+        WHERE (SELECT count(*) FROM users WHERE role = 'administrator') < ${MAX_ADMINISTRATORS}
         RETURNING id
       `);
 
       if (inserted.length === 0) {
         return {
           status: "refused",
-          message: "An administrator already exists. Bootstrap is closed.",
+          message: `The administrator limit of ${MAX_ADMINISTRATORS} is already reached.`,
         };
       }
 
@@ -69,8 +82,8 @@ export async function createAdmin(
       return { status: "ok", message: `Administrator ${email} created.`, password };
     });
   } catch (error) {
-    // The bootstrap guard can pass while the address collides with a non-administrator. Saying
-    // "bootstrap is closed" there would be a lie, and exit 3 would claim the database is broken.
+    // The limit can have room while the address collides with an existing user. Reporting a
+    // reached limit there would be a lie, and exit 3 would claim the database is broken.
     if (isUniqueViolation(error, USERS_EMAIL_UNIQUE)) {
       return { status: "refused", message: "A user with that email already exists." };
     }

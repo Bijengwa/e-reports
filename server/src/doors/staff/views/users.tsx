@@ -24,9 +24,11 @@ export type StaffUser = {
   /**
    * Whether this row is the administrator reading the page.
    *
-   * Decided in the route by comparing against the session, not by matching on role: there is
-   * exactly one administrator today, but "the row that is me" and "the row that is an
-   * administrator" are different questions and only the first one protects the right person.
+   * Decided in the route by comparing against the session, not by matching on role. Both
+   * questions are asked of this table, and they are not the same one: the row that is an
+   * administrator is refused because of what it can do, and the row that is me is refused
+   * because nobody should be able to lock themselves out — which stays true for a manager the
+   * day this list is shown to one.
    */
   isSelf: boolean;
 };
@@ -118,10 +120,11 @@ export function UsersPage({ users, error, viewerRole, viewerName }: UsersPagePro
               <td>{day(user.createdAt)}</td>
               <td>{day(user.lastSignInAt)}</td>
               <td>
-                {/* Nothing at all on your own row. An administrator may not reset or deactivate
-                    themselves, and the surest way to render that is to render no control — though
-                    the routes check it again, because a missing button is not a control. */}
-                {user.isSelf ? (
+                {/* Nothing at all on your own row, and nothing on any administrator's. Neither
+                    may be reset or deactivated from here, and the surest way to render that is to
+                    render no control — though the routes check both again, because a missing
+                    button is not a control. */}
+                {user.isSelf || user.role === "administrator" ? (
                   <span class="hint">—</span>
                 ) : (
                   <div class="row-actions">

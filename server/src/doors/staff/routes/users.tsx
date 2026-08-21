@@ -20,6 +20,15 @@ const NOT_FOUND = "That account no longer exists.";
 const SELF_RESET = "You cannot reset your own password here. Use the change-password page.";
 const SELF_DEACTIVATE = "You cannot deactivate your own account.";
 const RESET_DEACTIVATED = "That account is deactivated. Reactivate it before resetting.";
+/**
+ * Why an administrator is never a target here.
+ *
+ * A reset hands the person who clicked it a working credential for the account they aimed at, so
+ * an administrator who may reset another administrator may simply become them — and deactivating
+ * is the same power pointed the other way. Neither belongs to a role that is already the highest
+ * one; recovering an administrator is a break-glass job for whoever holds DATABASE_URL.
+ */
+const ADMIN_TARGET = "Administrator accounts are not managed here. Use the command-line tool.";
 
 /**
  * The submitted account, and the whole of what an administrator may decide about it.
@@ -262,12 +271,20 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
 
     const outcome = await app.db.transaction(async (tx) => {
       const found = await tx.execute(sql`
-        SELECT email, full_name, is_active FROM users WHERE id = ${target.data}
+        SELECT email, full_name, role, is_active FROM users WHERE id = ${target.data}
       `);
 
       if (found.length === 0) return { status: "missing" } as const;
 
-      const user = found[0] as { email: string; full_name: string; is_active: boolean };
+      const user = found[0] as {
+        email: string;
+        full_name: string;
+        role: string;
+        is_active: boolean;
+      };
+
+      // Checked on the stored role rather than on anything the request carried. See ADMIN_TARGET.
+      if (user.role === "administrator") return { status: "administrator" } as const;
 
       // The CLI's rule, for the CLI's reason: a reset that cannot be used is a trap, and better
       // the administrator learns now than after reading a password down a phone line.
@@ -293,6 +310,9 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
     });
 
     if (outcome.status === "missing") return renderUsers(app, request, reply, 404, NOT_FOUND);
+    if (outcome.status === "administrator") {
+      return renderUsers(app, request, reply, 403, ADMIN_TARGET);
+    }
     if (outcome.status === "inactive") {
       return renderUsers(app, request, reply, 409, RESET_DEACTIVATED);
     }
@@ -335,10 +355,17 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const outcome = await app.db.transaction(async (tx) => {
-      const found = await tx.execute(sql`SELECT email FROM users WHERE id = ${target.data}`);
+      const found = await tx.execute(sql`
+        SELECT email, role FROM users WHERE id = ${target.data}
+      `);
       if (found.length === 0) return { status: "missing" } as const;
 
-      const { email } = found[0] as { email: string };
+      const { email, role } = found[0] as { email: string; role: string };
+
+      // Both directions, not just deactivation. Reactivating an administrator is no danger in
+      // itself, but only the CLI can put one out of action, so only the CLI brings one back —
+      // one rule about administrators is easier to hold than one rule per verb. See ADMIN_TARGET.
+      if (role === "administrator") return { status: "administrator" } as const;
 
       await tx.execute(sql`UPDATE users SET is_active = ${active} WHERE id = ${target.data}`);
 
@@ -361,6 +388,9 @@ export async function usersRoutes(app: FastifyInstance): Promise<void> {
     });
 
     if (outcome.status === "missing") return renderUsers(app, request, reply, 404, NOT_FOUND);
+    if (outcome.status === "administrator") {
+      return renderUsers(app, request, reply, 403, ADMIN_TARGET);
+    }
 
     return reply.redirect("/users", 303);
   };
