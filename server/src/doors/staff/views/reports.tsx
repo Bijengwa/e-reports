@@ -479,6 +479,14 @@ export type ReportPageProps = {
    */
   secondAssessorPicker?: AssessorOption[];
   /**
+   * Who a manager could hand the report to once both assessments are in.
+   *
+   * Present only once the report is `awaiting_decision`, on the same argument
+   * `secondAssessorPicker` is: the route decides whether the decision belongs on this page, and
+   * the page only asks whether the list is here.
+   */
+  officerPicker?: AssessorOption[];
+  /**
    * The second assessment, once it is submitted — never a draft.
    *
    * Present makes the difference between "7.2 is pending" and "here is what the second assessor
@@ -509,6 +517,7 @@ export function ReportPage({
   assessor2Name,
   assessment1Review,
   secondAssessorPicker,
+  officerPicker,
   assessment2Review,
 }: ReportPageProps): JSX.Element {
   return (
@@ -659,6 +668,86 @@ export function ReportPage({
                 Assign second assessor
               </button>
             </form>
+          )}
+        </>
+      )}
+
+      {/* Drawn only once both assessments are in and the report is waiting on the manager. The
+          route makes the same test for itself, so this decides whether the decision is offered,
+          never whether it may be made. */}
+      {officerPicker && (
+        <>
+          <h2 class="report-heading">Manager decision</h2>
+          {officerPicker.length === 0 ? (
+            <p class="hint">No active Officer is available to assign.</p>
+          ) : (
+            <div class="grid2">
+              <form
+                method="POST"
+                action={`/reports/${report.id}/decide/approve`}
+                class="card card-b review-form"
+              >
+                <div class="f">
+                  <label for="decision-approve-comment">Comment / instruction (optional)</label>
+                  <textarea
+                    id="decision-approve-comment"
+                    name="comment"
+                    rows="4"
+                    class="short"
+                    placeholder="Instructions for the officer, if any."
+                  ></textarea>
+                </div>
+                <div class="f">
+                  <label for="decision-approve-officer">Assign to</label>
+                  <select id="decision-approve-officer" name="officer_id" aria-label="Officer">
+                    {officerPicker.map((option) => (
+                      <option value={option.id} safe>
+                        {option.fullName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div class="bar">
+                  <div class="sp"></div>
+                  <button type="submit" class="btn">
+                    Approve &amp; assign for work
+                  </button>
+                </div>
+              </form>
+
+              <form
+                method="POST"
+                action={`/reports/${report.id}/decide/send-back`}
+                class="card card-b review-form"
+              >
+                <div class="f">
+                  <label for="decision-send-back-comment">Comment</label>
+                  <textarea
+                    id="decision-send-back-comment"
+                    name="comment"
+                    rows="4"
+                    class="short"
+                    placeholder="What needs to be reassessed."
+                  ></textarea>
+                </div>
+                <div class="f">
+                  <label for="decision-send-back-officer">Assign to</label>
+                  <select id="decision-send-back-officer" name="officer_id" aria-label="Officer">
+                    {officerPicker.map((option) => (
+                      <option value={option.id} safe>
+                        {option.fullName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div class="bar">
+                  <div class="sp"></div>
+                  <button type="submit" class="btn ghost">
+                    Send back for re-assessment
+                  </button>
+                </div>
+              </form>
+            </div>
           )}
         </>
       )}

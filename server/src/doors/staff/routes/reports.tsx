@@ -365,6 +365,26 @@ export async function renderReport(
       })
     : undefined;
 
+  // Offered only once both assessments are in and the manager has a decision to make. Every
+  // active Officer is eligible — the work this hands off is not the assessment either of them
+  // already gave, so neither is excluded the way the second-assessor picker excludes the first.
+  const canDecide = isManager && found.report.status === "awaiting_decision";
+
+  const officerPicker: AssessorOption[] | undefined = canDecide
+    ? (
+        await app.db.execute(
+          sql`SELECT id, full_name
+                FROM users
+               WHERE role = 'assessor'
+                 AND is_active
+               ORDER BY full_name`,
+        )
+      ).map((r) => {
+        const u = r as { id: string; full_name: string };
+        return { id: u.id, fullName: u.full_name };
+      })
+    : undefined;
+
   return reply.status(status).html(
     <ReportPage
       report={found.report}
@@ -383,6 +403,7 @@ export async function renderReport(
       assessor2Name={found.assessor2Name}
       assessment1Review={assessment1Review}
       secondAssessorPicker={secondAssessorPicker}
+      officerPicker={officerPicker}
       // Submitted only. A draft is the second assessor's unfinished work and stays on their own
       // page, exactly as ordinal 1's does until it is sent. Not scoped to the manager: an Officer
       // reading a report they worked on may see the finished second assessment too, which is the
