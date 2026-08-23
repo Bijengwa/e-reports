@@ -1140,6 +1140,9 @@ textarea[aria-invalid="true"] {
   /* Clears the title bar rather than sliding under it: the bar is sticky at 0 and 56px tall. */
   top: 56px;
   z-index: 1;
+  /* Its own compositor layer. Without this, some Chromium builds (seen in Opera) occasionally
+     paint the sticky header a frame behind the row scrolling under it, so the two show at once. */
+  will-change: transform;
 }
 
 .utable thead th:first-child {
@@ -1618,6 +1621,413 @@ textarea[aria-invalid="true"] {
   font-family: inherit; font-size: 13px; background: var(--f4-field-bg);
 }
 .f4 textarea { resize: vertical; min-height: 50px; }
+
+/* ---------- A2 inline second-assessor review ----------
+ *
+ * Three degrees, three colours, and the follow-up each one earns. Which branch is visible is
+ * driven entirely by :has() on the checked radio, so the workspace needs no script and the
+ * server-rendered page and the just-clicked page look the same for the same reason.
+ *
+ * Agree is green and asks for nothing. Need Clarification is maroon and asks only for words —
+ * it never redraws A1's choices, because it does not replace them. Disagree is full red, redraws
+ * the choices, and asks for words too.
+ */
+.a2-intro {
+  border-left: 4px solid var(--green);
+  padding: 2px 0 2px 14px;
+  margin-bottom: 18px;
+}
+
+.a2-intro h2 {
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.a2-intro p {
+  color: var(--ink-2);
+  max-width: 78ch;
+}
+
+.a2-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.a2-legend span {
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 3px 10px;
+  color: #fff;
+}
+
+.a2-legend .k-agree { background: #16803c; }
+.a2-legend .k-clarification { background: #7f173a; }
+.a2-legend .k-disagree { background: #c20f0f; }
+
+.a2-summary {
+  display: grid;
+  gap: 12px;
+}
+
+.a2-inline,
+.a2-summary-row {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  padding: 14px;
+}
+
+.a2-inline {
+  margin-top: 12px;
+}
+
+/*
+ * A row A1 left blank — one of the "(If applicable)" fields. Not a decision, so it wears none of
+ * the three degree colours: a neutral box that says what it is (optional) rather than one that
+ * looks like it is waiting to be agreed or disagreed with.
+ */
+.a2-fillin {
+  margin-top: 12px;
+  background: var(--paper);
+  border: 1px dashed var(--rule-2);
+  border-radius: var(--r);
+  padding: 14px;
+}
+
+.a2-fillin .a2-inline-k {
+  background: var(--ink-3);
+}
+
+.a2-fillin-opt {
+  color: var(--ink-3);
+  font-weight: 500;
+  font-size: 11px;
+}
+
+.a2-fillin .a2-value-options {
+  margin-top: 10px;
+}
+
+.a2-fillin textarea {
+  width: 100%;
+  margin-top: 10px;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r);
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  background: #fff;
+  resize: vertical;
+}
+
+.a2-fillin .a2-value-grid {
+  margin-top: 10px;
+}
+
+/* Live, not stored: the tint follows the radio that is checked right now, which is also what the
+   server rendered as checked. One rule covers the saved draft and the unsaved click. */
+.a2-inline:has(.a2-agree input:checked) {
+  border-color: #90c49e;
+  background: #f2faf4;
+}
+
+.a2-inline:has(.a2-clarification input:checked) {
+  border-color: #8f1d3f;
+  background: #fff3f6;
+}
+
+.a2-inline:has(.a2-disagree input:checked) {
+  border-color: #b91c1c;
+  background: #fff1f1;
+}
+
+.a2-summary-row.is-agree { border-color: #90c49e; background: #f2faf4; }
+.a2-summary-row.is-clarification { border-color: #8f1d3f; background: #fff3f6; }
+.a2-summary-row.is-disagree { border-color: #b91c1c; background: #fff1f1; }
+
+.a2-inline-head {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 12px;
+  color: var(--ink-2);
+  font-weight: 600;
+}
+
+.a2-inline-k {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 3px;
+  background: var(--green-d);
+  color: #fff;
+  font-size: 11px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  flex: none;
+}
+
+.a2-summary-row > div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.a2-degrees {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 11px;
+}
+
+.a2-degree {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r);
+  padding: 8px 10px;
+  background: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.a2-degree input {
+  flex: none;
+}
+
+.a2-degree:has(input:checked) {
+  color: #fff;
+}
+
+.a2-agree:has(input:checked) {
+  background: #16803c;
+  border-color: #16803c;
+}
+
+.a2-clarification:has(input:checked) {
+  background: #7f173a;
+  border-color: #7f173a;
+}
+
+.a2-disagree:has(input:checked) {
+  background: #c20f0f;
+  border-color: #c20f0f;
+}
+
+/* Both follow-ups are closed until a degree earns them. */
+.a2-change,
+.a2-say,
+.a2-say-l {
+  display: none;
+}
+
+/* Disagree replaces A1's answer, so only Disagree redraws A1's controls. */
+.a2-inline:has(.a2-disagree input:checked) .a2-change {
+  display: block;
+  margin-top: 12px;
+  border-top: 1px solid var(--rule);
+  padding-top: 12px;
+}
+
+/* Both of the degrees that are not Agree must say why. */
+.a2-inline:has(.a2-clarification input:checked) .a2-say,
+.a2-inline:has(.a2-disagree input:checked) .a2-say {
+  display: block;
+  margin-top: 12px;
+}
+
+/* …and the box names the reason it is being asked for, without a line of script. */
+.a2-inline:has(.a2-clarification input:checked) .a2-say-l.for-clarification,
+.a2-inline:has(.a2-disagree input:checked) .a2-say-l.for-disagree {
+  display: block;
+}
+
+/* The rule between them belongs to Disagree, which is the only degree that has two blocks.
+   An adjacent-sibling rule would draw it under Need Clarification too, where nothing is above. */
+.a2-inline:has(.a2-disagree input:checked) .a2-say {
+  border-top: 1px solid var(--rule);
+  padding-top: 12px;
+}
+
+.a2-change-l,
+.a2-say-l,
+.a2-value-cell label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+  margin-bottom: 6px;
+}
+
+.a2-say textarea,
+.a2-value-text textarea {
+  width: 100%;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r);
+  padding: 8px 10px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+
+/*
+ * A "single"/"multi" item's Disagree replacement, paired beside the A1 option it redraws rather
+ * than listed again in full below the degree picker — Yes under Yes, No under No. `.a2-opt` is a
+ * sibling of `.f4-radio-row`/`.f4-card`/`.f4-tick` inside a shared `.f4-choice-pair`, not a child
+ * of `.a2-inline`, because A1's own options live outside `.a2-inline` entirely; the visibility
+ * rule below therefore has to reach up to their common ancestor, `.f4-block`.
+ */
+.f4-choice-pair {
+  display: flex;
+  flex-direction: column;
+}
+
+.a2-opt {
+  display: none;
+  align-items: center;
+  gap: 7px;
+  margin: 4px 0 2px 22px;
+  padding: 5px 10px;
+  border: 1px solid #b91c1c;
+  border-radius: var(--r);
+  background: #fff1f1;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.a2-opt input {
+  flex: none;
+}
+
+.a2-opt-k {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 16px;
+  border-radius: 3px;
+  background: #c20f0f;
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  flex: none;
+}
+
+/* `> .a2-inline` (a direct child) is what keeps this from also matching the IMDRF group's outer
+   `.f4-block`, which holds several `.f4-imdrf-item`s and several `.a2-inline`s, not one. */
+.f4-block:has(> .a2-inline .a2-disagree input:checked) .a2-opt,
+.f4-imdrf-item:has(.a2-inline .a2-disagree input:checked) .a2-opt {
+  display: flex;
+}
+
+/*
+ * The whole block tinted by A2's decision, not just the small decision box inside it — so the
+ * reader sees at a glance which findings A2 has taken a position on and what that position was
+ * without reading the box itself. A1's own controls (`.f4-filled`, `.f4-card.on`, `.f4-tick.on`)
+ * keep their own explicit backgrounds regardless, since none of them inherit this one.
+ */
+.f4-block:has(> .a2-inline .a2-agree input:checked),
+.f4-imdrf-item:has(.a2-inline .a2-agree input:checked) {
+  background: #f2faf4;
+}
+
+.f4-block:has(> .a2-inline .a2-clarification input:checked),
+.f4-imdrf-item:has(.a2-inline .a2-clarification input:checked) {
+  background: #fff3f6;
+}
+
+.f4-block:has(> .a2-inline .a2-disagree input:checked),
+.f4-imdrf-item:has(.a2-inline .a2-disagree input:checked) {
+  background: #fff1f1;
+}
+
+/* The fill-in box's own option list — `.a2-fillin` alone offers these, since a reviewed item's
+   replacement is paired inline beside A1's own option instead (`.a2-opt`, in `Radios` and the
+   card/tick loops). */
+.a2-value-options {
+  display: grid;
+  gap: 7px;
+}
+
+.a2-value-choice {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r);
+  background: #fff;
+  padding: 7px 9px;
+}
+
+.a2-value-choice input {
+  margin-top: 3px;
+  flex: none;
+}
+
+.a2-value-choice:has(input:checked) {
+  border-color: var(--ink-3);
+  box-shadow: inset 0 0 0 1px var(--ink-3);
+}
+
+.a2-value-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 9px;
+}
+
+.a2-value-cell label {
+  display: block;
+}
+
+.a2-value-cell input {
+  width: 100%;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r);
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  background: #fff;
+}
+
+.a2-summary-row span {
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: var(--paper);
+  color: var(--ink-2);
+}
+
+.a2-summary-row.is-agree span {
+  background: #16803c;
+  color: #fff;
+}
+
+.a2-summary-row.is-clarification span {
+  background: #7f173a;
+  color: #fff;
+}
+
+.a2-summary-row.is-disagree span {
+  background: #c20f0f;
+  color: #fff;
+}
+
+.a2-summary-row p {
+  margin-top: 7px;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 720px) {
+  .a2-degrees {
+    grid-template-columns: 1fr;
+  }
+}
 .f4 input[type="radio"], .f4 input[type="checkbox"] { accent-color: var(--f4-bar); }
 
 /*
@@ -1720,10 +2130,14 @@ textarea[aria-invalid="true"] {
  * theirs to write, without reading either. "Not supplied" is not painted this way — an absence
  * did not come from the reporter, and colouring it orange would claim it did.
  */
+/* !important on the three colour properties: `.f4-filled` loses the specificity contest against
+   the shared `.f4 input:not(...)` field reset above (three class-level selectors there, two here)
+   now that this is a real `<input readonly>` rather than a span, and losing it would leave the
+   reporter's value sitting in a plain white field indistinguishable from an assessor's own. */
 .f4-filled {
-  margin-top: 4px; font-weight: 500; display: inline-block; word-break: break-word;
-  background: var(--f4-value-bg); color: var(--f4-value-ink);
-  border: 1px solid var(--f4-value-border); border-radius: var(--r); padding: 2px 9px;
+  margin-top: 4px; font-weight: 500 !important; word-break: break-word; cursor: default;
+  background: var(--f4-value-bg) !important; color: var(--f4-value-ink) !important;
+  border: 1px solid var(--f4-value-border) !important; border-radius: var(--r); padding: 5px 9px !important;
 }
 .f4-blank { margin-top: 4px; color: var(--f4-ink-3); font-style: italic; font-size: 12px; }
 
@@ -1784,6 +2198,21 @@ textarea[aria-invalid="true"] {
   background: var(--f4-field-bg); break-inside: avoid;
 }
 .f4-card.on { border-color: var(--f4-bar); background: var(--f4-card-on-bg); box-shadow: inset 0 0 0 1px var(--f4-bar); }
+
+/*
+ * Once Disagree has replaced a card's or a tick's value, A1's own "chosen" card is still the one
+ * marked `.on` server-side — that class means "this is what A1 picked," not "this is still the
+ * answer," and it does not change just because a client-side radio does. Left as-is it would go on
+ * showing A1's superseded choice in the same green fill `.a2-agree` uses to mean "correct," which
+ * is the one thing Disagree is saying it is not. Only Disagree earns this: Need Clarification
+ * never replaces A1's answer, so A1's own highlight is still true then.
+ */
+.f4-block:has(> .a2-inline .a2-disagree input:checked) .f4-card.on,
+.f4-block:has(> .a2-inline .a2-disagree input:checked) .f4-tick.on {
+  background: var(--f4-field-bg);
+  border-color: var(--f4-pill-border);
+  box-shadow: none;
+}
 .f4-card-h { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
 .f4-card-c { font-size: 12.5px; color: var(--f4-ink-2); margin: 0; }
 ul.f4-card-c { padding-left: 18px; list-style: disc; }
@@ -1921,11 +2350,13 @@ ul.f4-card-c li { margin-bottom: 3px; }
   gap: 10px 12px; padding: 9px 16px 5px; align-items: start; break-inside: avoid;
 }
 /* The same orange surface `.f4-filled` wears in section 2, for the same reason: this line came
-   off the reporter's form, and the assessor's own note sits under it as a plain staff input. */
+   off the reporter's form, and the assessor's own note sits under it as a plain staff input.
+   !important for the same reason as `.f4-filled`: this is a real `<input readonly>`, contesting
+   specificity against the shared `.f4 input:not(...)` reset rather than a span it cannot touch. */
 .f4-fact .f4-value {
-  font-weight: 500; display: inline-block; width: fit-content; word-break: break-word;
-  background: var(--f4-value-bg); color: var(--f4-value-ink);
-  border: 1px solid var(--f4-value-border); border-radius: var(--r); padding: 2px 9px;
+  font-weight: 500 !important; word-break: break-word; cursor: default;
+  background: var(--f4-value-bg) !important; color: var(--f4-value-ink) !important;
+  border: 1px solid var(--f4-value-border) !important; border-radius: var(--r); padding: 5px 9px !important;
 }
 .f4-fact .f4-blank { font-style: italic; color: var(--f4-ink-3); font-size: 12px; }
 .f4-note-line { padding: 0 16px 10px 74px; border-bottom: 1px solid var(--f4-line-2); }

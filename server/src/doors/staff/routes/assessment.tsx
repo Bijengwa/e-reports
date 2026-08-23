@@ -3,16 +3,17 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
   collect,
-  collectSecond,
+  collectSecondReview,
   F004_VERSION,
   type F004Answers,
   FIRST_ASSESSMENT,
   type Issue,
+  normalizeSecondReview,
   prefillDeviceRows,
   prefillEventRows,
   SECOND_ASSESSMENT,
   validateForSubmit,
-  validateSecondForSubmit,
+  validateSecondReviewForSubmit,
   value,
 } from "../../../domain/f004.js";
 import { currentSession } from "../session-guard.js";
@@ -255,8 +256,7 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
         // The manager's words about the first assessment, read here and nowhere written. It hangs
         // off ordinal 1, so it cannot arrive as a remark about this Officer's own work.
         managerComment={first.managerComment}
-        answers={found.assessment2?.answers ?? {}}
-        assessedOn={found.assessment2?.submittedOn ?? today()}
+        review={normalizeSecondReview(found.assessment2?.answers)}
         submitted={found.assessment2?.submitted ?? false}
         issues={[]}
       />,
@@ -273,12 +273,13 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
     // quietly ignored: a POST that answers 200 and changes nothing looks like one that worked.
     if (found.assessment2?.submitted === true) return forbid(reply, session.role);
 
-    // `collectSecond`, never `collect`. The body may name 7.1's fields — hand-edited, or replayed
-    // from the read-only document this page renders above the form — and this is where they stop.
-    const answers = collectSecond(fields(request));
-    const submitting = value(fields(request), "intent") === "submit";
+    // A2 annotates A1 by section. The body may name 7.1's fields -- hand-edited, or replayed from
+    // the read-only document this page renders above the form -- and this is where they stop.
+    const posted = fields(request);
+    const answers = collectSecondReview(posted, first.answers);
+    const submitting = value(posted, "intent") === "submit";
 
-    const issues: Issue[] = submitting ? validateSecondForSubmit(answers, session.fullName) : [];
+    const issues: Issue[] = submitting ? validateSecondReviewForSubmit(answers, first.answers) : [];
 
     if (issues.length > 0) {
       return reply.status(422).html(
@@ -294,15 +295,13 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
             event: prefillEventRows(found.report.payload),
           }}
           managerComment={first.managerComment}
-          answers={answers}
-          assessedOn={today()}
+          review={answers}
           submitted={false}
           issues={issues}
         />,
       );
     }
 
-    const conclusion = value(answers, "conclusion_2").trim();
     // The assignment on the row, never the session id. They are equal — the guard just proved it —
     // but the assignment is the fact, and reading it is what keeps ordinal 2 and
     // `reports.assessor2_user_id` naming one person.
@@ -313,7 +312,7 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
         INSERT INTO assessments (report_id, assessor_id, ordinal, form_version, payload,
                                  conclusion, submitted_at)
         VALUES (${found.report.id}, ${assessorId}, ${SECOND_ASSESSMENT}, ${F004_VERSION},
-                ${JSON.stringify(answers)}::jsonb, ${conclusion === "" ? null : conclusion},
+                ${JSON.stringify(answers)}::jsonb, NULL,
                 ${submitting ? sql`now()` : sql`NULL`})
         ON CONFLICT (report_id, ordinal) DO UPDATE
            SET payload      = EXCLUDED.payload,

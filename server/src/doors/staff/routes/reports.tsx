@@ -1,8 +1,13 @@
 import { sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import type { F004Answers } from "../../../domain/f004.js";
-import { FIRST_ASSESSMENT, prefillDeviceRows, prefillEventRows } from "../../../domain/f004.js";
+import type { A2ReviewPayload, F004Answers } from "../../../domain/f004.js";
+import {
+  FIRST_ASSESSMENT,
+  normalizeSecondReview,
+  prefillDeviceRows,
+  prefillEventRows,
+} from "../../../domain/f004.js";
 import { currentSession } from "../session-guard.js";
 import type { SectionComment } from "../views/f004.js";
 import {
@@ -133,7 +138,7 @@ export type Assessment1Read = {
  */
 export type Assessment2Read = {
   assessorName: string;
-  answers: F004Answers;
+  answers: A2ReviewPayload;
   conclusion: string | null;
   submitted: boolean;
   submittedOn: string | null;
@@ -240,7 +245,7 @@ export async function loadReport(
       ? null
       : {
           assessorName: row.assessor2_name ?? "",
-          answers: (row.assessment2_payload ?? {}) as F004Answers,
+          answers: normalizeSecondReview(row.assessment2_payload),
           conclusion: row.assessment2_conclusion,
           submitted: row.assessment2_submitted_at !== null,
           submittedOn:

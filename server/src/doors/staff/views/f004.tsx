@@ -1,9 +1,18 @@
 import type { Children } from "@kitajs/html";
 import {
+  A2_DEGREE_LABELS,
+  A2_DEGREES,
+  A2_REVIEW_ITEMS,
+  type A2ReviewItem,
+  type A2ReviewPayload,
+  type A2SectionResponse,
   ACTIONS,
+  ASSESSED_DEVICE_KEYS,
   CAUSALITY_DISCUSSION_NOTE,
   CAUSALITY_OPTIONS,
   DEVICE_ROWS,
+  DEVICE_TYPE_OPTIONS,
+  type DeviceRow,
   EVENT_ROWS,
   EXPECTEDNESS_NOTE,
   EXPECTEDNESS_OPTIONS,
@@ -12,8 +21,10 @@ import {
   IMDRF_GROUPS,
   IMDRF_NOTE,
   type Issue,
+  isA1Blank,
   list,
   PUBLIC_HEALTH_QUESTION,
+  REPORT_STAGE_OPTIONS,
   RISK_IVD_NOTE,
   RISK_NOTE,
   RISK_OPTIONS,
@@ -80,6 +91,15 @@ export type F004FormProps = {
    * whose reader has to work out which of the two counts.
    */
   omitSecond?: boolean;
+  /** Inline A2 controls rendered inside the read-only A1 form. */
+  a2Review?: {
+    action: string;
+    review: A2ReviewPayload;
+    submitted: boolean;
+    /** The second assessor's name and the day they signed, once submitted — for the header strip. */
+    assessorName?: string;
+    assessedOn?: string;
+  };
   issues: readonly Issue[];
 };
 
@@ -94,16 +114,18 @@ export type F004FormProps = {
 function Sheet({
   locked,
   reportId,
+  action,
   children,
 }: {
   locked: boolean;
   reportId: string;
+  action?: string;
   children?: Children;
 }): JSX.Element {
   if (locked) return <div class="f4">{children}</div>;
 
   return (
-    <form method="POST" action={`/reports/${reportId}/assessment-1`} class="f4">
+    <form method="POST" action={action ?? `/reports/${reportId}/assessment-1`} class="f4">
       {children}
     </form>
   );
@@ -302,23 +324,21 @@ function Bar({
   );
 }
 
-/** A read-only requirement and the assessor's comment on it: the paper's two columns. */
+/**
+ * A requirement filed on the reporter's own form, in the reporter's own words.
+ *
+ * Read-only and unannotated: this is the record as filed, not a thing for the assessor to add a
+ * note beside. Section 2.1-2.4 wears the same orange surface section 1's facts do, and for the
+ * same reason — the value came off the paper, not out of the assessor's head.
+ */
 function RequirementRow({
   no,
   label,
-  name,
   filled,
-  answers,
-  rows,
-  locked,
 }: {
   no: string;
   label: string;
-  name: string;
   filled: string;
-  answers: F004Answers;
-  rows?: number;
-  locked: boolean;
 }): JSX.Element {
   return (
     <div class="f4-row">
@@ -333,16 +353,9 @@ function RequirementRow({
           {filled === "" ? (
             <div class="f4-blank">Not supplied by the reporter</div>
           ) : (
-            <div class="f4-filled" safe>
-              {filled}
-            </div>
+            <input class="f4-filled" value={filled} readonly tabindex={-1} />
           )}
         </div>
-      </div>
-      <div class="f4-comment">
-        <textarea name={name} rows={String(rows ?? 2)} placeholder="Comment" disabled={locked} safe>
-          {value(answers, name)}
-        </textarea>
       </div>
     </div>
   );
@@ -351,47 +364,33 @@ function RequirementRow({
 /**
  * Section 1 as the paper reads: the number, what is required, and what was filed.
  *
- * A comment box on all nineteen rows turned the administrative section into a wall of empty
- * textareas an assessor scrolled past. The value is the point of these rows; a note is the
- * exception, so it is one line and says it is optional.
+ * Read-only, and nothing beside it: every one of these is a fact off the orange form, not a
+ * finding, so there is nothing here for an assessor to add a note to. The four rows the orange
+ * form never asks — 1.3, 1.10, 1.11, 1.19 — are not `FactRow`s at all; see `AssessedDeviceField`.
  */
 function FactRow({
   no,
   label,
-  name,
   filled,
-  answers,
-  locked,
 }: {
   no: string;
   label: string;
-  name: string;
   filled: string;
-  answers: F004Answers;
-  locked: boolean;
 }): JSX.Element {
   return (
-    <>
-      <div class="f4-fact">
-        <span class="f4-no" safe>
-          {no}
-        </span>
-        <span class="f4-label" safe>
-          {label}
-        </span>
-        {filled === "" ? (
-          <span class="f4-blank">Not supplied by the reporter</span>
-        ) : (
-          <span class="f4-value" safe>
-            {filled}
-          </span>
-        )}
-      </div>
-      <div class="f4-note-line">
-        <label for={name}>Assessor note (optional)</label>
-        <input id={name} name={name} value={value(answers, name)} disabled={locked} />
-      </div>
-    </>
+    <div class="f4-fact">
+      <span class="f4-no" safe>
+        {no}
+      </span>
+      <span class="f4-label" safe>
+        {label}
+      </span>
+      {filled === "" ? (
+        <span class="f4-blank">Not supplied by the reporter</span>
+      ) : (
+        <input class="f4-value" value={filled} readonly tabindex={-1} />
+      )}
+    </div>
   );
 }
 
@@ -401,35 +400,95 @@ function FactRow({
  * around the whole row. No pill, no card — those are for the two questions the form itself gives
  * pages of criteria to (causality, risk); this is for the ones it settles in one line.
  */
+/** What A2 has chosen to replace an item's value with, whatever shape that item's value is. */
+function a2ChosenValues(review: A2ReviewPayload | undefined, itemKey: string): string[] {
+  const stored = review?.responses[itemKey]?.value;
+  if (Array.isArray(stored)) return stored;
+  if (typeof stored === "string") return stored === "" ? [] : [stored];
+  return [];
+}
+
+/**
+ * A2's own control for one of A1's options, paired beside it rather than redrawn in a list of its
+ * own — Yes under Yes, No under No. Hidden by CSS until Disagree is checked, scoped to the
+ * enclosing `.f4-block` so it can reach a sibling A1 was never nested under.
+ */
+function A2InlineOption({
+  itemKey,
+  optionValue,
+  label,
+  checked,
+  locked,
+  multi,
+}: {
+  itemKey: string;
+  optionValue: string;
+  label: string;
+  checked: boolean;
+  locked: boolean;
+  multi?: boolean;
+}): JSX.Element {
+  return (
+    <label class="a2-opt">
+      <span class="a2-opt-k">A2</span>
+      <input
+        type={multi ? "checkbox" : "radio"}
+        name={`a2_value_${itemKey}`}
+        value={optionValue}
+        checked={checked}
+        disabled={locked}
+      />
+      <span safe>{label}</span>
+    </label>
+  );
+}
+
+/** The second assessor's context for a choice field: which item, whose review, and whether it is locked. */
+type A2Choice = { key: string; review?: A2ReviewPayload; locked: boolean };
+
 function Radios({
   name,
   options,
   answers,
   locked,
+  a2,
 }: {
   name: string;
   options: readonly { value: string; label: string; note?: string }[];
   answers: F004Answers;
   locked: boolean;
+  a2?: A2Choice;
 }): JSX.Element {
   const chosen = value(answers, name);
+  const a2Values = a2 ? a2ChosenValues(a2.review, a2.key) : [];
 
   return (
     <div class="f4-radio-group">
       {options.map((option) => (
-        <label class="f4-radio-row">
-          <input
-            type="radio"
-            name={name}
-            value={option.value}
-            checked={chosen === option.value}
-            disabled={locked}
-          />
-          <span>
-            <b safe>{option.label}</b>
-            {option.note && <span class="f4-note" safe>{` — ${option.note}`}</span>}
-          </span>
-        </label>
+        <div class="f4-choice-pair">
+          <label class="f4-radio-row">
+            <input
+              type="radio"
+              name={name}
+              value={option.value}
+              checked={chosen === option.value}
+              disabled={locked}
+            />
+            <span>
+              <b safe>{option.label}</b>
+              {option.note && <span class="f4-note" safe>{` — ${option.note}`}</span>}
+            </span>
+          </label>
+          {a2 && (
+            <A2InlineOption
+              itemKey={a2.key}
+              optionValue={option.value}
+              label={option.label}
+              checked={a2Values.includes(option.value)}
+              locked={a2.locked}
+            />
+          )}
+        </div>
       ))}
     </div>
   );
@@ -438,7 +497,7 @@ function Radios({
 function Comment({
   name,
   answers,
-  rows = 3,
+  rows = 5,
   label = "Comment",
   locked,
 }: {
@@ -460,6 +519,336 @@ function Comment({
   );
 }
 
+/**
+ * The second assessor's position on one of the first assessor's answers, drawn beside that answer.
+ *
+ * Inline rather than gathered into a list of its own, because the question it asks is "is this
+ * right?" and the only way to answer it is to be looking at the thing. A separate panel would ask
+ * the assessor to hold 2.6's radio buttons in their head while ticking a box somewhere else.
+ *
+ * Which follow-up appears is decided by CSS on the radio that is checked, not by script: the
+ * replacement value belongs to Disagree alone, and the statement to Disagree and Need
+ * Clarification. `collectSecondReview` enforces the same rule on the way in, so the branch that is
+ * hidden is also the branch that cannot be stored — the page and the payload agree by construction
+ * rather than by both being careful.
+ */
+/** The options a "single"/"multi" item's fill-in box offers, when A1 left it blank to fill. */
+function a2FillInOptions(item: A2ReviewItem): readonly { value: string; label: string }[] {
+  if (item.key === "1.3") return DEVICE_TYPE_OPTIONS;
+  if (item.key === "1.19") return REPORT_STAGE_OPTIONS;
+  if (item.key === "2.5") return SOURCE_OPTIONS;
+  if (item.key === "2.6") return SERIOUSNESS_OPTIONS;
+  if (item.key === "2.7") return YES_NO;
+  if (item.key === "4.1") return EXPECTEDNESS_OPTIONS;
+  if (item.key === "4.2") return CAUSALITY_OPTIONS;
+  if (item.key === "5") return SIGNAL_OPTIONS;
+  if (item.key === "6") return RISK_OPTIONS;
+  if (item.key === "7.1_actions") return ACTIONS;
+  return [];
+}
+
+/**
+ * An item A1 left blank — one of the "(If applicable)" rows. There is no A1 position to agree,
+ * clarify or disagree with, so this offers none of the three: a single optional control, stored
+ * under `supplied` if it is filled in and not stored at all if it is not. Always visible, unlike
+ * `.a2-inline`'s own follow-ups, because there is no degree radio here to gate it behind.
+ */
+function A2FillIn({
+  item,
+  response,
+  locked,
+}: {
+  item: A2ReviewItem;
+  response?: A2SectionResponse;
+  locked: boolean;
+}): JSX.Element {
+  const stored = response?.value;
+  const chosenValues = Array.isArray(stored) ? stored : typeof stored === "string" ? [stored] : [];
+  const storedText = typeof stored === "string" ? stored : "";
+  const storedFields =
+    typeof stored === "object" && stored !== null && !Array.isArray(stored)
+      ? (stored as Record<string, string>)
+      : {};
+  const options = a2FillInOptions(item);
+
+  const hasValue =
+    item.valueKind === "text"
+      ? storedText.trim() !== ""
+      : item.valueKind === "fields"
+        ? Object.values(storedFields).some((entry) => entry.trim() !== "")
+        : chosenValues.length > 0;
+
+  // Read-only and never filled in: an empty optional box left over from a submission where A2
+  // chose not to add anything is noise, not a finding, so it prints nothing rather than a box with
+  // nothing in it. Still drawn empty while the form is live — A2 needs somewhere to type into.
+  if (locked && !hasValue) return <span hidden />;
+
+  return (
+    <div class="a2-fillin">
+      <div class="a2-inline-head">
+        <span class="a2-inline-k">2nd Assessor remarks</span>
+        <span safe>{`${item.no} ${item.title}`}</span>
+        <span class="a2-fillin-opt">(If applicable — optional)</span>
+      </div>
+
+      {item.valueKind === "single" && (
+        <div class="a2-value-options">
+          {options.map((option) => (
+            <label class="a2-value-choice">
+              <input
+                type="radio"
+                name={`a2_value_${item.key}`}
+                value={option.value}
+                checked={chosenValues.includes(option.value)}
+                disabled={locked}
+              />
+              <span safe>{option.label}</span>
+            </label>
+          ))}
+        </div>
+      )}
+
+      {item.valueKind === "multi" && (
+        <div class="a2-value-options">
+          {options.map((option) => (
+            <label class="a2-value-choice">
+              <input
+                type="checkbox"
+                name={`a2_value_${item.key}`}
+                value={option.value}
+                checked={chosenValues.includes(option.value)}
+                disabled={locked}
+              />
+              <span safe>{option.label}</span>
+            </label>
+          ))}
+        </div>
+      )}
+
+      {item.valueKind === "text" && (
+        <textarea name={`a2_value_${item.key}`} rows="4" disabled={locked} safe>
+          {storedText}
+        </textarea>
+      )}
+
+      {item.valueKind === "fields" && (
+        <div class="a2-value-grid">
+          {(item.fields ?? []).map((field) => (
+            <div class="a2-value-cell">
+              <label for={`a2-value-${item.key}-${field.key}`} safe>
+                {field.label}
+              </label>
+              <input
+                id={`a2-value-${item.key}-${field.key}`}
+                name={`a2_value_${item.key}_${field.key}`}
+                value={storedFields[field.key] ?? ""}
+                disabled={locked}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function A2InlineDecision({
+  itemKey,
+  answers,
+  review,
+  locked,
+}: {
+  itemKey: string;
+  answers: F004Answers;
+  review?: A2ReviewPayload;
+  locked: boolean;
+}): JSX.Element {
+  const item = A2_REVIEW_ITEMS.find((candidate) => candidate.key === itemKey);
+  if (item === undefined || review === undefined) return <span hidden />;
+
+  const response = review.responses[item.key];
+
+  if (isA1Blank(item, answers)) {
+    return <A2FillIn item={item} response={response} locked={locked} />;
+  }
+
+  const chosen = response?.degree;
+  const stored = response?.value;
+
+  // One stored shape per item kind, unpacked once so each branch below reads only its own.
+  // "single" and "multi" are unpacked in `Radios` and the card/tick loops instead, from the same
+  // `review`, which is why neither shape appears here.
+  const storedText = typeof stored === "string" ? stored : "";
+  const storedFields =
+    typeof stored === "object" && stored !== null && !Array.isArray(stored)
+      ? (stored as Record<string, string>)
+      : {};
+
+  return (
+    <div class="a2-inline">
+      <div class="a2-inline-head">
+        <span class="a2-inline-k">2nd Assessor remarks</span>
+        <span safe>{`${item.no} ${item.title}`}</span>
+      </div>
+
+      <div class="a2-degrees">
+        {A2_DEGREES.map((degree) => (
+          <label class={`a2-degree a2-${degree}`}>
+            <input
+              type="radio"
+              name={`a2_degree_${item.key}`}
+              value={degree}
+              checked={chosen === degree}
+              disabled={locked}
+            />
+            <span safe>{A2_DEGREE_LABELS[degree]}</span>
+          </label>
+        ))}
+      </div>
+
+      {/* Disagree only, and only for a text answer or an IMDRF grid: a "single"/"multi" item's
+          replacement options are paired inline beside A1's own, in `Radios` and the card/tick
+          loops, so there is nothing left for this block to redraw for those two kinds. */}
+      {(item.valueKind === "text" || item.valueKind === "fields") && (
+        <div class="a2-change">
+          <p class="a2-change-l" safe>
+            {item.valueLabel}
+          </p>
+
+          {item.valueKind === "text" && (
+            <div class="a2-value-text">
+              <label class="vh" for={`a2-value-${item.key}`} safe>
+                {item.valueLabel}
+              </label>
+              <textarea
+                id={`a2-value-${item.key}`}
+                name={`a2_value_${item.key}`}
+                rows="6"
+                disabled={locked}
+                safe
+              >
+                {storedText}
+              </textarea>
+            </div>
+          )}
+
+          {item.valueKind === "fields" && (
+            <div class="a2-value-grid">
+              {(item.fields ?? []).map((field) => (
+                <div class="a2-value-cell">
+                  <label for={`a2-value-${item.key}-${field.key}`} safe>
+                    {field.label}
+                  </label>
+                  <input
+                    id={`a2-value-${item.key}-${field.key}`}
+                    name={`a2_value_${item.key}_${field.key}`}
+                    value={storedFields[field.key] ?? ""}
+                    disabled={locked}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Need Clarification and Disagree. Two labels, one shown, so the box says what it is for
+          without a line of script — and the wrong one is display:none, so it is not read out.
+          Switching back to Agree hides this the same way it hides `.a2-change` above: neither is
+          a child of the radio that used to be checked, both are reached by `:has()` on the box
+          that holds all three, so there is nothing left over to fully un-hide again. */}
+      <div class="a2-say">
+        <label class="a2-say-l for-clarification" for={`a2-statement-${item.key}`}>
+          What needs clarifying, and from whom? Required.
+        </label>
+        <label class="a2-say-l for-disagree" for={`a2-statement-${item.key}`}>
+          Why the first assessor's answer is wrong. Required.
+        </label>
+        <textarea
+          id={`a2-statement-${item.key}`}
+          name={`a2_statement_${item.key}`}
+          rows="5"
+          disabled={locked}
+          safe
+        >
+          {response?.statement ?? ""}
+        </textarea>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * One of the four section-1 rows the orange form never answers — `ASSESSED_DEVICE_KEYS` — drawn
+ * as a finding rather than a fact: a choice or a line of text, required of A1, and reviewable by
+ * A2 exactly as 2.5 onward is. `row.no` is the row's own number, which is also its A2 item key.
+ */
+function AssessedDeviceField({
+  row,
+  answers,
+  locked,
+  a2Review,
+}: {
+  row: DeviceRow;
+  answers: F004Answers;
+  locked: boolean;
+  a2Review?: { review: A2ReviewPayload; submitted: boolean };
+}): JSX.Element {
+  const a2Locked = a2Review?.submitted ?? true;
+  const a2: A2Choice | undefined = a2Review && {
+    key: row.no,
+    review: a2Review.review,
+    locked: a2Locked,
+  };
+
+  return (
+    <div class="f4-block">
+      <div class="f4-blocktitle">
+        <span class="f4-no" safe>
+          {row.no}
+        </span>{" "}
+        <span safe>{row.label}</span>
+      </div>
+
+      {row.key === "device_type" && (
+        <Radios
+          name="device_type"
+          options={DEVICE_TYPE_OPTIONS}
+          answers={answers}
+          locked={locked}
+          a2={a2}
+        />
+      )}
+
+      {row.key === "report_stage" && (
+        <Radios
+          name="report_stage"
+          options={REPORT_STAGE_OPTIONS}
+          answers={answers}
+          locked={locked}
+          a2={a2}
+        />
+      )}
+
+      {(row.key === "registration_number" || row.key === "device_class") && (
+        <div class="f4-field">
+          <label for={row.key} safe>
+            {row.label}
+          </label>
+          <input id={row.key} name={row.key} value={value(answers, row.key)} disabled={locked} />
+        </div>
+      )}
+
+      <A2InlineDecision
+        itemKey={row.no}
+        answers={answers}
+        review={a2Review?.review}
+        locked={a2Locked}
+      />
+    </div>
+  );
+}
+
 export function F004Form({
   reportId,
   answers,
@@ -472,13 +861,21 @@ export function F004Form({
   sectionComments,
   commentAction,
   omitSecond,
+  a2Review,
   issues,
 }: F004FormProps): JSX.Element {
   const causality = value(answers, "causality");
   const risk = value(answers, "risk_level");
+  // Card-style and tick-style choices pair A2's option in beside A1's own rather than through
+  // `Radios`, so each reads its item's replacement value straight from the review here.
+  const causalityA2Values = a2ChosenValues(a2Review?.review, "4.2");
+  const riskA2Values = a2ChosenValues(a2Review?.review, "6");
+  const actionsA2Values = a2ChosenValues(a2Review?.review, "7.1_actions");
   // Submitted is one way to be closed and not being its author is the other, and the document is
   // rendered the same for both.
   const locked = submitted || readOnly === true;
+  const writingA2 = a2Review !== undefined && !a2Review.submitted;
+  const sheetLocked = locked && !writingA2;
 
   return (
     <>
@@ -522,13 +919,17 @@ export function F004Form({
               {assessedOn}
             </span>
           </div>
-          <div class="f4-muted">
+          <div class={a2Review?.submitted === true ? undefined : "f4-muted"}>
             <span class="f4-k">2nd Assessor</span>
-            <span class="f4-v">—</span>
+            <span class="f4-v" safe>
+              {a2Review?.submitted === true ? (a2Review.assessorName ?? "—") : "—"}
+            </span>
           </div>
-          <div class="f4-muted">
+          <div class={a2Review?.submitted === true ? undefined : "f4-muted"}>
             <span class="f4-k">Date</span>
-            <span class="f4-v">—</span>
+            <span class="f4-v" safe>
+              {a2Review?.submitted === true ? (a2Review.assessedOn ?? "—") : "—"}
+            </span>
           </div>
         </div>
       </div>
@@ -574,7 +975,7 @@ export function F004Form({
         </div>
       </div>
 
-      <Sheet locked={locked} reportId={reportId}>
+      <Sheet locked={sheetLocked} reportId={reportId} action={a2Review?.action}>
         {/* One fieldset keeps the document grouped, but the lock is applied to the assessment
             controls themselves. Section comments are live manager controls and must not inherit a
             disabled ancestor. */}
@@ -597,16 +998,18 @@ export function F004Form({
               comments={sectionComments?.["1"]}
               action={commentAction?.("1")}
             />
-            {DEVICE_ROWS.map((row) => (
-              <FactRow
-                no={row.no}
-                label={row.label}
-                name={`c1_${row.key}`}
-                filled={device[row.key] ?? ""}
-                answers={answers}
-                locked={locked}
-              />
-            ))}
+            {DEVICE_ROWS.map((row) =>
+              ASSESSED_DEVICE_KEYS.includes(row.key) ? (
+                <AssessedDeviceField
+                  row={row}
+                  answers={answers}
+                  locked={locked}
+                  a2Review={a2Review}
+                />
+              ) : (
+                <FactRow no={row.no} label={row.label} filled={device[row.key] ?? ""} />
+              ),
+            )}
           </section>
 
           <section class="f4-section" id="section-2">
@@ -617,15 +1020,7 @@ export function F004Form({
               action={commentAction?.("2")}
             />
             {EVENT_ROWS.map((row) => (
-              <RequirementRow
-                no={row.no}
-                label={row.label}
-                name={`c2_${row.key}`}
-                filled={event[row.key] ?? ""}
-                answers={answers}
-                rows={row.key === "description" ? 4 : 2}
-                locked={locked}
-              />
+              <RequirementRow no={row.no} label={row.label} filled={event[row.key] ?? ""} />
             ))}
 
             <div class="f4-block">
@@ -657,8 +1052,15 @@ export function F004Form({
                 options={SOURCE_OPTIONS}
                 answers={answers}
                 locked={locked}
+                a2={a2Review && { key: "2.5", review: a2Review.review, locked: a2Review.submitted }}
               />
               <Comment name="c2_5" answers={answers} locked={locked} />
+              <A2InlineDecision
+                itemKey="2.5"
+                answers={answers}
+                review={a2Review?.review}
+                locked={a2Review?.submitted ?? true}
+              />
             </div>
 
             <div class="f4-block">
@@ -678,16 +1080,35 @@ export function F004Form({
                 options={SERIOUSNESS_OPTIONS}
                 answers={answers}
                 locked={locked}
+                a2={a2Review && { key: "2.6", review: a2Review.review, locked: a2Review.submitted }}
               />
               <Comment name="c2_6" answers={answers} locked={locked} />
+              <A2InlineDecision
+                itemKey="2.6"
+                answers={answers}
+                review={a2Review?.review}
+                locked={a2Review?.submitted ?? true}
+              />
             </div>
 
             <div class="f4-block">
               <div class="f4-blocktitle">
                 <span class="f4-no">2.7</span> <span safe>{PUBLIC_HEALTH_QUESTION}</span>
               </div>
-              <Radios name="public_health" options={YES_NO} answers={answers} locked={locked} />
+              <Radios
+                name="public_health"
+                options={YES_NO}
+                answers={answers}
+                locked={locked}
+                a2={a2Review && { key: "2.7", review: a2Review.review, locked: a2Review.submitted }}
+              />
               <Comment name="c2_7" answers={answers} locked={locked} />
+              <A2InlineDecision
+                itemKey="2.7"
+                answers={answers}
+                review={a2Review?.review}
+                locked={a2Review?.submitted ?? true}
+              />
             </div>
           </section>
 
@@ -710,7 +1131,7 @@ export function F004Form({
                 {group.items.map((item) => (
                   <div class="f4-imdrf-item">
                     <div class="f4-imdrf-h">
-                      <span class="f4-letter" safe>{`(${item.letter})`}</span>{" "}
+                      <span class="f4-letter" safe>{`${group.no}.${item.letter}`}</span>{" "}
                       <span safe>{item.title}</span>
                     </div>
                     <p class="f4-note" safe>
@@ -742,6 +1163,12 @@ export function F004Form({
                         />
                       </div>
                     </div>
+                    <A2InlineDecision
+                      itemKey={`${group.no}.${item.letter}`}
+                      answers={answers}
+                      review={a2Review?.review}
+                      locked={a2Review?.submitted ?? true}
+                    />
                   </div>
                 ))}
               </div>
@@ -772,8 +1199,15 @@ export function F004Form({
                 options={EXPECTEDNESS_OPTIONS}
                 answers={answers}
                 locked={locked}
+                a2={a2Review && { key: "4.1", review: a2Review.review, locked: a2Review.submitted }}
               />
               <Comment name="c4_1" answers={answers} locked={locked} />
+              <A2InlineDecision
+                itemKey="4.1"
+                answers={answers}
+                review={a2Review?.review}
+                locked={a2Review?.submitted ?? true}
+              />
             </div>
 
             <div class="f4-block">
@@ -783,25 +1217,42 @@ export function F004Form({
               </div>
               <div class="f4-cards">
                 {CAUSALITY_OPTIONS.map((option) => (
-                  <label class={causality === option.value ? "f4-card on" : "f4-card"}>
-                    <div class="f4-card-h">
-                      <input
-                        type="radio"
-                        name="causality"
-                        value={option.value}
-                        checked={causality === option.value}
-                        disabled={locked}
+                  <div class="f4-choice-pair">
+                    <label class={causality === option.value ? "f4-card on" : "f4-card"}>
+                      <div class="f4-card-h">
+                        <input
+                          type="radio"
+                          name="causality"
+                          value={option.value}
+                          checked={causality === option.value}
+                          disabled={locked}
+                        />
+                        <b safe>{option.label}</b>
+                      </div>
+                      <ul class="f4-card-c">
+                        {option.criteria.map((line) => (
+                          <li safe>{line}</li>
+                        ))}
+                      </ul>
+                    </label>
+                    {a2Review && (
+                      <A2InlineOption
+                        itemKey="4.2"
+                        optionValue={option.value}
+                        label={option.label}
+                        checked={causalityA2Values.includes(option.value)}
+                        locked={a2Review.submitted}
                       />
-                      <b safe>{option.label}</b>
-                    </div>
-                    <ul class="f4-card-c">
-                      {option.criteria.map((line) => (
-                        <li safe>{line}</li>
-                      ))}
-                    </ul>
-                  </label>
+                    )}
+                  </div>
                 ))}
               </div>
+              <A2InlineDecision
+                itemKey="4.2"
+                answers={answers}
+                review={a2Review?.review}
+                locked={a2Review?.submitted ?? true}
+              />
             </div>
 
             <div class="f4-block">
@@ -811,7 +1262,13 @@ export function F004Form({
               <p class="f4-note" safe>
                 {CAUSALITY_DISCUSSION_NOTE}
               </p>
-              <Comment name="c4_3" answers={answers} rows={5} label="Discussion" locked={locked} />
+              <Comment name="c4_3" answers={answers} rows={8} label="Discussion" locked={locked} />
+              <A2InlineDecision
+                itemKey="4.3"
+                answers={answers}
+                review={a2Review?.review}
+                locked={a2Review?.submitted ?? true}
+              />
             </div>
           </section>
 
@@ -844,8 +1301,15 @@ export function F004Form({
                 options={SIGNAL_OPTIONS}
                 answers={answers}
                 locked={locked}
+                a2={a2Review && { key: "5", review: a2Review.review, locked: a2Review.submitted }}
               />
-              <Comment name="c5" answers={answers} rows={4} locked={locked} />
+              <Comment name="c5" answers={answers} rows={6} locked={locked} />
+              <A2InlineDecision
+                itemKey="5"
+                answers={answers}
+                review={a2Review?.review}
+                locked={a2Review?.submitted ?? true}
+              />
             </div>
           </section>
 
@@ -856,38 +1320,57 @@ export function F004Form({
               comments={sectionComments?.["6"]}
               action={commentAction?.("6")}
             />
-            <p class="f4-note" safe>
-              {RISK_NOTE}
-            </p>
-            <div class="f4-cards f4-risk">
-              {RISK_OPTIONS.map((option) => (
-                <label
-                  class={
-                    risk === option.value
-                      ? `f4-card r-${option.value} on`
-                      : `f4-card r-${option.value}`
-                  }
-                >
-                  <div class="f4-card-h">
-                    <input
-                      type="radio"
-                      name="risk_level"
-                      value={option.value}
-                      checked={risk === option.value}
-                      disabled={locked}
-                    />
-                    <b safe>{option.label}</b>
+            <div class="f4-block">
+              <p class="f4-note" safe>
+                {RISK_NOTE}
+              </p>
+              <div class="f4-cards f4-risk">
+                {RISK_OPTIONS.map((option) => (
+                  <div class="f4-choice-pair">
+                    <label
+                      class={
+                        risk === option.value
+                          ? `f4-card r-${option.value} on`
+                          : `f4-card r-${option.value}`
+                      }
+                    >
+                      <div class="f4-card-h">
+                        <input
+                          type="radio"
+                          name="risk_level"
+                          value={option.value}
+                          checked={risk === option.value}
+                          disabled={locked}
+                        />
+                        <b safe>{option.label}</b>
+                      </div>
+                      <p class="f4-card-c" safe>
+                        {option.note}
+                      </p>
+                    </label>
+                    {a2Review && (
+                      <A2InlineOption
+                        itemKey="6"
+                        optionValue={option.value}
+                        label={option.label}
+                        checked={riskA2Values.includes(option.value)}
+                        locked={a2Review.submitted}
+                      />
+                    )}
                   </div>
-                  <p class="f4-card-c" safe>
-                    {option.note}
-                  </p>
-                </label>
-              ))}
+                ))}
+              </div>
+              <p class="f4-note" safe>
+                {RISK_IVD_NOTE}
+              </p>
+              <Comment name="c6" answers={answers} locked={locked} />
+              <A2InlineDecision
+                itemKey="6"
+                answers={answers}
+                review={a2Review?.review}
+                locked={a2Review?.submitted ?? true}
+              />
             </div>
-            <p class="f4-note" safe>
-              {RISK_IVD_NOTE}
-            </p>
-            <Comment name="c6" answers={answers} locked={locked} />
           </section>
 
           <section class="f4-section" id="section-7">
@@ -905,33 +1388,57 @@ export function F004Form({
               <p class="f4-note">Possible risk mitigation action(s):</p>
               <div class="f4-ticks f4-11">
                 {ACTIONS.map((action) => (
-                  <label
-                    class={
-                      list(answers, "actions").includes(action.value) ? "f4-tick on" : "f4-tick"
-                    }
-                  >
-                    <input
-                      type="checkbox"
-                      name="actions"
-                      value={action.value}
-                      checked={list(answers, "actions").includes(action.value)}
-                      disabled={locked}
-                    />
-                    <span>
-                      <span class="f4-no" safe>
-                        {action.no}
-                      </span>{" "}
-                      <span safe>{action.label}</span>
-                    </span>
-                  </label>
+                  <div class="f4-choice-pair">
+                    <label
+                      class={
+                        list(answers, "actions").includes(action.value) ? "f4-tick on" : "f4-tick"
+                      }
+                    >
+                      <input
+                        type="checkbox"
+                        name="actions"
+                        value={action.value}
+                        checked={list(answers, "actions").includes(action.value)}
+                        disabled={locked}
+                      />
+                      <span>
+                        <span class="f4-no" safe>
+                          {action.no}
+                        </span>{" "}
+                        <span safe>{action.label}</span>
+                      </span>
+                    </label>
+                    {a2Review && (
+                      <A2InlineOption
+                        itemKey="7.1_actions"
+                        optionValue={action.value}
+                        label={action.label}
+                        checked={actionsA2Values.includes(action.value)}
+                        locked={a2Review.submitted}
+                        multi
+                      />
+                    )}
+                  </div>
                 ))}
               </div>
               <Comment
                 name="conclusion"
                 answers={answers}
-                rows={6}
+                rows={8}
                 label="Conclusion"
                 locked={locked}
+              />
+              <A2InlineDecision
+                itemKey="7.1_actions"
+                answers={answers}
+                review={a2Review?.review}
+                locked={a2Review?.submitted ?? true}
+              />
+              <A2InlineDecision
+                itemKey="7.1_conclusion"
+                answers={answers}
+                review={a2Review?.review}
+                locked={a2Review?.submitted ?? true}
               />
             </div>
 
@@ -1003,7 +1510,22 @@ export function F004Form({
           </section>
         </fieldset>
 
-        {submitted ? (
+        {a2Review?.submitted === true ? (
+          <p class="hint">
+            This second assessment has been submitted and is now read-only. The report is with the
+            manager for a decision.
+          </p>
+        ) : writingA2 ? (
+          <div class="bar f4-buttons">
+            <button type="submit" name="intent" value="save" class="btn ghost">
+              Save draft
+            </button>
+            <div class="sp"></div>
+            <button type="submit" name="intent" value="submit" class="btn">
+              Submit assessment
+            </button>
+          </div>
+        ) : submitted ? (
           <p class="hint">
             This assessment has been submitted and is now read-only. The report is with the second
             assessor.

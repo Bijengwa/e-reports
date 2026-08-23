@@ -139,23 +139,66 @@ function fileAtThePublicDoor() {
 function completeAssessment(signature: string) {
   return {
     intent: "submit",
+    device_type: "md",
+    registration_number: "TMDA-REG-0001",
+    device_class: "B",
+    report_stage: "initial",
+    source_of_event: "malfunction",
     seriousness: "serious",
+    public_health: "no",
+    imdrf_component_l1: "Battery",
+    imdrf_device_problem_l1: "Battery depletion",
+    imdrf_health_impact_l1: "No clinical signs",
+    imdrf_clinical_signs_l1: "None observed",
+    imdrf_investigation_type_l1: "Manufacturer investigation",
+    imdrf_investigation_findings_l1: "Cell fault confirmed",
+    imdrf_investigation_conclusion_l1: "Device to be replaced",
     expectedness: "unexpected",
     causality: "probable",
+    c4_3: "Temporal relationship with device use; no other cause identified.",
     signal_status: "signal",
     risk_level: "high",
+    actions: "monitoring",
     conclusion: "Recommend risk communication and enhanced monitoring.",
     signature,
   };
 }
 
-/** Everything a second assessment must carry to be submitted. Section 7.2 and its own signature. */
-function completeSecond(signature: string) {
+/**
+ * Everything a second assessment must carry to be submitted: a position on every A1 answer.
+ *
+ * One of each degree, so a submission exercises all three rules at once — Agree carrying nothing,
+ * Disagree carrying a corrected value and a statement, and Need Clarification carrying a statement
+ * alone. The keys are the A1 field numbers, which is what the payload is keyed by.
+ */
+function completeSecond(overrides: Record<string, string | string[]> = {}) {
   return {
     intent: "submit",
-    actions_2: "monitoring",
-    conclusion_2: "I concur with the first assessor and add enhanced monitoring.",
-    signature_2: signature,
+    "a2_degree_1.3": "agree",
+    "a2_degree_1.10": "agree",
+    "a2_degree_1.11": "agree",
+    "a2_degree_1.19": "agree",
+    "a2_degree_2.5": "agree",
+    "a2_degree_2.6": "disagree",
+    "a2_value_2.6": "non_serious",
+    "a2_statement_2.6": "This does not meet the serious criteria.",
+    "a2_degree_2.7": "agree",
+    "a2_degree_3.1.1": "agree",
+    "a2_degree_3.1.2": "agree",
+    "a2_degree_3.2.1": "agree",
+    "a2_degree_3.2.2": "agree",
+    "a2_degree_3.3.1": "agree",
+    "a2_degree_3.3.2": "agree",
+    "a2_degree_3.3.3": "agree",
+    "a2_degree_4.1": "agree",
+    "a2_degree_4.2": "agree",
+    "a2_degree_4.3": "agree",
+    a2_degree_5: "agree",
+    a2_degree_6: "agree",
+    "a2_degree_7.1_actions": "clarification",
+    "a2_statement_7.1_actions": "Clarify the monitoring action before the final decision.",
+    "a2_degree_7.1_conclusion": "agree",
+    ...overrides,
   };
 }
 
@@ -417,8 +460,11 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
 
     expect(page.statusCode).toBe(200);
     expect(page.body).toContain("Assessment 2");
-    // 7.2 is what this Officer writes, and it is the only conclusion field the page posts.
-    expect(page.body).toContain('name="conclusion_2"');
+    expect(page.body).toContain("Second assessor section review");
+    // Keyed by the A1 answer the decision is about, and drawn inline beside it.
+    expect(page.body).toContain('name="a2_degree_2.6"');
+    expect(page.body).toContain('name="a2_degree_7.1_conclusion"');
+    expect(page.body).not.toContain('name="conclusion_2"');
   });
 
   it("ignores first-assessment fields smuggled into the body", async () => {
@@ -427,7 +473,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
     // A hand-edited body naming 7.1's own fields. The page never offers them, and the route keeps
     // only what the second assessment owns — so this must leave assessment 1 exactly as it was.
     const submitted = await post(`/reports/${report.id}/assessment-2`, other.cookie, {
-      ...completeSecond(other.name),
+      ...completeSecond(),
       conclusion: "Overwritten by the second assessor.",
       signature: other.name,
       seriousness: "not_serious",
@@ -440,6 +486,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
     expect(first?.payload.seriousness).toBe("serious");
     expect(second?.payload.conclusion).toBeUndefined();
     expect(second?.payload.signature).toBeUndefined();
+    expect(second?.payload.kind).toBe("a2_section_review");
   });
 
   it("carries the manager's review of the first assessment", async () => {
@@ -467,8 +514,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
     for (const who of [officer, stranger]) {
       expect((await get(`/reports/${report.id}/assessment-2`, who.cookie)).statusCode).toBe(403);
       expect(
-        (await post(`/reports/${report.id}/assessment-2`, who.cookie, completeSecond(who.name)))
-          .statusCode,
+        (await post(`/reports/${report.id}/assessment-2`, who.cookie, completeSecond())).statusCode,
       ).toBe(403);
     }
 
@@ -483,7 +529,8 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
 
     const saved = await post(`/reports/${report.id}/assessment-2`, other.cookie, {
       intent: "save",
-      conclusion_2: "Still reading the IFU.",
+      "a2_degree_2.6": "agree",
+      "a2_statement_2.6": "This should be discarded because Agree has no statement.",
     });
 
     expect(saved.statusCode).toBe(302);
@@ -497,32 +544,67 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
     expect(first?.ordinal).toBe(1);
     expect(first?.conclusion).toBe("Recommend risk communication and enhanced monitoring.");
     expect(first?.submitted_at).not.toBeNull();
+    // Agree carries nothing, whatever the body said alongside it.
+    expect(second?.payload).toMatchObject({
+      kind: "a2_section_review",
+      responses: { "2.6": { degree: "agree" } },
+    });
+    expect(second?.payload.responses["2.6"]).not.toHaveProperty("statement");
   });
 
-  it("refuses to submit without 7.2 and a signature, and writes nothing", async () => {
+  it("refuses to submit with any A1 answer left undecided, and writes nothing", async () => {
     const { other, report } = await secondAssessmentAssigned();
 
     const refused = await post(`/reports/${report.id}/assessment-2`, other.cookie, {
       intent: "submit",
-      conclusion_2: "",
-      signature_2: "",
+      "a2_degree_2.6": "agree",
     });
 
     expect(refused.statusCode).toBe(422);
     expect(await assessmentsOf(report.id)).toHaveLength(1);
   });
 
-  it("refuses a signature that is not the second assessor's own name", async () => {
-    const { officer, other, report } = await secondAssessmentAssigned();
+  it("requires a statement for Need Clarification and for Disagree", async () => {
+    const { other, report } = await secondAssessmentAssigned();
+
+    const withoutClarification = await post(
+      `/reports/${report.id}/assessment-2`,
+      other.cookie,
+      completeSecond({ "a2_statement_7.1_actions": "" }),
+    );
+
+    expect(withoutClarification.statusCode).toBe(422);
+
+    const withoutDisagreement = await post(
+      `/reports/${report.id}/assessment-2`,
+      other.cookie,
+      completeSecond({ "a2_statement_2.6": "" }),
+    );
+
+    expect(withoutDisagreement.statusCode).toBe(422);
+    expect(await assessmentsOf(report.id)).toHaveLength(1);
+  });
+
+  it("requires a corrected value for Disagree, and asks for none under Need Clarification", async () => {
+    const { other, report } = await secondAssessmentAssigned();
 
     const refused = await post(
       `/reports/${report.id}/assessment-2`,
       other.cookie,
-      completeSecond(officer.name),
+      completeSecond({ "a2_value_2.6": "" }),
     );
 
     expect(refused.statusCode).toBe(422);
     expect(await assessmentsOf(report.id)).toHaveLength(1);
+
+    // The same review with Need Clarification in 2.6's place needs no value at all.
+    const accepted = await post(
+      `/reports/${report.id}/assessment-2`,
+      other.cookie,
+      completeSecond({ "a2_degree_2.6": "clarification", "a2_value_2.6": "" }),
+    );
+
+    expect(accepted.statusCode).toBe(302);
   });
 
   it("submits as ordinal 2 and sends the report on for a decision", async () => {
@@ -531,7 +613,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
     const submitted = await post(
       `/reports/${report.id}/assessment-2`,
       other.cookie,
-      completeSecond(other.name),
+      completeSecond(),
     );
 
     expect(submitted.statusCode).toBe(302);
@@ -540,9 +622,24 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
     const [first, second] = await assessmentsOf(report.id);
     expect(second?.ordinal).toBe(2);
     expect(second?.assessor_id).toBe(other.id);
-    expect(second?.conclusion).toBe(
-      "I concur with the first assessor and add enhanced monitoring.",
-    );
+    expect(second?.conclusion).toBeNull();
+    expect(second?.payload).toMatchObject({
+      kind: "a2_section_review",
+      responses: {
+        "2.5": { degree: "agree" },
+        "2.6": {
+          degree: "disagree",
+          value: "non_serious",
+          statement: "This does not meet the serious criteria.",
+        },
+        "7.1_actions": {
+          degree: "clarification",
+          statement: "Clarify the monitoring action before the final decision.",
+        },
+      },
+    });
+    // Need Clarification asks about A1's answer; it never replaces it.
+    expect(second?.payload.responses["7.1_actions"]).not.toHaveProperty("value");
     expect(second?.submitted_at).not.toBeNull();
     // The manager's review belongs to assessment 1 and stays there.
     expect(second?.manager_comment).toBeNull();
@@ -568,14 +665,17 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
     const before = await get(`/reports/${report.id}`, manager.cookie);
     expect(before.body).toContain("Pending second assessor review");
 
-    await post(`/reports/${report.id}/assessment-2`, other.cookie, completeSecond(other.name));
+    await post(`/reports/${report.id}/assessment-2`, other.cookie, completeSecond());
 
     const after = await get(`/reports/${report.id}`, manager.cookie);
-    expect(after.body).toContain("I concur with the first assessor and add enhanced monitoring.");
+    expect(after.body).toContain("Clarify the monitoring action before the final decision.");
+    expect(after.body).toContain("Need Clarification");
     expect(after.body).toContain(other.name);
     expect(after.body).not.toContain("Pending second assessor review");
-    // The manager's review of assessment 1 is still assessment 1's, sitting above it.
-    expect(after.body.indexOf(REVIEW)).toBeLessThan(after.body.indexOf("Second assessment"));
+    // A2's decisions render inline inside the same F004 document A1's answers do, rather than as
+    // a separate "Second assessment" section beneath it, so the manager's own review of assessment
+    // 1 — printed once the whole document closes — now comes after them, not above.
+    expect(after.body.indexOf("Need Clarification")).toBeLessThan(after.body.indexOf(REVIEW));
   });
 
   it("keeps an unsubmitted second assessment off the report page", async () => {
@@ -583,7 +683,8 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
 
     await post(`/reports/${report.id}/assessment-2`, other.cookie, {
       intent: "save",
-      conclusion_2: "A draft nobody else should be reading.",
+      "a2_degree_7.1_actions": "clarification",
+      "a2_statement_7.1_actions": "A draft nobody else should be reading.",
     });
 
     const page = await get(`/reports/${report.id}`, manager.cookie);
@@ -595,12 +696,8 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
   it("refuses a second submission of an assessment already sent", async () => {
     const { other, report } = await secondAssessmentAssigned();
 
-    await post(`/reports/${report.id}/assessment-2`, other.cookie, completeSecond(other.name));
-    const again = await post(
-      `/reports/${report.id}/assessment-2`,
-      other.cookie,
-      completeSecond(other.name),
-    );
+    await post(`/reports/${report.id}/assessment-2`, other.cookie, completeSecond());
+    const again = await post(`/reports/${report.id}/assessment-2`, other.cookie, completeSecond());
 
     expect(again.statusCode).toBe(403);
     expect((await reportRow(report.id)).status).toBe("awaiting_decision");

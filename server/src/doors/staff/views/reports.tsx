@@ -1,7 +1,7 @@
-import type { F004Answers } from "../../../domain/f004.js";
+import type { A2ReviewPayload, F004Answers } from "../../../domain/f004.js";
 import { STEP_FIELDS, STEPS } from "../../../domain/form-schema.js";
 import { type MessageKey, translatorFor } from "../../../i18n/index.js";
-import { F004Form, F004Second, type SectionComment } from "./f004.js";
+import { F004Form, type SectionComment } from "./f004.js";
 import { StaffShell } from "./shell.js";
 
 /**
@@ -492,7 +492,7 @@ export type ReportPageProps = {
 /** The second assessment as a finished record: 7.2, its signature, and the day it was signed. */
 export type Assessment2ReviewProps = {
   assessorName: string;
-  answers: F004Answers;
+  answers: A2ReviewPayload;
   submittedOn: string;
 };
 
@@ -585,6 +585,15 @@ export function ReportPage({
             sectionComments={assessment1Review.sectionComments}
             commentAction={assessment1Review.commentAction}
             omitSecond={assessment2Review !== undefined}
+            a2Review={
+              assessment2Review && {
+                action: `/reports/${report.id}/assessment-2`,
+                review: assessment2Review.answers,
+                submitted: true,
+                assessorName: assessment2Review.assessorName,
+                assessedOn: assessment2Review.submittedOn,
+              }
+            }
             issues={[]}
           />
 
@@ -626,25 +635,6 @@ export function ReportPage({
               </div>
             </form>
           )}
-        </>
-      )}
-
-      {/* What the second assessor concluded, once they have. Read-only for everyone here — the
-          Officer who wrote it has their own page, and nobody else may write 7.2 at all. */}
-      {assessment2Review && (
-        <>
-          <h2 class="report-heading">Second assessment</h2>
-          <p class="hint">
-            <span safe>{assessment2Review.assessorName}</span> ·{" "}
-            <span safe>{assessment2Review.submittedOn}</span>
-          </p>
-          <div class="f4">
-            <F004Second
-              answers={assessment2Review.answers}
-              signedOn={assessment2Review.submittedOn}
-              locked
-            />
-          </div>
         </>
       )}
 

@@ -128,14 +128,29 @@ function post(url: string, cookie: string, form: Record<string, string>) {
 function completeAssessment(signature: string, over: Record<string, string> = {}) {
   return {
     intent: "submit",
+    device_type: "md",
+    registration_number: "TMDA-REG-0001",
+    device_class: "B",
+    report_stage: "initial",
+    source_of_event: "malfunction",
     seriousness: "serious",
+    public_health: "no",
+    imdrf_component_l1: "Battery",
+    imdrf_device_problem_l1: "Battery depletion",
+    imdrf_health_impact_l1: "No clinical signs",
+    imdrf_clinical_signs_l1: "None observed",
+    imdrf_investigation_type_l1: "Manufacturer investigation",
+    imdrf_investigation_findings_l1: "Cell fault confirmed",
+    imdrf_investigation_conclusion_l1: "Device to be replaced",
     expectedness: "unexpected",
     causality: "probable",
+    c4_3: "Temporal relationship with device use; no other cause identified.",
     // Section 5 is now required too — locked in the same commit that restyled it away from pill
     // chrome. A fixture built before that commit would otherwise silently describe an incomplete
     // submission and every "complete" case here would 422.
     signal_status: "signal",
     risk_level: "high",
+    actions: "monitoring",
     conclusion: "Recommend risk communication and enhanced monitoring.",
     signature,
     ...over,
