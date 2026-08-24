@@ -453,6 +453,7 @@ function A2InlineOption({
   locked,
   multi,
   ordinal,
+  a1Chose,
 }: {
   itemKey: string;
   optionValue: string;
@@ -462,7 +463,25 @@ function A2InlineOption({
   multi?: boolean;
   /** 2, 3, 4, … — whose control this is. Printed, so it must be this reader's own ordinal. */
   ordinal: number;
+  /**
+   * Whether this is the option the first assessor chose — the one thing Disagree cannot say.
+   *
+   * Disagree means "that answer is wrong, here is the right one", so offering the answer being
+   * disagreed with is offering a contradiction. Not drawn at all rather than drawn disabled: a
+   * greyed control invites the reader to work out why it is refused, and there is nothing to work
+   * out — that option is simply not one of the replacements.
+   *
+   * Only for a single choice. Seven-eighths of 7.1's eleven ticks may legitimately match A1's,
+   * because what is being replaced there is the whole list; whether the list came back identical
+   * is a question about the set, and `validateSecondaryReviewForSubmit` is where it is asked.
+   *
+   * Ignored once the review is locked, so a record written before this rule existed still reads
+   * back exactly as it was stored. The rule governs what may be written, not what may be shown.
+   */
+  a1Chose?: boolean;
 }): JSX.Element {
+  if (a1Chose === true && multi !== true && !locked) return <span hidden />;
+
   return (
     <label class="a2-opt">
       <span class="a2-opt-k" safe>{`A${String(ordinal)}`}</span>
@@ -530,6 +549,7 @@ function Radios({
               checked={a2Values.includes(option.value)}
               locked={a2.locked}
               ordinal={a2.ordinal}
+              a1Chose={chosen === option.value}
             />
           )}
         </div>
@@ -1442,6 +1462,7 @@ export function F004Form({
                         checked={causalityA2Values.includes(option.value)}
                         locked={a2Review.submitted}
                         ordinal={a2Ordinal}
+                        a1Chose={causality === option.value}
                       />
                     )}
                   </div>
@@ -1566,6 +1587,7 @@ export function F004Form({
                         checked={riskA2Values.includes(option.value)}
                         locked={a2Review.submitted}
                         ordinal={a2Ordinal}
+                        a1Chose={risk === option.value}
                       />
                     )}
                   </div>

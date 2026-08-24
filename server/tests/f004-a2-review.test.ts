@@ -371,3 +371,159 @@ describe("what an A2 submission must carry", () => {
     expect(issues).toEqual([]);
   });
 });
+
+/**
+ * Disagree replaces the first assessor's answer. A replacement identical to the answer being
+ * disagreed with replaces nothing — it is the same finding an empty one is, said differently, and
+ * a manager reading "Disagree: Serious" against A1's "Serious" has been handed a contradiction
+ * rather than a correction.
+ *
+ * Every one of these goes through `validateSecondaryReviewForSubmit` rather than through the page,
+ * because the page is where the rule is made convenient and this is where it is made true. The
+ * last one builds the payload by hand, the way a request that never loaded the page would.
+ */
+describe("a Disagree that repeats the answer it disagrees with", () => {
+  const disagreeWith = (
+    key: string,
+    overrides: Record<string, string | string[]>,
+  ): Record<string, string | string[]> =>
+    agreeWithEverything({
+      [`a2_degree_${key}`]: "disagree",
+      [`a2_statement_${key}`]: "Recorded reasoning for the change.",
+      ...overrides,
+    });
+
+  const issuesFor = (
+    body: Record<string, string | string[]>,
+    a1Answers: F004Answers = FILLED_A1_ANSWERS,
+  ) =>
+    validateSecondaryReviewForSubmit(collectSecondaryReview(body, a1Answers), a1Answers).map(
+      (issue) => issue.field,
+    );
+
+  it("refuses a single choice that is the one A1 already made", () => {
+    expect(issuesFor(disagreeWith("2.6", { "a2_value_2.6": "serious" }))).toEqual(["a2_value_2.6"]);
+  });
+
+  it("accepts a single choice that differs from A1's", () => {
+    expect(issuesFor(disagreeWith("2.6", { "a2_value_2.6": "non_serious" }))).toEqual([]);
+  });
+
+  it("refuses the same choice on a card field as readily as on a radio", () => {
+    expect(issuesFor(disagreeWith("6", { a2_value_6: "high" }))).toEqual(["a2_value_6"]);
+    expect(issuesFor(disagreeWith("4.2", { "a2_value_4.2": "probable" }))).toEqual([
+      "a2_value_4.2",
+    ]);
+  });
+
+  it("refuses a retyped text answer, whitespace and all", () => {
+    const a1 = "Temporal relationship with device use; no other cause identified.";
+
+    expect(issuesFor(disagreeWith("4.3", { "a2_value_4.3": a1 }))).toEqual(["a2_value_4.3"]);
+    expect(issuesFor(disagreeWith("4.3", { "a2_value_4.3": `  ${a1}  ` }))).toEqual([
+      "a2_value_4.3",
+    ]);
+    expect(
+      issuesFor(
+        disagreeWith("4.3", {
+          "a2_value_4.3": "Temporal relationship with device use;\n  no other cause identified.",
+        }),
+      ),
+    ).toEqual(["a2_value_4.3"]);
+  });
+
+  it("accepts a text answer that actually says something else", () => {
+    expect(
+      issuesFor(disagreeWith("4.3", { "a2_value_4.3": "A concurrent medication explains it." })),
+    ).toEqual([]);
+  });
+
+  it("refuses the same set of mitigation actions, in any order", () => {
+    const a1Answers: F004Answers = {
+      ...FILLED_A1_ANSWERS,
+      actions: ["monitoring", "risk_communication"],
+    };
+
+    expect(
+      issuesFor(
+        disagreeWith("7.1_actions", {
+          "a2_value_7.1_actions": ["risk_communication", "monitoring"],
+        }),
+        a1Answers,
+      ),
+    ).toEqual(["a2_value_7.1_actions"]);
+  });
+
+  it("accepts a set of mitigation actions that is not A1's", () => {
+    expect(
+      issuesFor(disagreeWith("7.1_actions", { "a2_value_7.1_actions": ["monitoring", "removal"] })),
+    ).toEqual([]);
+  });
+
+  it("refuses an IMDRF grid filled in exactly as A1 left it", () => {
+    expect(
+      issuesFor(
+        disagreeWith("3.1.1", {
+          "a2_value_3.1.1_l1": "Battery",
+          "a2_value_3.1.1_l2": "",
+          "a2_value_3.1.1_l3": "",
+          "a2_value_3.1.1_code": "",
+        }),
+      ),
+    ).toEqual(["a2_value_3.1.1"]);
+  });
+
+  it("accepts an IMDRF grid that changes any one box", () => {
+    expect(
+      issuesFor(
+        disagreeWith("3.1.1", { "a2_value_3.1.1_l1": "Battery", "a2_value_3.1.1_code": "A0501" }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("leaves Agree and Need Clarification alone", () => {
+    // A value posted alongside Need Clarification never reaches the payload at all, so the answer
+    // being repeated cannot make a difference here — and the statement rule is the only one left.
+    expect(
+      issuesFor(
+        agreeWithEverything({
+          "a2_degree_2.6": "clarification",
+          "a2_value_2.6": "serious",
+          "a2_statement_2.6": "Which of the four criteria was met?",
+        }),
+      ),
+    ).toEqual([]);
+
+    expect(issuesFor(agreeWithEverything())).toEqual([]);
+  });
+
+  it("says nothing about an item A1 left blank, whatever is supplied", () => {
+    const a1Answers: F004Answers = { ...FILLED_A1_ANSWERS, registration_number: "" };
+
+    // `supplied`, not a degree — there is no A1 answer here to repeat.
+    expect(issuesFor(agreeWithEverything({ "a2_value_1.10": "TMDA-REG-0001" }), a1Answers)).toEqual(
+      [],
+    );
+  });
+
+  it("refuses a hand-built payload that never went near the page", () => {
+    const crafted = {
+      kind: "a2_section_review" as const,
+      responses: {
+        ...Object.fromEntries(
+          SECONDARY_REVIEW_ITEMS.map((item) => [item.key, { degree: "agree" as const }]),
+        ),
+        "2.6": {
+          degree: "disagree" as const,
+          value: "serious",
+          statement: "Posted directly, bypassing every control the page draws.",
+        },
+      },
+    };
+
+    const issues = validateSecondaryReviewForSubmit(crafted, FILLED_A1_ANSWERS);
+
+    expect(issues.map((issue) => issue.field)).toEqual(["a2_value_2.6"]);
+    expect(issues[0]?.message).toContain("different categorization");
+  });
+});

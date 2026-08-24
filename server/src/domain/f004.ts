@@ -1172,6 +1172,83 @@ export function validateSecondaryForSubmit(answers: F004Answers, assessorName: s
 }
 
 /**
+ * One string, compared the way two answers to the same question should be.
+ *
+ * Trimmed, and internal runs of whitespace collapsed, because "the same answer typed again" is
+ * what this comparison exists to catch and a copied paragraph that picked up a line break is still
+ * the same paragraph. Case is kept: two spellings of a word are two pieces of prose, and deciding
+ * they are one answer would be this file inventing a judgement the form never asked it to make.
+ */
+function sameText(a: string, b: string): boolean {
+  const flatten = (raw: string) => raw.trim().replace(/\s+/g, " ");
+  return flatten(a) === flatten(b);
+}
+
+/**
+ * The first assessor's own answer to one review item, in the shape that item's replacement takes.
+ *
+ * Read through the item rather than through the field name, so the four `valueKind`s answer in the
+ * four shapes `postedValue` and `storedValue` already speak — which is what lets one comparison
+ * below serve all of them.
+ *
+ * The `fields` case pairs `item.fields[i]` with `item.a1Fields[i]`. The two lists are built in one
+ * expression in `IMDRF_A2_ITEMS`, in the same order, from the same row of the form — the levels
+ * this row has, then its coding box — so the pairing is a property of that generator rather than
+ * an assumption made here about it.
+ */
+function a1ValueOf(item: A2ReviewItem, a1Answers: F004Answers): A2Value {
+  if (item.valueKind === "multi") return list(a1Answers, answerField(item));
+
+  if (item.valueKind === "fields") {
+    const parts: Record<string, string> = {};
+    (item.fields ?? []).forEach((field, index) => {
+      parts[field.key] = value(a1Answers, item.a1Fields[index] ?? "").trim();
+    });
+    return parts;
+  }
+
+  return value(a1Answers, answerField(item)).trim();
+}
+
+/**
+ * Whether a Disagree's replacement is, in fact, the answer being disagreed with.
+ *
+ * Disagree means "this answer is wrong, here is the right one". A replacement identical to what
+ * the first assessor already wrote is not a correction — it is a finding the manager cannot act
+ * on, exactly as an empty one is, and the two are refused side by side for the same reason.
+ *
+ * Order does not distinguish two sets of mitigation actions: 7.1 is a list of ticks, and ticking
+ * the same eleven boxes in a different sequence is the same answer. Every other kind compares as
+ * the single thing it is.
+ */
+function sameAsA1(item: A2ReviewItem, replacement: A2Value | undefined, a1Answers: F004Answers) {
+  if (replacement === undefined) return false;
+
+  const a1 = a1ValueOf(item, a1Answers);
+
+  if (Array.isArray(a1)) {
+    if (!Array.isArray(replacement)) return false;
+    const clean = (entries: readonly string[]) =>
+      new Set(entries.map((entry) => entry.trim()).filter((entry) => entry !== ""));
+    const mine = clean(replacement);
+    const theirs = clean(a1);
+    return mine.size === theirs.size && [...mine].every((entry) => theirs.has(entry));
+  }
+
+  if (typeof a1 === "object") {
+    if (typeof replacement !== "object" || replacement === null || Array.isArray(replacement)) {
+      return false;
+    }
+    return (item.fields ?? []).every((field) =>
+      sameText(replacement[field.key] ?? "", a1[field.key] ?? ""),
+    );
+  }
+
+  if (typeof replacement !== "string") return false;
+  return sameText(replacement, a1);
+}
+
+/**
  * What a second submission must carry: a position on every one of A1's answers, and the words the
  * two positions that are not Agree cannot mean anything without.
  *
@@ -1205,11 +1282,21 @@ export function validateSecondaryReviewForSubmit(
 
     if (degree === "agree") continue;
 
-    if (degree === "disagree" && isBlankA2Value(response?.value)) {
-      issues.push({
-        field: `a2_value_${item.key}`,
-        message: `${item.no} ${item.title}: Disagree replaces the first assessor's answer, so give the corrected one.`,
-      });
+    if (degree === "disagree") {
+      if (isBlankA2Value(response?.value)) {
+        issues.push({
+          field: `a2_value_${item.key}`,
+          message: `${item.no} ${item.title}: Disagree replaces the first assessor's answer, so give the corrected one.`,
+        });
+      } else if (sameAsA1(item, response?.value, a1Answers)) {
+        // Enforced here and not only in the page, because the page is a convenience and this is
+        // the rule. The control for A1's own answer is not drawn for a reader to choose, but a
+        // hand-written POST is under no obligation to have read the page at all.
+        issues.push({
+          field: `a2_value_${item.key}`,
+          message: `${item.no} ${item.title}: Disagree must give a different ${item.valueLabel} — that is the first assessor's own answer.`,
+        });
+      }
     }
 
     if ((response?.statement ?? "").trim() === "") {

@@ -34,6 +34,7 @@ export type StaffShellProps = {
     | "dashboard"
     | "workload"
     | "assessments"
+    | "my-work"
     | "reports"
     | "new-report"
     | "users"
@@ -77,6 +78,17 @@ function IconAssessments(): JSX.Element {
       <path d="M5 4h11l4 4v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" />
       <path d="M15 4v5h5" />
       <path d="M8 14l2.5 2.5L16 11" />
+    </svg>
+  );
+}
+
+/** A case: what the Officer has been handed to carry out, rather than to write. */
+function IconMyWork(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <rect x="3" y="7.5" width="18" height="12.5" rx="2" />
+      <path d="M9 7.5V6a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 6v1.5" />
+      <path d="M3 12.5h18" />
     </svg>
   );
 }
@@ -249,6 +261,21 @@ export function StaffShell({
               >
                 <IconAssessments />
                 <span class="rail-label">My assessments</span>
+              </a>
+            )}
+
+            {/* The other half of an Officer’s own list: what the manager approved and handed
+                them to carry out. Its own entry rather than a tab on My assessments, because
+                assessing a report and acting on a decision about it are two different jobs
+                arriving at two different times. */}
+            {isOfficer && (
+              <a
+                href="/my-work"
+                class={active === "my-work" ? "on" : ""}
+                aria-current={active === "my-work" ? "page" : undefined}
+              >
+                <IconMyWork />
+                <span class="rail-label">My work</span>
               </a>
             )}
 

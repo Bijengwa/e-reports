@@ -185,7 +185,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the state migration 0013 repairs", () => 
     // The manager sees a report being worked on and the wrong person against it: with no
     // `assessments` row above ordinal 1, the latest assessment on the report still looks
     // like A1.
-    const workload = (await get("/workload?stage=in-progress", manager.cookie)).body;
+    const workload = (await get("/workload?stage=secondary-assessment", manager.cookie)).body;
     expect(workload).toContain("<td>A1</td>");
     expect(workload).toContain("<td><span>Asha Mrema</span></td>");
     expect(workload).not.toContain("Baraka Nyoni");
@@ -233,7 +233,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the state migration 0013 repairs", () => 
 
     // The report is with A2 now, and the manager's row names them rather than the assessor
     // whose turn is over.
-    const workload = (await get("/workload?stage=in-progress", manager.cookie)).body;
+    const workload = (await get("/workload?stage=secondary-assessment", manager.cookie)).body;
     expect(workload).toContain("<td>A2</td>");
     expect(workload).toContain("<td><span>Baraka Nyoni</span></td>");
 

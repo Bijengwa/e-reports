@@ -569,8 +569,14 @@ function AssessmentHistory({
   );
 }
 
-/** The manager's decision history: who decided, when, and what, oldest first. */
-function DecisionHistory({ decisions }: { decisions: DecisionEntry[] }): JSX.Element {
+/**
+ * The manager's decision history: who decided, when, and what, oldest first.
+ *
+ * Exported because the Officer carrying out the work reads the same list on their own page. It is
+ * the record of how the report reached them, and two renderings of one history is how the two
+ * pages start disagreeing about what a manager decided.
+ */
+export function DecisionHistory({ decisions }: { decisions: DecisionEntry[] }): JSX.Element {
   if (decisions.length === 0) return <span hidden />;
 
   return (

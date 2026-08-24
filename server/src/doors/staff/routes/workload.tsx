@@ -17,7 +17,7 @@ const WORKLOAD_LIMIT = 200;
  * The filter, validated against the states the page actually draws.
  *
  * Read from `BUCKETS` rather than from `reportStatus.enumValues`: what may be filtered by is now a
- * question about the four states this page shows, not about the seven values the column can hold.
+ * question about the six states this page shows, not about the seven values the column can hold.
  * Taking the answer from the bar's own definition means a state added there is filterable the day
  * it exists, and a status the bar deliberately shows no tab for — `closed` — cannot be reached by
  * hand-editing the address either.
@@ -67,7 +67,7 @@ function toRow(row: unknown): WorkloadRow {
  * Two queries rather than one. The figures count every report the bar has a tab for and the list
  * shows at most a page of them, so a window function cannot serve both here the way it does on the
  * Officer's queue: that one counts and lists the same filtered set, and this one deliberately does
- * not — the four figures must stay true whatever state is being read.
+ * not — every figure must stay true whatever state is being read.
  *
  * The figures are still counted `GROUP BY status` and folded into states here, rather than grouped
  * by state in SQL. The status-to-state mapping lives in `BUCKETS` and is the tab bar's own; having

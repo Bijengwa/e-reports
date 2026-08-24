@@ -296,9 +296,13 @@ function bucketStat(label: string, count: number): string {
   return `<span>${label}</span> <span class="wl-count">${count}</span>`;
 }
 
-/** The workload tab for the bucket a manager acts on after A1 and after every An alike. */
-/** The state a report waiting on the manager sits in — after A1 and after every An alike. */
-const DECISION = "Decision";
+/**
+ * The state a report sits in once its assessment is in and the manager must name the next
+ * assessor — after A1 and after every An alike. Its own tab, apart from Decision: naming who
+ * reads a report next and deciding what happens to it are two different moves.
+ */
+const ASSIGN_NEXT = "Assign next assessor";
+const ASSIGN_NEXT_STAGE = "assign-next-assessor";
 
 describe.skipIf(!INTEGRATION_ENABLED)("the manager's pipeline", () => {
   beforeEach(start);
@@ -326,8 +330,10 @@ describe.skipIf(!INTEGRATION_ENABLED)("the manager's pipeline", () => {
     for (const number of ["8001", "8002", "8003", "8004", "8005"]) {
       expect(body, number).toContain(`MD-AE/2026/${number}`);
     }
-    expect(body).toContain(bucketStat(DECISION, 2));
+    expect(body).toContain(bucketStat(ASSIGN_NEXT, 2));
     expect(body).toContain(bucketStat("Not started", 1));
+    expect(body).toContain(bucketStat("First assessment", 1));
+    expect(body).toContain(bucketStat("Secondary assessment", 1));
     expect(body).toContain(bucketStat("Assigned for work", 0));
 
     // Newest first: the later arrival is printed above the earlier one.
@@ -340,7 +346,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the manager's pipeline", () => {
     await seedReport({ number: "MD-AE/2026/8011", status: "awaiting_second_assessor" });
     await seedReport({ number: "MD-AE/2026/8012", status: "received" });
 
-    const body = (await get("/workload?stage=decision", manager.cookie)).body;
+    const body = (await get(`/workload?stage=${ASSIGN_NEXT_STAGE}`, manager.cookie)).body;
 
     expect(body).toContain("MD-AE/2026/8011");
     expect(body).not.toContain("MD-AE/2026/8012");
@@ -355,9 +361,9 @@ describe.skipIf(!INTEGRATION_ENABLED)("the manager's pipeline", () => {
     const manager = await signedInAs("manager", "Mgr");
     await seedReport({ number: "MD-AE/2026/8010", status: "received" });
 
-    const body = (await get("/workload?stage=decision", manager.cookie)).body;
+    const body = (await get(`/workload?stage=${ASSIGN_NEXT_STAGE}`, manager.cookie)).body;
 
-    expect(body).toContain(bucketStat(DECISION, 0));
+    expect(body).toContain(bucketStat(ASSIGN_NEXT, 0));
     expect(body).toContain("No reports are in this state right now.");
     // No header over an empty body: that reads as a list that failed to load.
     expect(body).not.toContain("<table");
@@ -564,25 +570,27 @@ describe.skipIf(!INTEGRATION_ENABLED)("what the assignment hands over", () => {
   it("offers the manager the way in from the state that is waiting on them", async () => {
     const { manager, other, report } = await waiting();
 
-    // The row's own link, matched as the anchor rather than as bare words. It says Review: the
-    // top bar is a filter, and the decision itself is made on the report, where the rules about
-    // who may be named are enforced.
-    const rowLink = `<a href="/reports/${report.id}">Review</a>`;
+    // The row's own link, matched as the anchor rather than as bare words. It says Assign — the
+    // move this state asks for — and the naming itself happens on the report, where the rules
+    // about who may be named are enforced.
+    const rowLink = `<a href="/reports/${report.id}">Assign</a>`;
 
-    const waitingState = (await get("/workload?stage=decision", manager.cookie)).body;
+    const waitingState = (await get(`/workload?stage=${ASSIGN_NEXT_STAGE}`, manager.cookie)).body;
     expect(waitingState).toContain(rowLink);
-    // The duplicate action the list used to carry is gone from it.
-    expect(waitingState).not.toContain("Assign next assessor");
-    // It lives on the report the link points at, and nowhere else.
+    // The list names the state — that is what a tab and a status cell are for — but carries no way
+    // of acting on it. The duplicate control it used to hold is gone: no form, and nobody to pick.
+    expect(waitingState).not.toContain("/assign-next-assessor");
+    expect(waitingState).not.toContain("<select");
+    // The action lives on the report the link points at, and nowhere else.
     expect((await get(`/reports/${report.id}`, manager.cookie)).body).toContain(
-      "Assign next assessor",
+      `/reports/${report.id}/assign-next-assessor`,
     );
 
     await assign(report, manager.cookie, other.id);
 
     // Once named, the row says which assessment the report is on and who has it, rather than
     // offering a way in again.
-    const working = (await get("/workload?stage=in-progress", manager.cookie)).body;
+    const working = (await get("/workload?stage=secondary-assessment", manager.cookie)).body;
     expect(working).toContain("<td>A2</td>");
     expect(working).toContain(`<td><span>${other.name}</span></td>`);
     expect(working).toContain(`<a href="/reports/${report.id}">Open</a>`);
@@ -640,19 +648,19 @@ describe.skipIf(!INTEGRATION_ENABLED)("assigning one", () => {
   it("moves the report to the next bucket and takes the picker off the page", async () => {
     const { manager, other, report } = await waiting();
 
-    const before = await get("/workload?stage=decision", manager.cookie);
+    const before = await get(`/workload?stage=${ASSIGN_NEXT_STAGE}`, manager.cookie);
     expect(before.body).toContain(report.number);
 
     await assign(report, manager.cookie, other.id);
 
     // Out of the bucket it was in, and counted in the one it moved to.
-    const waitingBucket = (await get("/workload?stage=decision", manager.cookie)).body;
+    const waitingBucket = (await get(`/workload?stage=${ASSIGN_NEXT_STAGE}`, manager.cookie)).body;
     expect(waitingBucket).not.toContain(report.number);
-    expect(waitingBucket).toContain(bucketStat(DECISION, 0));
+    expect(waitingBucket).toContain(bucketStat(ASSIGN_NEXT, 0));
 
-    const secondBucket = (await get("/workload?stage=in-progress", manager.cookie)).body;
+    const secondBucket = (await get("/workload?stage=secondary-assessment", manager.cookie)).body;
     expect(secondBucket).toContain(report.number);
-    expect(secondBucket).toContain(bucketStat("In progress", 1));
+    expect(secondBucket).toContain(bucketStat("Secondary assessment", 1));
 
     // The report is no longer waiting, so there is nothing left to pick.
     const detail = (await get(`/reports/${report.id}`, manager.cookie)).body;

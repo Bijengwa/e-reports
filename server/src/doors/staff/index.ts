@@ -11,6 +11,7 @@ import { dashboardRoutes } from "./routes/dashboard.js";
 import { decisionRoutes } from "./routes/decisions.js";
 import { loginRoutes } from "./routes/login.js";
 import { logoutRoutes } from "./routes/logout.js";
+import { myWorkRoutes } from "./routes/my-work.js";
 import { newReportRoutes } from "./routes/new-report.js";
 import { reportsRoutes } from "./routes/reports.js";
 import { usersRoutes } from "./routes/users.js";
@@ -95,6 +96,11 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
         // An Officer's own assigned work. Here rather than beside the register because it is one
         // person's list, and nobody but an assessor has one.
         await registration.register(myAssessmentsRoutes);
+
+        // The read side of the manager approving a report: what that decision handed this
+        // Officer to carry out. Beside the assessment queue because it is the same person and
+        // the same kind of list — their own work, and nobody else can be shown it.
+        await registration.register(myWorkRoutes);
 
         // The first assessment of a report. Registered here because only an Officer may open one
         // at all; which Officer is a question about the row, and the route asks it for itself.

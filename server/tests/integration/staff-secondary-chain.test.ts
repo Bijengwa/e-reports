@@ -368,7 +368,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
     // Assigned and not yet opened. This is the state the manager's bucket exists to show, and the
     // state the Officer's own queue has to show them before they have written a word — the two
     // read the same assignment or the work is invisible to both of them.
-    const state = await get("/workload?stage=in-progress", manager.cookie);
+    const state = await get("/workload?stage=secondary-assessment", manager.cookie);
     expect(state.body).toContain("<td>A2</td>");
     expect(state.body).toContain(`<td><span>${second.name}</span></td>`);
     // The assessor before them has finished; naming them here would send the manager to work
@@ -390,7 +390,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
 
     // The report is with A3 now, and the bucket says so. Naming the assessor before them would
     // send the manager to someone whose work is finished and immutable.
-    const later = await get("/workload?stage=in-progress", manager.cookie);
+    const later = await get("/workload?stage=secondary-assessment", manager.cookie);
     expect(later.body).toContain("<td>A3</td>");
     expect(later.body).toContain(`<td><span>${third.name}</span></td>`);
     expect(later.body).not.toContain(second.name);
@@ -1007,7 +1007,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("what a decision does to the manager's sta
     );
   });
 
-  it("returns the report to In progress when the manager asks for another assessment", async () => {
+  it("returns the report to Secondary assessment when the manager asks for another one", async () => {
     const { manager, rest, report } = await afterFirstAssessment();
     const [second, third] = rest;
     if (second === undefined || third === undefined) throw new Error("need two Officers");
@@ -1030,7 +1030,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("what a decision does to the manager's sta
     expect(await statusOf(report.id)).toBe("second_assessment");
 
     // Back with an assessor, at the next ordinal, and out of the manager's own queue.
-    const working = (await get("/workload?stage=in-progress", manager.cookie)).body;
+    const working = (await get("/workload?stage=secondary-assessment", manager.cookie)).body;
     expect(working).toContain(report.number);
     expect(working).toContain("<td>A3</td>");
     expect(working).toContain(`<td><span>${third.name}</span></td>`);
@@ -1061,10 +1061,126 @@ describe.skipIf(!INTEGRATION_ENABLED)("what a decision does to the manager's sta
     expect(terminal).toContain(report.number);
 
     // Out of every other state, and never into a Closed one — this MVP has no closing workflow.
-    for (const stage of ["not-started", "in-progress", "decision"]) {
+    for (const stage of [
+      "not-started",
+      "first-assessment",
+      "assign-next-assessor",
+      "secondary-assessment",
+      "decision",
+    ]) {
       expect((await get(`/workload?stage=${stage}`, manager.cookie)).body, stage).not.toContain(
         report.number,
       );
     }
+  });
+});
+
+/**
+ * Disagree, over the wire.
+ *
+ * `f004-a2-review` pins the rule itself. This pins that the rule is actually reached by a request:
+ * that the page does not offer A1's own answer back as a replacement, and — the half a page can
+ * never guarantee — that a body which never loaded that page is refused all the same.
+ */
+describe.skipIf(!INTEGRATION_ENABLED)("a Disagree that repeats A1's own answer", () => {
+  beforeEach(start);
+
+  /** A report with A1 submitted and a named second assessor, ready to be reviewed. */
+  async function readyForSecondary() {
+    const { manager, rest, report } = await afterFirstAssessment();
+    const [second] = rest;
+    if (second === undefined) throw new Error("need an Officer");
+
+    await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
+      assessor_id: second.id,
+      comment: "Please review it.",
+    });
+
+    return { manager, second, report };
+  }
+
+  it("never draws A1's own choice as one of the replacements", async () => {
+    const { second, report } = await readyForSecondary();
+
+    const page = (await get(`/reports/${report.id}/secondary-assessment`, second.cookie)).body;
+
+    // A1 answered 2.6 "serious", so that is the one option Disagree cannot mean.
+    expect(page).not.toContain(`name="a2_value_2.6" value="serious"`);
+    expect(page).toContain(`name="a2_value_2.6" value="non_serious"`);
+
+    // The same rule on a card field, and the degree radios themselves are untouched.
+    expect(page).not.toContain(`name="a2_value_6" value="high"`);
+    expect(page).toContain(`name="a2_value_6" value="critical"`);
+    expect(page).toContain(`name="a2_degree_2.6" value="disagree"`);
+  });
+
+  it("refuses a posted replacement identical to A1's choice", async () => {
+    const { second, report } = await readyForSecondary();
+
+    const refused = await post(
+      `/reports/${report.id}/secondary-assessment`,
+      second.cookie,
+      completeSecondary({
+        "a2_degree_2.6": "disagree",
+        "a2_value_2.6": "serious",
+        "a2_statement_2.6": "Posted straight at the route.",
+      }),
+    );
+
+    expect(refused.statusCode).toBe(422);
+    // Escaped on the way out, so the assertion is on the half of the sentence that carries
+    // no apostrophe — the finding itself, named by the label the form gives that answer.
+    expect(refused.body).toContain("Disagree must give a different categorization");
+
+    const [, secondary] = await assessmentsOf(report.id);
+    expect(secondary?.submitted_at).toBeNull();
+    expect(await statusOf(report.id)).toBe("second_assessment");
+  });
+
+  it("refuses a retyped text answer and an unchanged IMDRF grid", async () => {
+    const { second, report } = await readyForSecondary();
+
+    const refused = await post(
+      `/reports/${report.id}/secondary-assessment`,
+      second.cookie,
+      completeSecondary({
+        "a2_degree_4.3": "disagree",
+        "a2_value_4.3": "Temporal relationship with device use; no other cause identified.",
+        "a2_statement_4.3": "Retyped word for word.",
+        "a2_degree_3.1.1": "disagree",
+        "a2_value_3.1.1_l1": "Battery",
+        "a2_value_3.1.1_code": "E1204",
+        "a2_statement_3.1.1": "Retyped box for box.",
+      }),
+    );
+
+    expect(refused.statusCode).toBe(422);
+    expect(refused.body).toContain("4.3 Discussion of causal relationship");
+    expect(refused.body).toContain("3.1.1");
+    expect(await statusOf(report.id)).toBe("second_assessment");
+  });
+
+  it("accepts a replacement that is genuinely different", async () => {
+    const { second, report } = await readyForSecondary();
+
+    const accepted = await post(
+      `/reports/${report.id}/secondary-assessment`,
+      second.cookie,
+      completeSecondary({
+        "a2_degree_2.6": "disagree",
+        "a2_value_2.6": "non_serious",
+        "a2_statement_2.6": "None of the four seriousness criteria is met on this record.",
+      }),
+    );
+
+    expect(accepted.statusCode).toBe(302);
+    expect(await statusOf(report.id)).toBe("awaiting_decision");
+
+    const [, secondary] = await assessmentsOf(report.id);
+    expect(secondary?.submitted_at).not.toBeNull();
+    expect(secondary?.payload.responses?.["2.6"]).toMatchObject({
+      degree: "disagree",
+      value: "non_serious",
+    });
   });
 });

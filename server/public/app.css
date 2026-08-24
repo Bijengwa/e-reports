@@ -1252,15 +1252,26 @@ textarea[aria-invalid="true"] {
   overscroll-behavior-x: contain;
 }
 
+/*
+ * Nothing wraps mid-cell, at any width — and this is what makes the box above actually scroll.
+ *
+ * `.utable` is `width: 100%`, so a table left to wrap does not overflow its box: it squeezes,
+ * every column narrows, and a device name folds onto three lines while the scrollbar never
+ * appears. That was true at every width between 620px and the table’s own natural width, which is
+ * most of the widths this application is read at.
+ *
+ * Holding the columns to their content instead means the table is as wide as it needs to be and
+ * the box scrolls when that exceeds it, which is the behaviour the rule was written for. It was
+ * scoped to a phone before, where the squeeze was merely most obvious.
+ */
+.tscroll .utable {
+  white-space: nowrap;
+}
+
 @media (max-width: 620px) {
   /* Less chrome to clear on a phone, so the box may be taller before it starts scrolling. */
   .tscroll {
     max-height: calc(100vh - 150px);
-  }
-
-  /* Nothing wraps mid-cell: a scrolling box is only readable if the columns keep their shape. */
-  .tscroll .utable {
-    white-space: nowrap;
   }
 }
 
