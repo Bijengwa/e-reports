@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
-  A2_REVIEW_ITEMS,
-  collectSecondReview,
+  collectSecondaryReview,
   type F004Answers,
   isA1Blank,
-  normalizeSecondReview,
-  validateSecondReviewForSubmit,
+  normalizeSecondaryReview,
+  SECONDARY_REVIEW_ITEMS,
+  validateSecondaryReviewForSubmit,
 } from "../src/domain/f004.js";
 
 /**
- * A1's answers, with every reviewable field non-blank — so every item in `A2_REVIEW_ITEMS` is
+ * A1's answers, with every reviewable field non-blank — so every item in `SECONDARY_REVIEW_ITEMS` is
  * reviewable, including the six IMDRF rows and the two section-1 rows that are optional and would
  * otherwise be `supplied`-only. Most tests in this file are about the reviewable path, which needs
  * a report where nothing was left blank to test it against.
@@ -43,13 +43,13 @@ function agreeWithEverything(
   overrides: Record<string, string | string[]> = {},
 ): Record<string, string | string[]> {
   const body: Record<string, string | string[]> = {};
-  for (const item of A2_REVIEW_ITEMS) body[`a2_degree_${item.key}`] = "agree";
+  for (const item of SECONDARY_REVIEW_ITEMS) body[`a2_degree_${item.key}`] = "agree";
   return { ...body, ...overrides };
 }
 
 describe("the A2 review item table", () => {
   it("keys every item by the A1 answer it is a position on", () => {
-    const keys = A2_REVIEW_ITEMS.map((item) => item.key);
+    const keys = SECONDARY_REVIEW_ITEMS.map((item) => item.key);
 
     expect(keys).toContain("2.6");
     expect(keys).toContain("7.1_conclusion");
@@ -61,8 +61,8 @@ describe("the A2 review item table", () => {
 
   it("redraws exactly the boxes section 3 prints, and no more", () => {
     // 3.3.1 has one terminology level on the paper; 3.3.3 has two. Coding is always the last.
-    const one = A2_REVIEW_ITEMS.find((item) => item.key === "3.3.1");
-    const two = A2_REVIEW_ITEMS.find((item) => item.key === "3.3.3");
+    const one = SECONDARY_REVIEW_ITEMS.find((item) => item.key === "3.3.1");
+    const two = SECONDARY_REVIEW_ITEMS.find((item) => item.key === "3.3.3");
 
     expect(one?.fields?.map((field) => field.key)).toEqual(["l1", "code"]);
     expect(two?.fields?.map((field) => field.key)).toEqual(["l1", "l2", "code"]);
@@ -71,7 +71,7 @@ describe("the A2 review item table", () => {
 
 describe("isA1Blank", () => {
   it("is blank when every one of an item's a1Fields is empty", () => {
-    const item = A2_REVIEW_ITEMS.find((candidate) => candidate.key === "1.10");
+    const item = SECONDARY_REVIEW_ITEMS.find((candidate) => candidate.key === "1.10");
     expect(item).toBeDefined();
     if (item === undefined) return;
 
@@ -81,7 +81,7 @@ describe("isA1Blank", () => {
   });
 
   it("is blank for an IMDRF item only when every one of its boxes is empty", () => {
-    const item = A2_REVIEW_ITEMS.find((candidate) => candidate.key === "3.1.1");
+    const item = SECONDARY_REVIEW_ITEMS.find((candidate) => candidate.key === "3.1.1");
     expect(item).toBeDefined();
     if (item === undefined) return;
 
@@ -90,7 +90,7 @@ describe("isA1Blank", () => {
   });
 
   it("is never blank for the fields required of every submission", () => {
-    const item = A2_REVIEW_ITEMS.find((candidate) => candidate.key === "2.6");
+    const item = SECONDARY_REVIEW_ITEMS.find((candidate) => candidate.key === "2.6");
     expect(item).toBeDefined();
     if (item === undefined) return;
 
@@ -100,7 +100,7 @@ describe("isA1Blank", () => {
 
 describe("collecting an A2 review from a posted body", () => {
   it("stores Agree as a degree and nothing else", () => {
-    const review = collectSecondReview(
+    const review = collectSecondaryReview(
       {
         "a2_degree_2.6": "agree",
         "a2_value_2.6": "non_serious",
@@ -113,7 +113,7 @@ describe("collecting an A2 review from a posted body", () => {
   });
 
   it("stores Need Clarification as a statement, never as a replacement value", () => {
-    const review = collectSecondReview(
+    const review = collectSecondaryReview(
       {
         "a2_degree_2.6": "clarification",
         // A hand-edited body, or one replayed after switching away from Disagree.
@@ -131,7 +131,7 @@ describe("collecting an A2 review from a posted body", () => {
   });
 
   it("stores Disagree with both the corrected answer and the statement", () => {
-    const review = collectSecondReview(
+    const review = collectSecondaryReview(
       {
         "a2_degree_2.6": "disagree",
         "a2_value_2.6": "non_serious",
@@ -148,7 +148,7 @@ describe("collecting an A2 review from a posted body", () => {
   });
 
   it("keeps a multi-value replacement as the list it is", () => {
-    const review = collectSecondReview(
+    const review = collectSecondaryReview(
       {
         "a2_degree_7.1_actions": "disagree",
         "a2_value_7.1_actions": ["monitoring", "samples"],
@@ -161,7 +161,7 @@ describe("collecting an A2 review from a posted body", () => {
   });
 
   it("keeps an IMDRF replacement as one box per level, plus the coding", () => {
-    const review = collectSecondReview(
+    const review = collectSecondaryReview(
       {
         "a2_degree_3.3.3": "disagree",
         "a2_value_3.3.3_l1": "Device failure",
@@ -180,7 +180,7 @@ describe("collecting an A2 review from a posted body", () => {
   });
 
   it("ignores a key the form does not own and a degree it never offered", () => {
-    const review = collectSecondReview(
+    const review = collectSecondaryReview(
       {
         a2_degree_9: "agree",
         "a2_degree_2.6": "maybe",
@@ -195,7 +195,7 @@ describe("collecting an A2 review from a posted body", () => {
   it("reads no degree at all for an item A1 left blank, only a2_value", () => {
     // 1.10 is "(If applicable)" — left out here, unlike in FILLED_A1_ANSWERS.
     const a1Answers = { ...FILLED_A1_ANSWERS, registration_number: "" };
-    const review = collectSecondReview(
+    const review = collectSecondaryReview(
       {
         "a2_degree_1.10": "disagree",
         "a2_statement_1.10": "Smuggled in by hand; there is no degree to smuggle it under.",
@@ -209,7 +209,7 @@ describe("collecting an A2 review from a posted body", () => {
 
   it("stores nothing for a blank item A2 also left blank", () => {
     const a1Answers = { ...FILLED_A1_ANSWERS, registration_number: "" };
-    const review = collectSecondReview({ "a2_value_1.10": "   " }, a1Answers);
+    const review = collectSecondaryReview({ "a2_value_1.10": "   " }, a1Answers);
 
     expect(review.responses).not.toHaveProperty("1.10");
   });
@@ -217,7 +217,7 @@ describe("collecting an A2 review from a posted body", () => {
 
 describe("reading a stored A2 review back", () => {
   it("survives a round trip through the column", () => {
-    const written = collectSecondReview(
+    const written = collectSecondaryReview(
       {
         "a2_degree_2.6": "disagree",
         "a2_value_2.6": "non_serious",
@@ -228,11 +228,11 @@ describe("reading a stored A2 review back", () => {
       FILLED_A1_ANSWERS,
     );
 
-    expect(normalizeSecondReview(JSON.parse(JSON.stringify(written)))).toEqual(written);
+    expect(normalizeSecondaryReview(JSON.parse(JSON.stringify(written)))).toEqual(written);
   });
 
   it("drops a value stored under Need Clarification by an older shape of this form", () => {
-    const read = normalizeSecondReview({
+    const read = normalizeSecondaryReview({
       kind: "a2_section_review",
       responses: { "2.6": { degree: "clarification", value: "non_serious", statement: "Why?" } },
     });
@@ -241,16 +241,16 @@ describe("reading a stored A2 review back", () => {
   });
 
   it("reads anything that is not a review as an empty one", () => {
-    expect(normalizeSecondReview(null).responses).toEqual({});
-    expect(normalizeSecondReview({ conclusion_2: "The old 7.2." }).responses).toEqual({});
+    expect(normalizeSecondaryReview(null).responses).toEqual({});
+    expect(normalizeSecondaryReview({ conclusion_2: "The old 7.2." }).responses).toEqual({});
   });
 });
 
 describe("what an A2 submission must carry", () => {
   it("accepts a position on every reviewable answer", () => {
     expect(
-      validateSecondReviewForSubmit(
-        collectSecondReview(agreeWithEverything(), FILLED_A1_ANSWERS),
+      validateSecondaryReviewForSubmit(
+        collectSecondaryReview(agreeWithEverything(), FILLED_A1_ANSWERS),
         FILLED_A1_ANSWERS,
       ),
     ).toEqual([]);
@@ -260,8 +260,8 @@ describe("what an A2 submission must carry", () => {
     const body = agreeWithEverything();
     delete body["a2_degree_4.2"];
 
-    const issues = validateSecondReviewForSubmit(
-      collectSecondReview(body, FILLED_A1_ANSWERS),
+    const issues = validateSecondaryReviewForSubmit(
+      collectSecondaryReview(body, FILLED_A1_ANSWERS),
       FILLED_A1_ANSWERS,
     );
 
@@ -270,8 +270,11 @@ describe("what an A2 submission must carry", () => {
   });
 
   it("requires a statement for Need Clarification, and asks for no value", () => {
-    const issues = validateSecondReviewForSubmit(
-      collectSecondReview(agreeWithEverything({ a2_degree_5: "clarification" }), FILLED_A1_ANSWERS),
+    const issues = validateSecondaryReviewForSubmit(
+      collectSecondaryReview(
+        agreeWithEverything({ a2_degree_5: "clarification" }),
+        FILLED_A1_ANSWERS,
+      ),
       FILLED_A1_ANSWERS,
     );
 
@@ -279,8 +282,8 @@ describe("what an A2 submission must carry", () => {
   });
 
   it("requires both the corrected answer and a statement for Disagree", () => {
-    const issues = validateSecondReviewForSubmit(
-      collectSecondReview(agreeWithEverything({ a2_degree_6: "disagree" }), FILLED_A1_ANSWERS),
+    const issues = validateSecondaryReviewForSubmit(
+      collectSecondaryReview(agreeWithEverything({ a2_degree_6: "disagree" }), FILLED_A1_ANSWERS),
       FILLED_A1_ANSWERS,
     );
 
@@ -288,8 +291,8 @@ describe("what an A2 submission must carry", () => {
   });
 
   it("counts an IMDRF replacement of nothing but blanks as no answer at all", () => {
-    const issues = validateSecondReviewForSubmit(
-      collectSecondReview(
+    const issues = validateSecondaryReviewForSubmit(
+      collectSecondaryReview(
         agreeWithEverything({
           "a2_degree_3.1.1": "disagree",
           "a2_value_3.1.1_l1": "   ",
@@ -305,8 +308,8 @@ describe("what an A2 submission must carry", () => {
   });
 
   it("accepts an IMDRF replacement that fills any one of its boxes", () => {
-    const issues = validateSecondReviewForSubmit(
-      collectSecondReview(
+    const issues = validateSecondaryReviewForSubmit(
+      collectSecondaryReview(
         agreeWithEverything({
           "a2_degree_3.1.1": "disagree",
           "a2_value_3.1.1_code": "A0501",
@@ -321,8 +324,8 @@ describe("what an A2 submission must carry", () => {
   });
 
   it("refuses an empty list of mitigation actions under Disagree", () => {
-    const issues = validateSecondReviewForSubmit(
-      collectSecondReview(
+    const issues = validateSecondaryReviewForSubmit(
+      collectSecondaryReview(
         agreeWithEverything({
           "a2_degree_7.1_actions": "disagree",
           "a2_statement_7.1_actions": "None of these follow from the findings.",
@@ -354,11 +357,14 @@ describe("what an A2 submission must carry", () => {
       conclusion: "Recommend risk communication and enhanced monitoring.",
     };
     const body: Record<string, string | string[]> = {};
-    for (const item of A2_REVIEW_ITEMS) {
+    for (const item of SECONDARY_REVIEW_ITEMS) {
       if (!isA1Blank(item, a1Answers)) body[`a2_degree_${item.key}`] = "agree";
     }
 
-    const issues = validateSecondReviewForSubmit(collectSecondReview(body, a1Answers), a1Answers);
+    const issues = validateSecondaryReviewForSubmit(
+      collectSecondaryReview(body, a1Answers),
+      a1Answers,
+    );
 
     expect(issues).toEqual([]);
   });

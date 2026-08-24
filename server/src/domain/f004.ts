@@ -13,7 +13,7 @@
 /** Stamped on every assessment row, so an old assessment stays readable when the form changes. */
 export const F004_VERSION = "TMDA/DMD/MDV/F/004 Rev 05";
 
-/** 1 = first assessment. The second assessor's is ordinal 2 and is not written here. */
+/** 1 = the primary F004. Every ordinal above it is a secondary assessment, however many exist. */
 export const FIRST_ASSESSMENT = 1;
 
 /**
@@ -28,7 +28,6 @@ export const FIRST_ASSESSMENT = 1;
  * says without migrating anything already written.
  */
 export const F004_SECTION_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8"] as const;
-export const SECOND_ASSESSMENT = 2;
 
 export type F004Answers = Record<string, string | string[]>;
 
@@ -86,15 +85,15 @@ export type A2Value = string | string[] | Record<string, string>;
  * the one degree that carries a replacement value. A hand-edited request that sends a value with
  * `clarification` therefore does not merely fail validation; the field never reaches the payload.
  */
-export type A2SectionResponse = {
+export type SecondaryReviewResponse = {
   degree?: A2Degree;
   value?: A2Value;
   statement?: string;
 };
 
-export type A2ReviewPayload = {
+export type SecondaryReviewPayload = {
   kind: "a2_section_review";
-  responses: Record<string, A2SectionResponse>;
+  responses: Record<string, SecondaryReviewResponse>;
 };
 
 function isA2Degree(value: string): value is A2Degree {
@@ -619,7 +618,7 @@ const IMDRF_A2_ITEMS: readonly A2ReviewItem[] = IMDRF_GROUPS.flatMap((group) =>
     key: `${group.no}.${item.letter}`,
     no: `${group.no}.${item.letter}`,
     title: item.title,
-    valueLabel: "A2 terminology and coding",
+    valueLabel: "terminology and coding",
     valueKind: "fields" as const,
     fields: [
       ...[1, 2, 3]
@@ -651,12 +650,12 @@ const IMDRF_A2_ITEMS: readonly A2ReviewItem[] = IMDRF_GROUPS.flatMap((group) =>
  * `key` is the A1 field's own number, and it is what the payload is keyed by. It survives the
  * form's wording changing, which "the fourth item" would not.
  */
-export const A2_REVIEW_ITEMS: readonly A2ReviewItem[] = [
+export const SECONDARY_REVIEW_ITEMS: readonly A2ReviewItem[] = [
   {
     key: "1.3",
     no: "1.3",
     title: "Type of device i.e., MD or IVD",
-    valueLabel: "A2 device type",
+    valueLabel: "device type",
     valueKind: "single",
     a1Fields: ["device_type"],
   },
@@ -664,7 +663,7 @@ export const A2_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     key: "1.10",
     no: "1.10",
     title: "Device registration number",
-    valueLabel: "A2 registration number",
+    valueLabel: "registration number",
     valueKind: "text",
     a1Fields: ["registration_number"],
   },
@@ -672,7 +671,7 @@ export const A2_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     key: "1.11",
     no: "1.11",
     title: "Device Class",
-    valueLabel: "A2 device class",
+    valueLabel: "device class",
     valueKind: "text",
     a1Fields: ["device_class"],
   },
@@ -680,7 +679,7 @@ export const A2_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     key: "1.19",
     no: "1.19",
     title: "Initial/Follow up/Final report",
-    valueLabel: "A2 report stage",
+    valueLabel: "report stage",
     valueKind: "single",
     a1Fields: ["report_stage"],
   },
@@ -688,7 +687,7 @@ export const A2_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     key: "2.5",
     no: "2.5",
     title: "Source of the event / incident",
-    valueLabel: "A2 source of event / incident",
+    valueLabel: "source of event / incident",
     valueKind: "single",
     a1Fields: ["source_of_event"],
   },
@@ -696,7 +695,7 @@ export const A2_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     key: "2.6",
     no: "2.6",
     title: "Categorization of event / incident",
-    valueLabel: "A2 categorization",
+    valueLabel: "categorization",
     valueKind: "single",
     a1Fields: ["seriousness"],
   },
@@ -704,7 +703,7 @@ export const A2_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     key: "2.7",
     no: "2.7",
     title: "Significant public health concern",
-    valueLabel: "A2 public health concern",
+    valueLabel: "public health concern",
     valueKind: "single",
     a1Fields: ["public_health"],
   },
@@ -713,7 +712,7 @@ export const A2_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     key: "4.1",
     no: "4.1",
     title: "Expected or unexpected",
-    valueLabel: "A2 expectedness",
+    valueLabel: "expectedness",
     valueKind: "single",
     a1Fields: ["expectedness"],
   },
@@ -721,7 +720,7 @@ export const A2_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     key: "4.2",
     no: "4.2",
     title: "Causal association category",
-    valueLabel: "A2 causal association",
+    valueLabel: "causal association",
     valueKind: "single",
     a1Fields: ["causality"],
   },
@@ -729,7 +728,7 @@ export const A2_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     key: "4.3",
     no: "4.3",
     title: "Discussion of causal relationship",
-    valueLabel: "A2 discussion of causal relationship",
+    valueLabel: "discussion of causal relationship",
     valueKind: "text",
     a1Fields: ["c4_3"],
   },
@@ -737,7 +736,7 @@ export const A2_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     key: "5",
     no: "5",
     title: "Signal detection",
-    valueLabel: "A2 signal assessment",
+    valueLabel: "signal assessment",
     valueKind: "single",
     a1Fields: ["signal_status"],
   },
@@ -745,7 +744,7 @@ export const A2_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     key: "6",
     no: "6",
     title: "Risk assessment",
-    valueLabel: "A2 risk level",
+    valueLabel: "risk level",
     valueKind: "single",
     a1Fields: ["risk_level"],
   },
@@ -753,7 +752,7 @@ export const A2_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     key: "7.1_actions",
     no: "7.1",
     title: "Proposed risk mitigation action(s)",
-    valueLabel: "A2 proposed risk mitigation action(s)",
+    valueLabel: "proposed risk mitigation action(s)",
     valueKind: "multi",
     a1Fields: ["actions"],
   },
@@ -761,14 +760,14 @@ export const A2_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     key: "7.1_conclusion",
     no: "7.1",
     title: "Recommendations and conclusion",
-    valueLabel: "A2 conclusion",
+    valueLabel: "conclusion",
     valueKind: "text",
     a1Fields: ["conclusion"],
   },
 ];
 
 function a2ReviewItem(key: string): A2ReviewItem | undefined {
-  return A2_REVIEW_ITEMS.find((item) => item.key === key);
+  return SECONDARY_REVIEW_ITEMS.find((item) => item.key === key);
 }
 
 // ---- Validation ---------------------------------------------------------------
@@ -887,7 +886,11 @@ export const F004_FIELDS: readonly string[] = [
  * is all it would take for the second assessor's remarks to render as the first's — different
  * names make that mix-up inexpressible rather than merely avoided.
  */
-export const F004_SECOND_FIELDS: readonly string[] = ["actions_2", "conclusion_2", "signature_2"];
+export const F004_SECONDARY_FIELDS: readonly string[] = [
+  "actions_2",
+  "conclusion_2",
+  "signature_2",
+];
 
 /** Keep what the named set owns and drop the rest, so a payload is the document and nothing else. */
 function keep(fields: Record<string, string | string[]>, names: readonly string[]): F004Answers {
@@ -913,8 +916,8 @@ export function collect(fields: Record<string, string | string[]>): F004Answers 
  * assessor's document, so a body carrying `conclusion` or `signature` — hand-edited, or replayed
  * from the page above — reaches the stored payload with neither.
  */
-export function collectSecond(fields: Record<string, string | string[]>): F004Answers {
-  return keep(fields, F004_SECOND_FIELDS);
+export function collectSecondary(fields: Record<string, string | string[]>): F004Answers {
+  return keep(fields, F004_SECONDARY_FIELDS);
 }
 
 /**
@@ -932,13 +935,13 @@ export function collectSecond(fields: Record<string, string | string[]>): F004An
  * nothing there to agree, clarify or disagree with. A non-blank value is stored as `supplied`; a
  * blank one is not stored at all, the same as never having been touched.
  */
-export function collectSecondReview(
+export function collectSecondaryReview(
   fields: Record<string, string | string[]>,
   a1Answers: F004Answers,
-): A2ReviewPayload {
-  const responses: A2ReviewPayload["responses"] = {};
+): SecondaryReviewPayload {
+  const responses: SecondaryReviewPayload["responses"] = {};
 
-  for (const item of A2_REVIEW_ITEMS) {
+  for (const item of SECONDARY_REVIEW_ITEMS) {
     if (isA1Blank(item, a1Answers)) {
       const posted = postedValue(item, fields);
       if (!isBlankA2Value(posted)) responses[item.key] = { degree: "supplied", value: posted };
@@ -1007,12 +1010,12 @@ function storedValue(item: A2ReviewItem, raw: unknown): A2Value {
  * this form. Read through the current item table rather than trusted, so a key the form no longer
  * has, a degree it never offered, or a value under Need Clarification cannot reach the page.
  */
-export function normalizeSecondReview(payload: unknown): A2ReviewPayload {
+export function normalizeSecondaryReview(payload: unknown): SecondaryReviewPayload {
   const raw = (payload ?? {}) as {
     kind?: unknown;
     responses?: Record<string, { degree?: unknown; value?: unknown; statement?: unknown }>;
   };
-  const responses: A2ReviewPayload["responses"] = {};
+  const responses: SecondaryReviewPayload["responses"] = {};
 
   if (raw.kind !== "a2_section_review" || typeof raw.responses !== "object") {
     return { kind: "a2_section_review", responses };
@@ -1026,7 +1029,7 @@ export function normalizeSecondReview(payload: unknown): A2ReviewPayload {
 
     // `supplied` never arrives on a posted `a2_degree_*` field — the page never offers one for a
     // blank item — so it is not one of `isA2Degree`'s three and is read back on its own, carrying
-    // only a value, the same shape `collectSecondReview` writes.
+    // only a value, the same shape `collectSecondaryReview` writes.
     if (degree === "supplied") {
       responses[key] = { degree, value: storedValue(item, response.value) };
       continue;
@@ -1058,7 +1061,7 @@ export function normalizeSecondReview(payload: unknown): A2ReviewPayload {
  * an anonymous one. The eleven actions are optional here exactly as they are in 7.1 — a second
  * assessor who proposes no new action has still concluded.
  */
-export function validateSecondForSubmit(answers: F004Answers, assessorName: string): Issue[] {
+export function validateSecondaryForSubmit(answers: F004Answers, assessorName: string): Issue[] {
   const issues: Issue[] = [];
 
   if (value(answers, "conclusion_2").trim() === "") {
@@ -1090,13 +1093,13 @@ export function validateSecondForSubmit(answers: F004Answers, assessorName: stri
  * An item A1 left blank never reaches these rules at all: `supplied` is optional by definition, so
  * there is nothing to require of it, whichever way it was left.
  */
-export function validateSecondReviewForSubmit(
-  review: A2ReviewPayload,
+export function validateSecondaryReviewForSubmit(
+  review: SecondaryReviewPayload,
   a1Answers: F004Answers,
 ): Issue[] {
   const issues: Issue[] = [];
 
-  for (const item of A2_REVIEW_ITEMS) {
+  for (const item of SECONDARY_REVIEW_ITEMS) {
     if (isA1Blank(item, a1Answers)) continue;
 
     const response = review.responses[item.key];

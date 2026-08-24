@@ -1,7 +1,9 @@
+import { sql } from "drizzle-orm";
 import {
   bigint,
   bigserial,
   boolean,
+  check,
   date,
   index,
   integer,
@@ -36,7 +38,17 @@ export const reportSeverity = pgEnum("report_severity", [
   "other",
 ]);
 
-/** The cascade, as data. Transitions are enforced in `domain/`, never by callers. */
+/**
+ * The cascade, as data. Transitions are enforced in `domain/`, never by callers.
+ *
+ * `awaiting_second_assessor` and `second_assessment` are reused for every secondary-assessment
+ * cycle (A2, A3, A4, …), not only the second: renaming them would be a value-rename migration for
+ * a caption change, and the caption is exactly what changes instead — see `STATUS_LABELS`.
+ *
+ * `assigned_for_work` is the MVP's real terminal state, added additively. `closed` predates the
+ * secondary-assessment cascade and stays for a later "work finished" feature; nothing in this
+ * slice writes it.
+ */
 export const reportStatus = pgEnum("report_status", [
   "received",
   "first_assessment",
@@ -44,6 +56,21 @@ export const reportStatus = pgEnum("report_status", [
   "second_assessment",
   "awaiting_decision",
   "closed",
+  "assigned_for_work",
+]);
+
+/**
+ * What one manager decision, recorded in `report_decisions`, was.
+ *
+ * Two kinds because they hand a report to two different pools for two different reasons — another
+ * secondary assessment, or the officer who will carry out the recommended work — and a single
+ * "decision" row with both an assessor column and an officer column would let a bug populate both
+ * on one event. The CHECK constraint on the table enforces that only the matching columns are ever
+ * non-null for a given kind.
+ */
+export const reportDecisionKind = pgEnum("report_decision_kind", [
+  "assign_next_assessor",
+  "assign_work_officer",
 ]);
 
 export const users = pgTable("users", {
@@ -236,6 +263,61 @@ export const assessmentComments = pgTable(
     // Both reads this feature makes — the count beside every bar, and one section's thread — filter
     // on the assessment then the section, and want the oldest first.
     index("assessment_comments_assessment_section_idx").on(t.assessmentId, t.section, t.createdAt),
+  ],
+);
+
+/**
+ * One manager decision on a report — the structured history the assessment cascade's repeated
+ * "manager reviews, then decides" step needs once there can be any number of secondary
+ * assessments.
+ *
+ * Not folded onto `assessments.manager_comment`: that column is the manager's review of one
+ * specific assessment row and stays exactly that. A decision is a different fact — who decided,
+ * when, what they decided, and who they handed the report to next — and it does not belong to any
+ * one assessment, including the one just read. Overloading `manager_comment` for it would make a
+ * later decision look like it belongs to whichever assessor's row it was written onto, which it
+ * does not.
+ *
+ * `reviewed_through_ordinal` records which submitted assessment was the latest one the manager had
+ * read when they decided — the fact that makes this row auditable independent of how many more
+ * assessments the report accumulates afterward.
+ *
+ * The CHECK below is the same discipline `f004.ts`'s `A2SectionResponse` already applies to its
+ * three degrees: a `kind` carries exactly its own columns, so a decision that claims to be one
+ * thing while carrying the other kind's data cannot be written at all.
+ */
+export const reportDecisions = pgTable(
+  "report_decisions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    reportId: uuid("report_id")
+      .notNull()
+      .references(() => reports.id, { onDelete: "cascade" }),
+    decidedByUserId: uuid("decided_by_user_id")
+      .notNull()
+      .references(() => users.id),
+    decidedAt: timestamp("decided_at", { withTimezone: true }).notNull().defaultNow(),
+    kind: reportDecisionKind("kind").notNull(),
+    /** Required for `assign_next_assessor` at the application layer; optional for the other kind. */
+    comment: text("comment"),
+    reviewedThroughOrdinal: smallint("reviewed_through_ordinal").notNull(),
+    /** Set iff kind = assign_next_assessor. */
+    nextAssessorUserId: uuid("next_assessor_user_id").references(() => users.id),
+    /** The ordinal created as a result — `reviewed_through_ordinal + 1`, stored rather than
+     *  recomputed so this row reads on its own for audit and PDF purposes. */
+    nextOrdinal: smallint("next_ordinal"),
+    /** Set iff kind = assign_work_officer. */
+    workOfficerUserId: uuid("work_officer_user_id").references(() => users.id),
+  },
+  (t) => [
+    index("report_decisions_report_idx").on(t.reportId, t.decidedAt),
+    check(
+      "report_decisions_kind_columns_ck",
+      sql`(kind = 'assign_next_assessor' AND next_assessor_user_id IS NOT NULL
+             AND next_ordinal IS NOT NULL AND work_officer_user_id IS NULL)
+          OR (kind = 'assign_work_officer' AND work_officer_user_id IS NOT NULL
+             AND next_assessor_user_id IS NULL AND next_ordinal IS NULL)`,
+    ),
   ],
 );
 

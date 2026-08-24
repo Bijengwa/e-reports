@@ -101,14 +101,14 @@ export const BUCKETS: readonly {
   },
   {
     status: "awaiting_second_assessor",
-    label: "Assign A2",
-    heading: "Waiting on you — assign A2",
+    label: "Assign assessor",
+    heading: "Waiting on you — assign the next assessor",
     Icon: IconAssignA2,
   },
   {
     status: "second_assessment",
-    label: "Second assessment",
-    heading: "In progress — second assessment",
+    label: "Secondary assessment",
+    heading: "In progress — secondary assessment",
     Icon: IconSecondAssessment,
   },
   {
@@ -116,6 +116,12 @@ export const BUCKETS: readonly {
     label: "Decision",
     heading: "Waiting on you — decision",
     Icon: IconDecision,
+  },
+  {
+    status: "assigned_for_work",
+    label: "Assigned for work",
+    heading: "Assigned for work",
+    Icon: IconClosed,
   },
   { status: "closed", label: "Closed", heading: "Closed", Icon: IconClosed },
 ];
@@ -134,7 +140,8 @@ function day(value: Date): string {
   return `${String(at.getUTCDate()).padStart(2, "0")} ${MONTHS[at.getUTCMonth()]} ${at.getUTCFullYear()}`;
 }
 
-/** A row of the pipeline, with both assessors resolved to names rather than ids. */
+/** A row of the pipeline. `latestSecondaryName`/`secondaryCount` summarise however many secondary
+ *  assessments the report has had, rather than naming a fixed second assessor. */
 export type WorkloadRow = {
   id: string;
   number: string;
@@ -143,7 +150,8 @@ export type WorkloadRow = {
   severity: string;
   status: string;
   assessor1Name: string | null;
-  assessor2Name: string | null;
+  latestSecondaryName: string | null;
+  secondaryCount: number;
 };
 
 export type WorkloadPageProps = {
@@ -169,10 +177,14 @@ function Assessors({ row }: { row: WorkloadRow }): JSX.Element {
   return (
     <>
       <span safe>{`A1: ${row.assessor1Name}`}</span>
-      {row.assessor2Name !== null ? (
+      {row.secondaryCount > 0 ? (
         <>
           <br />
-          <span safe>{`A2: ${row.assessor2Name}`}</span>
+          <span safe>
+            {row.secondaryCount === 1
+              ? `A2: ${row.latestSecondaryName ?? "—"}`
+              : `A${row.secondaryCount + 1}: ${row.latestSecondaryName ?? "—"} (${row.secondaryCount} so far)`}
+          </span>
         </>
       ) : (
         // The way into the one thing this bucket is waiting on the manager for. It is a link to
@@ -181,7 +193,7 @@ function Assessors({ row }: { row: WorkloadRow }): JSX.Element {
         row.status === "awaiting_second_assessor" && (
           <>
             <br />
-            <a href={`/reports/${row.id}`}>Assign A2</a>
+            <a href={`/reports/${row.id}`}>Assign next assessor</a>
           </>
         )
       )}

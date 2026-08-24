@@ -127,7 +127,19 @@ async function seedReport(over: {
             ${over.assessor2 ? sql`now()` : sql`NULL`})
     RETURNING id
   `);
-  return (rows[0] as { id: string }).id;
+  const id = (rows[0] as { id: string }).id;
+
+  // A secondary assessor is an `assessments` row now, not a column on the report. The legacy
+  // columns are still written above so a fixture keeps exercising them, but this is what the
+  // page actually reads.
+  if (over.assessor2 !== undefined) {
+    await owner.db.execute(sql`
+      INSERT INTO assessments (report_id, assessor_id, ordinal, form_version, payload)
+      VALUES (${id}, ${over.assessor2}, 2, 'F004', '{}'::jsonb)
+    `);
+  }
+
+  return id;
 }
 
 /** A bucket's figure, asserted as markup so a bare label elsewhere on the page cannot satisfy it. */
@@ -305,7 +317,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the figures", () => {
     const body = (await get("/workload", manager.cookie)).body;
 
     expect(body).toContain(bucketStat("Not started", 3));
-    expect(body).toContain(bucketStat("Assign A2", 1));
+    expect(body).toContain(bucketStat("Assign assessor", 1));
     expect(body).toContain(bucketStat("Closed", 1));
     // A bucket nothing is in is drawn as zero rather than left off the page.
     expect(body).toContain(bucketStat("First assessment", 0));
@@ -336,8 +348,8 @@ describe.skipIf(!INTEGRATION_ENABLED)("the figures", () => {
     for (const label of [
       "Not started",
       "First assessment",
-      "Assign A2",
-      "Second assessment",
+      "Assign assessor",
+      "Secondary assessment",
       "Decision",
       "Closed",
     ]) {
@@ -385,7 +397,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("what a row shows", () => {
     expect(body).toContain("Philips IntelliVue MX450");
     // The enum's caption, not the stored value.
     expect(body).toContain("Hospitalization");
-    expect(body).toContain("Awaiting second assessor");
+    expect(body).toContain("Awaiting next assessor");
   });
 
   it("names one assessor, both assessors, or neither", async () => {

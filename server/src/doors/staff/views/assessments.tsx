@@ -59,34 +59,33 @@ function IconSecondAssessment(): JSX.Element {
 }
 
 /**
- * A report this Officer holds as second assessor.
+ * A report this Officer holds as a secondary assessor, at whatever ordinal a manager assigned.
  *
  * Narrower than `ReceivedRow`: no `mine`, because that flag decides whether to offer the first
- * assessment's page and this is not the Officer who writes that one. It carries `status` instead,
- * which is what says how far the report has travelled since it was handed over.
+ * assessment's page and this is not the Officer who writes that one. It carries `status` and
+ * `ordinal` instead — `ordinal` is which position in the chain this Officer holds, and `submitted`
+ * is whether their own turn is finished.
  */
-export type SecondAssessmentRow = {
+export type SecondaryAssessmentRow = {
   id: string;
   number: string;
   receivedAt: Date;
   deviceName: string;
   severity: string;
   status: string;
+  ordinal: number;
+  submitted: boolean;
 };
 
 /**
- * The second assessor's work, and the way into each piece of it.
+ * A secondary assessor's work, and the way into each piece of it.
  *
- * The number opens the report and the action opens the second assessment, which is the same pair
- * the first assessor's rows offer one ordinal along. The route behind the action asks the row
- * whether this Officer is its second assessor, so the link decides what is drawn and never what
- * may be opened.
- *
- * The action is offered on every row in this group rather than on those in a particular status: a
- * report is in this list exactly because a manager named this Officer as its second assessor, and
- * that assignment is what the page behind it checks.
+ * The number opens the report and the action opens this Officer's own secondary assessment,
+ * whichever ordinal it is — one stable address for the whole A2..An chain. The route behind the
+ * action resolves which ordinal is theirs for itself, so the link decides what is drawn and never
+ * what may be opened.
  */
-function SecondAssessmentRows({ reports }: { reports: SecondAssessmentRow[] }): JSX.Element {
+function SecondaryAssessmentRows({ reports }: { reports: SecondaryAssessmentRow[] }): JSX.Element {
   return (
     <table class="utable">
       <thead>
@@ -116,12 +115,12 @@ function SecondAssessmentRows({ reports }: { reports: SecondAssessmentRow[] }): 
             </td>
             <td>
               <span class="tag muted" safe>
-                {STATUS_LABELS[report.status] ?? report.status}
+                {report.submitted ? "Submitted" : (STATUS_LABELS[report.status] ?? report.status)}
               </span>
             </td>
             <td>
-              <a href={`/reports/${report.id}/assessment-2`} class="btn ghost btn-sm">
-                Assessment 2
+              <a href={`/reports/${report.id}/secondary-assessment`} class="btn ghost btn-sm">
+                {`A${report.ordinal}`}
               </a>
             </td>
           </tr>
@@ -155,8 +154,8 @@ export type MyAssessmentsPageProps = {
   notStarted: ReceivedRow[];
   inProgress: ReceivedRow[];
   submitted: ReceivedRow[];
-  /** Reports a manager has handed to this Officer as second assessor. */
-  secondAssessment: SecondAssessmentRow[];
+  /** Reports a manager has handed to this Officer as a secondary assessor, any ordinal. */
+  secondaryAssessments: SecondaryAssessmentRow[];
 };
 
 function Section({ group }: { group: Group }): JSX.Element {
@@ -194,9 +193,10 @@ export function MyAssessmentsPage({
   notStarted,
   inProgress,
   submitted,
-  secondAssessment,
+  secondaryAssessments,
 }: MyAssessmentsPageProps): JSX.Element {
-  const total = notStarted.length + inProgress.length + submitted.length + secondAssessment.length;
+  const total =
+    notStarted.length + inProgress.length + submitted.length + secondaryAssessments.length;
 
   return (
     <StaffShell
@@ -246,10 +246,10 @@ export function MyAssessmentsPage({
               Submitted <span class="mya-count">{submitted.length}</span>
             </span>
           </a>
-          <a href="#second-assessment">
+          <a href="#secondary-assessments">
             <IconSecondAssessment />
             <span>
-              Second assessment <span class="mya-count">{secondAssessment.length}</span>
+              Secondary assessments <span class="mya-count">{secondaryAssessments.length}</span>
             </span>
           </a>
         </nav>
@@ -288,17 +288,15 @@ export function MyAssessmentsPage({
         {/* The fourth group is the other side of this Officer's work: reports a manager has handed
             them to review, rather than ones they were given at intake. Its own group rather than a
             state of the three above, because those three describe one report's journey through
-            the first assessment and this is a different job on a different report. */}
-        <div class="mya" id="second-assessment">
-          <h2>Second assessment</h2>
-          <p class="hint">
-            A manager has assigned you as second assessor. The form for writing one arrives in a
-            later release; until then these open as the report.
-          </p>
-          {secondAssessment.length === 0 ? (
-            <p class="hint">Nothing has been assigned to you for a second assessment.</p>
+            the first assessment and this is a different job on a different report — and, unlike
+            them, it can hold any number of reports at any ordinal from A2 upward. */}
+        <div class="mya" id="secondary-assessments">
+          <h2>Secondary assessments</h2>
+          <p class="hint">A manager has assigned you to review one or more of these reports.</p>
+          {secondaryAssessments.length === 0 ? (
+            <p class="hint">Nothing has been assigned to you for a secondary assessment.</p>
           ) : (
-            <SecondAssessmentRows reports={secondAssessment} />
+            <SecondaryAssessmentRows reports={secondaryAssessments} />
           )}
         </div>
       </div>

@@ -1,7 +1,7 @@
-import type { A2ReviewPayload, F004Answers } from "../../../domain/f004.js";
+import type { F004Answers, SecondaryReviewPayload } from "../../../domain/f004.js";
 import { STEP_FIELDS, STEPS } from "../../../domain/form-schema.js";
 import { type MessageKey, translatorFor } from "../../../i18n/index.js";
-import { F004Form, type SectionComment } from "./f004.js";
+import { F004Form, type PriorSecondaryReview, type SectionComment } from "./f004.js";
 import { StaffShell } from "./shell.js";
 
 /**
@@ -24,13 +24,20 @@ export const SEVERITY_LABELS: Record<string, string> = {
   other: "Other",
 };
 
+/**
+ * `awaiting_second_assessor` and `second_assessment` are reused for every secondary-assessment
+ * cycle now, not only the second — the captions say "next"/"a secondary assessor" rather than
+ * "second" so the wording stays true once a report reaches A3 or A4. The stored enum values are
+ * unchanged; see `db/schema/index.ts`.
+ */
 export const STATUS_LABELS: Record<string, string> = {
   received: "Received",
   first_assessment: "First assessment",
-  awaiting_second_assessor: "Awaiting second assessor",
-  second_assessment: "Second assessment",
-  awaiting_decision: "Awaiting decision",
+  awaiting_second_assessor: "Awaiting next assessor",
+  second_assessment: "Secondary assessment in progress",
+  awaiting_decision: "Awaiting manager decision",
   closed: "Closed",
+  assigned_for_work: "Assigned for work",
 };
 
 function caption(labels: Record<string, string>, value: string): string {
@@ -87,6 +94,11 @@ export type ReceivedRow = Pick<
 /** Where an Officer opens the first assessment of a report that is theirs. */
 export function assessment1Href(reportId: string): string {
   return `/reports/${reportId}/assessment-1`;
+}
+
+/** Where an Officer opens their own secondary assessment of a report, whatever ordinal it is. */
+export function secondaryAssessmentHref(reportId: string): string {
+  return `/reports/${reportId}/secondary-assessment`;
 }
 
 /**
@@ -152,7 +164,7 @@ export type ReportsPageProps = {
  * The register, read-only.
  *
  * Every signed-in role sees the same rows. Nothing here assigns, opens an assessment or changes a
- * status — those need a decision about who may do them, and this slice does not make it.
+ * status — those need a decision about who may do them, and this slice does not make one.
  */
 export function ReportsPage({
   reports,
@@ -335,8 +347,6 @@ export function ReportDocument({ report }: { report: ReportDetail }): JSX.Elemen
           <dt>Reporter</dt>
           <dd safe>{report.reporterName ?? "—"}</dd>
 
-          {/* Omitted rather than dashed when nobody keyed it in. An empty "Filled by" would be a
-              field the reader has to interpret; its absence says the public filed it directly. */}
           {report.filledBy !== null && (
             <>
               <dt>Filled by</dt>
@@ -372,7 +382,7 @@ export function ReportDocument({ report }: { report: ReportDetail }): JSX.Elemen
   );
 }
 
-/** One candidate for the second-assessor picker: enough to name them, nothing to act on yet. */
+/** One candidate for a next-assessor or work-officer picker: enough to name them. */
 export type AssessorOption = { id: string; fullName: string };
 
 /**
@@ -386,9 +396,9 @@ export type ManagerReviewNote = { text: string; byName: string; on: string };
 /**
  * A saved manager review, wherever it is read.
  *
- * One component because two pages show it — the manager's own report page and the second
- * assessor's assessment page — and a review that reads differently depending on who opened it is
- * two records pretending to be one. The heading is passed in rather than fixed, because those two
+ * One component because two pages show it — the manager's own report page and a secondary
+ * assessor's own assessment page — and a review that reads differently depending on who opened it
+ * is two records pretending to be one. The heading is passed in rather than fixed, because those
  * readers need to be told different things about the same text: whose it is, or which assessment
  * it is about.
  */
@@ -434,6 +444,29 @@ export type Assessment1ReviewProps = {
   managerComment: ManagerReviewNote | null;
 };
 
+/** One finished secondary assessment, as the manager's consolidated view and the history strip
+ *  both read it. */
+export type SecondaryAssignment = {
+  ordinal: number;
+  assessorId: string;
+  assessorName: string;
+  submitted: boolean;
+  submittedOn: string | null;
+  answers: SecondaryReviewPayload;
+};
+
+/** One manager decision, as the decision-history block prints it. */
+export type DecisionEntry = {
+  kind: "assign_next_assessor" | "assign_work_officer";
+  comment: string | null;
+  decidedByName: string;
+  decidedAt: string;
+  reviewedThroughOrdinal: number;
+  nextAssessorName: string | null;
+  nextOrdinal: number | null;
+  workOfficerName: string | null;
+};
+
 export type ReportPageProps = {
   report: ReportDetail;
   viewerRole: string;
@@ -448,14 +481,14 @@ export type ReportPageProps = {
    */
   canAssess: boolean;
   /**
-   * The same, for the second assessment: true only for the Officer a manager named as second.
-   *
-   * A separate flag rather than a widened `canAssess`, because the two lead to different pages
-   * and the reader who may open one is never the reader who may open the other.
+   * Which ordinal, if any, is this reader's own secondary assessment on this report — null for
+   * every reader who holds none. One flag rather than a fixed `canAssess2`, because the reader who
+   * may open a secondary assessment is whichever Officer an `assessments` row names, at whatever
+   * ordinal that happens to be.
    */
-  canAssess2?: boolean;
+  mySecondaryOrdinal: number | null;
   /**
-   * Whether to offer the manager's review box.
+   * Whether to offer the manager's review box on the first assessment.
    *
    * True only for a manager, and only over a submitted first assessment. The route behind the box
    * makes the same test — this decides whether the control is drawn, never whether it may be used.
@@ -463,9 +496,8 @@ export type ReportPageProps = {
   canComment?: boolean;
   /** A refused action, re-rendered over the page it was refused on. */
   error?: string;
-  /** Who holds each half of the review. Null until intake, or a manager, has named them. */
+  /** Who holds the first assessment. Null until intake has named them. */
   assessor1Name?: string | null;
-  assessor2Name?: string | null;
   /**
    * The first assessment, read-only, for a manager reviewing what the first Officer submitted.
    *
@@ -473,53 +505,126 @@ export type ReportPageProps = {
    * submitted — a draft in progress is not this page's to show.
    */
   assessment1Review?: Assessment1ReviewProps;
+  /** Every submitted secondary assessment, oldest first — the manager's accumulated picture. */
+  secondaryAssessments: SecondaryAssignment[];
   /**
-   * Who a manager could hand the second assessment to. Present only once the report is waiting
-   * for one and the first assessment behind it is submitted; undefined otherwise.
+   * Who a manager could hand the next secondary assessment to. Present only once the report is
+   * waiting for one; undefined otherwise.
    */
-  secondAssessorPicker?: AssessorOption[];
+  nextAssessorPicker?: AssessorOption[];
   /**
-   * Who a manager could hand the report to once both assessments are in.
-   *
-   * Present only once the report is `awaiting_decision`, on the same argument
-   * `secondAssessorPicker` is: the route decides whether the decision belongs on this page, and
-   * the page only asks whether the list is here.
+   * Who a manager could hand the report to for work once satisfied. Present only at
+   * `awaiting_decision`; undefined otherwise.
    */
-  officerPicker?: AssessorOption[];
-  /**
-   * The second assessment, once it is submitted — never a draft.
-   *
-   * Present makes the difference between "7.2 is pending" and "here is what the second assessor
-   * concluded", and the page must not say the first while the second is true. A draft stays out:
-   * it is that Officer's unfinished work, on the same argument ordinal 1 is withheld until it is
-   * submitted.
-   */
-  assessment2Review?: Assessment2ReviewProps;
+  workOfficerPicker?: AssessorOption[];
+  /** Every manager decision recorded on this report, oldest first. */
+  decisions: DecisionEntry[];
 };
 
-/** The second assessment as a finished record: 7.2, its signature, and the day it was signed. */
-export type Assessment2ReviewProps = {
-  assessorName: string;
-  answers: A2ReviewPayload;
-  submittedOn: string;
-};
+/**
+ * A compact, orientation-only strip of every assessment this report has had — who, and whether
+ * they have finished. Not a tab bar and not a navigation control: it exists so a reader can tell
+ * at a glance how far the report has travelled without opening five separate documents.
+ */
+function AssessmentHistory({
+  assessor1Name,
+  secondaryAssessments,
+  mySecondaryOrdinal,
+}: {
+  assessor1Name?: string | null;
+  secondaryAssessments: SecondaryAssignment[];
+  mySecondaryOrdinal: number | null;
+}): JSX.Element {
+  return (
+    <ol class="assessment-history">
+      <li>
+        <span class="a-hist-no">A1</span>
+        <span safe>{assessor1Name ?? "Not assigned"}</span>
+        {assessor1Name !== null && assessor1Name !== undefined && (
+          <span class="a-hist-done">✓</span>
+        )}
+      </li>
+      {secondaryAssessments.map((a) => (
+        <li>
+          <span class="a-hist-no" safe>{`A${a.ordinal}`}</span>
+          <span safe>{a.assessorName}</span>
+          {a.submitted ? (
+            <span class="a-hist-done">✓</span>
+          ) : a.ordinal === mySecondaryOrdinal ? (
+            <span class="a-hist-current">→ Current</span>
+          ) : (
+            <span class="hint">In progress</span>
+          )}
+        </li>
+      ))}
+    </ol>
+  );
+}
 
-/** One report, read-only. */
+/** The manager's decision history: who decided, when, and what, oldest first. */
+function DecisionHistory({ decisions }: { decisions: DecisionEntry[] }): JSX.Element {
+  if (decisions.length === 0) return <span hidden />;
+
+  return (
+    <>
+      <h2 class="report-heading">Manager decision history</h2>
+      <ol class="decision-history">
+        {decisions.map((d) => (
+          <li class="review">
+            <p class="hint">
+              <span safe>{d.decidedByName}</span> · <span safe>{d.decidedAt}</span> ·{" "}
+              <span safe>
+                {d.kind === "assign_next_assessor"
+                  ? `Assigned ${d.nextAssessorName ?? "—"} as A${d.nextOrdinal ?? "?"}`
+                  : `Assigned ${d.workOfficerName ?? "—"} for work`}
+              </span>
+            </p>
+            {d.comment && (
+              <p class="review-text" safe>
+                {d.comment}
+              </p>
+            )}
+          </li>
+        ))}
+      </ol>
+    </>
+  );
+}
+
+/** One report, read-only except for the manager's decision controls. */
 export function ReportPage({
   report,
   viewerRole,
   viewerName,
   canAssess,
-  canAssess2,
+  mySecondaryOrdinal,
   canComment,
   error,
   assessor1Name,
-  assessor2Name,
   assessment1Review,
-  secondAssessorPicker,
-  officerPicker,
-  assessment2Review,
+  secondaryAssessments,
+  nextAssessorPicker,
+  workOfficerPicker,
+  decisions,
 }: ReportPageProps): JSX.Element {
+  // The history strip carries every secondary assessment, including one just assigned and not yet
+  // written — that is what tells a reader the report is with somebody right now. The document
+  // below carries only the submitted ones: an empty draft has no findings to render.
+  const submitted = secondaryAssessments.filter((a) => a.submitted);
+
+  // The most recently submitted secondary review, if any — the one every reader most wants to see
+  // first. Everything before it renders as history; this one and the rest are read the same way,
+  // just in a different slot of `F004Form`'s props (see the comment on `priorReviews` there).
+  const latest = submitted[submitted.length - 1];
+  const earlierSecondary = submitted.slice(0, -1);
+
+  const priorReviews: PriorSecondaryReview[] = earlierSecondary.map((a) => ({
+    ordinal: a.ordinal,
+    assessorName: a.assessorName,
+    submittedOn: a.submittedOn ?? "",
+    review: a.answers,
+  }));
+
   return (
     <StaffShell
       title={`${report.number} — AE Reports`}
@@ -528,21 +633,18 @@ export function ReportPage({
       fullName={viewerName}
       active="reports"
     >
-      {/*
-       * The page's own top bar carries the assignment, beside the two actions that were already
-       * there. Who holds each half of the review reads on the same line as the rest of the
-       * report's facts, because that is where this page has always said what a report is — a card
-       * of its own would have been a second place to look for one line of text.
-       */}
       <div class="staff-head">
         <div class="sp">
           <h2 safe>{report.deviceName}</h2>
           <p class="hint">
             Received {day(report.receivedAt)} ·{" "}
-            <span safe>{caption(CHANNEL_LABELS, report.channel)}</span> ·{" "}
-            <span safe>{`A1: ${assessor1Name ?? "not assigned"}`}</span> ·{" "}
-            <span safe>{`A2: ${assessor2Name ?? "not assigned"}`}</span>
+            <span safe>{caption(CHANNEL_LABELS, report.channel)}</span>
           </p>
+          <AssessmentHistory
+            assessor1Name={assessor1Name}
+            secondaryAssessments={secondaryAssessments}
+            mySecondaryOrdinal={mySecondaryOrdinal}
+          />
         </div>
 
         {canAssess && (
@@ -550,9 +652,9 @@ export function ReportPage({
             Assessment 1
           </a>
         )}
-        {canAssess2 && (
-          <a href={`/reports/${report.id}/assessment-2`} class="btn">
-            Assessment 2
+        {mySecondaryOrdinal !== null && (
+          <a href={secondaryAssessmentHref(report.id)} class="btn">
+            {`My assessment (A${mySecondaryOrdinal})`}
           </a>
         )}
         <a href="/reports" class="btn ghost">
@@ -568,12 +670,6 @@ export function ReportPage({
 
       <ReportDocument report={report} />
 
-      {/*
-       * The rest of the page is the manager's work on this report, in the order the process does
-       * it: read the first assessment, write a review of it, then hand it to a second Officer.
-       * The picker used to sit in the top bar, above the assessment it is a decision about; it is
-       * here now so that a manager scrolling down meets the three steps in the order they happen.
-       */}
       {assessment1Review && (
         <>
           <h2 class="report-heading">First assessment</h2>
@@ -585,24 +681,24 @@ export function ReportPage({
             assessorName={assessment1Review.assessorName}
             assessedOn={assessment1Review.submittedOn}
             submitted
-            // Not this reader's document to write, whatever its state: the manager reads the
-            // finished F004 here and never posts one, so the page carries no form for it.
             readOnly
-            // Once 7.2 is actually in, it is rendered below with what the second assessor wrote.
-            // Leaving the placeholder here as well would have the page say "pending" directly
-            // above the finished thing.
             sectionComments={assessment1Review.sectionComments}
             commentAction={assessment1Review.commentAction}
-            omitSecond={assessment2Review !== undefined}
+            omitSecond={submitted.length > 0}
+            // The most recently submitted secondary review is shown through the same slot the
+            // active-review UI would use, so its option badges render inline exactly as they do
+            // on the reviewer's own page. Everything earlier is `priorReviews` — collapsed
+            // history, the same mechanism a later reviewer's own working page uses.
             a2Review={
-              assessment2Review && {
-                action: `/reports/${report.id}/assessment-2`,
-                review: assessment2Review.answers,
+              latest && {
+                action: secondaryAssessmentHref(report.id),
+                review: latest.answers,
                 submitted: true,
-                assessorName: assessment2Review.assessorName,
-                assessedOn: assessment2Review.submittedOn,
+                assessorName: latest.assessorName,
+                assessedOn: latest.submittedOn ?? "",
               }
             }
+            priorReviews={priorReviews}
             issues={[]}
           />
 
@@ -630,7 +726,7 @@ export function ReportPage({
                   name="comment"
                   rows="4"
                   class="short"
-                  placeholder="What the second assessor should know before starting."
+                  placeholder="What the next assessor should know before starting."
                   safe
                 >
                   {assessment1Review.managerComment?.text ?? ""}
@@ -647,108 +743,100 @@ export function ReportPage({
         </>
       )}
 
-      {/* Drawn only when the report is waiting for a second assessor and the first assessment
-          behind it is submitted. The route makes the same test for itself, so this decides
-          whether the control appears, never whether the assignment may be made. */}
-      {secondAssessorPicker && (
-        <>
-          <h2 class="report-heading">Second assessment</h2>
-          {secondAssessorPicker.length === 0 ? (
-            <p class="hint">No eligible Officer is free to take the second assessment.</p>
-          ) : (
-            <form method="POST" action={`/reports/${report.id}/assign-assessor-2`} class="bar">
-              <select name="assessor_id" aria-label="Second assessor">
-                {secondAssessorPicker.map((option) => (
-                  <option value={option.id} safe>
-                    {option.fullName}
-                  </option>
-                ))}
-              </select>
-              <button type="submit" class="btn">
-                Assign second assessor
-              </button>
-            </form>
-          )}
-        </>
-      )}
+      <DecisionHistory decisions={decisions} />
 
-      {/* Drawn only once both assessments are in and the report is waiting on the manager. The
-          route makes the same test for itself, so this decides whether the decision is offered,
-          never whether it may be made. */}
-      {officerPicker && (
+      {(nextAssessorPicker || workOfficerPicker) && (
         <>
           <h2 class="report-heading">Manager decision</h2>
-          {officerPicker.length === 0 ? (
-            <p class="hint">No active Officer is available to assign.</p>
-          ) : (
-            <div class="grid2">
+          <div class="grid2">
+            {nextAssessorPicker && (
               <form
                 method="POST"
-                action={`/reports/${report.id}/decide/approve`}
+                action={`/reports/${report.id}/assign-next-assessor`}
                 class="card card-b review-form"
               >
-                <div class="f">
-                  <label for="decision-approve-comment">Comment / instruction (optional)</label>
-                  <textarea
-                    id="decision-approve-comment"
-                    name="comment"
-                    rows="4"
-                    class="short"
-                    placeholder="Instructions for the officer, if any."
-                  ></textarea>
-                </div>
-                <div class="f">
-                  <label for="decision-approve-officer">Assign to</label>
-                  <select id="decision-approve-officer" name="officer_id" aria-label="Officer">
-                    {officerPicker.map((option) => (
-                      <option value={option.id} safe>
-                        {option.fullName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div class="bar">
-                  <div class="sp"></div>
-                  <button type="submit" class="btn">
-                    Approve &amp; assign for work
-                  </button>
-                </div>
+                <h3>Assign next assessor</h3>
+                {nextAssessorPicker.length === 0 ? (
+                  <p class="hint">No eligible Officer is free to take the next assessment.</p>
+                ) : (
+                  <>
+                    <div class="f">
+                      <label for="next-comment">
+                        {decisions.length > 0
+                          ? "Comment — why another assessment is needed"
+                          : "Comment (optional)"}
+                      </label>
+                      <textarea
+                        id="next-comment"
+                        name="comment"
+                        rows="4"
+                        class="short"
+                        placeholder="What needs to be reassessed."
+                      ></textarea>
+                    </div>
+                    <div class="f">
+                      <label for="next-officer">Assign to</label>
+                      <select id="next-officer" name="assessor_id" aria-label="Next assessor">
+                        {nextAssessorPicker.map((option) => (
+                          <option value={option.id} safe>
+                            {option.fullName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div class="bar">
+                      <div class="sp"></div>
+                      <button type="submit" class="btn ghost">
+                        Assign next assessor
+                      </button>
+                    </div>
+                  </>
+                )}
               </form>
+            )}
 
+            {workOfficerPicker && (
               <form
                 method="POST"
-                action={`/reports/${report.id}/decide/send-back`}
+                action={`/reports/${report.id}/assign-work-officer`}
                 class="card card-b review-form"
               >
-                <div class="f">
-                  <label for="decision-send-back-comment">Comment</label>
-                  <textarea
-                    id="decision-send-back-comment"
-                    name="comment"
-                    rows="4"
-                    class="short"
-                    placeholder="What needs to be reassessed."
-                  ></textarea>
-                </div>
-                <div class="f">
-                  <label for="decision-send-back-officer">Assign to</label>
-                  <select id="decision-send-back-officer" name="officer_id" aria-label="Officer">
-                    {officerPicker.map((option) => (
-                      <option value={option.id} safe>
-                        {option.fullName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div class="bar">
-                  <div class="sp"></div>
-                  <button type="submit" class="btn ghost">
-                    Send back for re-assessment
-                  </button>
-                </div>
+                <h3>Assign work officer</h3>
+                {workOfficerPicker.length === 0 ? (
+                  <p class="hint">No active Officer is available to assign.</p>
+                ) : (
+                  <>
+                    <div class="f">
+                      <label for="work-comment">Comment / instruction (optional)</label>
+                      <textarea
+                        id="work-comment"
+                        name="comment"
+                        rows="4"
+                        class="short"
+                        placeholder="Instructions for the officer, if any."
+                      ></textarea>
+                    </div>
+                    <div class="f">
+                      <label for="work-officer">Assign to</label>
+                      <select id="work-officer" name="officer_id" aria-label="Work officer">
+                        {workOfficerPicker.map((option) => (
+                          <option value={option.id} safe>
+                            {option.fullName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div class="bar">
+                      <div class="sp"></div>
+                      <button type="submit" class="btn">
+                        Assign work officer
+                      </button>
+                    </div>
+                  </>
+                )}
               </form>
-            </div>
-          )}
+            )}
+          </div>
         </>
       )}
     </StaffShell>

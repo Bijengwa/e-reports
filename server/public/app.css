@@ -2449,3 +2449,157 @@ ul.f4-card-c li { margin-bottom: 3px; }
 .mya + .mya { margin-top: 26px; }
 .mya h2 { font-size: 15px; font-weight: 600; }
 .mya > .hint { margin-bottom: 10px; }
+
+/* ---------- the secondary-assessment chain ---------- */
+/*
+ * Earlier secondary assessors' findings, folded away per item.
+ *
+ * A `<details>` drawn the way `.f4-notes` above is drawn, and for the same reason: this door
+ * renders on the server, so a panel that opens without JavaScript is the house pattern. Collapsed
+ * by default and scoped to one item, so a document with ten previous assessments on it is still
+ * the clean working form the current assessor came here to fill in.
+ */
+.a2-history {
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  background: var(--card);
+  margin: 8px 0;
+}
+
+.a2-history > summary {
+  cursor: pointer;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--ink-3);
+  list-style: none;
+}
+
+.a2-history > summary::-webkit-details-marker {
+  display: none;
+}
+
+.a2-history > summary::before {
+  content: "▸ ";
+}
+
+.a2-history[open] > summary::before {
+  content: "▾ ";
+}
+
+.a2-history > summary:hover {
+  color: var(--ink);
+}
+
+.a2-history > summary:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: -2px;
+}
+
+.a2-history[open] > summary {
+  color: var(--green-d);
+  font-weight: 600;
+  border-bottom: 1px solid var(--rule);
+}
+
+.a2-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 12px 8px;
+}
+
+.a2-history-list li {
+  padding: 8px 0;
+  border-top: 1px solid var(--rule);
+}
+
+.a2-history-list li:first-child {
+  border-top: 0;
+}
+
+.a2-history-who {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 12.5px;
+}
+
+/* The three degrees, in the colours the live controls already use for them. */
+.a2-history-degree {
+  display: inline-block;
+  margin-top: 3px;
+  border-radius: 20px;
+  padding: 2px 9px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.a2-history-degree.a2-agree {
+  background: #16803c;
+}
+
+.a2-history-degree.a2-clarification {
+  background: #7f173a;
+}
+
+.a2-history-degree.a2-disagree {
+  background: #c20f0f;
+}
+
+.a2-history-degree.a2-supplied {
+  background: var(--ink-3);
+}
+
+.a2-history-value,
+.a2-history-statement {
+  font-size: 13px;
+  margin-top: 3px;
+  white-space: pre-wrap;
+}
+
+/*
+ * Who holds each assessment of a report, for orientation rather than navigation — which is why it
+ * is a plain list and not a tab bar. It grows with the chain, so it wraps rather than scrolling.
+ */
+.assessment-history {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 8px 0 0;
+  padding: 0;
+  font-size: 12.5px;
+}
+
+.assessment-history li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.a-hist-no {
+  font-weight: 600;
+  color: var(--green-d);
+}
+
+.a-hist-done {
+  color: #16803c;
+}
+
+.a-hist-current {
+  color: var(--green-d);
+  font-weight: 600;
+}
+
+/** The manager's decisions, oldest first. Each entry is a `.review` block of its own. */
+.decision-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* The one instruction that explains why the current assessor is on this page at all. */
+.manager-instruction {
+  border-left-color: var(--green);
+  margin-bottom: 20px;
+}

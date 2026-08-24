@@ -31,7 +31,8 @@ function toRow(row: unknown): WorkloadRow {
     severity: string;
     status: string;
     assessor1_name: string | null;
-    assessor2_name: string | null;
+    latest_secondary_name: string | null;
+    secondary_count: number;
   };
 
   return {
@@ -42,7 +43,8 @@ function toRow(row: unknown): WorkloadRow {
     severity: report.severity,
     status: report.status,
     assessor1Name: report.assessor1_name,
-    assessor2Name: report.assessor2_name,
+    latestSecondaryName: report.latest_secondary_name,
+    secondaryCount: report.secondary_count,
   };
 }
 
@@ -90,10 +92,14 @@ export async function workloadRoutes(app: FastifyInstance): Promise<void> {
     const rows = await app.db.execute(sql`
       SELECT r.id, r.number, r.received_at, r.device_name, r.severity, r.status::text AS status,
              a1.full_name AS assessor1_name,
-             a2.full_name AS assessor2_name
+             (SELECT u.full_name FROM assessments a
+                JOIN users u ON u.id = a.assessor_id
+               WHERE a.report_id = r.id AND a.ordinal > 1
+               ORDER BY a.ordinal DESC LIMIT 1) AS latest_secondary_name,
+             (SELECT count(*)::int FROM assessments a
+               WHERE a.report_id = r.id AND a.ordinal > 1) AS secondary_count
         FROM reports r
         LEFT JOIN users a1 ON a1.id = r.assessor1_user_id
-        LEFT JOIN users a2 ON a2.id = r.assessor2_user_id
         ${where}
        ORDER BY r.received_at DESC, r.number DESC
        LIMIT ${WORKLOAD_LIMIT}

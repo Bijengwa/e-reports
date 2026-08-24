@@ -2,10 +2,8 @@ import type { Children } from "@kitajs/html";
 import {
   A2_DEGREE_LABELS,
   A2_DEGREES,
-  A2_REVIEW_ITEMS,
   type A2ReviewItem,
-  type A2ReviewPayload,
-  type A2SectionResponse,
+  type A2Value,
   ACTIONS,
   ASSESSED_DEVICE_KEYS,
   CAUSALITY_DISCUSSION_NOTE,
@@ -28,8 +26,11 @@ import {
   RISK_IVD_NOTE,
   RISK_NOTE,
   RISK_OPTIONS,
+  SECONDARY_REVIEW_ITEMS,
   SERIOUS_CRITERIA,
   SERIOUSNESS_OPTIONS,
+  type SecondaryReviewPayload,
+  type SecondaryReviewResponse,
   SIGNAL_CRITERIA,
   SIGNAL_NOTE,
   SIGNAL_OPTIONS,
@@ -91,16 +92,38 @@ export type F004FormProps = {
    * whose reader has to work out which of the two counts.
    */
   omitSecond?: boolean;
-  /** Inline A2 controls rendered inside the read-only A1 form. */
+  /**
+   * The secondary assessment actively relevant to this page — the officer's own open or
+   * just-submitted row. Undefined on the manager's page, which reads every secondary review but
+   * never writes one; there every submitted review arrives through `priorReviews` instead.
+   */
   a2Review?: {
     action: string;
-    review: A2ReviewPayload;
+    review: SecondaryReviewPayload;
     submitted: boolean;
-    /** The second assessor's name and the day they signed, once submitted — for the header strip. */
+    /** The reviewer's name and the day they signed, once submitted — for the header strip. */
     assessorName?: string;
     assessedOn?: string;
   };
+  /**
+   * Every other submitted secondary review (A2..An, excluding whichever one `a2Review` already
+   * represents), for the collapsed per-item "Previous assessments" history.
+   *
+   * A separate list rather than folded into `a2Review` because the two answer different
+   * questions: `a2Review` is what this page is actively about, `priorReviews` is context read on
+   * demand. Kept apart so a page that has no active review of its own — the manager's — can still
+   * carry the whole accumulated picture without inventing a fake "current" one.
+   */
+  priorReviews?: readonly PriorSecondaryReview[];
   issues: readonly Issue[];
+};
+
+/** One earlier secondary assessor's finished work, as the per-item history reads it. */
+export type PriorSecondaryReview = {
+  ordinal: number;
+  assessorName: string;
+  submittedOn: string;
+  review: SecondaryReviewPayload;
 };
 
 /**
@@ -197,7 +220,7 @@ export function F004Second({
       <div class="f4-block">
         <div class="f4-sign">
           <div class="f4-field">
-            <label for="signature_2">2nd Assessor — type your name to sign</label>
+            <label for="signature_2">Secondary assessor — type your name to sign</label>
             <input
               id="signature_2"
               name="signature_2"
@@ -401,7 +424,7 @@ function FactRow({
  * pages of criteria to (causality, risk); this is for the ones it settles in one line.
  */
 /** What A2 has chosen to replace an item's value with, whatever shape that item's value is. */
-function a2ChosenValues(review: A2ReviewPayload | undefined, itemKey: string): string[] {
+function a2ChosenValues(review: SecondaryReviewPayload | undefined, itemKey: string): string[] {
   const stored = review?.responses[itemKey]?.value;
   if (Array.isArray(stored)) return stored;
   if (typeof stored === "string") return stored === "" ? [] : [stored];
@@ -444,7 +467,7 @@ function A2InlineOption({
 }
 
 /** The second assessor's context for a choice field: which item, whose review, and whether it is locked. */
-type A2Choice = { key: string; review?: A2ReviewPayload; locked: boolean };
+type A2Choice = { key: string; review?: SecondaryReviewPayload; locked: boolean };
 
 function Radios({
   name,
@@ -559,7 +582,7 @@ function A2FillIn({
   locked,
 }: {
   item: A2ReviewItem;
-  response?: A2SectionResponse;
+  response?: SecondaryReviewResponse;
   locked: boolean;
 }): JSX.Element {
   const stored = response?.value;
@@ -586,7 +609,7 @@ function A2FillIn({
   return (
     <div class="a2-fillin">
       <div class="a2-inline-head">
-        <span class="a2-inline-k">2nd Assessor remarks</span>
+        <span class="a2-inline-k">Secondary assessment</span>
         <span safe>{`${item.no} ${item.title}`}</span>
         <span class="a2-fillin-opt">(If applicable — optional)</span>
       </div>
@@ -652,24 +675,123 @@ function A2FillIn({
   );
 }
 
+/** The value half of one item's response, resolved to the label a reader recognises. */
+function describeReviewValue(item: A2ReviewItem, val: A2Value | undefined): string {
+  if (val === undefined) return "";
+  if (item.valueKind === "text") return typeof val === "string" ? val : "";
+  if (item.valueKind === "fields") {
+    const rec =
+      typeof val === "object" && val !== null && !Array.isArray(val)
+        ? (val as Record<string, string>)
+        : {};
+    return (item.fields ?? [])
+      .map((field) => (rec[field.key] ? `${field.label}: ${rec[field.key]}` : ""))
+      .filter(Boolean)
+      .join("; ");
+  }
+  const chosen = Array.isArray(val) ? val : typeof val === "string" && val !== "" ? [val] : [];
+  const options = a2FillInOptions(item);
+  return chosen.map((v) => options.find((o) => o.value === v)?.label ?? v).join(", ");
+}
+
+/**
+ * Every earlier secondary assessor's finished position on one item, collapsed until asked for.
+ *
+ * A `<details>`, on the same argument `SectionComments` above already makes for its own: this
+ * door renders on the server, so a panel that opens without JavaScript is the house pattern. Kept
+ * collapsed and per-item rather than a running history at the top of the page, because the reader
+ * working through the F004 needs the field in front of them, not everyone who has ever touched it
+ * — the same document must stay usable whether two people have reviewed it or ten.
+ */
+function PriorReviewHistory({
+  itemKey,
+  priorReviews,
+}: {
+  itemKey: string;
+  priorReviews?: readonly PriorSecondaryReview[];
+}): JSX.Element {
+  if (priorReviews === undefined || priorReviews.length === 0) return <span hidden />;
+
+  const item = SECONDARY_REVIEW_ITEMS.find((candidate) => candidate.key === itemKey);
+  if (item === undefined) return <span hidden />;
+
+  const entries = priorReviews
+    .map((prior) => ({ prior, response: prior.review.responses[itemKey] }))
+    .filter(
+      (entry): entry is { prior: PriorSecondaryReview; response: SecondaryReviewResponse } =>
+        entry.response !== undefined,
+    );
+
+  if (entries.length === 0) return <span hidden />;
+
+  return (
+    <details class="a2-history">
+      <summary>{`Previous assessments (${entries.length})`}</summary>
+      <ul class="a2-history-list">
+        {entries.map(({ prior, response }) => (
+          <li>
+            <div class="a2-history-who">
+              <b safe>{`A${prior.ordinal} — ${prior.assessorName}`}</b>
+              <span class="hint" safe>
+                {prior.submittedOn}
+              </span>
+            </div>
+            {response.degree !== undefined && (
+              <div class={`a2-history-degree a2-${response.degree}`} safe>
+                {A2_DEGREE_LABELS[response.degree]}
+              </div>
+            )}
+            {describeReviewValue(item, response.value) !== "" && (
+              <p
+                class="a2-history-value"
+                safe
+              >{`Value: ${describeReviewValue(item, response.value)}`}</p>
+            )}
+            {response.statement && (
+              <p class="a2-history-statement" safe>
+                {response.statement}
+              </p>
+            )}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 function A2InlineDecision({
   itemKey,
   answers,
   review,
   locked,
+  priorReviews,
 }: {
   itemKey: string;
   answers: F004Answers;
-  review?: A2ReviewPayload;
+  review?: SecondaryReviewPayload;
   locked: boolean;
+  priorReviews?: readonly PriorSecondaryReview[];
 }): JSX.Element {
-  const item = A2_REVIEW_ITEMS.find((candidate) => candidate.key === itemKey);
-  if (item === undefined || review === undefined) return <span hidden />;
+  const item = SECONDARY_REVIEW_ITEMS.find((candidate) => candidate.key === itemKey);
+  if (item === undefined) return <span hidden />;
+
+  const history = <PriorReviewHistory itemKey={itemKey} priorReviews={priorReviews} />;
+
+  if (review === undefined) {
+    // The manager's page, or any reader with nothing of their own to write: still show the
+    // accumulated history even though there is no active review to annotate it with.
+    return history;
+  }
 
   const response = review.responses[item.key];
 
   if (isA1Blank(item, answers)) {
-    return <A2FillIn item={item} response={response} locked={locked} />;
+    return (
+      <>
+        {history}
+        <A2FillIn item={item} response={response} locked={locked} />
+      </>
+    );
   }
 
   const chosen = response?.degree;
@@ -685,96 +807,99 @@ function A2InlineDecision({
       : {};
 
   return (
-    <div class="a2-inline">
-      <div class="a2-inline-head">
-        <span class="a2-inline-k">2nd Assessor remarks</span>
-        <span safe>{`${item.no} ${item.title}`}</span>
-      </div>
+    <>
+      {history}
+      <div class="a2-inline">
+        <div class="a2-inline-head">
+          <span class="a2-inline-k">Secondary assessment</span>
+          <span safe>{`${item.no} ${item.title}`}</span>
+        </div>
 
-      <div class="a2-degrees">
-        {A2_DEGREES.map((degree) => (
-          <label class={`a2-degree a2-${degree}`}>
-            <input
-              type="radio"
-              name={`a2_degree_${item.key}`}
-              value={degree}
-              checked={chosen === degree}
-              disabled={locked}
-            />
-            <span safe>{A2_DEGREE_LABELS[degree]}</span>
-          </label>
-        ))}
-      </div>
+        <div class="a2-degrees">
+          {A2_DEGREES.map((degree) => (
+            <label class={`a2-degree a2-${degree}`}>
+              <input
+                type="radio"
+                name={`a2_degree_${item.key}`}
+                value={degree}
+                checked={chosen === degree}
+                disabled={locked}
+              />
+              <span safe>{A2_DEGREE_LABELS[degree]}</span>
+            </label>
+          ))}
+        </div>
 
-      {/* Disagree only, and only for a text answer or an IMDRF grid: a "single"/"multi" item's
+        {/* Disagree only, and only for a text answer or an IMDRF grid: a "single"/"multi" item's
           replacement options are paired inline beside A1's own, in `Radios` and the card/tick
           loops, so there is nothing left for this block to redraw for those two kinds. */}
-      {(item.valueKind === "text" || item.valueKind === "fields") && (
-        <div class="a2-change">
-          <p class="a2-change-l" safe>
-            {item.valueLabel}
-          </p>
+        {(item.valueKind === "text" || item.valueKind === "fields") && (
+          <div class="a2-change">
+            <p class="a2-change-l" safe>
+              {item.valueLabel}
+            </p>
 
-          {item.valueKind === "text" && (
-            <div class="a2-value-text">
-              <label class="vh" for={`a2-value-${item.key}`} safe>
-                {item.valueLabel}
-              </label>
-              <textarea
-                id={`a2-value-${item.key}`}
-                name={`a2_value_${item.key}`}
-                rows="6"
-                disabled={locked}
-                safe
-              >
-                {storedText}
-              </textarea>
-            </div>
-          )}
+            {item.valueKind === "text" && (
+              <div class="a2-value-text">
+                <label class="vh" for={`a2-value-${item.key}`} safe>
+                  {item.valueLabel}
+                </label>
+                <textarea
+                  id={`a2-value-${item.key}`}
+                  name={`a2_value_${item.key}`}
+                  rows="6"
+                  disabled={locked}
+                  safe
+                >
+                  {storedText}
+                </textarea>
+              </div>
+            )}
 
-          {item.valueKind === "fields" && (
-            <div class="a2-value-grid">
-              {(item.fields ?? []).map((field) => (
-                <div class="a2-value-cell">
-                  <label for={`a2-value-${item.key}-${field.key}`} safe>
-                    {field.label}
-                  </label>
-                  <input
-                    id={`a2-value-${item.key}-${field.key}`}
-                    name={`a2_value_${item.key}_${field.key}`}
-                    value={storedFields[field.key] ?? ""}
-                    disabled={locked}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+            {item.valueKind === "fields" && (
+              <div class="a2-value-grid">
+                {(item.fields ?? []).map((field) => (
+                  <div class="a2-value-cell">
+                    <label for={`a2-value-${item.key}-${field.key}`} safe>
+                      {field.label}
+                    </label>
+                    <input
+                      id={`a2-value-${item.key}-${field.key}`}
+                      name={`a2_value_${item.key}_${field.key}`}
+                      value={storedFields[field.key] ?? ""}
+                      disabled={locked}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
-      {/* Need Clarification and Disagree. Two labels, one shown, so the box says what it is for
+        {/* Need Clarification and Disagree. Two labels, one shown, so the box says what it is for
           without a line of script — and the wrong one is display:none, so it is not read out.
           Switching back to Agree hides this the same way it hides `.a2-change` above: neither is
           a child of the radio that used to be checked, both are reached by `:has()` on the box
           that holds all three, so there is nothing left over to fully un-hide again. */}
-      <div class="a2-say">
-        <label class="a2-say-l for-clarification" for={`a2-statement-${item.key}`}>
-          What needs clarifying, and from whom? Required.
-        </label>
-        <label class="a2-say-l for-disagree" for={`a2-statement-${item.key}`}>
-          Why the first assessor's answer is wrong. Required.
-        </label>
-        <textarea
-          id={`a2-statement-${item.key}`}
-          name={`a2_statement_${item.key}`}
-          rows="5"
-          disabled={locked}
-          safe
-        >
-          {response?.statement ?? ""}
-        </textarea>
+        <div class="a2-say">
+          <label class="a2-say-l for-clarification" for={`a2-statement-${item.key}`}>
+            What needs clarifying, and from whom? Required.
+          </label>
+          <label class="a2-say-l for-disagree" for={`a2-statement-${item.key}`}>
+            Why the first assessor's answer is wrong. Required.
+          </label>
+          <textarea
+            id={`a2-statement-${item.key}`}
+            name={`a2_statement_${item.key}`}
+            rows="5"
+            disabled={locked}
+            safe
+          >
+            {response?.statement ?? ""}
+          </textarea>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -788,11 +913,13 @@ function AssessedDeviceField({
   answers,
   locked,
   a2Review,
+  priorReviews,
 }: {
   row: DeviceRow;
   answers: F004Answers;
   locked: boolean;
-  a2Review?: { review: A2ReviewPayload; submitted: boolean };
+  a2Review?: { review: SecondaryReviewPayload; submitted: boolean };
+  priorReviews?: readonly PriorSecondaryReview[];
 }): JSX.Element {
   const a2Locked = a2Review?.submitted ?? true;
   const a2: A2Choice | undefined = a2Review && {
@@ -844,6 +971,7 @@ function AssessedDeviceField({
         answers={answers}
         review={a2Review?.review}
         locked={a2Locked}
+        priorReviews={priorReviews}
       />
     </div>
   );
@@ -862,6 +990,7 @@ export function F004Form({
   commentAction,
   omitSecond,
   a2Review,
+  priorReviews,
   issues,
 }: F004FormProps): JSX.Element {
   const causality = value(answers, "causality");
@@ -920,7 +1049,7 @@ export function F004Form({
             </span>
           </div>
           <div class={a2Review?.submitted === true ? undefined : "f4-muted"}>
-            <span class="f4-k">2nd Assessor</span>
+            <span class="f4-k">Secondary assessor</span>
             <span class="f4-v" safe>
               {a2Review?.submitted === true ? (a2Review.assessorName ?? "—") : "—"}
             </span>
@@ -931,6 +1060,17 @@ export function F004Form({
               {a2Review?.submitted === true ? (a2Review.assessedOn ?? "—") : "—"}
             </span>
           </div>
+          {/* A running count rather than a name-per-ordinal strip: the masthead has room for one
+              more fact, not for a row that grows with every secondary assessment a report ends up
+              with. `Assessment history` on the report page is where each one is named. */}
+          {priorReviews !== undefined && priorReviews.length > 0 && (
+            <div>
+              <span class="f4-k">Earlier secondary assessments</span>
+              <span class="f4-v" safe>
+                {String(priorReviews.length)}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1060,6 +1200,7 @@ export function F004Form({
                 answers={answers}
                 review={a2Review?.review}
                 locked={a2Review?.submitted ?? true}
+                priorReviews={priorReviews}
               />
             </div>
 
@@ -1088,6 +1229,7 @@ export function F004Form({
                 answers={answers}
                 review={a2Review?.review}
                 locked={a2Review?.submitted ?? true}
+                priorReviews={priorReviews}
               />
             </div>
 
@@ -1108,6 +1250,7 @@ export function F004Form({
                 answers={answers}
                 review={a2Review?.review}
                 locked={a2Review?.submitted ?? true}
+                priorReviews={priorReviews}
               />
             </div>
           </section>
@@ -1168,6 +1311,7 @@ export function F004Form({
                       answers={answers}
                       review={a2Review?.review}
                       locked={a2Review?.submitted ?? true}
+                      priorReviews={priorReviews}
                     />
                   </div>
                 ))}
@@ -1207,6 +1351,7 @@ export function F004Form({
                 answers={answers}
                 review={a2Review?.review}
                 locked={a2Review?.submitted ?? true}
+                priorReviews={priorReviews}
               />
             </div>
 
@@ -1252,6 +1397,7 @@ export function F004Form({
                 answers={answers}
                 review={a2Review?.review}
                 locked={a2Review?.submitted ?? true}
+                priorReviews={priorReviews}
               />
             </div>
 
@@ -1268,6 +1414,7 @@ export function F004Form({
                 answers={answers}
                 review={a2Review?.review}
                 locked={a2Review?.submitted ?? true}
+                priorReviews={priorReviews}
               />
             </div>
           </section>
@@ -1309,6 +1456,7 @@ export function F004Form({
                 answers={answers}
                 review={a2Review?.review}
                 locked={a2Review?.submitted ?? true}
+                priorReviews={priorReviews}
               />
             </div>
           </section>
@@ -1369,6 +1517,7 @@ export function F004Form({
                 answers={answers}
                 review={a2Review?.review}
                 locked={a2Review?.submitted ?? true}
+                priorReviews={priorReviews}
               />
             </div>
           </section>
@@ -1433,12 +1582,14 @@ export function F004Form({
                 answers={answers}
                 review={a2Review?.review}
                 locked={a2Review?.submitted ?? true}
+                priorReviews={priorReviews}
               />
               <A2InlineDecision
                 itemKey="7.1_conclusion"
                 answers={answers}
                 review={a2Review?.review}
                 locked={a2Review?.submitted ?? true}
+                priorReviews={priorReviews}
               />
             </div>
 
@@ -1502,7 +1653,7 @@ export function F004Form({
               </div>
               {!omitSecond && (
                 <div class="f4-field f4-muted">
-                  <label for="signature-2">2nd Assessor</label>
+                  <label for="signature-2">Secondary assessor</label>
                   <input id="signature-2" value="" disabled placeholder="Not yet assessed" />
                 </div>
               )}

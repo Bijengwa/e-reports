@@ -6,9 +6,9 @@ import { assessmentRoutes } from "./routes/assessment.js";
 import { assessmentCommentRoutes } from "./routes/assessment-comments.js";
 import { assessmentReviewRoutes } from "./routes/assessment-review.js";
 import { myAssessmentsRoutes } from "./routes/assessments.js";
-import { assignSecondAssessorRoutes } from "./routes/assign-second-assessor.js";
 import { changePasswordRoutes } from "./routes/change-password.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
+import { decisionRoutes } from "./routes/decisions.js";
 import { loginRoutes } from "./routes/login.js";
 import { logoutRoutes } from "./routes/logout.js";
 import { newReportRoutes } from "./routes/new-report.js";
@@ -119,7 +119,7 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
         // verdict `assessmentReviewRoutes` stores about the whole of it.
         await management.register(assessmentCommentRoutes);
 
-        await management.register(assignSecondAssessorRoutes);
+        await management.register(decisionRoutes);
       });
 
       await active.register(async (administration) => {

@@ -1,5 +1,5 @@
-import type { A2ReviewPayload, F004Answers, Issue } from "../../../domain/f004.js";
-import { F004Form } from "./f004.js";
+import type { F004Answers, Issue, SecondaryReviewPayload } from "../../../domain/f004.js";
+import { F004Form, type PriorSecondaryReview } from "./f004.js";
 import {
   ManagerReviewBlock,
   type ManagerReviewNote,
@@ -8,7 +8,7 @@ import {
 } from "./reports.js";
 import { StaffShell } from "./shell.js";
 
-/** What the second assessor reads before annotating: A1's submitted F004. */
+/** What a secondary assessor reads before annotating: A1's submitted F004. */
 export type FirstAssessmentRead = {
   assessorName: string;
   answers: F004Answers;
@@ -17,31 +17,40 @@ export type FirstAssessmentRead = {
   event: Record<string, string>;
 };
 
-export type Assessment2PageProps = {
+export type SecondaryAssessmentPageProps = {
   report: ReportDetail;
   viewerRole: string;
   viewerName: string;
+  /** 2, 3, 4, … — this reader's own position in the chain. */
+  ordinal: number;
   first: FirstAssessmentRead;
   managerComment: ManagerReviewNote | null;
-  review: A2ReviewPayload;
+  /** The manager's reason for THIS assignment specifically — not the whole decision history. */
+  managerInstruction: string | null;
+  /** Every earlier secondary assessor's finished work, read-only context for this one. */
+  priorReviews: readonly PriorSecondaryReview[];
+  review: SecondaryReviewPayload;
   submitted: boolean;
   issues: readonly Issue[];
 };
 
-export function Assessment2Page({
+export function SecondaryAssessmentPage({
   report,
   viewerRole,
   viewerName,
+  ordinal,
   first,
   managerComment,
+  managerInstruction,
+  priorReviews,
   review,
   submitted,
   issues,
-}: Assessment2PageProps): JSX.Element {
+}: SecondaryAssessmentPageProps): JSX.Element {
   return (
     <StaffShell
-      title={`Assessment 2 — ${report.number}`}
-      pageTitle="Assessment 2"
+      title={`Secondary assessment — ${report.number}`}
+      pageTitle={`Secondary assessment (A${ordinal})`}
       role={viewerRole}
       fullName={viewerName}
       active="assessments"
@@ -67,11 +76,13 @@ export function Assessment2Page({
 
         <div>
           <div class="a2-intro">
-            <h2>Second assessor section review</h2>
+            <h2>Secondary assessment</h2>
             <p>
               This is the first assessor's submitted F004, read-only. Take a position on each of
-              their answers where the form asks you to, using the A2 block beside the answer itself.
-              Every one of them needs a position before you can submit.
+              their answers where the form asks you to, using the block beside the answer itself.
+              Every one of them needs a position before you can submit. Where an earlier secondary
+              assessor has already reviewed a field, their finding is folded away above yours — open
+              it if you want it before deciding your own.
             </p>
             <div class="a2-legend">
               <span class="k-agree">Agree — keeps their answer, nothing to write</span>
@@ -81,6 +92,19 @@ export function Assessment2Page({
               <span class="k-disagree">Disagree — your corrected answer, and why</span>
             </div>
           </div>
+
+          {/* The manager's reason for handing THIS assessor the report, prominently, once — not
+              repeated at every section. A reader who wants the fuller decision history reads it on
+              the report page instead; this is oriented to the one instruction that explains why
+              this page exists at all. */}
+          {managerInstruction && (
+            <div class="review manager-instruction">
+              <p class="hint">Manager's instruction for this assignment</p>
+              <p class="review-text" safe>
+                {managerInstruction}
+              </p>
+            </div>
+          )}
 
           {managerComment && (
             <ManagerReviewBlock
@@ -101,10 +125,11 @@ export function Assessment2Page({
             omitSecond
             issues={issues}
             a2Review={{
-              action: `/reports/${report.id}/assessment-2`,
+              action: `/reports/${report.id}/secondary-assessment`,
               review,
               submitted,
             }}
+            priorReviews={priorReviews}
           />
         </div>
 

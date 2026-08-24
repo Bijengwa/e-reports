@@ -179,6 +179,16 @@ async function onlyReport(): Promise<Row> {
   return rows[0] as Row;
 }
 
+/** Who holds the secondary assessment: an `assessments` row, not a column on the report. */
+async function secondaryAssessorOf(reportId: string): Promise<string | null> {
+  const rows = await owner.db.execute(sql`
+    SELECT assessor_id FROM assessments
+     WHERE report_id = ${reportId} AND ordinal > 1
+     ORDER BY ordinal DESC LIMIT 1
+  `);
+  return rows.length === 0 ? null : (rows[0] as { assessor_id: string }).assessor_id;
+}
+
 async function reportRow(id: string): Promise<Row> {
   const rows = await owner.db.execute(sql`
     SELECT id, number, status::text AS status, assessor1_user_id, assessor2_user_id
@@ -244,7 +254,10 @@ function comment(report: Row, cookie: string, text: string) {
 }
 
 function assign(report: Row, cookie: string, assessorId: string) {
-  return post(`/reports/${report.id}/assign-assessor-2`, cookie, { assessor_id: assessorId });
+  return post(`/reports/${report.id}/assign-next-assessor`, cookie, {
+    assessor_id: assessorId,
+    comment: "Please take the next assessment.",
+  });
 }
 
 /** One note against one section of the first assessment. */
@@ -408,7 +421,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the manager's notes on a section", () => 
     // And the handover still works afterwards, which is the step the notes come before.
     expect((await assign(report, manager.cookie, other.id)).statusCode).toBe(302);
     const after = await reportRow(report.id);
-    expect(after.assessor2_user_id).toBe(other.id);
+    expect(await secondaryAssessorOf(report.id)).toBe(other.id);
     expect(after.status).toBe("second_assessment");
     // The first assessment itself is unchanged by any of it.
     expect(first.submitted_at).not.toBeNull();

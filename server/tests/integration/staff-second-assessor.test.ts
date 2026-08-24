@@ -257,16 +257,25 @@ async function waiting(): Promise<Waiting> {
 }
 
 function assign(report: Row, cookie: string, assessorId: string) {
-  return post(`/reports/${report.id}/assign-assessor-2`, cookie, { assessor_id: assessorId });
+  return post(`/reports/${report.id}/assign-next-assessor`, cookie, { assessor_id: assessorId });
 }
 
-/** The three columns this slice may touch, as one value, so a case can assert they did not move. */
-function assignment(row: Row) {
-  return {
-    status: row.status,
-    assessor2: row.assessor2_user_id,
-    assignedAt: row.assessor2_assigned_at,
-  };
+/**
+ * Who holds the secondary assessment of a report, read from where it actually lives now: an
+ * `assessments` row at ordinal 2 or above, not a column on the report.
+ */
+async function secondaryAssessorOf(reportId: string): Promise<string | null> {
+  const rows = await owner.db.execute(sql`
+    SELECT assessor_id FROM assessments
+     WHERE report_id = ${reportId} AND ordinal > 1
+     ORDER BY ordinal DESC LIMIT 1
+  `);
+  return rows.length === 0 ? null : (rows[0] as { assessor_id: string }).assessor_id;
+}
+
+/** What this slice may move, as one value, so a case can assert it did not. */
+async function assignment(row: Row) {
+  return { status: (await reportRow(row.id)).status, assessor2: await secondaryAssessorOf(row.id) };
 }
 
 /** A bucket's figure on the workload page, asserted as markup so a bare label cannot satisfy it. */
@@ -274,7 +283,7 @@ function bucketStat(label: string, count: number): string {
   return `<span>${label}</span> <span class="wl-count">${count}</span>`;
 }
 
-const ASSIGN_A2 = "Assign A2";
+const ASSIGN_A2 = "Assign assessor";
 
 describe.skipIf(!INTEGRATION_ENABLED)("the manager's pipeline", () => {
   beforeEach(start);
@@ -364,7 +373,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("who the picker offers", () => {
 
   /** The ids the picker actually offers, read out of the rendered menu. */
   function offered(body: string): string[] {
-    const select = body.match(/<select name="assessor_id"[^>]*>([\s\S]*?)<\/select>/);
+    const select = body.match(/<select[^>]*name="assessor_id"[^>]*>([\s\S]*?)<\/select>/);
     if (select === null) return [];
     return [...select[1].matchAll(/value="([^"]+)"/g)].map((m) => m[1]);
   }
@@ -434,7 +443,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("who the picker offers", () => {
 
     const body = (await get(`/reports/${filed.id}`, manager.cookie)).body;
 
-    expect(body).toContain("No eligible Officer is free to take the second assessment.");
+    expect(body).toContain("No eligible Officer is free to take the next assessment.");
     expect(body).not.toContain('name="assessor_id"');
   });
 
@@ -453,7 +462,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("who the picker offers", () => {
 
     const assessment = body.indexOf("First assessment");
     const review = body.indexOf(`/reports/${report.id}/assessment-1/comment`);
-    const assign = body.indexOf(`/reports/${report.id}/assign-assessor-2`);
+    const assign = body.indexOf(`/reports/${report.id}/assign-next-assessor`);
 
     expect(assessment).toBeGreaterThan(-1);
     expect(review).toBeGreaterThan(assessment);
@@ -461,13 +470,15 @@ describe.skipIf(!INTEGRATION_ENABLED)("who the picker offers", () => {
 
     // The same plain bar the rest of the door uses for a row of controls.
     expect(body).toContain(
-      `<form method="POST" action="/reports/${report.id}/assign-assessor-2" class="bar">`,
+      `<form method="POST" action="/reports/${report.id}/assign-next-assessor" class="card card-b review-form">`,
     );
 
-    // Both assessors still read on the top bar's own hint line, beside the report's other facts.
+    // The assessment history strip names who holds each assessment, in the top bar. Nobody holds
+    // a secondary one yet, so A1 is the only entry.
     const head = topBar(body);
-    expect(head).toContain("A1:");
-    expect(head).toContain("A2: not assigned");
+    expect(head).toContain("assessment-history");
+    expect(head).toContain(">A1<");
+    expect(head).not.toContain(">A2<");
   });
 });
 
@@ -480,19 +491,21 @@ describe.skipIf(!INTEGRATION_ENABLED)("what the assignment hands over", () => {
     // Before: it is the first assessor's submitted work, and nothing of the second's.
     const beforeOther = (await get("/assessments", other.cookie)).body;
     expect(beforeOther).not.toContain(report.number);
-    expect(beforeOther).toContain("Nothing has been assigned to you for a second assessment.");
+    expect(beforeOther).toContain("Nothing has been assigned to you for a secondary assessment.");
 
     await assign(report, manager.cookie, other.id);
 
     const afterOther = (await get("/assessments", other.cookie)).body;
     expect(afterOther).toContain(report.number);
-    expect(afterOther).toContain("Second assessment");
-    expect(afterOther).not.toContain("Nothing has been assigned to you for a second assessment.");
+    expect(afterOther).toContain("Secondary assessment");
+    expect(afterOther).not.toContain(
+      "Nothing has been assigned to you for a secondary assessment.",
+    );
 
     // The first assessor still has it, still listed as sent on rather than as theirs to review.
     const afterFirst = (await get("/assessments", officer.cookie)).body;
     expect(afterFirst).toContain(report.number);
-    expect(afterFirst).toContain("Nothing has been assigned to you for a second assessment.");
+    expect(afterFirst).toContain("Nothing has been assigned to you for a secondary assessment.");
 
     // A colleague who was named neither sees nothing of it.
     const stranger = await signedInAs("assessor", "Chausiku Njau");
@@ -516,16 +529,17 @@ describe.skipIf(!INTEGRATION_ENABLED)("what the assignment hands over", () => {
     const { manager, officer, other, report } = await waiting();
 
     const before = (await get(`/reports/${report.id}`, manager.cookie)).body;
-    expect(before).toContain(`A1: ${officer.name}`);
+    expect(before).toContain(officer.name);
     // Nobody holds the second half yet, and the top bar says so rather than leaving it blank.
-    expect(before).toContain("A2: not assigned");
+    expect(before).not.toContain("A2");
 
     await assign(report, manager.cookie, other.id);
 
     const after = (await get(`/reports/${report.id}`, manager.cookie)).body;
-    expect(after).toContain(`A1: ${officer.name}`);
-    expect(after).toContain(`A2: ${other.name}`);
-    expect(after).not.toContain("A2: not assigned");
+    // Both now read on the assessment-history strip, each named beside its own ordinal.
+    expect(after).toContain(officer.name);
+    expect(after).toContain(other.name);
+    expect(after).toContain(">A2<");
   });
 
   it("offers the manager the way in from the bucket that is waiting on them", async () => {
@@ -533,7 +547,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("what the assignment hands over", () => {
 
     // The row's own link, matched as the anchor rather than as the bare words: "Assign A2" is
     // also the caption of the bucket's tab, which is on the page whatever the rows say.
-    const rowLink = `<a href="/reports/${report.id}">Assign A2</a>`;
+    const rowLink = `<a href="/reports/${report.id}">Assign next assessor</a>`;
 
     const waitingBucket = (await get("/workload?status=awaiting_second_assessor", manager.cookie))
       .body;
@@ -560,8 +574,8 @@ describe.skipIf(!INTEGRATION_ENABLED)("assigning one", () => {
     expect(res.headers.location).toBe(`/reports/${report.id}`);
 
     const after = await reportRow(report.id);
-    expect(after.assessor2_user_id).toBe(other.id);
-    expect(after.assessor2_assigned_at).not.toBeNull();
+    // The assignment is an `assessments` row now, not a column on the report.
+    expect(await secondaryAssessorOf(report.id)).toBe(other.id);
     expect(after.status).toBe("second_assessment");
     // The first assessor is not disturbed by the second being named.
     expect(after.assessor1_user_id).toBe(officer.id);
@@ -574,7 +588,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("assigning one", () => {
 
     const rows = await owner.db.execute(sql`
       SELECT actor_user_id, entity_type, entity_id, after
-        FROM audit_log WHERE action = 'assessor2.assigned'
+        FROM audit_log WHERE action = 'decision.assign_next_assessor'
     `);
 
     expect(rows.length).toBe(1);
@@ -582,15 +596,17 @@ describe.skipIf(!INTEGRATION_ENABLED)("assigning one", () => {
       actor_user_id: string;
       entity_type: string;
       entity_id: string;
-      after: { number: string; assessor1UserId: string; assessor2UserId: string };
+      after: { number: string; assessorUserId: string; ordinal: number };
     };
 
     expect(entry.actor_user_id).toBe(manager.id);
     expect(entry.entity_type).toBe("report");
     expect(entry.entity_id).toBe(report.id);
     expect(entry.after.number).toBe(report.number);
-    expect(entry.after.assessor1UserId).toBe(officer.id);
-    expect(entry.after.assessor2UserId).toBe(other.id);
+    // The trail names who was assigned and at which ordinal, rather than a fixed pair of slots.
+    expect(entry.after.assessorUserId).toBe(other.id);
+    expect(entry.after.ordinal).toBe(2);
+    expect(officer.id).not.toBe(other.id);
   });
 
   it("moves the report to the next bucket and takes the picker off the page", async () => {
@@ -609,7 +625,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("assigning one", () => {
 
     const secondBucket = (await get("/workload?status=second_assessment", manager.cookie)).body;
     expect(secondBucket).toContain(report.number);
-    expect(secondBucket).toContain(bucketStat("Second assessment", 1));
+    expect(secondBucket).toContain(bucketStat("Secondary assessment", 1));
 
     // The report is no longer waiting, so there is nothing left to pick.
     const detail = (await get(`/reports/${report.id}`, manager.cookie)).body;
@@ -625,7 +641,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("what it refuses", () => {
     const { manager, other } = await waiting();
 
     for (const id of ["not-a-uuid", NOBODY]) {
-      const res = await post(`/reports/${id}/assign-assessor-2`, manager.cookie, {
+      const res = await post(`/reports/${id}/assign-next-assessor`, manager.cookie, {
         assessor_id: other.id,
       });
       expect(res.statusCode, id).toBe(404);
@@ -639,12 +655,12 @@ describe.skipIf(!INTEGRATION_ENABLED)("what it refuses", () => {
       await owner.db.execute(sql`
         UPDATE reports SET status = ${status}::report_status WHERE id = ${report.id}
       `);
-      const before = assignment(await reportRow(report.id));
+      const before = await assignment(await reportRow(report.id));
 
       const res = await assign(report, manager.cookie, other.id);
 
       expect(res.statusCode, status).toBe(403);
-      expect(assignment(await reportRow(report.id)), status).toEqual(before);
+      expect(await assignment(await reportRow(report.id)), status).toEqual(before);
     }
   });
 
@@ -661,12 +677,12 @@ describe.skipIf(!INTEGRATION_ENABLED)("what it refuses", () => {
       assessor1: officer.id,
     });
     const report = await reportRow(id);
-    const before = assignment(report);
+    const before = await assignment(report);
 
     const res = await assign(report, manager.cookie, other.id);
 
     expect(res.statusCode).toBe(403);
-    expect(assignment(await reportRow(id))).toEqual(before);
+    expect(await assignment(await reportRow(id))).toEqual(before);
   });
 
   it("refuses a second assignment and does not overwrite the first", async () => {
@@ -675,42 +691,42 @@ describe.skipIf(!INTEGRATION_ENABLED)("what it refuses", () => {
 
     await assign(report, manager.cookie, other.id);
     const assigned = await reportRow(report.id);
-    expect(assigned.assessor2_user_id).toBe(other.id);
+    expect(await secondaryAssessorOf(report.id)).toBe(other.id);
 
     const res = await assign(report, manager.cookie, third.id);
 
     expect(res.statusCode).toBe(403);
-    expect(assignment(await reportRow(report.id))).toEqual(assignment(assigned));
+    expect(await assignment(await reportRow(report.id))).toEqual(await assignment(assigned));
   });
 
   it("refuses a body with no assessor, and one that is not a uuid", async () => {
     const { manager, report } = await waiting();
-    const before = assignment(report);
+    const before = await assignment(report);
 
     for (const [name, form] of [
       ["missing", {}],
       ["not a uuid", { assessor_id: "whoever" }],
     ] as const) {
-      const res = await post(`/reports/${report.id}/assign-assessor-2`, manager.cookie, form);
+      const res = await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, form);
 
       expect(res.statusCode, name).toBe(403);
-      expect(assignment(await reportRow(report.id)), name).toEqual(before);
+      expect(await assignment(await reportRow(report.id)), name).toEqual(before);
     }
   });
 
   it("refuses an id that names nobody", async () => {
     const { manager, report } = await waiting();
-    const before = assignment(report);
+    const before = await assignment(report);
 
     const res = await assign(report, manager.cookie, NOBODY);
 
     expect(res.statusCode).toBe(403);
-    expect(assignment(await reportRow(report.id))).toEqual(before);
+    expect(await assignment(await reportRow(report.id))).toEqual(before);
   });
 
   it("refuses a manager and an administrator as the choice", async () => {
     const { manager, report } = await waiting();
-    const before = assignment(report);
+    const before = await assignment(report);
 
     const otherManager = await signedInAs("manager", "Second Mgr");
     const admin = await signedInAs("administrator", "Adm");
@@ -722,39 +738,39 @@ describe.skipIf(!INTEGRATION_ENABLED)("what it refuses", () => {
       const res = await assign(report, manager.cookie, staff.id);
 
       expect(res.statusCode, who).toBe(403);
-      expect(assignment(await reportRow(report.id)), who).toEqual(before);
+      expect(await assignment(await reportRow(report.id)), who).toEqual(before);
     }
   });
 
   it("refuses a deactivated Officer", async () => {
     const { manager, report } = await waiting();
-    const before = assignment(report);
+    const before = await assignment(report);
     const dormant = await inactiveAssessor();
 
     const res = await assign(report, manager.cookie, dormant);
 
     expect(res.statusCode).toBe(403);
-    expect(assignment(await reportRow(report.id))).toEqual(before);
+    expect(await assignment(await reportRow(report.id))).toEqual(before);
   });
 
   it("refuses the first assessor, who may not also be the second", async () => {
     const { manager, officer, report } = await waiting();
-    const before = assignment(report);
+    const before = await assignment(report);
 
     const res = await assign(report, manager.cookie, officer.id);
 
     expect(res.statusCode).toBe(403);
-    expect(assignment(await reportRow(report.id))).toEqual(before);
+    expect(await assignment(await reportRow(report.id))).toEqual(before);
   });
 
   it("refuses the manager naming themselves", async () => {
     const { manager, report } = await waiting();
-    const before = assignment(report);
+    const before = await assignment(report);
 
     const res = await assign(report, manager.cookie, manager.id);
 
     expect(res.statusCode).toBe(403);
-    expect(assignment(await reportRow(report.id))).toEqual(before);
+    expect(await assignment(await reportRow(report.id))).toEqual(before);
   });
 });
 
@@ -764,7 +780,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("who may reach it at all", () => {
   it("refuses an Officer and an administrator on a report that would otherwise qualify", async () => {
     const { officer, other, report } = await waiting();
     const admin = await signedInAs("administrator", "Adm");
-    const before = assignment(report);
+    const before = await assignment(report);
 
     for (const [who, staff] of [
       ["an Officer", officer],
@@ -774,7 +790,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("who may reach it at all", () => {
 
       // Refused by the scope the route is registered in, not by anything it checks for itself.
       expect(res.statusCode, who).toBe(403);
-      expect(assignment(await reportRow(report.id)), who).toEqual(before);
+      expect(await assignment(await reportRow(report.id)), who).toEqual(before);
     }
   });
 
@@ -816,7 +832,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("what the page offers", () => {
     expect([...posts].sort()).toEqual(
       [
         `action="/reports/${report.id}/assessment-1/comment"`,
-        `action="/reports/${report.id}/assign-assessor-2"`,
+        `action="/reports/${report.id}/assign-next-assessor"`,
         ...sections,
       ].sort(),
     );
