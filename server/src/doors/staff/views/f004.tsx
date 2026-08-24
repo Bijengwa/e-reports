@@ -101,6 +101,15 @@ export type F004FormProps = {
     action: string;
     review: SecondaryReviewPayload;
     submitted: boolean;
+    /**
+     * Which assessment in the chain this one is — 2, 3, 4, …
+     *
+     * Carried rather than assumed, because the badge drawn beside every replacement control names
+     * it. Hardcoding "A2" was true only while a report could have exactly one secondary assessor;
+     * on an A3's page it labelled all thirty-nine of that officer's own controls as somebody
+     * else's. Defaults to 2 where a caller has no ordinal to hand.
+     */
+    ordinal?: number;
     /** The reviewer's name and the day they signed, once submitted — for the header strip. */
     assessorName?: string;
     assessedOn?: string;
@@ -443,6 +452,7 @@ function A2InlineOption({
   checked,
   locked,
   multi,
+  ordinal,
 }: {
   itemKey: string;
   optionValue: string;
@@ -450,10 +460,12 @@ function A2InlineOption({
   checked: boolean;
   locked: boolean;
   multi?: boolean;
+  /** 2, 3, 4, … — whose control this is. Printed, so it must be this reader's own ordinal. */
+  ordinal: number;
 }): JSX.Element {
   return (
     <label class="a2-opt">
-      <span class="a2-opt-k">A2</span>
+      <span class="a2-opt-k" safe>{`A${String(ordinal)}`}</span>
       <input
         type={multi ? "checkbox" : "radio"}
         name={`a2_value_${itemKey}`}
@@ -466,8 +478,16 @@ function A2InlineOption({
   );
 }
 
-/** The second assessor's context for a choice field: which item, whose review, and whether it is locked. */
-type A2Choice = { key: string; review?: SecondaryReviewPayload; locked: boolean };
+/**
+ * A secondary assessor's context for a choice field: which item, whose review, whether it is
+ * locked, and which assessment in the chain it is — the last so the badge can name itself.
+ */
+type A2Choice = {
+  key: string;
+  review?: SecondaryReviewPayload;
+  locked: boolean;
+  ordinal: number;
+};
 
 function Radios({
   name,
@@ -509,6 +529,7 @@ function Radios({
               label={option.label}
               checked={a2Values.includes(option.value)}
               locked={a2.locked}
+              ordinal={a2.ordinal}
             />
           )}
         </div>
@@ -918,7 +939,7 @@ function AssessedDeviceField({
   row: DeviceRow;
   answers: F004Answers;
   locked: boolean;
-  a2Review?: { review: SecondaryReviewPayload; submitted: boolean };
+  a2Review?: { review: SecondaryReviewPayload; submitted: boolean; ordinal?: number };
   priorReviews?: readonly PriorSecondaryReview[];
 }): JSX.Element {
   const a2Locked = a2Review?.submitted ?? true;
@@ -926,6 +947,7 @@ function AssessedDeviceField({
     key: row.no,
     review: a2Review.review,
     locked: a2Locked,
+    ordinal: a2Review.ordinal ?? 2,
   };
 
   return (
@@ -1000,6 +1022,9 @@ export function F004Form({
   const causalityA2Values = a2ChosenValues(a2Review?.review, "4.2");
   const riskA2Values = a2ChosenValues(a2Review?.review, "6");
   const actionsA2Values = a2ChosenValues(a2Review?.review, "7.1_actions");
+  // Whose controls the inline replacement badges belong to. 2 when the caller did not say, which
+  // is the ordinal every secondary assessment had back when there could only be one of them.
+  const a2Ordinal = a2Review?.ordinal ?? 2;
   // Submitted is one way to be closed and not being its author is the other, and the document is
   // rendered the same for both.
   const locked = submitted || readOnly === true;
@@ -1145,6 +1170,7 @@ export function F004Form({
                   answers={answers}
                   locked={locked}
                   a2Review={a2Review}
+                  priorReviews={priorReviews}
                 />
               ) : (
                 <FactRow no={row.no} label={row.label} filled={device[row.key] ?? ""} />
@@ -1192,7 +1218,14 @@ export function F004Form({
                 options={SOURCE_OPTIONS}
                 answers={answers}
                 locked={locked}
-                a2={a2Review && { key: "2.5", review: a2Review.review, locked: a2Review.submitted }}
+                a2={
+                  a2Review && {
+                    key: "2.5",
+                    review: a2Review.review,
+                    locked: a2Review.submitted,
+                    ordinal: a2Ordinal,
+                  }
+                }
               />
               <Comment name="c2_5" answers={answers} locked={locked} />
               <A2InlineDecision
@@ -1221,7 +1254,14 @@ export function F004Form({
                 options={SERIOUSNESS_OPTIONS}
                 answers={answers}
                 locked={locked}
-                a2={a2Review && { key: "2.6", review: a2Review.review, locked: a2Review.submitted }}
+                a2={
+                  a2Review && {
+                    key: "2.6",
+                    review: a2Review.review,
+                    locked: a2Review.submitted,
+                    ordinal: a2Ordinal,
+                  }
+                }
               />
               <Comment name="c2_6" answers={answers} locked={locked} />
               <A2InlineDecision
@@ -1242,7 +1282,14 @@ export function F004Form({
                 options={YES_NO}
                 answers={answers}
                 locked={locked}
-                a2={a2Review && { key: "2.7", review: a2Review.review, locked: a2Review.submitted }}
+                a2={
+                  a2Review && {
+                    key: "2.7",
+                    review: a2Review.review,
+                    locked: a2Review.submitted,
+                    ordinal: a2Ordinal,
+                  }
+                }
               />
               <Comment name="c2_7" answers={answers} locked={locked} />
               <A2InlineDecision
@@ -1343,7 +1390,14 @@ export function F004Form({
                 options={EXPECTEDNESS_OPTIONS}
                 answers={answers}
                 locked={locked}
-                a2={a2Review && { key: "4.1", review: a2Review.review, locked: a2Review.submitted }}
+                a2={
+                  a2Review && {
+                    key: "4.1",
+                    review: a2Review.review,
+                    locked: a2Review.submitted,
+                    ordinal: a2Ordinal,
+                  }
+                }
               />
               <Comment name="c4_1" answers={answers} locked={locked} />
               <A2InlineDecision
@@ -1387,6 +1441,7 @@ export function F004Form({
                         label={option.label}
                         checked={causalityA2Values.includes(option.value)}
                         locked={a2Review.submitted}
+                        ordinal={a2Ordinal}
                       />
                     )}
                   </div>
@@ -1448,7 +1503,14 @@ export function F004Form({
                 options={SIGNAL_OPTIONS}
                 answers={answers}
                 locked={locked}
-                a2={a2Review && { key: "5", review: a2Review.review, locked: a2Review.submitted }}
+                a2={
+                  a2Review && {
+                    key: "5",
+                    review: a2Review.review,
+                    locked: a2Review.submitted,
+                    ordinal: a2Ordinal,
+                  }
+                }
               />
               <Comment name="c5" answers={answers} rows={6} locked={locked} />
               <A2InlineDecision
@@ -1503,6 +1565,7 @@ export function F004Form({
                         label={option.label}
                         checked={riskA2Values.includes(option.value)}
                         locked={a2Review.submitted}
+                        ordinal={a2Ordinal}
                       />
                     )}
                   </div>
@@ -1565,6 +1628,7 @@ export function F004Form({
                         checked={actionsA2Values.includes(action.value)}
                         locked={a2Review.submitted}
                         multi
+                        ordinal={a2Ordinal}
                       />
                     )}
                   </div>
@@ -1601,9 +1665,9 @@ export function F004Form({
             {!omitSecond && (
               <div class="f4-block f4-locked">
                 <div class="f4-blocktitle">
-                  <span class="f4-no">7.2</span> Second assessor concluding remarks
+                  <span class="f4-no">7.2</span> Secondary assessor concluding remarks
                 </div>
-                <p class="f4-pending">Pending second assessor review</p>
+                <p class="f4-pending">Pending secondary assessment</p>
                 <div class="f4-ticks f4-11">
                   {ACTIONS.map((action) => (
                     <label class="f4-tick f4-tick-locked">
@@ -1621,7 +1685,7 @@ export function F004Form({
                   <textarea
                     rows="3"
                     disabled
-                    placeholder="(To be completed by the second assessor upon review)"
+                    placeholder="(To be completed by the secondary assessor upon review)"
                   />
                 </div>
               </div>

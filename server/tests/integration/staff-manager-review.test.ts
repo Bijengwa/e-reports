@@ -144,20 +144,33 @@ function completeAssessment(signature: string) {
     device_class: "B",
     report_stage: "initial",
     source_of_event: "malfunction",
+    c2_5: "Reported by the facility as a device malfunction.",
     seriousness: "serious",
+    c2_6: "Required medical intervention and a 24-hour admission.",
     public_health: "no",
+    c2_7: "One device at one facility; no wider exposure identified.",
     imdrf_component_l1: "Battery",
+    imdrf_component_code: "E1204",
     imdrf_device_problem_l1: "Battery depletion",
+    imdrf_device_problem_code: "A0501",
     imdrf_health_impact_l1: "No clinical signs",
+    imdrf_health_impact_code: "E2301",
     imdrf_clinical_signs_l1: "None observed",
+    imdrf_clinical_signs_code: "E0101",
     imdrf_investigation_type_l1: "Manufacturer investigation",
+    imdrf_investigation_type_code: "A05",
     imdrf_investigation_findings_l1: "Cell fault confirmed",
+    imdrf_investigation_findings_code: "A0702",
     imdrf_investigation_conclusion_l1: "Device to be replaced",
+    imdrf_investigation_conclusion_code: "A0803",
     expectedness: "unexpected",
+    c4_1: "Not described in the manufacturer's IFU or risk file.",
     causality: "probable",
     c4_3: "Temporal relationship with device use; no other cause identified.",
     signal_status: "signal",
+    c5: "Second report against this lot within a month.",
     risk_level: "high",
+    c6: "Serious outcome with an unresolved cause.",
     actions: "monitoring",
     conclusion: "Recommend risk communication and enhanced monitoring.",
     signature,
@@ -673,7 +686,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
    * The manager receiving the finished second assessment.
    *
    * Before this existed the report page rendered the first assessor's F004 with 7.2 showing
-   * "Pending second assessor review" — true until the moment it stops being true, and the page
+   * "Pending secondary assessment" — true until the moment it stops being true, and the page
    * had no way to notice. So the finished 7.2 is rendered from what the second assessor wrote,
    * and the placeholder is dropped rather than left contradicting it.
    */
@@ -681,7 +694,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
     const { manager, other, report } = await secondAssessmentAssigned();
 
     const before = await get(`/reports/${report.id}`, manager.cookie);
-    expect(before.body).toContain("Pending second assessor review");
+    expect(before.body).toContain("Pending secondary assessment");
 
     await post(`/reports/${report.id}/secondary-assessment`, other.cookie, completeSecond());
 
@@ -689,7 +702,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
     expect(after.body).toContain("Clarify the monitoring action before the final decision.");
     expect(after.body).toContain("Need Clarification");
     expect(after.body).toContain(other.name);
-    expect(after.body).not.toContain("Pending second assessor review");
+    expect(after.body).not.toContain("Pending secondary assessment");
     // A2's decisions render inline inside the same F004 document A1's answers do, rather than as
     // a separate "Second assessment" section beneath it, so the manager's own review of assessment
     // 1 — printed once the whole document closes — now comes after them, not above.
@@ -708,7 +721,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
     const page = await get(`/reports/${report.id}`, manager.cookie);
 
     expect(page.body).not.toContain("A draft nobody else should be reading.");
-    expect(page.body).toContain("Pending second assessor review");
+    expect(page.body).toContain("Pending secondary assessment");
   });
 
   it("refuses a second submission of an assessment already sent", async () => {

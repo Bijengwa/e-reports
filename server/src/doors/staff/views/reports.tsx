@@ -694,6 +694,7 @@ export function ReportPage({
                 action: secondaryAssessmentHref(report.id),
                 review: latest.answers,
                 submitted: true,
+                ordinal: latest.ordinal,
                 assessorName: latest.assessorName,
                 assessedOn: latest.submittedOn ?? "",
               }

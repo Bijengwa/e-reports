@@ -141,20 +141,33 @@ function completeAssessment(signature: string) {
     device_class: "",
     report_stage: "initial",
     source_of_event: "malfunction",
+    c2_5: "Reported by the facility as a device malfunction.",
     seriousness: "serious",
+    c2_6: "Required medical intervention and a 24-hour admission.",
     public_health: "no",
+    c2_7: "One device at one facility; no wider exposure identified.",
     imdrf_component_l1: "Battery",
+    imdrf_component_code: "E1204",
     imdrf_device_problem_l1: "Battery depletion",
+    imdrf_device_problem_code: "A0501",
     imdrf_health_impact_l1: "No clinical signs",
+    imdrf_health_impact_code: "E2301",
     imdrf_clinical_signs_l1: "None observed",
+    imdrf_clinical_signs_code: "E0101",
     imdrf_investigation_type_l1: "Manufacturer investigation",
+    imdrf_investigation_type_code: "A05",
     imdrf_investigation_findings_l1: "Cell fault confirmed",
+    imdrf_investigation_findings_code: "A0702",
     imdrf_investigation_conclusion_l1: "Device to be replaced",
+    imdrf_investigation_conclusion_code: "A0803",
     expectedness: "unexpected",
+    c4_1: "Not described in the manufacturer's IFU or risk file.",
     causality: "probable",
     c4_3: "Temporal relationship with device use; no other cause identified.",
     signal_status: "signal",
+    c5: "Second report against this lot within a month.",
     risk_level: "high",
+    c6: "Serious outcome with an unresolved cause.",
     actions: "monitoring",
     conclusion: "Recommend risk communication and enhanced monitoring.",
     signature,
@@ -397,6 +410,86 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
     expect(afterA3.find((r) => r.ordinal === 3)?.payload.responses?.["2.5"]).toMatchObject({
       degree: "agree",
     });
+  });
+
+  /**
+   * The collapsed history has to reach every item the page asks a judgement on, not most of them.
+   *
+   * 1.3 and 1.19 are drawn by a different component from 2.5 onward — the two section-1 rows that
+   * are findings rather than facts — and that component was not being handed `priorReviews`. The
+   * page looked right, because eleven of the thirteen items carried their history; the two that
+   * did not simply showed A3 nothing about what A2 had decided. Counted rather than spot-checked
+   * for exactly that reason.
+   */
+  it("carries the earlier review beside every item it asks the next assessor to judge", async () => {
+    const { manager, rest, report } = await afterFirstAssessment();
+    const [second, third] = rest;
+    if (second === undefined || third === undefined) throw new Error("need two Officers");
+
+    await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
+      assessor_id: second.id,
+      comment: "First secondary review, please.",
+    });
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
+
+    await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
+      assessor_id: third.id,
+      comment: "Second opinion, please.",
+    });
+
+    const page = await get(`/reports/${report.id}/secondary-assessment`, third.cookie);
+    expect(page.statusCode).toBe(200);
+
+    const judged = new Set(
+      [...page.body.matchAll(/name="(a2_degree_[^"]+)"/g)].map((match) => match[1]),
+    );
+    const histories = page.body.match(/<details class="a2-history">/g) ?? [];
+
+    expect(judged.size).toBeGreaterThan(10);
+    expect(histories).toHaveLength(judged.size);
+
+    // The two that were missing it, named so a regression says which rows went quiet. The
+    // nearest history above each control must be that item's own — nothing else may sit between.
+    for (const item of ["1.3", "1.19"]) {
+      const at = page.body.indexOf(`name="a2_degree_${item}"`);
+      expect(at).toBeGreaterThan(-1);
+
+      const above = page.body.slice(0, at);
+      const nearest = above.lastIndexOf('<details class="a2-history">');
+      expect(nearest).toBeGreaterThan(-1);
+      expect(above.slice(nearest)).not.toContain('name="a2_degree_');
+    }
+  });
+
+  /**
+   * Whose controls these are, said in the badge beside every replacement option.
+   *
+   * It was the literal string "A2" until a report could have more than one secondary assessor;
+   * on A3's page that labelled all of this Officer's own controls as the previous one's.
+   */
+  it("badges the working assessor's own replacement options with their own ordinal", async () => {
+    const { manager, rest, report } = await afterFirstAssessment();
+    const [second, third] = rest;
+    if (second === undefined || third === undefined) throw new Error("need two Officers");
+
+    await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
+      assessor_id: second.id,
+      comment: "First secondary review, please.",
+    });
+
+    const a2Page = await get(`/reports/${report.id}/secondary-assessment`, second.cookie);
+    expect(a2Page.body).toContain('<span class="a2-opt-k">A2</span>');
+    expect(a2Page.body).not.toContain('<span class="a2-opt-k">A3</span>');
+
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
+    await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
+      assessor_id: third.id,
+      comment: "Second opinion, please.",
+    });
+
+    const a3Page = await get(`/reports/${report.id}/secondary-assessment`, third.cookie);
+    expect(a3Page.body).toContain('<span class="a2-opt-k">A3</span>');
+    expect(a3Page.body).not.toContain('<span class="a2-opt-k">A2</span>');
   });
 
   it("lets each secondary assessor supply their own answer where A1 left one blank", async () => {

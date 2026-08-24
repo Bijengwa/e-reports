@@ -133,23 +133,36 @@ function completeAssessment(signature: string, over: Record<string, string> = {}
     device_class: "B",
     report_stage: "initial",
     source_of_event: "malfunction",
+    c2_5: "Reported by the facility as a device malfunction.",
     seriousness: "serious",
+    c2_6: "Required medical intervention and a 24-hour admission.",
     public_health: "no",
+    c2_7: "One device at one facility; no wider exposure identified.",
     imdrf_component_l1: "Battery",
+    imdrf_component_code: "E1204",
     imdrf_device_problem_l1: "Battery depletion",
+    imdrf_device_problem_code: "A0501",
     imdrf_health_impact_l1: "No clinical signs",
+    imdrf_health_impact_code: "E2301",
     imdrf_clinical_signs_l1: "None observed",
+    imdrf_clinical_signs_code: "E0101",
     imdrf_investigation_type_l1: "Manufacturer investigation",
+    imdrf_investigation_type_code: "A05",
     imdrf_investigation_findings_l1: "Cell fault confirmed",
+    imdrf_investigation_findings_code: "A0702",
     imdrf_investigation_conclusion_l1: "Device to be replaced",
+    imdrf_investigation_conclusion_code: "A0803",
     expectedness: "unexpected",
+    c4_1: "Not described in the manufacturer's IFU or risk file.",
     causality: "probable",
     c4_3: "Temporal relationship with device use; no other cause identified.",
     // Section 5 is now required too — locked in the same commit that restyled it away from pill
     // chrome. A fixture built before that commit would otherwise silently describe an incomplete
     // submission and every "complete" case here would 422.
     signal_status: "signal",
+    c5: "Second report against this lot within a month.",
     risk_level: "high",
+    c6: "Serious outcome with an unresolved cause.",
     actions: "monitoring",
     conclusion: "Recommend risk communication and enhanced monitoring.",
     signature,
@@ -224,7 +237,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("opening the F004", () => {
     expect(res.body).toContain("Submitted answers");
     expect(res.body).toContain("Muhimbili National Hospital");
     // 7.2 is named as the second assessor's and carries nothing to type into.
-    expect(res.body).toContain("Second assessor concluding remarks");
+    expect(res.body).toContain("Secondary assessor concluding remarks");
     expect(res.body).not.toContain('name="conclusion_2"');
     expect(res.body).not.toContain('name="c7_2"');
   });
@@ -250,7 +263,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("opening the F004", () => {
 
     // Broader than checking a couple of guessed field names: nothing in this block may ever be
     // able to post a value, whatever a future edit to 7.2's markup ends up calling its fields.
-    const start = body.indexOf("Second assessor concluding remarks");
+    const start = body.indexOf("Secondary assessor concluding remarks");
     const end = body.indexOf("</section>", start);
     expect(start).toBeGreaterThan(-1);
 
@@ -369,9 +382,12 @@ describe.skipIf(!INTEGRATION_ENABLED)("saving a draft", () => {
     const res = await post(`/reports/${report.id}/assessment-1`, officer.cookie, {
       intent: "save",
       seriousness: "serious",
+      c2_6: "Required medical intervention and a 24-hour admission.",
       expectedness: "unexpected",
+      c4_1: "Not described in the manufacturer's IFU or risk file.",
       causality: "probable",
       risk_level: "high",
+      c6: "Serious outcome with an unresolved cause.",
       conclusion: "Still thinking about this one.",
     });
 
@@ -419,7 +435,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("submitting", () => {
     );
 
     expect(res.statusCode).toBe(422);
-    expect(res.body).toContain("potential safety signal");
+    expect(res.body).toContain("5 Signal detection is required");
 
     // Nothing was written at all here — this is the first thing this officer has done to the
     // report, so there is no earlier draft to be "still" anything. A row existing at all, or the

@@ -128,6 +128,7 @@ export function SecondaryAssessmentPage({
               action: `/reports/${report.id}/secondary-assessment`,
               review,
               submitted,
+              ordinal,
             }}
             priorReviews={priorReviews}
           />

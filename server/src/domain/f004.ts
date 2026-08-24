@@ -71,6 +71,22 @@ export type A2ReviewItem = {
    * own preferred-terminology levels plus its coding box.
    */
   a1Fields: readonly string[];
+  /**
+   * The comment box the paper prints beside this item's answer, where it has one.
+   *
+   * Deliberately not folded into `a1Fields`: `isA1Blank` asks "did A1 take a position here?", and
+   * a stray comment against an unanswered row is not a position. Keeping the two apart is what
+   * lets `validateForSubmit` insist on both while `isA1Blank` still reads only the answer.
+   */
+  commentField?: string;
+  /**
+   * "(If applicable)" on the paper: A1 may leave this item entirely alone.
+   *
+   * Optional as a whole, never by halves — an item touched at all owes the same completeness a
+   * required one does. `validateForSubmit` is the single place that decides what "touched" means
+   * for each `valueKind`.
+   */
+  optional?: boolean;
 };
 
 /** A replacement answer, shaped like the A1 control it stands in for. */
@@ -373,6 +389,13 @@ export type ImdrfItem = {
   annex: string;
   /** How many preferred-terminology levels this annex carries. */
   levels: 1 | 2 | 3;
+  /**
+   * "(If applicable)" on the paper. Six of the seven rows carry it; 3.3.1 does not.
+   *
+   * Stated here rather than sniffed out of `title`, so the rule survives the wording being
+   * edited, and so `validateForSubmit` and `SECONDARY_REVIEW_ITEMS` read one fact rather than two.
+   */
+  optional?: boolean;
 };
 
 /**
@@ -394,6 +417,7 @@ export const IMDRF_GROUPS: readonly ImdrfGroup[] = [
         title: "Component of the medical device involved in the incident (If applicable)",
         annex: "IMDRF N43 Annex G — Medical Device Component",
         levels: 3,
+        optional: true,
       },
       {
         letter: "2",
@@ -401,6 +425,7 @@ export const IMDRF_GROUPS: readonly ImdrfGroup[] = [
         title: "Medical device problem (If applicable)",
         annex: "IMDRF N43 Annex A — adverse incident terminologies and coding",
         levels: 3,
+        optional: true,
       },
     ],
   },
@@ -414,6 +439,7 @@ export const IMDRF_GROUPS: readonly ImdrfGroup[] = [
         title: "Health effects — health impact (If applicable)",
         annex: "IMDRF N43 Annex F — adverse event terminologies and coding",
         levels: 3,
+        optional: true,
       },
       {
         letter: "2",
@@ -422,6 +448,7 @@ export const IMDRF_GROUPS: readonly ImdrfGroup[] = [
           "Health effects — clinical signs and symptoms or conditions of the affected person (If applicable)",
         annex: "IMDRF N43 Annex E — terminologies and coding of conditions",
         levels: 3,
+        optional: true,
       },
     ],
   },
@@ -442,6 +469,7 @@ export const IMDRF_GROUPS: readonly ImdrfGroup[] = [
         title: "Cause investigation — investigation findings (If applicable)",
         annex: "IMDRF N43 Annex C",
         levels: 3,
+        optional: true,
       },
       {
         letter: "3",
@@ -449,6 +477,7 @@ export const IMDRF_GROUPS: readonly ImdrfGroup[] = [
         title: "Cause investigation — investigation conclusion (If applicable)",
         annex: "IMDRF N43 Annex D",
         levels: 2,
+        optional: true,
       },
     ],
   },
@@ -635,6 +664,7 @@ const IMDRF_A2_ITEMS: readonly A2ReviewItem[] = IMDRF_GROUPS.flatMap((group) =>
         .map((level) => `imdrf_${item.key}_l${level}`),
       `imdrf_${item.key}_code`,
     ],
+    optional: item.optional === true,
   })),
 );
 
@@ -666,6 +696,7 @@ export const SECONDARY_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     valueLabel: "registration number",
     valueKind: "text",
     a1Fields: ["registration_number"],
+    optional: true,
   },
   {
     key: "1.11",
@@ -674,6 +705,7 @@ export const SECONDARY_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     valueLabel: "device class",
     valueKind: "text",
     a1Fields: ["device_class"],
+    optional: true,
   },
   {
     key: "1.19",
@@ -690,6 +722,7 @@ export const SECONDARY_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     valueLabel: "source of event / incident",
     valueKind: "single",
     a1Fields: ["source_of_event"],
+    commentField: "c2_5",
   },
   {
     key: "2.6",
@@ -698,6 +731,7 @@ export const SECONDARY_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     valueLabel: "categorization",
     valueKind: "single",
     a1Fields: ["seriousness"],
+    commentField: "c2_6",
   },
   {
     key: "2.7",
@@ -706,6 +740,7 @@ export const SECONDARY_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     valueLabel: "public health concern",
     valueKind: "single",
     a1Fields: ["public_health"],
+    commentField: "c2_7",
   },
   ...IMDRF_A2_ITEMS,
   {
@@ -715,6 +750,7 @@ export const SECONDARY_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     valueLabel: "expectedness",
     valueKind: "single",
     a1Fields: ["expectedness"],
+    commentField: "c4_1",
   },
   {
     key: "4.2",
@@ -739,6 +775,7 @@ export const SECONDARY_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     valueLabel: "signal assessment",
     valueKind: "single",
     a1Fields: ["signal_status"],
+    commentField: "c5",
   },
   {
     key: "6",
@@ -747,6 +784,7 @@ export const SECONDARY_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     valueLabel: "risk level",
     valueKind: "single",
     a1Fields: ["risk_level"],
+    commentField: "c6",
   },
   {
     key: "7.1_actions",
@@ -774,13 +812,65 @@ function a2ReviewItem(key: string): A2ReviewItem | undefined {
 
 export type Issue = { field: string; message: string };
 
+/** "2.6 Categorization of event / incident" — the number and the title, as the paper prints them. */
+function itemLabel(item: A2ReviewItem): string {
+  return `${item.no} ${item.title.replace(/\s*\(If applicable\)\s*$/, "")}`;
+}
+
+/** Where to send a reader who left the answer out: the control, not the comment beside it. */
+function answerField(item: A2ReviewItem): string {
+  return item.a1Fields[0] ?? item.key;
+}
+
+/**
+ * Whether A1 gave this item an answer — the position itself, never the comment beside it.
+ *
+ * One question asked four ways, because the four `valueKind`s are four different controls. An
+ * IMDRF grid counts as answered the moment any of its boxes carries something; whether that is a
+ * *complete* answer is `imdrfMissing`'s question, asked separately so the two failures read as the
+ * two different mistakes they are.
+ */
+function isAnswered(item: A2ReviewItem, answers: F004Answers): boolean {
+  if (item.valueKind === "multi") return list(answers, answerField(item)).length > 0;
+  if (item.valueKind === "fields")
+    return item.a1Fields.some((f) => value(answers, f).trim() !== "");
+  return value(answers, answerField(item)).trim() !== "";
+}
+
+/** Anything at all filled in against this item, its comment box included. */
+function isTouched(item: A2ReviewItem, answers: F004Answers): boolean {
+  if (isAnswered(item, answers)) return true;
+  return item.commentField !== undefined && value(answers, item.commentField).trim() !== "";
+}
+
+/** The first half of an IMDRF row left empty — level 1 or the coding — or undefined if both are in. */
+function imdrfMissing(item: A2ReviewItem, answers: F004Answers): string | undefined {
+  const level1 = item.a1Fields.find((f) => f.endsWith("_l1"));
+  const code = item.a1Fields.find((f) => f.endsWith("_code"));
+
+  if (level1 !== undefined && value(answers, level1).trim() === "") return level1;
+  if (code !== undefined && value(answers, code).trim() === "") return code;
+  return undefined;
+}
+
 /**
  * What a submission must carry.
  *
  * A draft may be as empty as the assessor likes — half an assessment saved at the end of the day
  * is the point of a draft. A submission is the assessor's finding, and these are what the rest of
- * the process reads: without them the second assessor and the manager have nothing to agree or
+ * the process reads: without them the secondary assessor and the manager have nothing to agree or
  * differ with.
+ *
+ * Walked from `SECONDARY_REVIEW_ITEMS` rather than written out again here. That list already is
+ * the document's numbered items — it is what every secondary assessor is asked to take a position
+ * on — so a second hand-written list would be free to drift from it, and the row a later assessor
+ * is made to judge would be one nobody made A1 fill in. Each item carries its own answer field(s),
+ * the comment box beside it, and whether the paper marks it "(If applicable)".
+ *
+ * The rule, for every item: an answer is required, and where the paper prints a comment box beside
+ * that answer the comment is required with it — a ticked radio over an empty box is a verdict with
+ * no reasoning. An optional item may be left entirely alone, but once touched it owes the same
+ * completeness as a required one, so "(If applicable)" cannot be used to submit half an answer.
  *
  * The signature is required with them. The paper is signed, and a submitted assessment nobody put
  * their name to is not the same document. It is checked against the signed-in name rather than
@@ -788,49 +878,43 @@ export type Issue = { field: string; message: string };
  */
 export function validateForSubmit(answers: F004Answers, assessorName: string): Issue[] {
   const issues: Issue[] = [];
-  const required = (field: string, message: string) => {
-    if (value(answers, field).trim() === "") issues.push({ field, message });
-  };
 
-  // 1.10 and 1.11 are marked "(If applicable)" on the paper — optional, exactly like the
-  // "(If applicable)" IMDRF boxes below, and left unenforced for the same reason.
-  required("device_type", "1.3 Type of device (MD or IVD) is required.");
-  required("report_stage", "1.19 Initial/Follow up/Final report is required.");
-  required("source_of_event", "2.5 Source of the event/incident is required.");
-  required("seriousness", "2.6 Categorization of the event/incident is required.");
-  required("public_health", "2.7 Significant public health concern is required.");
+  for (const item of SECONDARY_REVIEW_ITEMS) {
+    const label = itemLabel(item);
+    const answered = isAnswered(item, answers);
 
-  // Of the seven IMDRF rows, only 3.3.1 (cause investigation, type) is not marked "(If
-  // applicable)" on the paper. The other six are optional, so only this one is enforced.
-  {
-    const item = IMDRF_GROUPS.flatMap((group) => group.items).find(
-      (candidate) => candidate.key === "investigation_type",
-    );
-    if (item !== undefined) {
-      const filled = value(answers, `imdrf_${item.key}_l1`).trim() !== "";
-      const codeFilled = value(answers, `imdrf_${item.key}_code`).trim() !== "";
-      if (!filled && !codeFilled) {
+    // "(If applicable)" and untouched: the paper allows exactly this, so there is nothing to
+    // check. Touched, and it owes the same completeness a required row does — an optional item is
+    // optional as a whole, not field by field.
+    if (item.optional === true && !answered && !isTouched(item, answers)) continue;
+
+    if (!answered) {
+      issues.push({ field: answerField(item), message: `${label} is required.` });
+      continue;
+    }
+
+    // An IMDRF row is answered once any box carries something, but the terminology and the coding
+    // are two halves of one answer: half of it names a term nobody can look up, or a code nobody
+    // can read. Both, or neither.
+    if (item.valueKind === "fields") {
+      const missing = imdrfMissing(item, answers);
+      if (missing !== undefined) {
         issues.push({
-          field: `imdrf_${item.key}_l1`,
-          message: "3.3.1 Cause investigation, type of investigation: required.",
+          field: missing,
+          message: `${label}: give both the preferred terminology and the coding.`,
         });
       }
     }
-  }
 
-  required("expectedness", "4.1 Expected or unexpected is required.");
-  required("causality", "4.2 Causal association category is required.");
-  required("c4_3", "4.3 Discussion of causal relationship is required.");
-  required("signal_status", "5 Whether this is a potential safety signal is required.");
-  required("risk_level", "6 Risk assessment is required.");
-
-  if (list(answers, "actions").length === 0) {
-    issues.push({
-      field: "actions",
-      message: "7.1 At least one proposed risk mitigation action is required.",
-    });
+    // The answer and the words beside it are one finding. A ticked radio with an empty comment is
+    // a verdict with no reasoning, which is what the next assessor and the manager actually read.
+    if (item.commentField !== undefined && value(answers, item.commentField).trim() === "") {
+      issues.push({
+        field: item.commentField,
+        message: `${label}: write the comment that goes with your answer.`,
+      });
+    }
   }
-  required("conclusion", "7.1 Conclusion and recommendations are required.");
 
   const signature = value(answers, "signature").trim();
   if (signature === "") {

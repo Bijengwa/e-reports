@@ -444,7 +444,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the first assessment doorway", () => {
     expect(posts).toEqual([`action="/reports/${row.id}/assessment-1"`]);
     // The second assessor's section is present as the closed part of the document it is, and
     // carries nothing to fill in on their behalf.
-    expect(body).toContain("Second assessor concluding remarks");
+    expect(body).toContain("Secondary assessor concluding remarks");
     expect(body).not.toContain('name="conclusion_2"');
     expect(body).toContain('id="signature-2"');
     expect(body).toContain("disabled");
