@@ -1663,8 +1663,8 @@ export function F004Form({
 
         {a2Review?.submitted === true ? (
           <p class="hint">
-            This second assessment has been submitted and is now read-only. The report is with the
-            manager for a decision.
+            This secondary assessment has been submitted and is now read-only. The report is with
+            the manager for a decision.
           </p>
         ) : writingA2 ? (
           <div class="bar f4-buttons">
@@ -1678,8 +1678,8 @@ export function F004Form({
           </div>
         ) : submitted ? (
           <p class="hint">
-            This assessment has been submitted and is now read-only. The report is with the second
-            assessor.
+            This assessment has been submitted and is now read-only. The report is with the manager,
+            who decides whether another assessor reviews it.
           </p>
         ) : (
           // Only ever reached on the live path, where `Sheet` is a real form for these to submit.
