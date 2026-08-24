@@ -110,44 +110,47 @@ export function secondaryAssessmentHref(reportId: string): string {
  */
 export function ReceivedRows({ reports }: { reports: ReceivedRow[] }): JSX.Element {
   return (
-    <table class="utable">
-      <thead>
-        <tr>
-          <th>Number</th>
-          <th>Received</th>
-          <th>Device</th>
-          <th>Severity</th>
-          <th>Assessment</th>
-        </tr>
-      </thead>
-      <tbody>
-        {reports.map((report) => (
+    // Wider than a narrow window, so it scrolls inside its own box rather than pushing the page sideways. See `.tscroll` in the stylesheet.
+    <div class="tscroll">
+      <table class="utable">
+        <thead>
           <tr>
-            <td>
-              <a href={`/reports/${report.id}`} safe>
-                {report.number}
-              </a>
-            </td>
-            <td>{day(report.receivedAt)}</td>
-            <td safe>{report.deviceName}</td>
-            <td>
-              <span class={`tag ${severityTone(report.severity) === "caution" ? "warn" : ""}`}>
-                {caption(SEVERITY_LABELS, report.severity)}
-              </span>
-            </td>
-            {/* An orphan is waiting for somebody to be given it; until then there is nothing to
-                open, and a link that answered 403 would be worse than no link. */}
-            <td>
-              {report.mine ? (
-                <a href={assessment1Href(report.id)}>Assessment 1</a>
-              ) : (
-                <span class="hint">Unassigned</span>
-              )}
-            </td>
+            <th>Number</th>
+            <th>Received</th>
+            <th>Device</th>
+            <th>Severity</th>
+            <th>Assessment</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {reports.map((report) => (
+            <tr>
+              <td>
+                <a href={`/reports/${report.id}`} safe>
+                  {report.number}
+                </a>
+              </td>
+              <td>{day(report.receivedAt)}</td>
+              <td safe>{report.deviceName}</td>
+              <td>
+                <span class={`tag ${severityTone(report.severity) === "caution" ? "warn" : ""}`}>
+                  {caption(SEVERITY_LABELS, report.severity)}
+                </span>
+              </td>
+              {/* An orphan is waiting for somebody to be given it; until then there is nothing to
+                  open, and a link that answered 403 would be worse than no link. */}
+              <td>
+                {report.mine ? (
+                  <a href={assessment1Href(report.id)}>Assessment 1</a>
+                ) : (
+                  <span class="hint">Unassigned</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -197,40 +200,45 @@ export function ReportsPage({
       {reports.length === 0 ? (
         <p class="hint">Nothing has been reported yet.</p>
       ) : (
-        <table class="utable">
-          <thead>
-            <tr>
-              <th>Number</th>
-              <th>Received</th>
-              <th>Device</th>
-              <th>Severity</th>
-              <th>Status</th>
-              <th>Channel</th>
-              <th>Facility</th>
-            </tr>
-          </thead>
-          <tbody>
-            {reports.map((report) => (
+        // Wider than a narrow window, so it scrolls inside its own box rather than pushing the page sideways. See `.tscroll` in the stylesheet.
+        <div class="tscroll">
+          <table class="utable">
+            <thead>
               <tr>
-                <td>
-                  <a href={`/reports/${report.id}`} safe>
-                    {report.number}
-                  </a>
-                </td>
-                <td>{day(report.receivedAt)}</td>
-                <td safe>{report.deviceName}</td>
-                <td>
-                  <span class={`tag ${severityTone(report.severity) === "caution" ? "warn" : ""}`}>
-                    {caption(SEVERITY_LABELS, report.severity)}
-                  </span>
-                </td>
-                <td safe>{caption(STATUS_LABELS, report.status)}</td>
-                <td safe>{caption(CHANNEL_LABELS, report.channel)}</td>
-                <td safe>{report.facility ?? "—"}</td>
+                <th>Number</th>
+                <th>Received</th>
+                <th>Device</th>
+                <th>Severity</th>
+                <th>Status</th>
+                <th>Channel</th>
+                <th>Facility</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {reports.map((report) => (
+                <tr>
+                  <td>
+                    <a href={`/reports/${report.id}`} safe>
+                      {report.number}
+                    </a>
+                  </td>
+                  <td>{day(report.receivedAt)}</td>
+                  <td safe>{report.deviceName}</td>
+                  <td>
+                    <span
+                      class={`tag ${severityTone(report.severity) === "caution" ? "warn" : ""}`}
+                    >
+                      {caption(SEVERITY_LABELS, report.severity)}
+                    </span>
+                  </td>
+                  <td safe>{caption(STATUS_LABELS, report.status)}</td>
+                  <td safe>{caption(CHANNEL_LABELS, report.channel)}</td>
+                  <td safe>{report.facility ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </StaffShell>
   );
@@ -749,6 +757,15 @@ export function ReportPage({
       {(nextAssessorPicker || workOfficerPicker) && (
         <>
           <h2 class="report-heading">Manager decision</h2>
+          {/* What this section is for, said once at the top rather than left implied by two
+              cards. A manager arriving from the Decision queue has just read the report and the
+              assessments above; this is the line that tells them the next move is theirs, and
+              names it. */}
+          <p class="hint">
+            {workOfficerPicker
+              ? "Choose one: send the report for another assessment, or approve it and assign the work."
+              : "Name the Officer who will assess this report next."}
+          </p>
           <div class="grid2">
             {nextAssessorPicker && (
               <form
@@ -802,7 +819,7 @@ export function ReportPage({
                 action={`/reports/${report.id}/assign-work-officer`}
                 class="card card-b review-form"
               >
-                <h3>Assign work officer</h3>
+                <h3>Approve & assign work</h3>
                 {workOfficerPicker.length === 0 ? (
                   <p class="hint">No active Officer is available to assign.</p>
                 ) : (
@@ -830,7 +847,7 @@ export function ReportPage({
                     <div class="bar">
                       <div class="sp"></div>
                       <button type="submit" class="btn">
-                        Assign work officer
+                        Approve & assign work
                       </button>
                     </div>
                   </>

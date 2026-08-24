@@ -1137,8 +1137,10 @@ textarea[aria-invalid="true"] {
   /* The header alone. Freezing a first data row as well would hide a real record behind a
      heading and make the count on the page disagree with what is readable. */
   position: sticky;
-  /* Clears the title bar rather than sliding under it: the bar is sticky at 0 and 56px tall. */
-  top: 56px;
+  /* Zero, not 56px. Every `.utable` sits in a `.tscroll` box now, and that box is what the header
+     sticks to — so it freezes against the top of the table rather than against the title bar, and
+     an offset meant for the viewport would leave a 56px gap inside the box instead. */
+  top: 0;
   z-index: 1;
   /* Its own compositor layer. Without this, some Chromium builds (seen in Opera) occasionally
      paint the sticky header a frame behind the row scrolling under it, so the two show at once. */
@@ -1231,11 +1233,33 @@ textarea[aria-invalid="true"] {
   margin: 8px 0 10px;
 }
 
+/* ---------- wide tables ---------- */
+/*
+ * Every wide table scrolls inside its own box, at every width, so the page itself never scrolls
+ * sideways. This replaces a `display: block` on `.utable` below 620px, which only helped a phone
+ * and broke the table's own column layout to do it.
+ *
+ * `overflow` rather than `overflow-x`, with a `max-height` beside it, because the two axes cannot
+ * be separated: a box that scrolls on one has no `visible` left on the other, so a bare
+ * `overflow-x: auto` wrapper would quietly become the scroll container for `.utable th`'s
+ * `position: sticky` and leave the header inert. Bounding the height instead keeps the header
+ * frozen — against the top of this box, which is why the `top` above is 0.
+ */
+.tscroll {
+  overflow: auto;
+  max-height: calc(100vh - 210px);
+  /* A sideways flick inside the table does not drag the page behind it once the box hits its end. */
+  overscroll-behavior-x: contain;
+}
+
 @media (max-width: 620px) {
-  /* The list is wider than a phone; scrolling it beats stacking six columns into unreadable rows. */
-  .utable {
-    display: block;
-    overflow-x: auto;
+  /* Less chrome to clear on a phone, so the box may be taller before it starts scrolling. */
+  .tscroll {
+    max-height: calc(100vh - 150px);
+  }
+
+  /* Nothing wraps mid-cell: a scrolling box is only readable if the columns keep their shape. */
+  .tscroll .utable {
     white-space: nowrap;
   }
 }
@@ -1412,11 +1436,11 @@ textarea[aria-invalid="true"] {
 
 /* ---------- the workload pipeline ---------- */
 /*
- * The six buckets are one flat bar, not six tiles: they are a filter over the list below, and a
+ * The four states are one flat bar, not four tiles: they are a filter over the list below, and a
  * filter reads as a row of tabs. The rules live with `.mya-tabs` further down, which is the same
  * bar the Officer's own page draws — one set of declarations, two names, so the two cannot drift.
  *
- * Still links rather than buttons: each is a GET of this page filtered to one status, which is
+ * Still links rather than buttons: each is a GET of this page filtered to one state, which is
  * what lets a filtered pipeline be bookmarked and reloaded.
  */
 
@@ -2387,9 +2411,9 @@ ul.f4-card-c li { margin-bottom: 3px; }
  * default, now also `:target`) blanks the panel. In progress and Submitted were never the default,
  * so they were not caught.
  */
-/* One bar, two pages: the Officer's four states and the manager's six buckets are the same
-   control over the same kind of list, so they share these declarations rather than each keeping
-   a copy that could drift. */
+/* One bar, two pages: the Officer's three states and the manager's four are the same control
+   over the same kind of list, so they share these declarations rather than each keeping a copy
+   that could drift. */
 .mya-tabs,
 .wl-tabs {
   display: flex; flex-wrap: wrap; gap: 2px;
@@ -2424,8 +2448,7 @@ ul.f4-card-c li { margin-bottom: 3px; }
 .wl-tabs a.on,
 .mya-wrap:has(#not-started:target) .mya-tabs a[href="#not-started"],
 .mya-wrap:has(#in-progress:target) .mya-tabs a[href="#in-progress"],
-.mya-wrap:has(#submitted:target) .mya-tabs a[href="#submitted"],
-.mya-wrap:has(#second-assessment:target) .mya-tabs a[href="#second-assessment"] {
+.mya-wrap:has(#submitted:target) .mya-tabs a[href="#submitted"] {
   color: var(--green-d); font-weight: 600; border-bottom-color: var(--green);
 }
 /* Once the reader picks In progress or Submitted, the server-rendered default tab
@@ -2433,13 +2456,11 @@ ul.f4-card-c li { margin-bottom: 3px; }
    leave `a.on` painted — un-marking it whenever *any* group is `:target` is the
    same specificity trap as hiding `.mya-default` below. */
 .mya-wrap:has(#in-progress:target) .mya-tabs a.on,
-.mya-wrap:has(#submitted:target) .mya-tabs a.on,
-.mya-wrap:has(#second-assessment:target) .mya-tabs a.on {
+.mya-wrap:has(#submitted:target) .mya-tabs a.on {
   color: var(--ink-3); font-weight: 500; border-bottom-color: transparent;
 }
 .mya-wrap:has(#in-progress:target) .mya-tabs a.on:hover,
-.mya-wrap:has(#submitted:target) .mya-tabs a.on:hover,
-.mya-wrap:has(#second-assessment:target) .mya-tabs a.on:hover { color: var(--ink); }
+.mya-wrap:has(#submitted:target) .mya-tabs a.on:hover { color: var(--ink); }
 
 /* ---------- my assessments ---------- */
 .mya { display: none; scroll-margin-top: 72px; }

@@ -1,15 +1,14 @@
 import {
+  assessment1Href,
   day,
-  type ReceivedRow,
-  ReceivedRows,
   SEVERITY_LABELS,
-  STATUS_LABELS,
+  secondaryAssessmentHref,
   severityTone,
 } from "./reports.js";
 import { StaffShell } from "./shell.js";
 
 /**
- * The four tab icons, drawn the way the rail draws its own.
+ * The three tab icons, drawn the way the rail draws its own.
  *
  * Same contract as `shell.tsx`'s set and no other: a 24-unit box, no `fill`, and no colour of
  * their own — `stroke: currentcolor` in the stylesheet means each one is painted by whatever the
@@ -47,86 +46,124 @@ function IconSubmitted(): JSX.Element {
   );
 }
 
-function IconSecondAssessment(): JSX.Element {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <circle cx="9" cy="8" r="3.4" />
-      <path d="M2.6 20a6.4 6.4 0 0 1 12.8 0" />
-      <path d="M16.2 5.2a3.4 3.4 0 0 1 0 5.8" />
-      <path d="M17.8 14.4A6.4 6.4 0 0 1 21.4 20" />
-    </svg>
-  );
-}
+/** The three states one assignment can be in, whatever its ordinal. */
+export type AssignmentState = "not-started" | "in-progress" | "submitted";
 
 /**
- * A report this Officer holds as a secondary assessor, at whatever ordinal a manager assigned.
+ * One assessment this Officer holds, at whatever ordinal a manager gave them.
  *
- * Narrower than `ReceivedRow`: no `mine`, because that flag decides whether to offer the first
- * assessment's page and this is not the Officer who writes that one. It carries `status` and
- * `ordinal` instead — `ordinal` is which position in the chain this Officer holds, and `submitted`
- * is whether their own turn is finished.
+ * One row type for the whole page, where there used to be two. The old page listed A1 from
+ * `reports` in three state groups and A2..An from `assessments` in a fourth group of its own,
+ * which meant "Submitted" silently meant "A1 submitted" and a secondary assessment had no state at
+ * all — only its own tab. An assignment is an assignment: `ordinal` says which one it is, `state`
+ * says how far along it is, and neither depends on the other.
  */
-export type SecondaryAssessmentRow = {
-  id: string;
+export type AssignmentRow = {
+  reportId: string;
   number: string;
   receivedAt: Date;
   deviceName: string;
   severity: string;
-  status: string;
+  /** 1 for the first assessment, 2, 3, 4 … for each secondary one. */
   ordinal: number;
-  submitted: boolean;
+  state: AssignmentState;
+};
+
+/** What one row says about itself. The same three words at every ordinal — that is the point. */
+const STATE_LABELS: Record<AssignmentState, string> = {
+  "not-started": "Not started",
+  "in-progress": "In progress",
+  submitted: "Submitted",
+};
+
+/** What the way in is called, which is the one thing that does differ between the three. */
+const ACTION_LABELS: Record<AssignmentState, string> = {
+  "not-started": "Start",
+  "in-progress": "Continue",
+  submitted: "View",
 };
 
 /**
- * A secondary assessor's work, and the way into each piece of it.
+ * Where this Officer opens their own assessment of a report.
  *
- * The number opens the report and the action opens this Officer's own secondary assessment,
- * whichever ordinal it is — one stable address for the whole A2..An chain. The route behind the
- * action resolves which ordinal is theirs for itself, so the link decides what is drawn and never
- * what may be opened.
+ * Two addresses because they are two different documents — the F004 itself at ordinal 1, and the
+ * review of it at every ordinal above — not because the page treats the ordinals differently. The
+ * secondary address is one stable link for the whole A2..An chain; the route behind it resolves
+ * which ordinal belongs to the reader for itself, so this decides what is drawn and never what may
+ * be opened.
  */
-function SecondaryAssessmentRows({ reports }: { reports: SecondaryAssessmentRow[] }): JSX.Element {
+function assignmentHref(row: AssignmentRow): string {
+  return row.ordinal === 1 ? assessment1Href(row.reportId) : secondaryAssessmentHref(row.reportId);
+}
+
+/**
+ * One state's worth of the Officer's work.
+ *
+ * The ordinal is a column, not a heading and not a tab. A1/A2/A3 is still the fact that decides
+ * which document opens and still the fact an auditor needs, so it is printed on every row — but a
+ * reader who does not know what "secondary assessment" means can still read this table, which is
+ * exactly what four workflow-shaped tabs made impossible.
+ */
+function AssignmentRows({
+  rows,
+  assessorName,
+}: {
+  rows: AssignmentRow[];
+  assessorName: string;
+}): JSX.Element {
   return (
-    <table class="utable">
-      <thead>
-        <tr>
-          <th>Number</th>
-          <th>Received</th>
-          <th>Device</th>
-          <th>Severity</th>
-          <th>Status</th>
-          <th>Assessment</th>
-        </tr>
-      </thead>
-      <tbody>
-        {reports.map((report) => (
+    // Wider than a narrow window once the ordinal and the assessor are on it, so the table scrolls
+    // inside its own box rather than pushing the page sideways. See `.tscroll` in the stylesheet.
+    <div class="tscroll">
+      <table class="utable">
+        <thead>
           <tr>
-            <td>
-              <a href={`/reports/${report.id}`} safe>
-                {report.number}
-              </a>
-            </td>
-            <td>{day(report.receivedAt)}</td>
-            <td safe>{report.deviceName}</td>
-            <td>
-              <span class={`tag ${severityTone(report.severity) === "caution" ? "warn" : ""}`} safe>
-                {SEVERITY_LABELS[report.severity] ?? report.severity}
-              </span>
-            </td>
-            <td>
-              <span class="tag muted" safe>
-                {report.submitted ? "Submitted" : (STATUS_LABELS[report.status] ?? report.status)}
-              </span>
-            </td>
-            <td>
-              <a href={`/reports/${report.id}/secondary-assessment`} class="btn ghost btn-sm">
-                {`A${report.ordinal}`}
-              </a>
-            </td>
+            <th>Number</th>
+            <th>Received</th>
+            <th>Device</th>
+            <th>Severity</th>
+            <th>Assessment</th>
+            <th>Assessor</th>
+            <th>Status</th>
+            <th>Action</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr>
+              <td>
+                <a href={`/reports/${row.reportId}`} safe>
+                  {row.number}
+                </a>
+              </td>
+              <td>{day(row.receivedAt)}</td>
+              <td safe>{row.deviceName}</td>
+              <td>
+                <span class={`tag ${severityTone(row.severity) === "caution" ? "warn" : ""}`} safe>
+                  {SEVERITY_LABELS[row.severity] ?? row.severity}
+                </span>
+              </td>
+              <td safe>{`A${row.ordinal}`}</td>
+              {/* Always the reader, on a page built from one WHERE clause on their own id. Printed
+                  anyway: this table is read alongside the manager's, which names somebody else in
+                  the same column, and a column that vanishes between two views of the same work is
+                  harder to read than one that states the obvious. */}
+              <td safe>{assessorName}</td>
+              <td>
+                <span class="tag muted" safe>
+                  {STATE_LABELS[row.state]}
+                </span>
+              </td>
+              <td>
+                <a href={assignmentHref(row)} class="btn ghost btn-sm" safe>
+                  {ACTION_LABELS[row.state]}
+                </a>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -137,7 +174,7 @@ type Group = {
   title: string;
   hint: string;
   empty: string;
-  rows: ReceivedRow[];
+  rows: AssignmentRow[];
   /**
    * The group shown when the reader has picked nothing yet.
    *
@@ -151,14 +188,15 @@ type Group = {
 export type MyAssessmentsPageProps = {
   viewerRole: string;
   viewerName: string;
-  notStarted: ReceivedRow[];
-  inProgress: ReceivedRow[];
-  submitted: ReceivedRow[];
-  /** Reports a manager has handed to this Officer as a secondary assessor, any ordinal. */
-  secondaryAssessments: SecondaryAssessmentRow[];
+  /** Assigned and not opened — at any ordinal. */
+  notStarted: AssignmentRow[];
+  /** Part-written — at any ordinal. */
+  inProgress: AssignmentRow[];
+  /** Sent on — at any ordinal. */
+  submitted: AssignmentRow[];
 };
 
-function Section({ group }: { group: Group }): JSX.Element {
+function Section({ group, assessorName }: { group: Group; assessorName: string }): JSX.Element {
   return (
     <div class={group.initial ? "mya mya-default" : "mya"} id={group.id}>
       <h2 safe>{group.title}</h2>
@@ -170,22 +208,27 @@ function Section({ group }: { group: Group }): JSX.Element {
           {group.empty}
         </p>
       ) : (
-        <ReceivedRows reports={group.rows} />
+        <AssignmentRows rows={group.rows} assessorName={assessorName} />
       )}
     </div>
   );
 }
 
 /**
- * Everything assigned to this Officer, in the three states it can be in.
+ * Everything assigned to this Officer, in the three states an assignment can be in.
  *
- * The dashboard shows what has just arrived; this shows the whole of one Officer's work, including
- * what they have already sent on. A submitted assessment stays listed because "I finished that
- * one" is something an assessor needs to be able to check, and a list that dropped work the moment
- * it left their hands would send them hunting through the register for it.
+ * Three groups, not four. The fourth used to be "Secondary assessments", which was a different
+ * kind of thing from the other three — they were states, it was a position in the chain — so the
+ * bar asked its reader to hold two incompatible ideas at once, and to know what "secondary" meant
+ * before they could find a report they had already been told was theirs. An A2 nobody has opened
+ * belongs under Not started for the same reason an A1 does: nobody has started it.
  *
- * Nobody else's reports appear, and there is no filter that could show them: the page is built
- * from one WHERE clause on the reader's own id.
+ * A submitted assessment stays listed because "I finished that one" is something an assessor needs
+ * to be able to check, and a list that dropped work the moment it left their hands would send them
+ * hunting through the register for it.
+ *
+ * Nobody else's work appears, and there is no filter that could show it: the page is built from
+ * one WHERE clause on the reader's own id.
  */
 export function MyAssessmentsPage({
   viewerRole,
@@ -193,10 +236,8 @@ export function MyAssessmentsPage({
   notStarted,
   inProgress,
   submitted,
-  secondaryAssessments,
 }: MyAssessmentsPageProps): JSX.Element {
-  const total =
-    notStarted.length + inProgress.length + submitted.length + secondaryAssessments.length;
+  const total = notStarted.length + inProgress.length + submitted.length;
 
   return (
     <StaffShell
@@ -209,7 +250,7 @@ export function MyAssessmentsPage({
       <div class="staff-head">
         <div class="sp">
           <p class="hint">
-            {total} report{total === 1 ? "" : "s"} assigned to you
+            {total} assessment{total === 1 ? "" : "s"} assigned to you
           </p>
         </div>
       </div>
@@ -246,36 +287,33 @@ export function MyAssessmentsPage({
               Submitted <span class="mya-count">{submitted.length}</span>
             </span>
           </a>
-          <a href="#secondary-assessments">
-            <IconSecondAssessment />
-            <span>
-              Secondary assessments <span class="mya-count">{secondaryAssessments.length}</span>
-            </span>
-          </a>
         </nav>
 
         <Section
+          assessorName={viewerName}
           group={{
             id: "not-started",
             title: "Not started",
-            hint: "Assigned to you and waiting for a first assessment.",
-            empty: "Nothing is waiting to be assessed.",
+            hint: "Assigned to you and not opened yet.",
+            empty: "Nothing is waiting for you to start.",
             rows: notStarted,
             initial: true,
           }}
         />
 
         <Section
+          assessorName={viewerName}
           group={{
             id: "in-progress",
             title: "In progress",
-            hint: "You have saved a draft assessment on these.",
+            hint: "You have saved a draft on these.",
             empty: "No assessment is part-written.",
             rows: inProgress,
           }}
         />
 
         <Section
+          assessorName={viewerName}
           group={{
             id: "submitted",
             title: "Submitted",
@@ -284,21 +322,6 @@ export function MyAssessmentsPage({
             rows: submitted,
           }}
         />
-
-        {/* The fourth group is the other side of this Officer's work: reports a manager has handed
-            them to review, rather than ones they were given at intake. Its own group rather than a
-            state of the three above, because those three describe one report's journey through
-            the first assessment and this is a different job on a different report — and, unlike
-            them, it can hold any number of reports at any ordinal from A2 upward. */}
-        <div class="mya" id="secondary-assessments">
-          <h2>Secondary assessments</h2>
-          <p class="hint">A manager has assigned you to review one or more of these reports.</p>
-          {secondaryAssessments.length === 0 ? (
-            <p class="hint">Nothing has been assigned to you for a secondary assessment.</p>
-          ) : (
-            <SecondaryAssessmentRows reports={secondaryAssessments} />
-          )}
-        </div>
       </div>
     </StaffShell>
   );

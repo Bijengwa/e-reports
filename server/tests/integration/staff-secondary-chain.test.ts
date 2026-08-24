@@ -368,13 +368,19 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
     // Assigned and not yet opened. This is the state the manager's bucket exists to show, and the
     // state the Officer's own queue has to show them before they have written a word — the two
     // read the same assignment or the work is invisible to both of them.
-    const bucket = await get("/workload?status=second_assessment", manager.cookie);
-    expect(bucket.body).toContain(`A1: ${first.name}`);
-    expect(bucket.body).toContain(`A2: ${second.name}`);
+    const state = await get("/workload?stage=in-progress", manager.cookie);
+    expect(state.body).toContain("<td>A2</td>");
+    expect(state.body).toContain(`<td><span>${second.name}</span></td>`);
+    // The assessor before them has finished; naming them here would send the manager to work
+    // that is already immutable.
+    expect(state.body).not.toContain(first.name);
 
+    // The same assignment on the Officer's own queue, in the state it is actually in: given
+    // to them and not yet opened, which is Not started whatever the ordinal.
     const queue = await get("/assessments", second.cookie);
-    expect(queue.body).toContain('Secondary assessments <span class="mya-count">1</span>');
+    expect(queue.body).toContain('Not started <span class="mya-count">1</span>');
     expect(queue.body).toContain(report.number);
+    expect(queue.body).toContain("<td>A2</td>");
 
     await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
     await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
@@ -384,17 +390,21 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
 
     // The report is with A3 now, and the bucket says so. Naming the assessor before them would
     // send the manager to someone whose work is finished and immutable.
-    const later = await get("/workload?status=second_assessment", manager.cookie);
-    expect(later.body).toContain(`A3: ${third.name}`);
-    expect(later.body).not.toContain(`A2: ${second.name}`);
+    const later = await get("/workload?stage=in-progress", manager.cookie);
+    expect(later.body).toContain("<td>A3</td>");
+    expect(later.body).toContain(`<td><span>${third.name}</span></td>`);
+    expect(later.body).not.toContain(second.name);
 
     const theirs = await get("/assessments", third.cookie);
-    expect(theirs.body).toContain('Secondary assessments <span class="mya-count">1</span>');
+    expect(theirs.body).toContain('Not started <span class="mya-count">1</span>');
+    expect(theirs.body).toContain("<td>A3</td>");
 
-    // A2 keeps their row, as something already sent on rather than as work still owed.
+    // A2 keeps their row, as something already sent on rather than as work still owed — and
+    // under the same Submitted heading an A1 would be under, not a category of its own.
     const done = await get("/assessments", second.cookie);
-    expect(done.body).toContain('Secondary assessments <span class="mya-count">1</span>');
-    expect(done.body).toContain("Submitted");
+    expect(done.body).toContain('Submitted <span class="mya-count">1</span>');
+    expect(done.body).toContain('<span class="tag muted">Submitted</span>');
+    expect(done.body).toContain("<td>A2</td>");
   });
 
   it("shows a later assessor every earlier review, read-only, and keeps them immutable", async () => {
@@ -842,5 +852,219 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
     expect(body).toContain("assessment-history");
     expect(body).toContain(">A2<");
     expect(body).toContain(">A3<");
+  });
+});
+
+/**
+ * The two simplified queues, driven by the real chain rather than by seeded rows.
+ *
+ * Everything above pins the workflow itself. These pin what the two people running it are shown
+ * while it moves — which is the part that used to ask them to know the A1/A2 architecture before
+ * they could find their own work.
+ */
+describe.skipIf(!INTEGRATION_ENABLED)("the Officer's own queue, in three states", () => {
+  beforeEach(start);
+
+  it("offers three states and no secondary category", async () => {
+    const { manager, rest, report } = await afterFirstAssessment();
+    const [second] = rest;
+    if (second === undefined) throw new Error("need an Officer");
+
+    await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
+      assessor_id: second.id,
+      comment: "Please take the second assessment.",
+    });
+
+    const body = (await get("/assessments", second.cookie)).body;
+
+    expect(body).toContain('href="#not-started"');
+    expect(body).toContain('href="#in-progress"');
+    expect(body).toContain('href="#submitted"');
+
+    // The fourth tab is gone. It was a position in the chain sitting beside three states, so it
+    // asked its reader to hold two incompatible ideas at once — and to know what "secondary"
+    // meant before they could find a report they had already been told was theirs.
+    expect(body).not.toContain("Secondary assessments");
+    expect(body).not.toContain('href="#secondary-assessments"');
+  });
+
+  it("holds an unopened first assessment under Not started and a part-written one under In progress", async () => {
+    const a = await signedInAs("assessor", "Asha Mrema");
+    const b = await signedInAs("assessor", "Baraka Nyoni");
+
+    await fileAtThePublicDoor();
+    const filed = await onlyReport();
+    const mine = [a, b].find((s) => s.id === filed.assessor1_user_id);
+    if (mine === undefined) throw new Error("intake assigned nobody this suite knows");
+
+    const fresh = (await get("/assessments", mine.cookie)).body;
+    expect(fresh).toContain('Not started <span class="mya-count">1</span>');
+    expect(fresh).toContain('In progress <span class="mya-count">0</span>');
+    expect(fresh).toContain("<td>A1</td>");
+    expect(fresh).toContain(`href="/reports/${filed.id}/assessment-1"`);
+
+    // A draft, not a submission.
+    const saved = await post(`/reports/${filed.id}/assessment-1`, mine.cookie, {
+      ...completeAssessment(mine.name),
+      intent: "save",
+    });
+    expect(saved.statusCode).toBe(302);
+
+    const working = (await get("/assessments", mine.cookie)).body;
+    expect(working).toContain('Not started <span class="mya-count">0</span>');
+    expect(working).toContain('In progress <span class="mya-count">1</span>');
+    expect(working).toContain("<td>A1</td>");
+  });
+
+  it("moves one secondary assignment through all three states, and the next one after it", async () => {
+    const { manager, first, rest, report } = await afterFirstAssessment();
+    const [second, third] = rest;
+    if (second === undefined || third === undefined) throw new Error("need two Officers");
+
+    // A1 is finished, and sits under Submitted — the same heading every other finished assessment
+    // sits under, at every ordinal.
+    const firstQueue = (await get("/assessments", first.cookie)).body;
+    expect(firstQueue).toContain('Submitted <span class="mya-count">1</span>');
+    expect(firstQueue).toContain("<td>A1</td>");
+
+    await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
+      assessor_id: second.id,
+      comment: "Please take the second assessment.",
+    });
+
+    // Given to them and not opened. Not a state the old page could show at all above ordinal 1.
+    const given = (await get("/assessments", second.cookie)).body;
+    expect(given).toContain('Not started <span class="mya-count">1</span>');
+    expect(given).toContain('In progress <span class="mya-count">0</span>');
+    expect(given).toContain("<td>A2</td>");
+    expect(given).toContain(`href="/reports/${report.id}/secondary-assessment"`);
+
+    // Part-written.
+    const saved = await post(
+      `/reports/${report.id}/secondary-assessment`,
+      second.cookie,
+      completeSecondary({ intent: "save" }),
+    );
+    expect(saved.statusCode).toBe(302);
+
+    const working = (await get("/assessments", second.cookie)).body;
+    expect(working).toContain('Not started <span class="mya-count">0</span>');
+    expect(working).toContain('In progress <span class="mya-count">1</span>');
+    expect(working).toContain("<td>A2</td>");
+
+    // Sent on. "Submitted" means submitted, whatever the ordinal — it used to mean "A1 submitted".
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
+
+    const done = (await get("/assessments", second.cookie)).body;
+    expect(done).toContain('In progress <span class="mya-count">0</span>');
+    expect(done).toContain('Submitted <span class="mya-count">1</span>');
+    expect(done).toContain("<td>A2</td>");
+
+    // And the one after it, which no navigation ever named.
+    await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
+      assessor_id: third.id,
+      comment: "One more opinion, please.",
+    });
+
+    const next = (await get("/assessments", third.cookie)).body;
+    expect(next).toContain('Not started <span class="mya-count">1</span>');
+    expect(next).toContain("<td>A3</td>");
+
+    // A2's own row is untouched by the assignment of A3: their work is finished and read-only.
+    const stillDone = (await get("/assessments", second.cookie)).body;
+    expect(stillDone).toContain('Submitted <span class="mya-count">1</span>');
+    expect(stillDone).toContain('<span class="tag muted">Submitted</span>');
+  });
+});
+
+describe.skipIf(!INTEGRATION_ENABLED)("what a decision does to the manager's states", () => {
+  beforeEach(start);
+
+  it("offers only the next assessor after A1, and both decisions once a secondary is in", async () => {
+    const { manager, rest, report } = await afterFirstAssessment();
+    const [second] = rest;
+    if (second === undefined) throw new Error("need an Officer");
+
+    // After A1 there is nothing yet to be satisfied with, so there is one move, not two.
+    const afterFirst = (await get(`/reports/${report.id}`, manager.cookie)).body;
+    expect(afterFirst).toContain("Manager decision");
+    expect(afterFirst).toContain("Assign next assessor");
+    expect(afterFirst).not.toContain("Approve & assign work");
+
+    await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
+      assessor_id: second.id,
+      comment: "Please review it.",
+    });
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
+
+    // Now both, side by side under one heading, which is the whole of the Decision stage.
+    const afterSecond = (await get(`/reports/${report.id}`, manager.cookie)).body;
+    expect(afterSecond).toContain("Manager decision");
+    expect(afterSecond).toContain("Assign next assessor");
+    expect(afterSecond).toContain("Approve & assign work");
+    expect(afterSecond).toContain(
+      "Choose one: send the report for another assessment, or approve it and assign the work.",
+    );
+  });
+
+  it("returns the report to In progress when the manager asks for another assessment", async () => {
+    const { manager, rest, report } = await afterFirstAssessment();
+    const [second, third] = rest;
+    if (second === undefined || third === undefined) throw new Error("need two Officers");
+
+    await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
+      assessor_id: second.id,
+      comment: "Please review it.",
+    });
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
+
+    // Waiting on the manager, in the one state that means that.
+    const waiting = (await get("/workload?stage=decision", manager.cookie)).body;
+    expect(waiting).toContain(report.number);
+    expect(waiting).toContain("<td>A2</td>");
+
+    await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
+      assessor_id: third.id,
+      comment: "Not satisfied - one more opinion, please.",
+    });
+    expect(await statusOf(report.id)).toBe("second_assessment");
+
+    // Back with an assessor, at the next ordinal, and out of the manager's own queue.
+    const working = (await get("/workload?stage=in-progress", manager.cookie)).body;
+    expect(working).toContain(report.number);
+    expect(working).toContain("<td>A3</td>");
+    expect(working).toContain(`<td><span>${third.name}</span></td>`);
+
+    expect((await get("/workload?stage=decision", manager.cookie)).body).not.toContain(
+      report.number,
+    );
+  });
+
+  it("moves the report to Assigned for work when the manager approves", async () => {
+    const { manager, rest, report } = await afterFirstAssessment();
+    const [second, worker] = rest;
+    if (second === undefined || worker === undefined) throw new Error("need two Officers");
+
+    await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
+      assessor_id: second.id,
+      comment: "Please review it.",
+    });
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
+
+    await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
+      officer_id: worker.id,
+      comment: "Please carry out the recommended monitoring.",
+    });
+    expect(await statusOf(report.id)).toBe("assigned_for_work");
+
+    const terminal = (await get("/workload?stage=assigned-for-work", manager.cookie)).body;
+    expect(terminal).toContain(report.number);
+
+    // Out of every other state, and never into a Closed one — this MVP has no closing workflow.
+    for (const stage of ["not-started", "in-progress", "decision"]) {
+      expect((await get(`/workload?stage=${stage}`, manager.cookie)).body, stage).not.toContain(
+        report.number,
+      );
+    }
   });
 });

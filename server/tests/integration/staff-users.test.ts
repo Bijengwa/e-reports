@@ -123,6 +123,22 @@ describe.skipIf(!INTEGRATION_ENABLED)("who may reach the user pages", () => {
     expect(res.body).toContain("Staff accounts");
   });
 
+  it("scrolls the account table inside its own box, and leaks no source comment doing it", async () => {
+    const cookie = await signedInAs("administrator");
+
+    const body = (await get("/users", cookie)).body;
+
+    // Wider than a narrow window, so the box owns the overflow and the page itself never
+    // scrolls sideways.
+    expect(body).toContain('<div class="tscroll"><table class="utable">');
+
+    // The wrapper went in above a JSX children position, where a `//` line is not a comment at
+    // all — it is text, and it renders. Asserted here because the page reads perfectly well to
+    // a test that only looks for the headings it expects to find.
+    expect(body).not.toContain("// Wider than a narrow window");
+    expect(body).not.toContain("in the stylesheet");
+  });
+
   it("refuses a manager with 403 rather than redirecting them away", async () => {
     const cookie = await signedInAs("manager");
 

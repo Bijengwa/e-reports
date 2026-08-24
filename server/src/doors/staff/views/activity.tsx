@@ -76,56 +76,59 @@ function when(value: Date): string {
  */
 export function ActivityTable({ entries }: { entries: ActivityEntry[] }): JSX.Element {
   return (
-    <table class="utable">
-      <thead>
-        <tr>
-          <th>When (UTC)</th>
-          <th>Actor</th>
-          <th>Role</th>
-          <th>Action</th>
-          <th>Target</th>
-        </tr>
-      </thead>
-      <tbody>
-        {entries.map((entry) => (
-          <tr class={`tone-${toneOf(entry.action)}`}>
-            <td>{when(entry.at)}</td>
-            <td>
-              {entry.actorName ? (
-                <>
-                  <span safe>{entry.actorName}</span>
-                  <span class="hint block" safe>
-                    {entry.actorEmail ?? ""}
-                  </span>
-                </>
-              ) : (
-                <span class="hint">System (CLI)</span>
-              )}
-            </td>
-            <td>
-              {entry.actorRole ? (
-                <span safe>{roleLabel(entry.actorRole)}</span>
-              ) : (
-                <span class="hint">—</span>
-              )}
-            </td>
-            <td safe>{labelOf(entry.action)}</td>
-            <td>
-              {entry.targetName ? (
-                <>
-                  <span safe>{entry.targetName}</span>
-                  <span class="hint block" safe>
-                    {entry.targetEmail ?? ""}
-                  </span>
-                </>
-              ) : (
-                <span class="hint">—</span>
-              )}
-            </td>
+    // Wider than a narrow window, so it scrolls inside its own box rather than pushing the page sideways. See `.tscroll` in the stylesheet.
+    <div class="tscroll">
+      <table class="utable">
+        <thead>
+          <tr>
+            <th>When (UTC)</th>
+            <th>Actor</th>
+            <th>Role</th>
+            <th>Action</th>
+            <th>Target</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {entries.map((entry) => (
+            <tr class={`tone-${toneOf(entry.action)}`}>
+              <td>{when(entry.at)}</td>
+              <td>
+                {entry.actorName ? (
+                  <>
+                    <span safe>{entry.actorName}</span>
+                    <span class="hint block" safe>
+                      {entry.actorEmail ?? ""}
+                    </span>
+                  </>
+                ) : (
+                  <span class="hint">System (CLI)</span>
+                )}
+              </td>
+              <td>
+                {entry.actorRole ? (
+                  <span safe>{roleLabel(entry.actorRole)}</span>
+                ) : (
+                  <span class="hint">—</span>
+                )}
+              </td>
+              <td safe>{labelOf(entry.action)}</td>
+              <td>
+                {entry.targetName ? (
+                  <>
+                    <span safe>{entry.targetName}</span>
+                    <span class="hint block" safe>
+                      {entry.targetEmail ?? ""}
+                    </span>
+                  </>
+                ) : (
+                  <span class="hint">—</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

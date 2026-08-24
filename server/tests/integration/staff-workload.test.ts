@@ -25,15 +25,48 @@ const PUBLIC_HOST = "public.test";
 const PASSWORD = "a correct staff password";
 const COOKIE = "__Host-ae_session";
 
-/** Every status the column can hold, which is exactly what the filter accepts. */
+/**
+ * Every status the column can hold.
+ *
+ * `closed` is among them deliberately. No state on the bar claims it, and this suite has to be
+ * able to prove the page keeps it out — of the tabs, of the figures, of the filtered lists and of
+ * the unfiltered one — which a fixture that never seeded one could not.
+ */
 const EVERY_STATUS = [
   "received",
   "first_assessment",
   "awaiting_second_assessor",
   "second_assessment",
   "awaiting_decision",
+  "assigned_for_work",
   "closed",
 ] as const;
+
+/**
+ * The four states the bar draws, and the statuses each one folds together.
+ *
+ * Written out here rather than imported from the view. The mapping is the whole point of this
+ * page — that `first_assessment` and `second_assessment` are one thing to a manager, and that
+ * `awaiting_second_assessor` and `awaiting_decision` are another — so a bucket quietly re-pointed
+ * at a different status must fail this suite rather than agree with it.
+ */
+const STAGES = [
+  { id: "not-started", label: "Not started", statuses: ["received"] },
+  {
+    id: "in-progress",
+    label: "In progress",
+    statuses: ["first_assessment", "second_assessment"],
+  },
+  {
+    id: "decision",
+    label: "Decision",
+    statuses: ["awaiting_second_assessor", "awaiting_decision"],
+  },
+  { id: "assigned-for-work", label: "Assigned for work", statuses: ["assigned_for_work"] },
+] as const;
+
+/** The one status no state claims, and the one this page must keep out of every view of itself. */
+const UNBUCKETED_STATUS = "closed";
 
 type Role = "administrator" | "manager" | "assessor";
 type Staff = { cookie: string; id: string; name: string };
@@ -159,7 +192,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("who may open the pipeline", () => {
     // The staff door's own convention, shared with every other page behind it: the sign-in page is
     // `/`, so that is where the guard sends someone who has no session. Asserted here as well as
     // on `/reports` because a page added to the wrong scope would answer 200 to a stranger.
-    for (const url of ["/workload", "/workload?status=received", "/reports", "/dashboard"]) {
+    for (const url of ["/workload", "/workload?stage=not-started", "/reports", "/dashboard"]) {
       const res = await getAnonymous(url);
 
       expect(res.statusCode, url).toBe(302);
@@ -201,53 +234,104 @@ describe.skipIf(!INTEGRATION_ENABLED)("who may open the pipeline", () => {
   });
 });
 
-describe.skipIf(!INTEGRATION_ENABLED)("the status filter", () => {
+/**
+ * One assessment on a report, at whatever ordinal.
+ *
+ * This is the row the page reads "which assessment, and who with" from, so a fixture that wants a
+ * report to be with A3 has to write one — the manager's page deliberately no longer infers a
+ * secondary assessor from `reports.assessor2_user_id`, which migration 0013 emptied of meaning.
+ */
+async function seedAssessment(
+  reportId: string,
+  assessorId: string,
+  ordinal: number,
+  over: { submitted?: boolean } = {},
+): Promise<void> {
+  await owner.db.execute(sql`
+    INSERT INTO assessments (report_id, assessor_id, ordinal, form_version, payload, submitted_at)
+    VALUES (${reportId}, ${assessorId}, ${ordinal}, 'F004', '{"7.1":"seeded"}'::jsonb,
+            ${over.submitted ? sql`now()` : sql`NULL`})
+  `);
+}
+
+describe.skipIf(!INTEGRATION_ENABLED)("the state filter", () => {
   beforeEach(start);
 
-  it("accepts every status the column can hold", async () => {
+  it("lists exactly the statuses each state folds together", async () => {
     const manager = await signedInAs("manager", "Grace Mollel");
 
-    // One report in each bucket, so a status that filtered wrongly would show the wrong number.
+    // One report in each status, so a state that filtered wrongly would show the wrong number.
     for (const status of EVERY_STATUS) {
       await seedReport({ number: `MD-AE/2026/${status}`, status });
     }
 
-    for (const status of EVERY_STATUS) {
-      const res = await get(`/workload?status=${status}`, manager.cookie);
+    for (const stage of STAGES) {
+      const res = await get(`/workload?stage=${stage.id}`, manager.cookie);
 
-      expect(res.statusCode, status).toBe(200);
-      expect(res.body, status).toContain(`MD-AE/2026/${status}`);
-      expect(rowCount(res.body), status).toBe(1);
+      expect(res.statusCode, stage.id).toBe(200);
+      expect(rowCount(res.body), stage.id).toBe(stage.statuses.length);
+
+      for (const status of stage.statuses) {
+        expect(res.body, `${stage.id}/${status}`).toContain(`MD-AE/2026/${status}`);
+      }
+
+      // Nothing from another state leaks in, and least of all the status no state claims.
+      expect(res.body, stage.id).not.toContain(`MD-AE/2026/${UNBUCKETED_STATUS}`);
     }
   });
 
-  it("shows the whole pipeline when no status is asked for", async () => {
+  it("shows every state at once when none is asked for", async () => {
     const manager = await signedInAs("manager", "Grace Mollel");
     await seedReport({ number: "MD-AE/2026/9010", status: "received" });
-    await seedReport({ number: "MD-AE/2026/9011", status: "closed" });
+    await seedReport({ number: "MD-AE/2026/9011", status: "second_assessment" });
+    await seedReport({ number: "MD-AE/2026/9012", status: "assigned_for_work" });
 
     const body = (await get("/workload", manager.cookie)).body;
 
     expect(body).toContain("All reports");
     expect(body).toContain("MD-AE/2026/9010");
     expect(body).toContain("MD-AE/2026/9011");
+    expect(body).toContain("MD-AE/2026/9012");
     // Nothing to clear, so the page does not offer a control that would go nowhere.
     expect(body).not.toContain("Show all");
   });
 
-  it("ignores a status that is not one, rather than erroring or emptying the page", async () => {
+  it("never shows a report in a state the bar has no tab for", async () => {
+    const manager = await signedInAs("manager", "Grace Mollel");
+    await seedReport({ number: "MD-AE/2026/9013", status: "received" });
+    await seedReport({ number: "MD-AE/2026/9014", status: UNBUCKETED_STATUS });
+
+    // "All reports" means every state the reader can navigate back to, not every row in the
+    // table. Listing a report here that no tab would list is showing them a stage that does not
+    // exist for them — and there is no closing workflow in this MVP for it to belong to.
+    const all = (await get("/workload", manager.cookie)).body;
+    expect(all).toContain("MD-AE/2026/9013");
+    expect(all).not.toContain("MD-AE/2026/9014");
+
+    // Nor by hand-editing the address: the filter is whitelisted against the bar, not the enum.
+    for (const query of ["stage=closed", "stage=Closed", "status=closed"]) {
+      const res = await get(`/workload?${query}`, manager.cookie);
+
+      expect(res.statusCode, query).toBe(200);
+      expect(res.body, query).not.toContain("MD-AE/2026/9014");
+    }
+  });
+
+  it("ignores a state that is not one, rather than erroring or emptying the page", async () => {
     const manager = await signedInAs("manager", "Grace Mollel");
     await seedReport({ number: "MD-AE/2026/9020", status: "received" });
-    await seedReport({ number: "MD-AE/2026/9021", status: "closed" });
+    await seedReport({ number: "MD-AE/2026/9021", status: "awaiting_decision" });
 
-    // A mistyped status, a status-shaped word the enum does not carry, the parameter given twice
-    // (which Fastify hands over as an array), and a value that is not a string at all.
+    // A mistyped state, a state-shaped word the bar does not carry, a stored status rather than a
+    // state, the parameter given twice (which Fastify hands over as an array), and a value that is
+    // not a string at all.
     for (const query of [
-      "status=nonsense",
-      "status=RECEIVED",
-      "status=received;closed",
-      "status=received&status=closed",
-      "status[]=received",
+      "stage=nonsense",
+      "stage=NOT-STARTED",
+      "stage=received",
+      "stage=not-started;decision",
+      "stage=not-started&stage=decision",
+      "stage[]=not-started",
     ]) {
       const res = await get(`/workload?${query}`, manager.cookie);
 
@@ -260,12 +344,12 @@ describe.skipIf(!INTEGRATION_ENABLED)("the status filter", () => {
     }
   });
 
-  it("treats an empty status as no filter", async () => {
+  it("treats an empty state as no filter", async () => {
     const manager = await signedInAs("manager", "Grace Mollel");
     await seedReport({ number: "MD-AE/2026/9030", status: "received" });
-    await seedReport({ number: "MD-AE/2026/9031", status: "closed" });
+    await seedReport({ number: "MD-AE/2026/9031", status: "assigned_for_work" });
 
-    for (const query of ["status=", "status"]) {
+    for (const query of ["stage=", "stage"]) {
       const res = await get(`/workload?${query}`, manager.cookie);
 
       expect(res.statusCode, query).toBe(200);
@@ -281,14 +365,15 @@ describe.skipIf(!INTEGRATION_ENABLED)("the status filter", () => {
 
     // If any of these were concatenated into the statement the request would 500 on a syntax
     // error, or in the worst case take the table with it. The report surviving each one is the
-    // assertion: the parameter is bound, and is whitelisted against the enum before that.
+    // assertion: the parameter is whitelisted against the bar before it is used at all, and the
+    // statuses it selects are bound one by one after that.
     for (const hostile of [
-      "received' OR '1'='1",
-      "received; DROP TABLE reports; --",
+      "not-started' OR '1'='1",
+      "not-started; DROP TABLE reports; --",
       "'; TRUNCATE reports; --",
-      "received') UNION SELECT null,null--",
+      "not-started') UNION SELECT null,null--",
     ]) {
-      const res = await get(`/workload?status=${encodeURIComponent(hostile)}`, manager.cookie);
+      const res = await get(`/workload?stage=${encodeURIComponent(hostile)}`, manager.cookie);
 
       expect(res.statusCode, hostile).toBe(200);
       expect(res.body, hostile).toContain("All reports");
@@ -305,23 +390,37 @@ describe.skipIf(!INTEGRATION_ENABLED)("the status filter", () => {
 describe.skipIf(!INTEGRATION_ENABLED)("the figures", () => {
   beforeEach(start);
 
-  it("counts each bucket, and prints a zero for an empty one", async () => {
+  it("counts each state, and prints a zero for an empty one", async () => {
     const manager = await signedInAs("manager", "Grace Mollel");
 
     await seedReport({ number: "MD-AE/2026/9050", status: "received" });
     await seedReport({ number: "MD-AE/2026/9051", status: "received" });
-    await seedReport({ number: "MD-AE/2026/9052", status: "received" });
-    await seedReport({ number: "MD-AE/2026/9053", status: "awaiting_second_assessor" });
-    await seedReport({ number: "MD-AE/2026/9054", status: "closed" });
+    // Two statuses, one figure. This is the count that used to be split across two tabs.
+    await seedReport({ number: "MD-AE/2026/9052", status: "first_assessment" });
+    await seedReport({ number: "MD-AE/2026/9053", status: "second_assessment" });
+    await seedReport({ number: "MD-AE/2026/9054", status: "awaiting_second_assessor" });
 
     const body = (await get("/workload", manager.cookie)).body;
 
-    expect(body).toContain(bucketStat("Not started", 3));
-    expect(body).toContain(bucketStat("Assign next assessor", 1));
-    expect(body).toContain(bucketStat("Closed", 1));
-    // A bucket nothing is in is drawn as zero rather than left off the page.
-    expect(body).toContain(bucketStat("First assessment", 0));
-    expect(body).toContain(bucketStat("Decision", 0));
+    expect(body).toContain(bucketStat("Not started", 2));
+    expect(body).toContain(bucketStat("In progress", 2));
+    expect(body).toContain(bucketStat("Decision", 1));
+    // A state nothing is in is drawn as zero rather than left off the page.
+    expect(body).toContain(bucketStat("Assigned for work", 0));
+  });
+
+  it("counts both waiting-on-the-manager statuses into the one Decision figure", async () => {
+    const manager = await signedInAs("manager", "Grace Mollel");
+
+    // The two ways a report arrives at the manager's queue: straight after A1, and after any
+    // secondary assessment since. One figure, because it is one job.
+    await seedReport({ number: "MD-AE/2026/9055", status: "awaiting_second_assessor" });
+    await seedReport({ number: "MD-AE/2026/9056", status: "awaiting_decision" });
+
+    const body = (await get("/workload", manager.cookie)).body;
+
+    expect(body).toContain(bucketStat("Decision", 2));
+    expect(rowCount(body)).toBe(2);
   });
 
   it("keeps the figures whole while the list is filtered", async () => {
@@ -329,31 +428,42 @@ describe.skipIf(!INTEGRATION_ENABLED)("the figures", () => {
 
     await seedReport({ number: "MD-AE/2026/9060", status: "received" });
     await seedReport({ number: "MD-AE/2026/9061", status: "received" });
-    await seedReport({ number: "MD-AE/2026/9062", status: "closed" });
+    await seedReport({ number: "MD-AE/2026/9062", status: "assigned_for_work" });
 
-    const body = (await get("/workload?status=closed", manager.cookie)).body;
+    const body = (await get("/workload?stage=assigned-for-work", manager.cookie)).body;
 
-    // The list is one bucket and the figures are the register. A count computed from the filtered
+    // The list is one state and the figures are the register. A count computed from the filtered
     // rows would tell a manager two reports had gone missing.
     expect(rowCount(body)).toBe(1);
     expect(body).toContain(bucketStat("Not started", 2));
-    expect(body).toContain(bucketStat("Closed", 1));
+    expect(body).toContain(bucketStat("Assigned for work", 1));
   });
 
-  it("draws six zeroes and an honest sentence over an empty register", async () => {
+  it("counts no report into a state the bar does not draw", async () => {
+    const manager = await signedInAs("manager", "Grace Mollel");
+
+    await seedReport({ number: "MD-AE/2026/9063", status: "received" });
+    await seedReport({ number: "MD-AE/2026/9064", status: UNBUCKETED_STATUS });
+    await seedReport({ number: "MD-AE/2026/9065", status: UNBUCKETED_STATUS });
+
+    const body = (await get("/workload", manager.cookie)).body;
+
+    // A figure that counted a report no tab would list is the worst of both: it tells the reader
+    // something is there and then refuses to show it to them.
+    expect(body).toContain(bucketStat("Not started", 1));
+    expect(rowCount(body)).toBe(1);
+    for (const stage of STAGES) {
+      expect(body, stage.id).not.toContain(bucketStat(stage.label, 3));
+    }
+  });
+
+  it("draws four zeroes and an honest sentence over an empty register", async () => {
     const manager = await signedInAs("manager", "Grace Mollel");
 
     const body = (await get("/workload", manager.cookie)).body;
 
-    for (const label of [
-      "Not started",
-      "First assessment",
-      "Assign next assessor",
-      "Secondary assessment",
-      "Decision",
-      "Closed",
-    ]) {
-      expect(body, label).toContain(bucketStat(label, 0));
+    for (const stage of STAGES) {
+      expect(body, stage.label).toContain(bucketStat(stage.label, 0));
     }
 
     expect(body).toContain("Nothing has been reported yet.");
@@ -361,23 +471,49 @@ describe.skipIf(!INTEGRATION_ENABLED)("the figures", () => {
     expect(body).not.toContain("<table");
   });
 
-  it("says which stage is empty when a bucket is filtered to nothing", async () => {
+  it("says which state is empty when one is filtered to nothing", async () => {
     const manager = await signedInAs("manager", "Grace Mollel");
     await seedReport({ number: "MD-AE/2026/9070", status: "received" });
 
-    const body = (await get("/workload?status=closed", manager.cookie)).body;
+    const body = (await get("/workload?stage=assigned-for-work", manager.cookie)).body;
 
-    expect(body).toContain("No reports are in this stage right now.");
+    expect(body).toContain("No reports are in this state right now.");
     expect(body).not.toContain("<table");
-    // Still the bucket's own heading, so the reader knows which stage is clear.
-    expect(body).toContain("Closed");
+    // Still the state's own heading, so the reader knows which one is clear.
+    expect(body).toContain("Assigned for work");
+    expect(body).toContain("Show all");
+  });
+});
+
+describe.skipIf(!INTEGRATION_ENABLED)("what the bar offers", () => {
+  beforeEach(start);
+
+  it("draws these four states and no others", async () => {
+    const manager = await signedInAs("manager", "Grace Mollel");
+
+    const body = (await get("/workload", manager.cookie)).body;
+
+    for (const stage of STAGES) {
+      expect(body, stage.id).toContain(`href="/workload?stage=${stage.id}"`);
+    }
+
+    // The workflow-shaped tabs are gone. They asked a manager to know what "first" and "secondary"
+    // meant — the A1/A2 architecture — before they could find their own queue, and the ordinal is
+    // a column now instead.
+    expect(body).not.toContain("First assessment");
+    expect(body).not.toContain("Secondary assessment");
+    // Not in this MVP: nothing writes `closed`, so a tab for it is a stage that does not run.
+    expect(body).not.toContain(">Closed<");
+    expect(body).not.toContain("stage=closed");
+    // And the filter is a filter. The action that used to sit in a row lives on the report.
+    expect(body).not.toContain("Assign next assessor");
   });
 });
 
 describe.skipIf(!INTEGRATION_ENABLED)("what a row shows", () => {
   beforeEach(start);
 
-  it("prints the number, the date, the device, the severity and the status", async () => {
+  it("prints the number, the date, the device, the severity and the state", async () => {
     const manager = await signedInAs("manager", "Grace Mollel");
 
     const id = await seedReport({
@@ -397,30 +533,77 @@ describe.skipIf(!INTEGRATION_ENABLED)("what a row shows", () => {
     expect(body).toContain("Philips IntelliVue MX450");
     // The enum's caption, not the stored value.
     expect(body).toContain("Hospitalization");
-    expect(body).toContain("Awaiting next assessor");
+    // The state's word, not the status'. `awaiting_second_assessor` used to print "Awaiting next
+    // assessor", which named a step of the machine rather than what the reader has to do.
+    expect(body).toContain("Awaiting decision");
+    expect(body).not.toContain("Awaiting next assessor");
   });
 
-  it("names one assessor, both assessors, or neither", async () => {
+  it("names the assessment and the assessor a report is actually with, at every ordinal", async () => {
     const manager = await signedInAs("manager", "Grace Mollel");
     const first = await signedInAs("assessor", "Asha Mrema");
     const second = await signedInAs("assessor", "Baraka Nyoni");
+    const third = await signedInAs("assessor", "Chausiku Njau");
 
+    // With A1, before anybody has opened it.
     await seedReport({ number: "MD-AE/2026/9090", assessor1: first.id });
+
+    // With A2: the fixture writes the `assessments` row, which is what the page reads.
     await seedReport({
       number: "MD-AE/2026/9091",
       status: "second_assessment",
       assessor1: first.id,
       assessor2: second.id,
     });
-    // Filed while no Officer was active, so intake had nobody to give it to.
-    await seedReport({ number: "MD-AE/2026/9092" });
+
+    // With A3, which no tab ever named and which the row must state plainly.
+    const deep = await seedReport({
+      number: "MD-AE/2026/9092",
+      status: "second_assessment",
+      assessor1: first.id,
+    });
+    await seedAssessment(deep, first.id, 1, { submitted: true });
+    await seedAssessment(deep, second.id, 2, { submitted: true });
+    await seedAssessment(deep, third.id, 3);
 
     const body = (await get("/workload", manager.cookie)).body;
 
-    expect(body).toContain("A1: Asha Mrema");
-    expect(body).toContain("A2: Baraka Nyoni");
-    // An orphan says so rather than printing an empty column.
-    expect(body).toContain("Unassigned");
+    // The ordinal is a column now, so each row says which assessment it is on and who has it.
+    expect(body).toContain("<td>A1</td>");
+    expect(body).toContain("<td>A2</td>");
+    expect(body).toContain("<td>A3</td>");
+    expect(body).toContain("<td><span>Asha Mrema</span></td>");
+    expect(body).toContain("<td><span>Baraka Nyoni</span></td>");
+    expect(body).toContain("<td><span>Chausiku Njau</span></td>");
+
+    // The old stacked cell named A1 and the latest secondary assessor together, which is how a
+    // reader ended up thinking a report was with two people at once.
+    expect(body).not.toContain("A1: Asha Mrema");
+    expect(body).not.toContain("A2: Baraka Nyoni");
+  });
+
+  it("says so when intake found nobody to give a report to", async () => {
+    const manager = await signedInAs("manager", "Grace Mollel");
+
+    // Filed while no Officer was active, so intake had nobody to give it to. An orphan says so
+    // rather than printing an empty column.
+    await seedReport({ number: "MD-AE/2026/9093" });
+
+    expect((await get("/workload", manager.cookie)).body).toContain("Unassigned");
+  });
+
+  it("offers Review where the manager is being waited on, and Open everywhere else", async () => {
+    const manager = await signedInAs("manager", "Grace Mollel");
+
+    await seedReport({ number: "MD-AE/2026/9094", status: "awaiting_decision" });
+    const waiting = (await get("/workload?stage=decision", manager.cookie)).body;
+    expect(waiting).toContain(">Review</a>");
+    expect(waiting).not.toContain(">Open</a>");
+
+    await seedReport({ number: "MD-AE/2026/9095", status: "received" });
+    const resting = (await get("/workload?stage=not-started", manager.cookie)).body;
+    expect(resting).toContain(">Open</a>");
+    expect(resting).not.toContain(">Review</a>");
   });
 
   it("escapes a hostile device name rather than rendering it", async () => {
@@ -438,6 +621,19 @@ describe.skipIf(!INTEGRATION_ENABLED)("what a row shows", () => {
     expect(body).not.toContain("<script>alert(1)</script>");
   });
 
+  it("escapes a hostile assessor name rather than rendering it", async () => {
+    const manager = await signedInAs("manager", "Grace Mollel");
+    const hostile = await signedInAs("assessor", "<script>alert(2)</script>");
+
+    await seedReport({ number: "MD-AE/2026/9101", assessor1: hostile.id });
+
+    const body = (await get("/workload", manager.cookie)).body;
+
+    // A column this page did not print before it named the current assessor directly.
+    expect(body).toContain("&lt;script");
+    expect(body).not.toContain("<script>alert(2)</script>");
+  });
+
   it("carries no control that writes", async () => {
     const manager = await signedInAs("manager", "Grace Mollel");
     await seedReport({ number: "MD-AE/2026/9110", status: "awaiting_second_assessor" });
@@ -450,6 +646,138 @@ describe.skipIf(!INTEGRATION_ENABLED)("what a row shows", () => {
       (action) => !action.includes("/logout"),
     );
     expect(posts).toEqual([]);
+  });
+
+  it("scrolls the table inside its own box rather than widening the page", async () => {
+    const manager = await signedInAs("manager", "Grace Mollel");
+    await seedReport({ number: "MD-AE/2026/9111", status: "received" });
+
+    const body = (await get("/workload", manager.cookie)).body;
+
+    // Eight columns is wider than a narrow window. The box owns the overflow so the page itself
+    // never scrolls sideways — see `.tscroll` in the stylesheet.
+    expect(body).toContain('<div class="tscroll"><table class="utable">');
+  });
+});
+
+describe.skipIf(!INTEGRATION_ENABLED)("what each state holds", () => {
+  beforeEach(start);
+
+  it("holds a report nobody has begun assessing under Not started", async () => {
+    const manager = await signedInAs("manager", "Grace Mollel");
+    const officer = await signedInAs("assessor", "Asha Mrema");
+
+    await seedReport({ number: "MD-AE/2026/9120", status: "received", assessor1: officer.id });
+    await seedReport({ number: "MD-AE/2026/9121", status: "first_assessment" });
+
+    const body = (await get("/workload?stage=not-started", manager.cookie)).body;
+
+    expect(body).toContain("MD-AE/2026/9120");
+    expect(body).not.toContain("MD-AE/2026/9121");
+    expect(rowCount(body)).toBe(1);
+  });
+
+  it("holds every active assessment under In progress, whatever the ordinal", async () => {
+    const manager = await signedInAs("manager", "Grace Mollel");
+    const first = await signedInAs("assessor", "Asha Mrema");
+    const second = await signedInAs("assessor", "Baraka Nyoni");
+    const third = await signedInAs("assessor", "Chausiku Njau");
+    const fourth = await signedInAs("assessor", "Deo Mushi");
+
+    // A1 writing.
+    await seedReport({
+      number: "MD-AE/2026/9130",
+      status: "first_assessment",
+      assessor1: first.id,
+    });
+
+    // A2 writing.
+    await seedReport({
+      number: "MD-AE/2026/9131",
+      status: "second_assessment",
+      assessor1: first.id,
+      assessor2: second.id,
+    });
+
+    // A3 writing, and A4 writing. Neither had a tab of its own before, and neither needs one:
+    // somebody is writing an assessment, which is the only fact the state carries.
+    for (const [number, holder, ordinal] of [
+      ["MD-AE/2026/9132", third, 3],
+      ["MD-AE/2026/9133", fourth, 4],
+    ] as const) {
+      const id = await seedReport({
+        number,
+        status: "second_assessment",
+        assessor1: first.id,
+      });
+      await seedAssessment(id, first.id, 1, { submitted: true });
+      for (let n = 2; n < ordinal; n += 1) {
+        await seedAssessment(id, second.id, n, { submitted: true });
+      }
+      await seedAssessment(id, holder.id, ordinal);
+    }
+
+    const body = (await get("/workload?stage=in-progress", manager.cookie)).body;
+
+    expect(rowCount(body)).toBe(4);
+    for (const number of [
+      "MD-AE/2026/9130",
+      "MD-AE/2026/9131",
+      "MD-AE/2026/9132",
+      "MD-AE/2026/9133",
+    ]) {
+      expect(body, number).toContain(number);
+    }
+
+    // One word for all four, and the ordinal beside it to say which is which.
+    expect(body).toContain("<td>A1</td>");
+    expect(body).toContain("<td>A4</td>");
+    expect(body).toContain(bucketStat("In progress", 4));
+  });
+
+  it("holds a report waiting on the manager under Decision, after A1 and after An alike", async () => {
+    const manager = await signedInAs("manager", "Grace Mollel");
+    const first = await signedInAs("assessor", "Asha Mrema");
+    const second = await signedInAs("assessor", "Baraka Nyoni");
+
+    // A1 in, nothing else yet.
+    const afterFirst = await seedReport({
+      number: "MD-AE/2026/9140",
+      status: "awaiting_second_assessor",
+      assessor1: first.id,
+    });
+    await seedAssessment(afterFirst, first.id, 1, { submitted: true });
+
+    // A2 in, on top of A1.
+    const afterSecond = await seedReport({
+      number: "MD-AE/2026/9141",
+      status: "awaiting_decision",
+      assessor1: first.id,
+    });
+    await seedAssessment(afterSecond, first.id, 1, { submitted: true });
+    await seedAssessment(afterSecond, second.id, 2, { submitted: true });
+
+    const body = (await get("/workload?stage=decision", manager.cookie)).body;
+
+    expect(rowCount(body)).toBe(2);
+    expect(body).toContain("MD-AE/2026/9140");
+    expect(body).toContain("MD-AE/2026/9141");
+    // The latest assessment on each, which is what the manager is being asked to respond to.
+    expect(body).toContain("<td>A1</td>");
+    expect(body).toContain("<td>A2</td>");
+  });
+
+  it("holds what the manager has approved under Assigned for work", async () => {
+    const manager = await signedInAs("manager", "Grace Mollel");
+
+    await seedReport({ number: "MD-AE/2026/9150", status: "assigned_for_work" });
+    await seedReport({ number: "MD-AE/2026/9151", status: "awaiting_decision" });
+
+    const body = (await get("/workload?stage=assigned-for-work", manager.cookie)).body;
+
+    expect(body).toContain("MD-AE/2026/9150");
+    expect(body).not.toContain("MD-AE/2026/9151");
+    expect(rowCount(body)).toBe(1);
   });
 });
 

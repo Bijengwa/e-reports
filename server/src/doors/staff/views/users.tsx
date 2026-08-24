@@ -88,71 +88,76 @@ export function UsersPage({ users, error, viewerRole, viewerName }: UsersPagePro
         </div>
       )}
 
-      <table class="utable">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th>Status</th>
-            <th>Added</th>
-            <th>Last sign-in</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map((user) => (
+      {/* Wider than a narrow window, so it scrolls inside its own box rather than pushing the
+          page sideways. See `.tscroll` in the stylesheet. A JSX comment, not a `//` one: this
+          is a children position, where `//` is text the reader would see. */}
+      <div class="tscroll">
+        <table class="utable">
+          <thead>
             <tr>
-              <td>
-                <span safe>{user.fullName}</span>
-                {user.isSelf && <span class="tag muted">You</span>}
-              </td>
-              <td safe>{user.email}</td>
-              <td safe>{roleLabel(user.role)}</td>
-              <td>
-                {user.isActive ? (
-                  <span class="tag">Active</span>
-                ) : (
-                  <span class="tag muted">Deactivated</span>
-                )}
-                {user.mustChangePassword && <span class="tag warn">Password not set</span>}
-              </td>
-              <td>{day(user.createdAt)}</td>
-              <td>{day(user.lastSignInAt)}</td>
-              <td>
-                {/* Nothing at all on your own row, and nothing on any administrator's. Neither
-                    may be reset or deactivated from here, and the surest way to render that is to
-                    render no control — though the routes check both again, because a missing
-                    button is not a control. */}
-                {user.isSelf || user.role === "administrator" ? (
-                  <span class="hint">—</span>
-                ) : (
-                  <div class="row-actions">
-                    {/* Offered only while the account is active, because a reset of a deactivated
-                        account is refused. A button that always fails is worse than no button. */}
-                    {user.isActive && (
-                      <form method="POST" action={`/users/${user.id}/reset`}>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Added</th>
+              <th>Last sign-in</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map((user) => (
+              <tr>
+                <td>
+                  <span safe>{user.fullName}</span>
+                  {user.isSelf && <span class="tag muted">You</span>}
+                </td>
+                <td safe>{user.email}</td>
+                <td safe>{roleLabel(user.role)}</td>
+                <td>
+                  {user.isActive ? (
+                    <span class="tag">Active</span>
+                  ) : (
+                    <span class="tag muted">Deactivated</span>
+                  )}
+                  {user.mustChangePassword && <span class="tag warn">Password not set</span>}
+                </td>
+                <td>{day(user.createdAt)}</td>
+                <td>{day(user.lastSignInAt)}</td>
+                <td>
+                  {/* Nothing at all on your own row, and nothing on any administrator's. Neither
+                      may be reset or deactivated from here, and the surest way to render that is to
+                      render no control — though the routes check both again, because a missing
+                      button is not a control. */}
+                  {user.isSelf || user.role === "administrator" ? (
+                    <span class="hint">—</span>
+                  ) : (
+                    <div class="row-actions">
+                      {/* Offered only while the account is active, because a reset of a deactivated
+                          account is refused. A button that always fails is worse than no button. */}
+                      {user.isActive && (
+                        <form method="POST" action={`/users/${user.id}/reset`}>
+                          <button type="submit" class="btn ghost btn-sm">
+                            Reset password
+                          </button>
+                        </form>
+                      )}
+
+                      <form
+                        method="POST"
+                        action={`/users/${user.id}/${user.isActive ? "deactivate" : "reactivate"}`}
+                      >
                         <button type="submit" class="btn ghost btn-sm">
-                          Reset password
+                          {user.isActive ? "Deactivate" : "Reactivate"}
                         </button>
                       </form>
-                    )}
-
-                    <form
-                      method="POST"
-                      action={`/users/${user.id}/${user.isActive ? "deactivate" : "reactivate"}`}
-                    >
-                      <button type="submit" class="btn ghost btn-sm">
-                        {user.isActive ? "Deactivate" : "Reactivate"}
-                      </button>
-                    </form>
-                  </div>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </StaffShell>
   );
 }

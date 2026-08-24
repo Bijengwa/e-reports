@@ -1,30 +1,55 @@
 import { sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { currentSession } from "../session-guard.js";
-import { MyAssessmentsPage, type SecondaryAssessmentRow } from "../views/assessments.js";
-import type { ReceivedRow } from "../views/reports.js";
+import {
+  type AssignmentRow,
+  type AssignmentState,
+  MyAssessmentsPage,
+} from "../views/assessments.js";
 
-/** One report as the primary-assessment query returns it. */
+/** One assignment as the query returns it, before its state is read off it. */
 type Row = {
   id: string;
   number: string;
   received_at: Date;
   device_name: string;
   severity: string;
-  status: string;
+  ordinal: number;
+  started: boolean;
+  submitted: boolean;
 };
 
-function toRow(report: Row): ReceivedRow & { status: string } {
+/**
+ * How far along one assignment is, by the same test at every ordinal.
+ *
+ * `submitted_at` is the only column that means "finished", and an untouched assignment is the one
+ * whose payload is still the empty object it was created with — `assign-next-assessor` inserts
+ * `'{}'::jsonb` eagerly when it names the next assessor, and the first draft save replaces it with
+ * real answers. At ordinal 1 there is no row at all until that first save, which is the same fact
+ * said a different way: the query coalesces a missing payload to `'{}'` so the two cases answer
+ * alike. Comparing the missing one directly would not — `NULL IS DISTINCT FROM '{}'` is true, so
+ * an unopened first assessment would report itself as part-written.
+ *
+ * This is what makes "In progress" mean one thing. The page used to derive an A1's state from
+ * `reports.status` and give a secondary assessment no state at all, so `first_assessment` was the
+ * only progress the Officer's queue could see.
+ */
+function stateOf(row: Row): AssignmentState {
+  if (row.submitted) return "submitted";
+  return row.started ? "in-progress" : "not-started";
+}
+
+function toRow(raw: unknown): AssignmentRow {
+  const row = raw as Row;
+
   return {
-    id: report.id,
-    number: report.number,
-    receivedAt: report.received_at,
-    deviceName: report.device_name,
-    severity: report.severity,
-    status: report.status,
-    // Only the rows the reader holds as first assessor reach this mapper, so every one offers the
-    // way into the F004 that is theirs to write.
-    mine: true,
+    reportId: row.id,
+    number: row.number,
+    receivedAt: row.received_at,
+    deviceName: row.device_name,
+    severity: row.severity,
+    ordinal: row.ordinal,
+    state: stateOf(row),
   };
 }
 
@@ -35,56 +60,52 @@ function toRow(report: Row): ReceivedRow & { status: string } {
  * shown an empty page — neither is ever assigned a report, and a page that could only say
  * "nothing here" is a worse answer than saying it is not theirs.
  *
- * Two queries rather than one, unlike before this generalization: "first assessor" is still read
- * from `reports.assessor1_user_id`, but "secondary assessor" is now `assessments.assessor_id` at
- * any ordinal above 1 — the whole point of not being a fixed second column any more.
+ * One query rather than two, and one list rather than two. The first assessment is still found
+ * through `reports.assessor1_user_id` and a secondary one through `assessments.assessor_id` at any
+ * ordinal above 1 — those are genuinely two different records — but they are unioned into one set
+ * of assignments here, because everything the page does with them afterwards is the same. Keeping
+ * them apart all the way to the view is what produced a "Submitted" tab that only ever meant A1
+ * and a "Secondary assessments" tab that mixed three states together.
+ *
+ * Ordering is by arrival, newest first, with `number` breaking the tie the way every other queue
+ * in the app breaks it — `number` is unique, so the order is total rather than merely usually
+ * stable. Two assignments on one report sort together, later ordinal first.
  */
 export async function myAssessmentsRoutes(app: FastifyInstance): Promise<void> {
   app.get("/assessments", async (request, reply) => {
     const session = currentSession(request);
 
-    const primary = await app.db.execute(sql`
-      SELECT id, number, received_at, device_name, severity, status::text AS status
-        FROM reports
-       WHERE assessor1_user_id = ${session.userId}
-       ORDER BY received_at DESC, number DESC
-    `);
+    const rows = await app.db.execute(sql`
+      SELECT r.id, r.number, r.received_at, r.device_name, r.severity,
+             1 AS ordinal,
+             (coalesce(a.payload, '{}'::jsonb) IS DISTINCT FROM '{}'::jsonb) AS started,
+             (a.submitted_at IS NOT NULL) AS submitted
+        FROM reports r
+        LEFT JOIN assessments a ON a.report_id = r.id AND a.ordinal = 1
+       WHERE r.assessor1_user_id = ${session.userId}
 
-    const secondary = await app.db.execute(sql`
-      SELECT r.id, r.number, r.received_at, r.device_name, r.severity, r.status::text AS status,
-             a.ordinal, a.submitted_at
+       UNION ALL
+
+      SELECT r.id, r.number, r.received_at, r.device_name, r.severity,
+             a.ordinal,
+             (coalesce(a.payload, '{}'::jsonb) IS DISTINCT FROM '{}'::jsonb) AS started,
+             (a.submitted_at IS NOT NULL) AS submitted
         FROM assessments a
         JOIN reports r ON r.id = a.report_id
        WHERE a.assessor_id = ${session.userId} AND a.ordinal > 1
-       ORDER BY r.received_at DESC, r.number DESC
+
+       ORDER BY received_at DESC, number DESC, ordinal DESC
     `);
 
-    const mine = (primary as unknown as Row[]).map(toRow);
-
-    const secondaryRows: SecondaryAssessmentRow[] = secondary.map((raw) => {
-      const r = raw as Row & { ordinal: number; submitted_at: Date | null };
-      return {
-        id: r.id,
-        number: r.number,
-        receivedAt: r.received_at,
-        deviceName: r.device_name,
-        severity: r.severity,
-        status: r.status,
-        ordinal: r.ordinal,
-        submitted: r.submitted_at !== null,
-      };
-    });
+    const assignments = rows.map(toRow);
 
     return reply.html(
       <MyAssessmentsPage
         viewerRole={session.role}
         viewerName={session.fullName}
-        notStarted={mine.filter((row) => row.status === "received")}
-        inProgress={mine.filter((row) => row.status === "first_assessment")}
-        submitted={mine.filter(
-          (row) => row.status !== "received" && row.status !== "first_assessment",
-        )}
-        secondaryAssessments={secondaryRows}
+        notStarted={assignments.filter((row) => row.state === "not-started")}
+        inProgress={assignments.filter((row) => row.state === "in-progress")}
+        submitted={assignments.filter((row) => row.state === "submitted")}
       />,
     );
   });

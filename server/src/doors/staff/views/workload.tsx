@@ -1,19 +1,26 @@
-import { SEVERITY_LABELS, STATUS_LABELS, severityTone } from "./reports.js";
+import { SEVERITY_LABELS, severityTone } from "./reports.js";
 import { StaffShell } from "./shell.js";
 
 /**
  * The manager's view of the whole pipeline.
  *
- * Six buckets, one per status, and the register underneath filtered to whichever is chosen. The
- * dashboard this replaces showed a manager one queue — the reports waiting on them to name a
- * second assessor — which is the third of these six and told them nothing about the other five.
+ * Four states, not one tab per status. The seven values in `report_status` describe how the
+ * application moves a report; a manager needs to know only whether a report is waiting to be
+ * picked up, being worked on, waiting on them, or done with. `first_assessment` and
+ * `second_assessment` are the same fact to a reader — somebody is writing an assessment right now
+ * — and splitting them into two tabs forced every manager to learn the A1/A2 architecture before
+ * they could find their own queue.
  *
- * Nothing here writes. The rows carry no action button: what a manager may do to a report is
- * decided on the report's own page, and a control here would have to repeat those rules.
+ * Which assessment and which assessor is a column, not a tab. `A2` beside `Josh Edward` in a row
+ * says everything the old "Secondary assessment" bucket said, without asking the reader to know
+ * what "secondary" means.
+ *
+ * Nothing here writes. Every row links to the report, and what a manager may do to it is decided
+ * there — a control here would have to repeat those rules.
  */
 
 /**
- * The six tab icons, drawn to the same contract as the rail's and the Officer's own tabs.
+ * The four tab icons, drawn to the same contract as the rail's and the Officer's own tabs.
  *
  * A 24-unit box, no `fill`, and no colour of their own: `stroke: currentcolor` in the stylesheet
  * means the active tab's green reaches the icon through the rule that already paints its label.
@@ -28,31 +35,11 @@ function IconNotStarted(): JSX.Element {
   );
 }
 
-function IconFirstAssessment(): JSX.Element {
+function IconInProgress(): JSX.Element {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17v3z" />
       <path d="M14.5 7.5l3 3" />
-    </svg>
-  );
-}
-
-function IconAssignA2(): JSX.Element {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <circle cx="9" cy="8" r="3.4" />
-      <path d="M2.6 20a6.4 6.4 0 0 1 12.8 0" />
-      <path d="M17.5 8.5h5" />
-      <path d="M20 6v5" />
-    </svg>
-  );
-}
-
-function IconSecondAssessment(): JSX.Element {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <circle cx="11" cy="11" r="6" />
-      <path d="M15.5 15.5L21 21" />
     </svg>
   );
 }
@@ -69,7 +56,7 @@ function IconDecision(): JSX.Element {
   );
 }
 
-function IconClosed(): JSX.Element {
+function IconAssignedForWork(): JSX.Element {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       <circle cx="12" cy="12" r="8.5" />
@@ -78,55 +65,85 @@ function IconClosed(): JSX.Element {
   );
 }
 
-/**
- * The six, in pipeline order. The captions are the manager's words, not the enum's.
- *
- * Two of them, because a tab and a heading are read differently. `label` is what fits in a bar of
- * six — short enough that the row stays one line and the eye can sweep it. `heading` is what the
- * page says once a bucket is chosen and there is room to name who is being waited on, which is the
- * part a manager acts upon and the part a bare "Decision" would drop.
- */
-export const BUCKETS: readonly {
-  status: string;
+/** One state of the pipeline, as the bar draws it and the route filters by it. */
+export type Bucket = {
+  id: string;
   label: string;
   heading: string;
+  state: string;
+  statuses: readonly string[];
   Icon: () => JSX.Element;
-}[] = [
-  { status: "received", label: "Not started", heading: "Not started", Icon: IconNotStarted },
+};
+
+/**
+ * The four states a manager reads the pipeline in, in pipeline order.
+ *
+ * `statuses` is the set each one folds together, and it is the only place that mapping is
+ * written — the route filters by it and counts by it, so the tab, the figure and the list cannot
+ * come to disagree about what "In progress" contains.
+ *
+ * Three captions rather than one, because a tab, a heading and a cell are read differently.
+ * `label` is what fits in the bar. `heading` is what the page says once a state is chosen, where
+ * there is room to name who is being waited on. `state` is what one row says about itself, and it
+ * is deliberately the same word at every ordinal: a report with A1 writing and a report with A4
+ * writing are both, to a manager, in progress.
+ *
+ * `closed` is in no bucket. Nothing in this slice writes it and the MVP has no closing workflow,
+ * so a tab for it would be a stage of a pipeline that does not run yet.
+ */
+export const BUCKETS: readonly Bucket[] = [
   {
-    status: "first_assessment",
-    label: "First assessment",
-    heading: "In progress — first assessment",
-    Icon: IconFirstAssessment,
+    id: "not-started",
+    label: "Not started",
+    heading: "Not started",
+    state: "Not started",
+    statuses: ["received"],
+    Icon: IconNotStarted,
   },
   {
-    status: "awaiting_second_assessor",
-    // "next", not "second": this bucket is where a manager stands after A1 and after every
-    // secondary assessment alike, so the word has to hold for naming A2, A5 or An.
-    label: "Assign next assessor",
-    heading: "Waiting on you — assign the next assessor",
-    Icon: IconAssignA2,
+    id: "in-progress",
+    label: "In progress",
+    heading: "In progress",
+    state: "In progress",
+    // One bucket for every ordinal. `first_assessment` is A1 writing and `second_assessment` is
+    // whichever of A2..An holds it — the same fact about the report, and the row's own Assessment
+    // column is what separates them for a reader who cares which.
+    statuses: ["first_assessment", "second_assessment"],
+    Icon: IconInProgress,
   },
   {
-    status: "second_assessment",
-    label: "Secondary assessment",
-    heading: "In progress — secondary assessment",
-    Icon: IconSecondAssessment,
-  },
-  {
-    status: "awaiting_decision",
+    id: "decision",
     label: "Decision",
     heading: "Waiting on you — decision",
+    state: "Awaiting decision",
+    // Both of the statuses that mean "the latest assessment is in and it is the manager's move":
+    // right after A1, and after every secondary assessment since. A manager standing at either one
+    // is doing the same thing — reading what came back and deciding what happens next.
+    statuses: ["awaiting_second_assessor", "awaiting_decision"],
     Icon: IconDecision,
   },
   {
-    status: "assigned_for_work",
+    id: "assigned-for-work",
     label: "Assigned for work",
     heading: "Assigned for work",
-    Icon: IconClosed,
+    state: "Assigned for work",
+    statuses: ["assigned_for_work"],
+    Icon: IconAssignedForWork,
   },
-  { status: "closed", label: "Closed", heading: "Closed", Icon: IconClosed },
 ];
+
+/** Every status some bucket claims — what the unfiltered page shows, and nothing else. */
+export const BUCKETED_STATUSES: readonly string[] = BUCKETS.flatMap((bucket) => bucket.statuses);
+
+/** Which state a stored status reads as, or undefined for one no bucket claims. */
+export function bucketOfStatus(status: string): Bucket | undefined {
+  return BUCKETS.find((bucket) => bucket.statuses.includes(status));
+}
+
+/** Whether a row is one the manager is being waited on for, whichever bucket is being viewed. */
+function awaitsDecision(status: string): boolean {
+  return bucketOfStatus(status)?.id === "decision";
+}
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -142,8 +159,14 @@ function day(value: Date): string {
   return `${String(at.getUTCDate()).padStart(2, "0")} ${MONTHS[at.getUTCMonth()]} ${at.getUTCFullYear()}`;
 }
 
-/** A row of the pipeline. `latestSecondaryName`/`secondaryCount` summarise however many secondary
- *  assessments the report has had, rather than naming a fixed second assessor. */
+/**
+ * A row of the pipeline.
+ *
+ * `currentOrdinal`/`currentAssessorName` are the assessment the report is on right now, at
+ * whatever ordinal that is — the pair that replaced the old stacked "A1: … / A2: …" cell. They
+ * carry the A1/A2/A3 fact the workflow-specific tabs used to carry, as data in the row rather
+ * than as navigation the reader has to understand first.
+ */
 export type WorkloadRow = {
   id: string;
   number: string;
@@ -151,57 +174,20 @@ export type WorkloadRow = {
   deviceName: string;
   severity: string;
   status: string;
-  assessor1Name: string | null;
-  latestSecondaryName: string | null;
-  secondaryCount: number;
+  currentOrdinal: number;
+  currentAssessorName: string | null;
 };
 
 export type WorkloadPageProps = {
   viewerRole: string;
   /** The signed-in person, for the title bar. */
   viewerName: string;
-  /** Every bucket's size, keyed by status. A bucket with nothing in it is absent, not zero. */
+  /** Every bucket's size, keyed by bucket id. A bucket with nothing in it is absent, not zero. */
   counts: Record<string, number>;
-  /** The status being shown, or null for all of them. */
+  /** The bucket being shown, or null for all of them. */
   selected: string | null;
   rows: WorkloadRow[];
 };
-
-/**
- * Who a report is with, as one cell.
- *
- * An unassigned report says so rather than printing an empty column: null here means intake found
- * no active Officer to give it to, which is a state a manager needs to see, not a blank.
- */
-function Assessors({ row }: { row: WorkloadRow }): JSX.Element {
-  if (row.assessor1Name === null) return <span class="hint">Unassigned</span>;
-
-  return (
-    <>
-      <span safe>{`A1: ${row.assessor1Name}`}</span>
-      {row.secondaryCount > 0 ? (
-        <>
-          <br />
-          <span safe>
-            {row.secondaryCount === 1
-              ? `A2: ${row.latestSecondaryName ?? "—"}`
-              : `A${row.secondaryCount + 1}: ${row.latestSecondaryName ?? "—"} (${row.secondaryCount} so far)`}
-          </span>
-        </>
-      ) : (
-        // The way into the one thing this bucket is waiting on the manager for. It is a link to
-        // the report, where the picker lives and where the rules about who may be named are
-        // enforced — not a control that assigns from here, which would have to repeat them.
-        row.status === "awaiting_second_assessor" && (
-          <>
-            <br />
-            <a href={`/reports/${row.id}`}>Assign next assessor</a>
-          </>
-        )
-      )}
-    </>
-  );
-}
 
 export function WorkloadPage({
   viewerRole,
@@ -210,13 +196,8 @@ export function WorkloadPage({
   selected,
   rows,
 }: WorkloadPageProps): JSX.Element {
-  const shown = selected === null ? undefined : BUCKETS.find((b) => b.status === selected);
-
-  // Filtering is validated against the schema enum, which may one day carry a status this page
-  // draws no card for. Falling back to "All reports" there would head a filtered list with the
-  // one caption that is certainly wrong, so the status' own label answers instead.
-  const heading =
-    selected === null ? "All reports" : (shown?.heading ?? STATUS_LABELS[selected] ?? selected);
+  const shown = selected === null ? undefined : BUCKETS.find((bucket) => bucket.id === selected);
+  const heading = shown?.heading ?? "All reports";
 
   return (
     <StaffShell
@@ -227,25 +208,25 @@ export function WorkloadPage({
       active="workload"
     >
       {/*
-       * Links, not buttons. Filtering is a different view of the same page, so it is a GET with the
-       * status in the address — which means a filtered pipeline can be bookmarked, opened in a
-       * second tab and reloaded, none of which a scripted filter would give. The chosen card links
-       * back to the unfiltered page, so clicking it twice undoes it.
+       * Links, not buttons, and a filter only — never an action. Filtering is a different view of
+       * the same page, so it is a GET with the state in the address, which means a filtered
+       * pipeline can be bookmarked, opened in a second tab and reloaded. The chosen tab links back
+       * to the unfiltered page, so clicking it twice undoes it.
        */}
-      <nav class="wl-tabs" aria-label="Filter by stage">
+      <nav class="wl-tabs" aria-label="Filter by state">
         {BUCKETS.map((bucket) => {
-          const on = bucket.status === selected;
+          const on = bucket.id === selected;
 
           return (
             <a
-              href={on ? "/workload" : `/workload?status=${bucket.status}`}
+              href={on ? "/workload" : `/workload?stage=${bucket.id}`}
               class={on ? "on" : ""}
               aria-current={on ? "true" : undefined}
             >
               <bucket.Icon />
               <span>
                 <span safe>{bucket.label}</span>{" "}
-                <span class="wl-count">{counts[bucket.status] ?? 0}</span>
+                <span class="wl-count">{counts[bucket.id] ?? 0}</span>
               </span>
             </a>
           );
@@ -274,50 +255,73 @@ export function WorkloadPage({
         <p class="hint">
           {selected === null
             ? "Nothing has been reported yet."
-            : "No reports are in this stage right now."}
+            : "No reports are in this state right now."}
         </p>
       ) : (
-        <table class="utable">
-          <thead>
-            <tr>
-              <th>Number</th>
-              <th>Received</th>
-              <th>Device</th>
-              <th>Severity</th>
-              <th>Assessors</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
+        // Eight columns is wider than a narrow window, so the table scrolls inside its own box
+        // rather than pushing the page sideways. See `.tscroll` in the stylesheet.
+        <div class="tscroll">
+          <table class="utable">
+            <thead>
               <tr>
-                <td>
-                  <a href={`/reports/${row.id}`} safe>
-                    {row.number}
-                  </a>
-                </td>
-                <td>{day(row.receivedAt)}</td>
-                <td safe>{row.deviceName}</td>
-                <td>
-                  <span
-                    class={`tag ${severityTone(row.severity) === "caution" ? "warn" : ""}`}
-                    safe
-                  >
-                    {SEVERITY_LABELS[row.severity] ?? row.severity}
-                  </span>
-                </td>
-                <td>
-                  <Assessors row={row} />
-                </td>
-                <td>
-                  <span class="tag muted" safe>
-                    {STATUS_LABELS[row.status] ?? row.status}
-                  </span>
-                </td>
+                <th>Number</th>
+                <th>Received</th>
+                <th>Device</th>
+                <th>Severity</th>
+                <th>Assessment</th>
+                <th>Assessor</th>
+                <th>Status</th>
+                <th>Action</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr>
+                  <td>
+                    <a href={`/reports/${row.id}`} safe>
+                      {row.number}
+                    </a>
+                  </td>
+                  <td>{day(row.receivedAt)}</td>
+                  <td safe>{row.deviceName}</td>
+                  <td>
+                    <span
+                      class={`tag ${severityTone(row.severity) === "caution" ? "warn" : ""}`}
+                      safe
+                    >
+                      {SEVERITY_LABELS[row.severity] ?? row.severity}
+                    </span>
+                  </td>
+                  {/* The ordinal, as data. This is where A1/A2/A3 lives now it is not a tab. */}
+                  <td safe>{`A${row.currentOrdinal}`}</td>
+                  {/* An unassigned report says so rather than printing an empty column: null here
+                      means intake found no active Officer to give it to, which is a state a
+                      manager needs to see, not a blank. */}
+                  <td>
+                    {row.currentAssessorName === null ? (
+                      <span class="hint">Unassigned</span>
+                    ) : (
+                      <span safe>{row.currentAssessorName}</span>
+                    )}
+                  </td>
+                  <td>
+                    <span class="tag muted" safe>
+                      {bucketOfStatus(row.status)?.state ?? row.status}
+                    </span>
+                  </td>
+                  {/* One way in, worded for what the reader will be doing when they get there. The
+                      decision itself is made on the report, where the rules about who may be named
+                      are enforced — not from here, which would have to repeat them. */}
+                  <td>
+                    <a href={`/reports/${row.id}`}>
+                      {awaitsDecision(row.status) ? "Review" : "Open"}
+                    </a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </StaffShell>
   );

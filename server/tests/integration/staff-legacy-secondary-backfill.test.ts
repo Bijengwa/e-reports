@@ -182,14 +182,18 @@ describe.skipIf(!INTEGRATION_ENABLED)("the state migration 0013 repairs", () => 
 
     await seedLegacy({ number: "MD-AE/2026/7001", assessor1: first.id, assessor2: second.id });
 
-    // The manager sees a report in the bucket and no name to go with it.
-    const workload = (await get("/workload?status=second_assessment", manager.cookie)).body;
-    expect(workload).toContain("A1: Asha Mrema");
+    // The manager sees a report being worked on and the wrong person against it: with no
+    // `assessments` row above ordinal 1, the latest assessment on the report still looks
+    // like A1.
+    const workload = (await get("/workload?stage=in-progress", manager.cookie)).body;
+    expect(workload).toContain("<td>A1</td>");
+    expect(workload).toContain("<td><span>Asha Mrema</span></td>");
     expect(workload).not.toContain("Baraka Nyoni");
 
-    // The Officer it is actually with is told they have no secondary work.
+    // The Officer it is actually with is told they have nothing at all.
     const queue = (await get("/assessments", second.cookie)).body;
-    expect(queue).toContain('Secondary assessments <span class="mya-count">0</span>');
+    expect(queue).toContain('Not started <span class="mya-count">0</span>');
+    expect(queue).toContain("Nothing is waiting for you to start.");
   });
 
   it("gives the report its open assessment row, as a draft at the next ordinal", async () => {
@@ -227,17 +231,21 @@ describe.skipIf(!INTEGRATION_ENABLED)("the state migration 0013 repairs", () => 
     });
     await runBackfill();
 
-    const workload = (await get("/workload?status=second_assessment", manager.cookie)).body;
-    expect(workload).toContain("A1: Asha Mrema");
-    expect(workload).toContain("A2: Baraka Nyoni");
+    // The report is with A2 now, and the manager's row names them rather than the assessor
+    // whose turn is over.
+    const workload = (await get("/workload?stage=in-progress", manager.cookie)).body;
+    expect(workload).toContain("<td>A2</td>");
+    expect(workload).toContain("<td><span>Baraka Nyoni</span></td>");
 
     const queue = (await get("/assessments", second.cookie)).body;
-    expect(queue).toContain('Secondary assessments <span class="mya-count">1</span>');
+    expect(queue).toContain('Not started <span class="mya-count">1</span>');
     expect(queue).toContain("MD-AE/2026/7003");
+    expect(queue).toContain("<td>A2</td>");
     // The way in, at the ordinal that is actually theirs.
     expect(queue).toContain(`href="/reports/${id}/secondary-assessment"`);
-    // Still their own work to do, not something already sent on.
-    expect(queue).toContain("Secondary assessment in progress");
+    // Still their own work to do, and never yet opened — not something already sent on.
+    expect(queue).toContain('<span class="tag muted">Not started</span>');
+    expect(queue).not.toContain('<span class="tag muted">Submitted</span>');
   });
 
   it("leaves the assessor's own way into the form working", async () => {

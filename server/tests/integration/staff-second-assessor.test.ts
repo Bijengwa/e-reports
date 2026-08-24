@@ -297,7 +297,8 @@ function bucketStat(label: string, count: number): string {
 }
 
 /** The workload tab for the bucket a manager acts on after A1 and after every An alike. */
-const ASSIGN_NEXT = "Assign next assessor";
+/** The state a report waiting on the manager sits in — after A1 and after every An alike. */
+const DECISION = "Decision";
 
 describe.skipIf(!INTEGRATION_ENABLED)("the manager's pipeline", () => {
   beforeEach(start);
@@ -325,9 +326,9 @@ describe.skipIf(!INTEGRATION_ENABLED)("the manager's pipeline", () => {
     for (const number of ["8001", "8002", "8003", "8004", "8005"]) {
       expect(body, number).toContain(`MD-AE/2026/${number}`);
     }
-    expect(body).toContain(bucketStat(ASSIGN_NEXT, 2));
+    expect(body).toContain(bucketStat(DECISION, 2));
     expect(body).toContain(bucketStat("Not started", 1));
-    expect(body).toContain(bucketStat("Closed", 0));
+    expect(body).toContain(bucketStat("Assigned for work", 0));
 
     // Newest first: the later arrival is printed above the earlier one.
     expect(body.indexOf("MD-AE/2026/8002")).toBeLessThan(body.indexOf("MD-AE/2026/8001"));
@@ -339,7 +340,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the manager's pipeline", () => {
     await seedReport({ number: "MD-AE/2026/8011", status: "awaiting_second_assessor" });
     await seedReport({ number: "MD-AE/2026/8012", status: "received" });
 
-    const body = (await get("/workload?status=awaiting_second_assessor", manager.cookie)).body;
+    const body = (await get("/workload?stage=decision", manager.cookie)).body;
 
     expect(body).toContain("MD-AE/2026/8011");
     expect(body).not.toContain("MD-AE/2026/8012");
@@ -354,10 +355,10 @@ describe.skipIf(!INTEGRATION_ENABLED)("the manager's pipeline", () => {
     const manager = await signedInAs("manager", "Mgr");
     await seedReport({ number: "MD-AE/2026/8010", status: "received" });
 
-    const body = (await get("/workload?status=awaiting_second_assessor", manager.cookie)).body;
+    const body = (await get("/workload?stage=decision", manager.cookie)).body;
 
-    expect(body).toContain(bucketStat(ASSIGN_NEXT, 0));
-    expect(body).toContain("No reports are in this stage right now.");
+    expect(body).toContain(bucketStat(DECISION, 0));
+    expect(body).toContain("No reports are in this state right now.");
     // No header over an empty body: that reads as a list that failed to load.
     expect(body).not.toContain("<table");
   });
@@ -505,21 +506,25 @@ describe.skipIf(!INTEGRATION_ENABLED)("what the assignment hands over", () => {
     // Before: it is the first assessor's submitted work, and nothing of the second's.
     const beforeOther = (await get("/assessments", other.cookie)).body;
     expect(beforeOther).not.toContain(report.number);
-    expect(beforeOther).toContain("Nothing has been assigned to you for a secondary assessment.");
+    expect(beforeOther).toContain("Nothing is waiting for you to start.");
 
     await assign(report, manager.cookie, other.id);
 
+    // Theirs now, at the ordinal they were given, and in the same Not started state an A1 would
+    // be in — not in a category of its own whose only meaning is “secondary”.
     const afterOther = (await get("/assessments", other.cookie)).body;
     expect(afterOther).toContain(report.number);
-    expect(afterOther).toContain("Secondary assessment");
-    expect(afterOther).not.toContain(
-      "Nothing has been assigned to you for a secondary assessment.",
-    );
+    expect(afterOther).toContain("<td>A2</td>");
+    expect(afterOther).toContain('<span class="tag muted">Not started</span>');
+    expect(afterOther).not.toContain("Nothing is waiting for you to start.");
 
     // The first assessor still has it, still listed as sent on rather than as theirs to review.
     const afterFirst = (await get("/assessments", officer.cookie)).body;
     expect(afterFirst).toContain(report.number);
-    expect(afterFirst).toContain("Nothing has been assigned to you for a secondary assessment.");
+    expect(afterFirst).toContain("<td>A1</td>");
+    expect(afterFirst).toContain('<span class="tag muted">Submitted</span>');
+    // Another Officer's A2 is not theirs, and does not reach their page at all.
+    expect(afterFirst).not.toContain("<td>A2</td>");
 
     // A colleague who was named neither sees nothing of it.
     const stranger = await signedInAs("assessor", "Chausiku Njau");
@@ -556,23 +561,32 @@ describe.skipIf(!INTEGRATION_ENABLED)("what the assignment hands over", () => {
     expect(after).toContain(">A2<");
   });
 
-  it("offers the manager the way in from the bucket that is waiting on them", async () => {
+  it("offers the manager the way in from the state that is waiting on them", async () => {
     const { manager, other, report } = await waiting();
 
-    // The row's own link, matched as the anchor rather than as the bare words: "Assign A2" is
-    // also the caption of the bucket's tab, which is on the page whatever the rows say.
-    const rowLink = `<a href="/reports/${report.id}">Assign next assessor</a>`;
+    // The row's own link, matched as the anchor rather than as bare words. It says Review: the
+    // top bar is a filter, and the decision itself is made on the report, where the rules about
+    // who may be named are enforced.
+    const rowLink = `<a href="/reports/${report.id}">Review</a>`;
 
-    const waitingBucket = (await get("/workload?status=awaiting_second_assessor", manager.cookie))
-      .body;
-    expect(waitingBucket).toContain(rowLink);
+    const waitingState = (await get("/workload?stage=decision", manager.cookie)).body;
+    expect(waitingState).toContain(rowLink);
+    // The duplicate action the list used to carry is gone from it.
+    expect(waitingState).not.toContain("Assign next assessor");
+    // It lives on the report the link points at, and nowhere else.
+    expect((await get(`/reports/${report.id}`, manager.cookie)).body).toContain(
+      "Assign next assessor",
+    );
 
     await assign(report, manager.cookie, other.id);
 
-    // Once named, the row states who rather than offering the way in again.
-    const secondBucket = (await get("/workload?status=second_assessment", manager.cookie)).body;
-    expect(secondBucket).toContain(`A2: ${other.name}`);
-    expect(secondBucket).not.toContain(rowLink);
+    // Once named, the row says which assessment the report is on and who has it, rather than
+    // offering a way in again.
+    const working = (await get("/workload?stage=in-progress", manager.cookie)).body;
+    expect(working).toContain("<td>A2</td>");
+    expect(working).toContain(`<td><span>${other.name}</span></td>`);
+    expect(working).toContain(`<a href="/reports/${report.id}">Open</a>`);
+    expect(working).not.toContain(rowLink);
   });
 });
 
@@ -626,20 +640,19 @@ describe.skipIf(!INTEGRATION_ENABLED)("assigning one", () => {
   it("moves the report to the next bucket and takes the picker off the page", async () => {
     const { manager, other, report } = await waiting();
 
-    const before = await get("/workload?status=awaiting_second_assessor", manager.cookie);
+    const before = await get("/workload?stage=decision", manager.cookie);
     expect(before.body).toContain(report.number);
 
     await assign(report, manager.cookie, other.id);
 
     // Out of the bucket it was in, and counted in the one it moved to.
-    const waitingBucket = (await get("/workload?status=awaiting_second_assessor", manager.cookie))
-      .body;
+    const waitingBucket = (await get("/workload?stage=decision", manager.cookie)).body;
     expect(waitingBucket).not.toContain(report.number);
-    expect(waitingBucket).toContain(bucketStat(ASSIGN_NEXT, 0));
+    expect(waitingBucket).toContain(bucketStat(DECISION, 0));
 
-    const secondBucket = (await get("/workload?status=second_assessment", manager.cookie)).body;
+    const secondBucket = (await get("/workload?stage=in-progress", manager.cookie)).body;
     expect(secondBucket).toContain(report.number);
-    expect(secondBucket).toContain(bucketStat("Secondary assessment", 1));
+    expect(secondBucket).toContain(bucketStat("In progress", 1));
 
     // The report is no longer waiting, so there is nothing left to pick.
     const detail = (await get(`/reports/${report.id}`, manager.cookie)).body;
