@@ -127,18 +127,21 @@ function fileAtThePublicDoor() {
 }
 
 /**
- * A first assessment that leaves 1.10 and 1.11 blank on purpose.
+ * A first assessment that leaves 1.10 blank on purpose.
  *
- * Both are "(If applicable)" on the paper, so A1 may leave them empty and a secondary assessor is
- * offered `supplied` rather than the three judgement degrees for them. That is the fourth case the
+ * 1.10 is "(If applicable)" on the paper, so A1 may leave it empty and a secondary assessor is
+ * offered `supplied` rather than the three judgement degrees for it. That is the fourth case the
  * whole model turns on, and it has to survive being generalized past A2.
+ *
+ * 1.11 beside it is filled, and must be: the paper marks 1.10 "(If applicable)" and does not mark
+ * the device class at all, so an assessment cannot be submitted without one.
  */
 function completeAssessment(signature: string) {
   return {
     intent: "submit",
     device_type: "md",
     registration_number: "",
-    device_class: "",
+    device_class: "B",
     report_stage: "initial",
     source_of_event: "malfunction",
     c2_5: "Reported by the facility as a device malfunction.",
@@ -177,14 +180,15 @@ function completeAssessment(signature: string) {
 /**
  * A complete secondary review of A1: a position on every reviewable item.
  *
- * 1.10 and 1.11 carry no degree at all — A1 left them blank, so they are `supplied` items and the
- * page never offers the three degrees for them. `validateSecondaryReviewForSubmit` must not ask
- * for one either, whichever ordinal is writing.
+ * 1.10 carries no degree at all — A1 left it blank, so it is a `supplied` item and the page never
+ * offers the three degrees for it. `validateSecondaryReviewForSubmit` must not ask for one either,
+ * whichever ordinal is writing. 1.11 beside it does carry one, A1 having answered it.
  */
 function completeSecondary(overrides: Record<string, string> = {}) {
   return {
     intent: "submit",
     "a2_degree_1.3": "agree",
+    "a2_degree_1.11": "agree",
     "a2_degree_1.19": "agree",
     "a2_degree_2.5": "agree",
     "a2_degree_2.6": "agree",
@@ -504,17 +508,17 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
     await post(
       `/reports/${report.id}/secondary-assessment`,
       second.cookie,
-      completeSecondary({ "a2_value_1.11": "Class B" }),
+      completeSecondary({ "a2_value_1.10": "TMDA-REG-0002" }),
     );
 
     await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
       assessor_id: third.id,
-      comment: "Please check the class.",
+      comment: "Please check the registration.",
     });
     await post(
       `/reports/${report.id}/secondary-assessment`,
       third.cookie,
-      completeSecondary({ "a2_value_1.11": "Class C" }),
+      completeSecondary({ "a2_value_1.10": "TMDA-REG-0003" }),
     );
 
     const rows = await assessmentsOf(report.id);
@@ -523,15 +527,15 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
     // promotes one of them into A1's document.
     const a1 = rows.find((r) => r.ordinal === 1);
     if (a1 === undefined) throw new Error("the primary assessment is missing");
-    expect((a1.payload as unknown as Record<string, string>).device_class).toBe("");
+    expect((a1.payload as unknown as Record<string, string>).registration_number).toBe("");
 
-    expect(rows.find((r) => r.ordinal === 2)?.payload.responses?.["1.11"]).toEqual({
+    expect(rows.find((r) => r.ordinal === 2)?.payload.responses?.["1.10"]).toEqual({
       degree: "supplied",
-      value: "Class B",
+      value: "TMDA-REG-0002",
     });
-    expect(rows.find((r) => r.ordinal === 3)?.payload.responses?.["1.11"]).toEqual({
+    expect(rows.find((r) => r.ordinal === 3)?.payload.responses?.["1.10"]).toEqual({
       degree: "supplied",
-      value: "Class C",
+      value: "TMDA-REG-0003",
     });
   });
 

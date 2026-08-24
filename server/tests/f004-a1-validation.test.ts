@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { type F004Answers, SECONDARY_REVIEW_ITEMS, validateForSubmit } from "../src/domain/f004.js";
+import {
+  type F004Answers,
+  IMDRF_GROUPS,
+  SECONDARY_REVIEW_ITEMS,
+  validateForSubmit,
+} from "../src/domain/f004.js";
 
 /**
  * What `validateForSubmit` guards: an answer is never a finding on its own.
@@ -16,6 +21,7 @@ const ASSESSOR = "Asha Mrema";
 /** Every item's answer AND the comment the paper prints beside it. The baseline that must pass. */
 const COMPLETE: F004Answers = {
   device_type: "md",
+  device_class: "B",
   report_stage: "initial",
   source_of_event: "malfunction",
   c2_5: "Reported as a device malfunction by the facility.",
@@ -54,6 +60,55 @@ const COMMENTED_ITEMS = SECONDARY_REVIEW_ITEMS.filter((item) => item.commentFiel
 
 /** Every item the paper marks "(If applicable)". */
 const OPTIONAL_ITEMS = SECONDARY_REVIEW_ITEMS.filter((item) => item.optional === true);
+
+/** One IMDRF row, under the numbering F004 Rev. 05 prints beside its own boxes. */
+type ImdrfBoxes = {
+  key: string;
+  /** "3.1.1-3.1.4" — the span of boxes this row owns on the paper. */
+  boxes: string;
+  optional: boolean;
+  fields: readonly string[];
+};
+
+/**
+ * The seven IMDRF rows, each with the span of form boxes it actually owns.
+ *
+ * The paper numbers the *boxes*, not the rows: 3.1 runs 3.1.1-3.1.4 for the component and then
+ * 3.1.5-3.1.8 for the device problem, so a row's span is its preferred-terminology levels plus its
+ * one coding box. Computed from the item table rather than typed out beside it, so a row that grew
+ * or lost a level would move its own span and be caught by the pin below — which is what ties this
+ * suite to the numbers actually printed on F004 Rev. 05.
+ */
+const IMDRF_BOXES: readonly ImdrfBoxes[] = IMDRF_GROUPS.flatMap((group) => {
+  let next = 1;
+
+  return group.items.map((item) => {
+    const levels = [1, 2, 3].filter((level) => level <= item.levels);
+    const first = next;
+    next += levels.length + 1;
+
+    return {
+      key: item.key,
+      boxes: `${group.no}.${String(first)}-${group.no}.${String(next - 1)}`,
+      optional: item.optional === true,
+      fields: [
+        ...levels.map((level) => `imdrf_${item.key}_l${String(level)}`),
+        `imdrf_${item.key}_code`,
+      ],
+    };
+  });
+});
+
+const OPTIONAL_IMDRF = IMDRF_BOXES.filter((row) => row.optional);
+
+/** Every box of one row filled: a term at each level the annex carries, and the coding. */
+function filledWith(row: ImdrfBoxes): F004Answers {
+  const answers: F004Answers = { ...COMPLETE };
+  for (const field of row.fields) {
+    answers[field] = field.endsWith("_code") ? "A0501" : "Battery depletion";
+  }
+  return answers;
+}
 
 describe("a complete first assessment", () => {
   it("is accepted", () => {
@@ -155,17 +210,142 @@ describe('an "(If applicable)" item', () => {
     ).toEqual([]);
   });
 
-  it("is accepted when 1.10 and 1.11 are filled, having no comment box to owe", () => {
+  it("is accepted when 1.10 is filled, having no comment box to owe", () => {
     expect(
-      validateForSubmit(
-        { ...COMPLETE, registration_number: "TMDA-REG-0001", device_class: "B" },
-        ASSESSOR,
-      ),
+      validateForSubmit({ ...COMPLETE, registration_number: "TMDA-REG-0001" }, ASSESSOR),
     ).toEqual([]);
   });
 });
 
-describe("the required IMDRF row, 3.3.1", () => {
+/**
+ * What "(If applicable)" is worth, group by group, against the numbering on the paper.
+ *
+ * The six spans below are the ones F004 Rev. 05 opens with a parent instruction ending in
+ * "(If applicable)" — the component, the device problem, the health impact, the clinical signs,
+ * the investigation findings and the investigation conclusion. Each is optional as a whole and by
+ * halves is not one of the states the form has: blank, or complete.
+ */
+describe('an IMDRF group the paper marks "(If applicable)"', () => {
+  it("is one of exactly six spans, numbered as the form numbers them", () => {
+    expect(OPTIONAL_IMDRF.map((row) => row.boxes)).toEqual([
+      "3.1.1-3.1.4",
+      "3.1.5-3.1.8",
+      "3.2.1-3.2.4",
+      "3.2.5-3.2.8",
+      "3.3.3-3.3.6",
+      "3.3.7-3.3.9",
+    ]);
+  });
+
+  it.each(OPTIONAL_IMDRF.map((row) => [row.boxes, row] as const))(
+    "is accepted with %s left completely blank",
+    (_boxes, row) => {
+      for (const field of row.fields) expect(COMPLETE[field]).toBeUndefined();
+      expect(validateForSubmit(COMPLETE, ASSESSOR)).toEqual([]);
+    },
+  );
+
+  it.each(
+    OPTIONAL_IMDRF.flatMap((row) => row.fields.map((field) => [row.boxes, field, row] as const)),
+  )("is refused when %s carries %s and nothing else", (_boxes, field, row) => {
+    const issues = validateForSubmit({ ...COMPLETE, [field]: "Battery depletion" }, ASSESSOR);
+
+    // One complaint, and it names a box of this row: starting a group is starting all of it.
+    expect(issues).toHaveLength(1);
+    expect(row.fields).toContain(issues[0]?.field);
+  });
+
+  it.each(OPTIONAL_IMDRF.map((row) => [row.boxes, row] as const))(
+    "is accepted with %s filled to every level it carries",
+    (_boxes, row) => {
+      expect(validateForSubmit(filledWith(row), ASSESSOR)).toEqual([]);
+    },
+  );
+
+  it.each(OPTIONAL_IMDRF.map((row) => [row.boxes, row] as const))(
+    "is accepted with %s stopped at level 1 and its coding, the depth an annex may end at",
+    (_boxes, row) => {
+      const level1 = row.fields[0] as string;
+      const code = row.fields[row.fields.length - 1] as string;
+
+      expect(
+        validateForSubmit(
+          { ...COMPLETE, [level1]: "Battery depletion", [code]: "A0501" },
+          ASSESSOR,
+        ),
+      ).toEqual([]);
+    },
+  );
+});
+
+/**
+ * Which items the form leaves open, pinned — the guard against this drifting either way.
+ *
+ * Optionality lives in one table, which is what lets the page, the validation and the secondary
+ * assessor's workspace agree about it. The cost of one table is that one careless `optional: true`
+ * excuses an assessor from a finding the regulation asks for, silently and everywhere at once.
+ * Both lists are written out so that either kind of drift fails here rather than in front of an
+ * assessor: a required row turned optional, or an "(If applicable)" row turned required.
+ */
+describe("the item table's optionality", () => {
+  it("marks exactly the rows F004 Rev. 05 prints as optional", () => {
+    expect(OPTIONAL_ITEMS.map((item) => item.key)).toEqual([
+      "1.10", // Device registration number (If applicable)
+      "3.1.1", // 3.1.1-3.1.4  component of the medical device (If applicable)
+      "3.1.2", // 3.1.5-3.1.8  medical device problem (If applicable)
+      "3.2.1", // 3.2.1-3.2.4  health effects - health impact (If applicable)
+      "3.2.2", // 3.2.5-3.2.8  clinical signs and symptoms (If applicable)
+      "3.3.2", // 3.3.3-3.3.6  investigation findings (If applicable)
+      "3.3.3", // 3.3.7-3.3.9  investigation conclusion (If applicable)
+    ]);
+  });
+
+  it("leaves every other row required, the paper having marked none of them", () => {
+    expect(
+      SECONDARY_REVIEW_ITEMS.filter((item) => item.optional !== true).map((item) => item.key),
+    ).toEqual([
+      "1.3",
+      "1.11",
+      "1.19",
+      "2.5",
+      "2.6",
+      "2.7",
+      "3.3.1",
+      "4.1",
+      "4.2",
+      "4.3",
+      "5",
+      "6",
+      "7.1_actions",
+      "7.1_conclusion",
+    ]);
+  });
+
+  it("keeps 1.11 Device Class required, the one section-1 row beside 1.10 that is not marked", () => {
+    expect(fieldsFlagged(without("device_class"))).toContain("device_class");
+    expect(fieldsFlagged({ ...COMPLETE, device_class: "   " })).toContain("device_class");
+  });
+});
+
+describe("the required IMDRF row, 3.3.1 Type of Investigation with its coding at 3.3.2", () => {
+  it("owns exactly those two boxes, and is not one of the spans the paper leaves open", () => {
+    const row = IMDRF_BOXES.find((candidate) => candidate.key === "investigation_type");
+
+    expect(row?.boxes).toBe("3.3.1-3.3.2");
+    expect(row?.optional).toBe(false);
+  });
+
+  it("stays required although 3.3.3-3.3.9 beneath it are optional", () => {
+    const findings = OPTIONAL_IMDRF.find((row) => row.boxes === "3.3.3-3.3.6");
+    const conclusion = OPTIONAL_IMDRF.find((row) => row.boxes === "3.3.7-3.3.9");
+
+    expect(findings).toBeDefined();
+    expect(conclusion).toBeDefined();
+    expect(
+      fieldsFlagged(without("imdrf_investigation_type_l1", "imdrf_investigation_type_code")),
+    ).toContain("imdrf_investigation_type_l1");
+  });
+
   it("is refused when left out entirely", () => {
     expect(
       fieldsFlagged(without("imdrf_investigation_type_l1", "imdrf_investigation_type_code")),

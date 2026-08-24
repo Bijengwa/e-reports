@@ -134,10 +134,14 @@ export function value(answers: F004Answers, field: string): string {
 /**
  * Whether A1 left this item blank — every one of its `a1Fields` empty on the report being read.
  *
- * The question that decides whether an item is reviewable at all, this time. Section 1's four
- * assessed rows and 7.1 are effectively never blank, because A1 cannot submit without them; the
- * question matters for the "(If applicable)" rows — the IMDRF boxes that are not `investigation_type`,
- * and 1.10/1.11 — which A1 may leave exactly as empty as the paper allows.
+ * The question that decides whether an item is reviewable at all, this time. Section 1's three
+ * required assessed rows and 7.1 are effectively never blank, because A1 cannot submit without
+ * them; the question matters for the "(If applicable)" rows — the IMDRF boxes that are not
+ * `investigation_type`, and 1.10 — which A1 may leave exactly as empty as the paper allows.
+ *
+ * Read off the answers rather than off `optional`, deliberately: an assessment submitted under an
+ * earlier reading of the form may hold a blank where the paper now asks for one, and a second
+ * assessor is offered `supplied` for whatever is in fact blank in front of them.
  */
 export function isA1Blank(item: A2ReviewItem, answers: F004Answers): boolean {
   return item.a1Fields.every((field) => value(answers, field).trim() === "");
@@ -705,7 +709,9 @@ export const SECONDARY_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     valueLabel: "device class",
     valueKind: "text",
     a1Fields: ["device_class"],
-    optional: true,
+    // Deliberately not optional. 1.10 beside it carries "(If applicable)" on the paper and 1.11
+    // does not, so the class is a finding every submitted assessment owes — one of the four rows
+    // the orange form never asks the reporter for, which is why the assessor determines it.
   },
   {
     key: "1.19",

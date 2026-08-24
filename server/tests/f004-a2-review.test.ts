@@ -339,10 +339,12 @@ describe("what an A2 submission must carry", () => {
   });
 
   it("never requires anything of an item A1 left blank", () => {
-    // A1's answers here omit 1.10, 1.11 and every IMDRF row but investigation_type — all
-    // "(If applicable)" and left out. A submission that never mentions them still passes.
+    // A1's answers here omit 1.10 and every IMDRF row but investigation_type — all
+    // "(If applicable)" and left out. A submission that never mentions them still passes. 1.11 is
+    // present because the paper does not mark it, so a submitted A1 always carries one.
     const a1Answers: F004Answers = {
       device_type: "md",
+      device_class: "B",
       report_stage: "initial",
       source_of_event: "malfunction",
       seriousness: "serious",
