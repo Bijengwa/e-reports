@@ -101,7 +101,9 @@ export const BUCKETS: readonly {
   },
   {
     status: "awaiting_second_assessor",
-    label: "Assign assessor",
+    // "next", not "second": this bucket is where a manager stands after A1 and after every
+    // secondary assessment alike, so the word has to hold for naming A2, A5 or An.
+    label: "Assign next assessor",
     heading: "Waiting on you — assign the next assessor",
     Icon: IconAssignA2,
   },

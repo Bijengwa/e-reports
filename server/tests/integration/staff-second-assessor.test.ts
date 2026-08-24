@@ -296,7 +296,8 @@ function bucketStat(label: string, count: number): string {
   return `<span>${label}</span> <span class="wl-count">${count}</span>`;
 }
 
-const ASSIGN_A2 = "Assign assessor";
+/** The workload tab for the bucket a manager acts on after A1 and after every An alike. */
+const ASSIGN_NEXT = "Assign next assessor";
 
 describe.skipIf(!INTEGRATION_ENABLED)("the manager's pipeline", () => {
   beforeEach(start);
@@ -324,7 +325,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the manager's pipeline", () => {
     for (const number of ["8001", "8002", "8003", "8004", "8005"]) {
       expect(body, number).toContain(`MD-AE/2026/${number}`);
     }
-    expect(body).toContain(bucketStat(ASSIGN_A2, 2));
+    expect(body).toContain(bucketStat(ASSIGN_NEXT, 2));
     expect(body).toContain(bucketStat("Not started", 1));
     expect(body).toContain(bucketStat("Closed", 0));
 
@@ -355,7 +356,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the manager's pipeline", () => {
 
     const body = (await get("/workload?status=awaiting_second_assessor", manager.cookie)).body;
 
-    expect(body).toContain(bucketStat(ASSIGN_A2, 0));
+    expect(body).toContain(bucketStat(ASSIGN_NEXT, 0));
     expect(body).toContain("No reports are in this stage right now.");
     // No header over an empty body: that reads as a list that failed to load.
     expect(body).not.toContain("<table");
@@ -634,7 +635,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("assigning one", () => {
     const waitingBucket = (await get("/workload?status=awaiting_second_assessor", manager.cookie))
       .body;
     expect(waitingBucket).not.toContain(report.number);
-    expect(waitingBucket).toContain(bucketStat(ASSIGN_A2, 0));
+    expect(waitingBucket).toContain(bucketStat(ASSIGN_NEXT, 0));
 
     const secondBucket = (await get("/workload?status=second_assessment", manager.cookie)).body;
     expect(secondBucket).toContain(report.number);

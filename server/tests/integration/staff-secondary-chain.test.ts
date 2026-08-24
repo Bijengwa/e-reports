@@ -355,6 +355,48 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
     }
   });
 
+  it("names the assessor a report is actually with, on both queues, at every ordinal", async () => {
+    const { manager, first, rest, report } = await afterFirstAssessment();
+    const [second, third] = rest;
+    if (second === undefined || third === undefined) throw new Error("need two Officers");
+
+    await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
+      assessor_id: second.id,
+      comment: "Please take the second assessment.",
+    });
+
+    // Assigned and not yet opened. This is the state the manager's bucket exists to show, and the
+    // state the Officer's own queue has to show them before they have written a word — the two
+    // read the same assignment or the work is invisible to both of them.
+    const bucket = await get("/workload?status=second_assessment", manager.cookie);
+    expect(bucket.body).toContain(`A1: ${first.name}`);
+    expect(bucket.body).toContain(`A2: ${second.name}`);
+
+    const queue = await get("/assessments", second.cookie);
+    expect(queue.body).toContain('Secondary assessments <span class="mya-count">1</span>');
+    expect(queue.body).toContain(report.number);
+
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
+    await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
+      assessor_id: third.id,
+      comment: "One more opinion, please.",
+    });
+
+    // The report is with A3 now, and the bucket says so. Naming the assessor before them would
+    // send the manager to someone whose work is finished and immutable.
+    const later = await get("/workload?status=second_assessment", manager.cookie);
+    expect(later.body).toContain(`A3: ${third.name}`);
+    expect(later.body).not.toContain(`A2: ${second.name}`);
+
+    const theirs = await get("/assessments", third.cookie);
+    expect(theirs.body).toContain('Secondary assessments <span class="mya-count">1</span>');
+
+    // A2 keeps their row, as something already sent on rather than as work still owed.
+    const done = await get("/assessments", second.cookie);
+    expect(done.body).toContain('Secondary assessments <span class="mya-count">1</span>');
+    expect(done.body).toContain("Submitted");
+  });
+
   it("shows a later assessor every earlier review, read-only, and keeps them immutable", async () => {
     const { manager, rest, report } = await afterFirstAssessment();
     const [second, third] = rest;

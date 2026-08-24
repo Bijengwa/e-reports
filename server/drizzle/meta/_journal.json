@@ -92,6 +92,13 @@
       "when": 1787840959000,
       "tag": "0012_secondary_assessments",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1787927359000,
+      "tag": "0013_backfill_legacy_secondary_assessments",
+      "breakpoints": true
     }
   ]
 }

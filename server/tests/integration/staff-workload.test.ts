@@ -317,7 +317,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the figures", () => {
     const body = (await get("/workload", manager.cookie)).body;
 
     expect(body).toContain(bucketStat("Not started", 3));
-    expect(body).toContain(bucketStat("Assign assessor", 1));
+    expect(body).toContain(bucketStat("Assign next assessor", 1));
     expect(body).toContain(bucketStat("Closed", 1));
     // A bucket nothing is in is drawn as zero rather than left off the page.
     expect(body).toContain(bucketStat("First assessment", 0));
@@ -348,7 +348,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the figures", () => {
     for (const label of [
       "Not started",
       "First assessment",
-      "Assign assessor",
+      "Assign next assessor",
       "Secondary assessment",
       "Decision",
       "Closed",
