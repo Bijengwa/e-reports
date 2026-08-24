@@ -112,7 +112,7 @@ describe("collecting an A2 review from a posted body", () => {
     expect(review.responses["2.6"]).toEqual({ degree: "agree" });
   });
 
-  it("stores Need Clarification as a statement, never as a replacement value", () => {
+  it("stores Required clarification as a statement, never as a replacement value", () => {
     const review = collectSecondaryReview(
       {
         "a2_degree_2.6": "clarification",
@@ -231,7 +231,7 @@ describe("reading a stored A2 review back", () => {
     expect(normalizeSecondaryReview(JSON.parse(JSON.stringify(written)))).toEqual(written);
   });
 
-  it("drops a value stored under Need Clarification by an older shape of this form", () => {
+  it("drops a value stored under Required clarification by an older shape of this form", () => {
     const read = normalizeSecondaryReview({
       kind: "a2_section_review",
       responses: { "2.6": { degree: "clarification", value: "non_serious", statement: "Why?" } },
@@ -269,7 +269,7 @@ describe("what an A2 submission must carry", () => {
     expect(issues[0]?.field).toBe("a2_degree_4.2");
   });
 
-  it("requires a statement for Need Clarification, and asks for no value", () => {
+  it("requires a statement for Required clarification, and asks for no value", () => {
     const issues = validateSecondaryReviewForSubmit(
       collectSecondaryReview(
         agreeWithEverything({ a2_degree_5: "clarification" }),
@@ -481,8 +481,8 @@ describe("a Disagree that repeats the answer it disagrees with", () => {
     ).toEqual([]);
   });
 
-  it("leaves Agree and Need Clarification alone", () => {
-    // A value posted alongside Need Clarification never reaches the payload at all, so the answer
+  it("leaves Agree and Required clarification alone", () => {
+    // A value posted alongside Required clarification never reaches the payload at all, so the answer
     // being repeated cannot make a difference here — and the statement rule is the only one left.
     expect(
       issuesFor(

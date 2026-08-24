@@ -597,7 +597,14 @@ function Comment({
  * rather than by both being careful.
  */
 /** The options a "single"/"multi" item's fill-in box offers, when A1 left it blank to fill. */
-function a2FillInOptions(item: A2ReviewItem): readonly { value: string; label: string }[] {
+/**
+ * The option list one review item's answer is drawn from, or an empty list for a free-text one.
+ *
+ * Exported because the Final Document has to print the same words this form does. A resolved
+ * answer stored as `"non_serious"` is a code, and a document that showed the reader the code
+ * rather than "Non-serious" would be a different document from the one they assessed.
+ */
+export function a2FillInOptions(item: A2ReviewItem): readonly { value: string; label: string }[] {
   if (item.key === "1.3") return DEVICE_TYPE_OPTIONS;
   if (item.key === "1.19") return REPORT_STAGE_OPTIONS;
   if (item.key === "2.5") return SOURCE_OPTIONS;
@@ -917,14 +924,15 @@ function A2InlineDecision({
           </div>
         )}
 
-        {/* Need Clarification and Disagree. Two labels, one shown, so the box says what it is for
+        {/* Required clarification and Disagree. Two labels, one shown, so the box says what it is for
           without a line of script — and the wrong one is display:none, so it is not read out.
           Switching back to Agree hides this the same way it hides `.a2-change` above: neither is
           a child of the radio that used to be checked, both are reached by `:has()` on the box
           that holds all three, so there is nothing left over to fully un-hide again. */}
         <div class="a2-say">
           <label class="a2-say-l for-clarification" for={`a2-statement-${item.key}`}>
-            What needs clarifying, and from whom? Required.
+            The corrected wording to be used. It replaces the statement beside their answer; the
+            answer itself stands. Required.
           </label>
           <label class="a2-say-l for-disagree" for={`a2-statement-${item.key}`}>
             Why the first assessor's answer is wrong. Required.

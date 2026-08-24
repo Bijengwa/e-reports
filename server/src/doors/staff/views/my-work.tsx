@@ -1,3 +1,4 @@
+import { OrangeReportIdentity } from "./orange-report.js";
 import {
   type DecisionEntry,
   DecisionHistory,
@@ -194,11 +195,12 @@ export function MyWorkItemPage({
     >
       <div class="staff-head">
         <div class="sp">
-          <h2 safe>{report.number}</h2>
-          <p class="hint" safe>
-            {report.deviceName}
-          </p>
+          {/* The report this work is about, wearing the identity it wears on every other page. */}
+          <OrangeReportIdentity report={report} />
         </div>
+        <a href={`/reports/${report.id}/final-document`} class="btn">
+          Final F004
+        </a>
         <a href="/my-work" class="btn ghost">
           ← Back to my work
         </a>
@@ -218,6 +220,16 @@ export function MyWorkItemPage({
           </p>
         )}
       </div>
+
+      {/* The approved outcome, before the working history. This reader is carrying out what the
+          manager approved, so the approved document is the thing they need first — the assessments
+          below are context for it, not a substitute. Always present: a report only reaches this
+          page through the approval that writes the final document. */}
+      <p class="hint">
+        <a href={`/reports/${report.id}/final-document`}>
+          Open the final F004 — the approved assessment of this report
+        </a>
+      </p>
 
       <h2 class="report-heading">The report as filed</h2>
       <ReportDocument report={report} />

@@ -181,7 +181,7 @@ function completeAssessment(signature: string) {
  * Everything a second assessment must carry to be submitted: a position on every A1 answer.
  *
  * One of each degree, so a submission exercises all three rules at once — Agree carrying nothing,
- * Disagree carrying a corrected value and a statement, and Need Clarification carrying a statement
+ * Disagree carrying a corrected value and a statement, and Required clarification carrying a statement
  * alone. The keys are the A1 field numbers, which is what the payload is keyed by.
  */
 function completeSecond(overrides: Record<string, string | string[]> = {}) {
@@ -595,7 +595,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
     expect(await assessmentsOf(report.id)).toHaveLength(2);
   });
 
-  it("requires a statement for Need Clarification and for Disagree", async () => {
+  it("requires a statement for Required clarification and for Disagree", async () => {
     const { other, report } = await secondAssessmentAssigned();
 
     const withoutClarification = await post(
@@ -616,7 +616,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
     expect(await assessmentsOf(report.id)).toHaveLength(2);
   });
 
-  it("requires a corrected value for Disagree, and asks for none under Need Clarification", async () => {
+  it("requires a corrected value for Disagree, and asks for none under Required clarification", async () => {
     const { other, report } = await secondAssessmentAssigned();
 
     const refused = await post(
@@ -628,7 +628,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
     expect(refused.statusCode).toBe(422);
     expect(await assessmentsOf(report.id)).toHaveLength(2);
 
-    // The same review with Need Clarification in 2.6's place needs no value at all.
+    // The same review with Required clarification in 2.6's place needs no value at all.
     const accepted = await post(
       `/reports/${report.id}/secondary-assessment`,
       other.cookie,
@@ -669,7 +669,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
         },
       },
     });
-    // Need Clarification asks about A1's answer; it never replaces it.
+    // Required clarification asks about A1's answer; it never replaces it.
     expect(second?.payload.responses["7.1_actions"]).not.toHaveProperty("value");
     expect(second?.submitted_at).not.toBeNull();
     // The manager's review belongs to assessment 1 and stays there.
@@ -700,13 +700,13 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
 
     const after = await get(`/reports/${report.id}`, manager.cookie);
     expect(after.body).toContain("Clarify the monitoring action before the final decision.");
-    expect(after.body).toContain("Need Clarification");
+    expect(after.body).toContain("Required clarification");
     expect(after.body).toContain(other.name);
     expect(after.body).not.toContain("Pending secondary assessment");
     // A2's decisions render inline inside the same F004 document A1's answers do, rather than as
     // a separate "Second assessment" section beneath it, so the manager's own review of assessment
     // 1 — printed once the whole document closes — now comes after them, not above.
-    expect(after.body.indexOf("Need Clarification")).toBeLessThan(after.body.indexOf(REVIEW));
+    expect(after.body.indexOf("Required clarification")).toBeLessThan(after.body.indexOf(REVIEW));
   });
 
   it("keeps an unsubmitted second assessment off the report page", async () => {

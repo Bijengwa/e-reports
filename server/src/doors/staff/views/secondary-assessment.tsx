@@ -6,6 +6,7 @@ import {
   type ReportDetail,
   ReportDocument,
 } from "./reports.js";
+import { OrangeReportIdentity } from "./orange-report.js";
 import { StaffShell } from "./shell.js";
 
 /** What a secondary assessor reads before annotating: A1's submitted F004. */
@@ -58,10 +59,10 @@ export function SecondaryAssessmentPage({
     >
       <div class="staff-head">
         <div class="sp">
-          <h2 safe>{report.number}</h2>
-          <p class="hint" safe>
-            {report.deviceName}
-          </p>
+          {/* The Orange Report this assessment is OF, wearing its own identity. The assessment
+              being written has its own heading and its own dates below; the two must not read as
+              one document. */}
+          <OrangeReportIdentity report={report} />
         </div>
         <label for="a1-drawer" class="btn ghost a1-open">
           The report
@@ -87,7 +88,7 @@ export function SecondaryAssessmentPage({
             <div class="a2-legend">
               <span class="k-agree">Agree — keeps their answer, nothing to write</span>
               <span class="k-clarification">
-                Need Clarification — a statement only, their answer stands
+                Required clarification — your corrected wording, their answer stands
               </span>
               <span class="k-disagree">Disagree — your corrected answer, and why</span>
             </div>
@@ -145,6 +146,7 @@ export function SecondaryAssessmentPage({
               Close
             </label>
           </div>
+          <OrangeReportIdentity report={report} compact />
           <ReportDocument report={report} />
         </aside>
       </div>

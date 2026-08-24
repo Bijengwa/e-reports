@@ -384,6 +384,13 @@ export async function renderReport(
       })
     : undefined;
 
+  // Whether an approved Final Document exists — a boolean, because this page only offers the way
+  // to it. Reading the whole snapshot to decide whether to draw one link would be reading a
+  // document nobody on this page is going to look at.
+  const finalDocument = await app.db.execute(sql`
+    SELECT 1 FROM report_final_documents WHERE report_id = ${found.report.id}
+  `);
+
   return reply
     .status(status)
     .html(
@@ -408,6 +415,7 @@ export async function renderReport(
         nextAssessorPicker={nextAssessorPicker}
         workOfficerPicker={workOfficerPicker}
         decisions={found.decisions}
+        hasFinalDocument={finalDocument.length > 0}
         canComment={isManager && found.assessment1 !== null}
       />,
     );

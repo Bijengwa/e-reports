@@ -1,5 +1,6 @@
 import type { F004Answers, Issue } from "../../../domain/f004.js";
 import { F004Form } from "./f004.js";
+import { OrangeReportIdentity } from "./orange-report.js";
 import { type ReportDetail, ReportDocument } from "./reports.js";
 import { StaffShell } from "./shell.js";
 
@@ -56,10 +57,10 @@ export function Assessment1Page({
     >
       <div class="staff-head">
         <div class="sp">
-          <h2 safe>{report.number}</h2>
-          <p class="hint" safe>
-            {report.deviceName}
-          </p>
+          {/* The Orange Report this assessment is OF, wearing its own identity. The assessment
+              being written has its own heading and its own dates below; the two must not read as
+              one document. */}
+          <OrangeReportIdentity report={report} />
         </div>
         {/* A label, not a button: it drives the checkbox below, so it opens the drawer with or
             without a script running. */}
@@ -100,6 +101,7 @@ export function Assessment1Page({
               Close
             </label>
           </div>
+          <OrangeReportIdentity report={report} compact />
           <ReportDocument report={report} />
         </aside>
       </div>

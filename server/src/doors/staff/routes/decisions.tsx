@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import { F004_VERSION } from "../../../domain/f004.js";
+import { resolveFinalDocument } from "../../../domain/final-document.js";
 import { currentSession } from "../session-guard.js";
 import { ForbiddenPage } from "../views/forbidden.js";
 import { loadReport, renderReport } from "./reports.js";
@@ -133,6 +134,11 @@ export async function decisionRoutes(app: FastifyInstance): Promise<void> {
 
     if (found.report.status !== "awaiting_decision") return forbid(reply, session.role);
 
+    // Stated rather than inferred. `awaiting_decision` is only reachable through a submitted A1,
+    // so this cannot fail today — but approving is what freezes the Final Document, and a snapshot
+    // resolved from an absent first assessment would be an approved document of nothing.
+    if (found.assessment1 === null) return forbid(reply, session.role);
+
     const body = (request.body ?? {}) as Record<string, unknown>;
     const posted = UserId.safeParse(body.officer_id);
     if (!posted.success) return forbid(reply, session.role);
@@ -152,23 +158,52 @@ export async function decisionRoutes(app: FastifyInstance): Promise<void> {
     `);
     const reviewedThroughOrdinal = (held[0] as { max_ordinal: number }).max_ordinal;
 
+    // The Final Document, resolved before the transaction opens: it is a pure fold over rows
+    // `loadReport` has already read, so computing it inside would only hold the write lock while
+    // this thinks. Only submitted assessments are folded in — a draft is one Officer's unfinished
+    // work and has never been a finding, which is the same test every other reader applies.
+    const chain = found.secondaryAssessments
+      .filter((a) => a.submitted)
+      .map((a) => ({ ordinal: a.ordinal, review: a.answers }));
+
+    const finalDocument = resolveFinalDocument(found.assessment1.answers, chain);
+
     await app.db.transaction(async (tx) => {
       await tx.execute(sql`
         UPDATE reports SET status = 'assigned_for_work'
          WHERE id = ${found.report.id} AND status = 'awaiting_decision'
       `);
 
-      await tx.execute(sql`
+      const [decision] = await tx.execute(sql`
         INSERT INTO report_decisions (report_id, decided_by_user_id, kind, comment,
                                        reviewed_through_ordinal, work_officer_user_id)
         VALUES (${found.report.id}, ${session.userId}, 'assign_work_officer',
                 ${rawComment === "" ? null : rawComment}, ${reviewedThroughOrdinal}, ${chosenId})
+        RETURNING id
+      `);
+
+      if (decision === undefined) throw new Error("Decision insert returned no row");
+
+      // Inside the same transaction as the decision and the status change, and pointing at that
+      // decision by id. A report that reached `assigned_for_work` without the document the manager
+      // approved would be a report nobody can answer "approved what?" about, and the three facts
+      // are one event — they stand or fall together.
+      await tx.execute(sql`
+        INSERT INTO report_final_documents (report_id, decision_id, approved_by_user_id,
+                                            resolved_through_ordinal, form_version, payload)
+        VALUES (${found.report.id}, ${(decision as { id: string }).id}, ${session.userId},
+                ${reviewedThroughOrdinal}, ${F004_VERSION},
+                ${JSON.stringify(finalDocument)}::jsonb)
       `);
 
       await tx.execute(sql`
         INSERT INTO audit_log (actor_user_id, action, entity_type, entity_id, after)
         VALUES (${session.userId}, 'decision.assign_work_officer', 'report', ${found.report.id},
-                ${JSON.stringify({ number: found.report.number, workOfficerUserId: chosenId })}::jsonb)
+                ${JSON.stringify({
+                  number: found.report.number,
+                  workOfficerUserId: chosenId,
+                  resolvedThroughOrdinal: reviewedThroughOrdinal,
+                })}::jsonb)
       `);
     });
 

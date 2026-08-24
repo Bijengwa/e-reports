@@ -368,7 +368,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
     // Assigned and not yet opened. This is the state the manager's bucket exists to show, and the
     // state the Officer's own queue has to show them before they have written a word — the two
     // read the same assignment or the work is invisible to both of them.
-    const state = await get("/workload?stage=secondary-assessment", manager.cookie);
+    const state = await get("/workload?stage=in-progress", manager.cookie);
     expect(state.body).toContain("<td>A2</td>");
     expect(state.body).toContain(`<td><span>${second.name}</span></td>`);
     // The assessor before them has finished; naming them here would send the manager to work
@@ -390,7 +390,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
 
     // The report is with A3 now, and the bucket says so. Naming the assessor before them would
     // send the manager to someone whose work is finished and immutable.
-    const later = await get("/workload?stage=secondary-assessment", manager.cookie);
+    const later = await get("/workload?stage=in-progress", manager.cookie);
     expect(later.body).toContain("<td>A3</td>");
     expect(later.body).toContain(`<td><span>${third.name}</span></td>`);
     expect(later.body).not.toContain(second.name);
@@ -1030,7 +1030,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("what a decision does to the manager's sta
     expect(await statusOf(report.id)).toBe("second_assessment");
 
     // Back with an assessor, at the next ordinal, and out of the manager's own queue.
-    const working = (await get("/workload?stage=secondary-assessment", manager.cookie)).body;
+    const working = (await get("/workload?stage=in-progress", manager.cookie)).body;
     expect(working).toContain(report.number);
     expect(working).toContain("<td>A3</td>");
     expect(working).toContain(`<td><span>${third.name}</span></td>`);
@@ -1061,13 +1061,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("what a decision does to the manager's sta
     expect(terminal).toContain(report.number);
 
     // Out of every other state, and never into a Closed one — this MVP has no closing workflow.
-    for (const stage of [
-      "not-started",
-      "first-assessment",
-      "assign-next-assessor",
-      "secondary-assessment",
-      "decision",
-    ]) {
+    for (const stage of ["not-started", "in-progress", "decision"]) {
       expect((await get(`/workload?stage=${stage}`, manager.cookie)).body, stage).not.toContain(
         report.number,
       );

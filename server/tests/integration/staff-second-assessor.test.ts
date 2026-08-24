@@ -297,12 +297,13 @@ function bucketStat(label: string, count: number): string {
 }
 
 /**
- * The state a report sits in once its assessment is in and the manager must name the next
- * assessor — after A1 and after every An alike. Its own tab, apart from Decision: naming who
- * reads a report next and deciding what happens to it are two different moves.
+ * The state a report sits in once its assessment is in and the manager must act — after A1 and
+ * after every An alike. One state, not two: "name the next assessor" and "approve it" are both
+ * decisions, and which of them is available depends on rules the report page owns. A tab that
+ * guessed at those rules would be a second, quieter copy of them.
  */
-const ASSIGN_NEXT = "Assign next assessor";
-const ASSIGN_NEXT_STAGE = "assign-next-assessor";
+const ASSIGN_NEXT = "Decision";
+const ASSIGN_NEXT_STAGE = "decision";
 
 describe.skipIf(!INTEGRATION_ENABLED)("the manager's pipeline", () => {
   beforeEach(start);
@@ -332,8 +333,9 @@ describe.skipIf(!INTEGRATION_ENABLED)("the manager's pipeline", () => {
     }
     expect(body).toContain(bucketStat(ASSIGN_NEXT, 2));
     expect(body).toContain(bucketStat("Not started", 1));
-    expect(body).toContain(bucketStat("First assessment", 1));
-    expect(body).toContain(bucketStat("Secondary assessment", 1));
+    // A1 writing and A2 writing are one figure: an Officer is assessing it, and the row's own
+    // Assessment column is where A1/A2/A3 belongs.
+    expect(body).toContain(bucketStat("In progress", 2));
     expect(body).toContain(bucketStat("Assigned for work", 0));
 
     // Newest first: the later arrival is printed above the earlier one.
@@ -570,10 +572,10 @@ describe.skipIf(!INTEGRATION_ENABLED)("what the assignment hands over", () => {
   it("offers the manager the way in from the state that is waiting on them", async () => {
     const { manager, other, report } = await waiting();
 
-    // The row's own link, matched as the anchor rather than as bare words. It says Assign — the
-    // move this state asks for — and the naming itself happens on the report, where the rules
-    // about who may be named are enforced.
-    const rowLink = `<a href="/reports/${report.id}">Assign</a>`;
+    // The row's own link, matched as the anchor rather than as bare words. It says Decide — the
+    // move this state asks for — and which decision, and who may be named, is settled on the
+    // report, where those rules are enforced.
+    const rowLink = `<a href="/reports/${report.id}">Decide</a>`;
 
     const waitingState = (await get(`/workload?stage=${ASSIGN_NEXT_STAGE}`, manager.cookie)).body;
     expect(waitingState).toContain(rowLink);
@@ -590,7 +592,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("what the assignment hands over", () => {
 
     // Once named, the row says which assessment the report is on and who has it, rather than
     // offering a way in again.
-    const working = (await get("/workload?stage=secondary-assessment", manager.cookie)).body;
+    const working = (await get("/workload?stage=in-progress", manager.cookie)).body;
     expect(working).toContain("<td>A2</td>");
     expect(working).toContain(`<td><span>${other.name}</span></td>`);
     expect(working).toContain(`<a href="/reports/${report.id}">Open</a>`);
@@ -658,9 +660,9 @@ describe.skipIf(!INTEGRATION_ENABLED)("assigning one", () => {
     expect(waitingBucket).not.toContain(report.number);
     expect(waitingBucket).toContain(bucketStat(ASSIGN_NEXT, 0));
 
-    const secondBucket = (await get("/workload?stage=secondary-assessment", manager.cookie)).body;
+    const secondBucket = (await get("/workload?stage=in-progress", manager.cookie)).body;
     expect(secondBucket).toContain(report.number);
-    expect(secondBucket).toContain(bucketStat("Secondary assessment", 1));
+    expect(secondBucket).toContain(bucketStat("In progress", 1));
 
     // The report is no longer waiting, so there is nothing left to pick.
     const detail = (await get(`/reports/${report.id}`, manager.cookie)).body;

@@ -2,20 +2,20 @@ import type { F004Answers, SecondaryReviewPayload } from "../../../domain/f004.j
 import { STEP_FIELDS, STEPS } from "../../../domain/form-schema.js";
 import { type MessageKey, translatorFor } from "../../../i18n/index.js";
 import { F004Form, type PriorSecondaryReview, type SectionComment } from "./f004.js";
+import { CHANNEL_LABELS, OrangeReportIdentity } from "./orange-report.js";
 import { StaffShell } from "./shell.js";
 
 /**
- * Captions for the three enums a report carries.
+ * Captions for the enums a report carries.
  *
  * Same argument as `ROLE_LABELS`: the stored value is the fact and these are the words. Written
  * together with the values they caption so an enum member cannot arrive with no caption — the
  * fallback prints the raw value, which makes that visible rather than blank.
+ *
+ * The channel's captions live in `orange-report.tsx` with the rest of the report's own identity
+ * and are re-exported here, where every existing reader already looks for them.
  */
-export const CHANNEL_LABELS: Record<string, string> = {
-  online_form: "Online form",
-  email: "Email",
-  hard_copy: "Hard copy",
-};
+export { CHANNEL_LABELS };
 
 export const SEVERITY_LABELS: Record<string, string> = {
   death: "Death",
@@ -527,6 +527,14 @@ export type ReportPageProps = {
   workOfficerPicker?: AssessorOption[];
   /** Every manager decision recorded on this report, oldest first. */
   decisions: DecisionEntry[];
+  /**
+   * Whether an approved Final Document exists for this report.
+   *
+   * A boolean rather than the document itself: this page shows the working record — the report,
+   * the assessments, the decisions — and the final F004 is a different document with a page of
+   * its own. All this page owes the reader is the way to it, and only once there is one.
+   */
+  hasFinalDocument?: boolean;
 };
 
 /**
@@ -620,6 +628,7 @@ export function ReportPage({
   nextAssessorPicker,
   workOfficerPicker,
   decisions,
+  hasFinalDocument,
 }: ReportPageProps): JSX.Element {
   // The history strip carries every secondary assessment, including one just assigned and not yet
   // written — that is what tells a reader the report is with somebody right now. The document
@@ -649,11 +658,10 @@ export function ReportPage({
     >
       <div class="staff-head">
         <div class="sp">
-          <h2 safe>{report.deviceName}</h2>
-          <p class="hint">
-            Received {day(report.receivedAt)} ·{" "}
-            <span safe>{caption(CHANNEL_LABELS, report.channel)}</span>
-          </p>
+          {/* The Orange Report's own identity, the same block every other page that shows this
+              report mounts. The device, the number and the received date are the report's; the
+              strip under them is the assessment work, which has its own dates and says so. */}
+          <OrangeReportIdentity report={report} />
           <AssessmentHistory
             assessor1Name={assessor1Name}
             secondaryAssessments={secondaryAssessments}
@@ -661,6 +669,11 @@ export function ReportPage({
           />
         </div>
 
+        {hasFinalDocument === true && (
+          <a href={`/reports/${report.id}/final-document`} class="btn">
+            Final F004
+          </a>
+        )}
         {canAssess && (
           <a href={assessment1Href(report.id)} class="btn">
             Assessment 1

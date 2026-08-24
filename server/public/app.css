@@ -2635,3 +2635,99 @@ ul.f4-card-c li { margin-bottom: 3px; }
   border-left-color: var(--green);
   margin-bottom: 20px;
 }
+
+/* ---------- the Orange Report's identity ---------- */
+/*
+ * The staff app shows three documents and a reader has to tell them apart at a glance: the Orange
+ * Report a member of the public filed, the assessment work, and the approved Final Document. Only
+ * the first is orange, and this block is the only thing in the staff app that wears the orange
+ * door's own colours.
+ *
+ * Deliberately restrained. "Consistent Orange Report identity" is a promise that the colour means
+ * one thing, and a page sprinkled with orange decoration breaks that promise faster than no colour
+ * at all: the left rule and the tinted surface are borrowed off the orange form's own cards, and
+ * nothing else on the page is allowed either.
+ */
+.orange-id {
+  border-left: 5px solid var(--orange);
+  background: var(--orange-bg);
+  border-radius: 0 8px 8px 0;
+  padding: 12px 16px;
+  margin-bottom: 14px;
+}
+
+/* Inside the assessment drawer, which already has a heading over it. */
+.orange-id.is-compact {
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+
+.orange-id p {
+  margin: 0;
+}
+
+.orange-id-kind {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--orange-d);
+}
+
+.orange-id-no {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--ink);
+}
+
+.orange-id.is-compact .orange-id-no {
+  font-size: 16px;
+}
+
+.orange-id-device {
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+/* The three facts that make it this report: when it arrived, how, and on which form. */
+.orange-id-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 4px !important;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.orange-id-meta b {
+  color: var(--ink);
+}
+
+/* ---------- the final F004 ---------- */
+/*
+ * The document itself is `F004Form`, unchanged and read-only, so it needs no rules of its own —
+ * that is the point of rendering the real form rather than a summary of it. All that is left is
+ * the card above it, which says who approved this and which assessments it resolves.
+ */
+.fd-approval {
+  margin-bottom: 18px;
+}
+
+.fd-approval dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 20px;
+  margin: 0;
+}
+
+.fd-approval dt {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.fd-approval dd {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink);
+}

@@ -371,3 +371,58 @@ export const auditLog = pgTable(
     index("audit_log_at_idx").on(t.at),
   ],
 );
+
+/**
+ * The Final Document: what the manager actually approved, frozen at the moment they approved it.
+ *
+ * The third document in a system that has three. `reports.payload` is the Orange Report as the
+ * reporter filed it and never changes. `assessments` is the internal working record — A1, A2, A3
+ * and every disagreement and clarification along the way. This is neither: it is the one clean set
+ * of resolved answers, in the first assessor's own field vocabulary, with the argument left behind
+ * in the rows above.
+ *
+ * Snapshotted rather than derived, and that is the whole reason the table exists. "What exactly did
+ * the manager approve?" has to be answerable next year without replaying a resolution that may
+ * have been corrected since, over assessment rows that may have gained a sibling. A derived answer
+ * is a claim about the present; this is a record of the past.
+ *
+ * Deliberately not columns on `reports`. That table is granted UPDATE for the status cascade, so a
+ * snapshot living there would be a mutable record of an immutable event. Here the application role
+ * holds SELECT and INSERT and nothing else, the same discipline `report_decisions` and
+ * `assessment_comments` already keep, and the database is what enforces it rather than a promise.
+ *
+ * One row per report, by unique index: approval is terminal in this MVP and fires only from
+ * `awaiting_decision`, which it leaves. The index is what makes a second one impossible rather
+ * than merely unlikely.
+ */
+export const reportFinalDocuments = pgTable(
+  "report_final_documents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    reportId: uuid("report_id")
+      .notNull()
+      .unique()
+      .references(() => reports.id, { onDelete: "cascade" }),
+    /** The decision that produced it — the `assign_work_officer` row written in the same statement. */
+    decisionId: uuid("decision_id")
+      .notNull()
+      .references(() => reportDecisions.id),
+    approvedByUserId: uuid("approved_by_user_id")
+      .notNull()
+      .references(() => users.id),
+    approvedAt: timestamp("approved_at", { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * The last assessment folded into this document — A1 alone would be 1, A1..A3 would be 3.
+     *
+     * Stored rather than recomputed, on the same argument as `report_decisions.next_ordinal`: the
+     * row has to read on its own for audit and for the PDF, without a join to a table that has
+     * since grown rows this document never saw.
+     */
+    resolvedThroughOrdinal: smallint("resolved_through_ordinal").notNull(),
+    /** The F004 revision the resolved answers are keyed by, e.g. "TMDA/DMD/MDV/F/004 Rev 05". */
+    formVersion: text("form_version").notNull(),
+    /** `{ kind, answers, provenance }` — see `domain/final-document.ts`. */
+    payload: jsonb("payload").notNull(),
+  },
+  (t) => [index("report_final_documents_approved_at_idx").on(t.approvedAt)],
+);

@@ -214,8 +214,8 @@ export function StaffShell({
 
           <nav class="rail-nav" aria-label="Staff navigation">
             {/* A manager's landing page is the pipeline, not the dashboard: the dashboard told
-                them the size of the register and one of their six buckets, and the workload page
-                tells them all six. The other roles keep the dashboard, which is still about
+                them the size of the register and one stage of it, and the workload page tells
+                them every stage. The other roles keep the dashboard, which is still about
                 their own work. Presentation only — `requireRole` decides what opens. */}
             {isManager ? (
               <a

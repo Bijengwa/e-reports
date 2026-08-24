@@ -27,6 +27,28 @@ export function requireSession(app: FastifyInstance, opts: { idleMinutes: number
   app.decorateRequest("staffSession", null);
   app.decorateRequest("staffSessionToken", null);
 
+  /*
+   * Nothing behind the session gate is cacheable.
+   *
+   * The browser's Back button is not a security boundary and is not treated as one: it is not
+   * disabled, intercepted or fought with. What is fixed is the actual defect behind "I signed out
+   * and Back showed me the report again" — a page held in the browser's history cache and redrawn
+   * without asking us. `no-store` is what forbids that; the guard above is what answers every
+   * request that does reach us, signed out or not.
+   *
+   * On the same scope as the guard, and for the same reason: a page is uncacheable because of
+   * where it was registered, not because its author remembered. Assets are registered outside this
+   * scope entirely and keep whatever caching they had.
+   *
+   * `onSend` rather than `onRequest`, so the header is stamped on redirects and refusals too —
+   * those carry the reader's own name and role, and a cached 403 is as wrong as a cached report.
+   */
+  app.addHook("onSend", async (_request, reply, payload) => {
+    reply.header("Cache-Control", "no-store, must-revalidate");
+    reply.header("Pragma", "no-cache");
+    return payload;
+  });
+
   app.addHook("onRequest", async (request, reply) => {
     const token = request.cookies[SESSION_COOKIE];
     const session = token ? await loadSession(app.db, token, opts.idleMinutes) : undefined;

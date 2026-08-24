@@ -34,9 +34,17 @@ export type F004Answers = Record<string, string | string[]>;
 /**
  * What a second assessor may say about one answer of the first assessor's.
  *
- * Four degrees, and the fourth is not a position: Agree keeps A1's answer as it stands, Need
- * Clarification keeps it but asks for words about it, and Disagree replaces it — three ways of
- * responding to something A1 said. `supplied` is what a review item becomes when A1 left the field
+ * Four degrees, and the fourth is not a position: Agree keeps A1's answer as it stands, Required
+ * clarification keeps the answer but replaces the words beside it, and Disagree replaces the
+ * answer itself — three ways of responding to something A1 said.
+ *
+ * "Required clarification" is not a softer Disagree and is not a question. It is a correction the
+ * assessor supplies and the final document incorporates: "Add the manufacturer's investigation
+ * conclusion", "Replace the current statement with the following". The earlier caption, "Need
+ * Clarification", read as a request to somebody else and left readers using it to mean "I have
+ * doubts" — which is Disagree, and is settled by choosing Disagree.
+ *
+ * `supplied` is what a review item becomes when A1 left the field
  * blank (an optional one, never required of A1): there is nothing there to agree, clarify or
  * disagree WITH, so a second assessor is never offered those three, only asked whether they want to
  * add the value themselves. Recorded distinctly rather than as `disagree` so the record never claims
@@ -48,7 +56,7 @@ export type A2Degree = (typeof A2_DEGREES)[number] | "supplied";
 /** The wording on screen, written once so the workspace and the record cannot name them apart. */
 export const A2_DEGREE_LABELS: Record<A2Degree, string> = {
   agree: "Agree",
-  clarification: "Need Clarification",
+  clarification: "Required clarification",
   disagree: "Disagree",
   supplied: "Supplied",
 };
@@ -80,6 +88,20 @@ export type A2ReviewItem = {
    */
   commentField?: string;
   /**
+   * Whether this item's own answer IS the prose, rather than a choice with prose beside it.
+   *
+   * Only two items are: 4.3 is a discussion and 7.1's conclusion is a conclusion. Everything else
+   * on the F004 answers with a choice, a list or a short identifier, and carries its words — where
+   * it has any — in the `commentField` above.
+   *
+   * The distinction is what makes a clarification field-aware. A clarification supplies words and
+   * never a new answer, so the words have to land somewhere: on a choice item that is the comment
+   * beside it, and on a prose item it is the answer itself. Deriving this from `valueKind: "text"`
+   * would be wrong in both directions — 1.10 and 1.11 are short text and are not prose, and a
+   * clarification that overwrote a device class with a sentence would corrupt the final document.
+   */
+  prose?: boolean;
+  /**
    * "(If applicable)" on the paper: A1 may leave this item entirely alone.
    *
    * Optional as a whole, never by halves — an item touched at all owes the same completeness a
@@ -96,7 +118,7 @@ export type A2Value = string | string[] | Record<string, string>;
  * One decision, stored under the first assessor's own field key — "2.6", "7.1_conclusion".
  *
  * The three degrees carry different halves of this shape on purpose, so a combination the process
- * has no meaning for cannot be written down at all: Agree carries nothing, Need Clarification
+ * has no meaning for cannot be written down at all: Agree carries nothing, Required clarification
  * carries only a statement — it asks about A1's answer, it does not replace it — and Disagree is
  * the one degree that carries a replacement value. A hand-edited request that sends a value with
  * `clarification` therefore does not merely fail validation; the field never reaches the payload.
@@ -773,6 +795,7 @@ export const SECONDARY_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     valueLabel: "discussion of causal relationship",
     valueKind: "text",
     a1Fields: ["c4_3"],
+    prose: true,
   },
   {
     key: "5",
@@ -807,6 +830,7 @@ export const SECONDARY_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     valueLabel: "conclusion",
     valueKind: "text",
     a1Fields: ["conclusion"],
+    prose: true,
   },
 ];
 
@@ -1016,7 +1040,7 @@ export function collectSecondary(fields: Record<string, string | string[]>): F00
  *
  * What each degree carries is decided here rather than trusted from the request, because the three
  * degrees mean three different things and the payload is what everyone downstream reads. Agree
- * carries nothing. Need Clarification carries a statement and no replacement value — it asks about
+ * carries nothing. Required clarification carries a statement and no replacement value — it asks about
  * A1's answer, it does not overwrite it, so a value posted alongside it is dropped rather than
  * stored to be silently honoured later. Only Disagree carries both.
  *
@@ -1098,7 +1122,7 @@ function storedValue(item: A2ReviewItem, raw: unknown): A2Value {
  *
  * A jsonb column holds whatever was put in it, including a payload written by an older shape of
  * this form. Read through the current item table rather than trusted, so a key the form no longer
- * has, a degree it never offered, or a value under Need Clarification cannot reach the page.
+ * has, a degree it never offered, or a value under Required clarification cannot reach the page.
  */
 export function normalizeSecondaryReview(payload: unknown): SecondaryReviewPayload {
   const raw = (payload ?? {}) as {
@@ -1253,9 +1277,9 @@ function sameAsA1(item: A2ReviewItem, replacement: A2Value | undefined, a1Answer
  * two positions that are not Agree cannot mean anything without.
  *
  * A draft may be as empty as the assessor likes. A submission moves the report to the manager for
- * a decision, and a "Disagree" with no corrected value, or a "Need Clarification" with nothing
+ * a decision, and a "Disagree" with no corrected value, or a "Required clarification" with nothing
  * asked, is a finding the manager cannot act on. The value is required for Disagree alone —
- * Need Clarification does not replace A1's answer, so there is nothing there to require.
+ * Required clarification does not replace A1's answer, so there is nothing there to require.
  *
  * An item A1 left blank never reaches these rules at all: `supplied` is optional by definition, so
  * there is nothing to require of it, whichever way it was left.
@@ -1275,7 +1299,7 @@ export function validateSecondaryReviewForSubmit(
     if (degree === undefined) {
       issues.push({
         field: `a2_degree_${item.key}`,
-        message: `${item.no} ${item.title}: choose Agree, Need Clarification, or Disagree.`,
+        message: `${item.no} ${item.title}: choose Agree, Required clarification, or Disagree.`,
       });
       continue;
     }

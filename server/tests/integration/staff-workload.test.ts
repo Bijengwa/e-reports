@@ -43,29 +43,41 @@ const EVERY_STATUS = [
 ] as const;
 
 /**
- * The six states the bar draws, and the statuses each one folds together.
+ * The four states the bar draws, and the statuses each one folds together.
  *
  * Written out here rather than imported from the view. The mapping is the whole point of this
- * page — one state per status, so that the two moves a manager can be asked for are two tabs and
- * not one — so a bucket quietly re-pointed at a different status must fail this suite rather than
+ * page, so a bucket quietly re-pointed at a different status must fail this suite rather than
  * agree with it.
+ *
+ * Four, and two of them fold several statuses. "In progress" holds both assessment statuses
+ * because they are one fact — an Officer is writing an assessment — and which ordinal it is
+ * belongs in the row's Assessment column. "Decision" holds both waiting-on-the-manager statuses
+ * for the same reason: an assessment has been submitted and the manager has to act. The workflow's
+ * internal steps are not navigation categories, and this list is what holds that line.
  */
 const STAGES = [
   { id: "not-started", label: "Not started", statuses: ["received"] },
-  { id: "first-assessment", label: "First assessment", statuses: ["first_assessment"] },
   {
-    id: "assign-next-assessor",
-    label: "Assign next assessor",
-    statuses: ["awaiting_second_assessor"],
+    id: "in-progress",
+    label: "In progress",
+    statuses: ["first_assessment", "second_assessment"],
   },
   {
-    id: "secondary-assessment",
-    label: "Secondary assessment",
-    statuses: ["second_assessment"],
+    id: "decision",
+    label: "Decision",
+    statuses: ["awaiting_second_assessor", "awaiting_decision"],
   },
-  { id: "decision", label: "Decision", statuses: ["awaiting_decision"] },
   { id: "assigned-for-work", label: "Assigned for work", statuses: ["assigned_for_work"] },
 ] as const;
+
+/**
+ * The two tabs this page must NOT have.
+ *
+ * They were states of the workflow shown as navigation, and a manager had to know what "secondary
+ * assessment" meant before they could find their own work. Named here so re-adding either one is
+ * a failing test rather than a design decision nobody notices.
+ */
+const FORBIDDEN_TABS = ["First assessment", "Assign next assessor", "Secondary assessment"] as const;
 
 /** The one status no state claims, and the one this page must keep out of every view of itself. */
 const UNBUCKETED_STATUS = "closed";
@@ -397,36 +409,37 @@ describe.skipIf(!INTEGRATION_ENABLED)("the figures", () => {
 
     await seedReport({ number: "MD-AE/2026/9050", status: "received" });
     await seedReport({ number: "MD-AE/2026/9051", status: "received" });
-    // One status per figure. A1 writing and A2 writing are two different answers to "who has it",
-    // so they are counted apart rather than summed into one number a manager cannot act on.
+    // A1 writing and A2 writing are one answer to "who has it": an Officer is assessing it. The
+    // figure sums them, and the row's Assessment column is where the difference lives.
     await seedReport({ number: "MD-AE/2026/9052", status: "first_assessment" });
     await seedReport({ number: "MD-AE/2026/9053", status: "second_assessment" });
-    await seedReport({ number: "MD-AE/2026/9054", status: "awaiting_second_assessor" });
 
     const body = (await get("/workload", manager.cookie)).body;
 
     expect(body).toContain(bucketStat("Not started", 2));
-    expect(body).toContain(bucketStat("First assessment", 1));
-    expect(body).toContain(bucketStat("Secondary assessment", 1));
-    expect(body).toContain(bucketStat("Assign next assessor", 1));
+    expect(body).toContain(bucketStat("In progress", 2));
     // A state nothing is in is drawn as zero rather than left off the page.
     expect(body).toContain(bucketStat("Decision", 0));
     expect(body).toContain(bucketStat("Assigned for work", 0));
+
+    // And the three tabs that were the workflow's own steps are gone.
+    for (const tab of FORBIDDEN_TABS) {
+      expect(body, tab).not.toContain(`>${tab}<`);
+    }
   });
 
-  it("counts the two waiting-on-the-manager states apart, because they ask for two moves", async () => {
+  it("counts both waiting-on-the-manager states into one Decision figure", async () => {
     const manager = await signedInAs("manager", "Grace Mollel");
 
-    // The two ways a report arrives at the manager's queue, and they are not the same job: after
-    // A1 the manager names who reads it next, and after a secondary assessment they approve it or
-    // send it round again. One figure for both is a bar that cannot say which is being asked for.
+    // The two ways a report arrives at the manager's queue. They are one figure because they are
+    // one question — "what needs me?" — and the answer to "which move" is on the report's own
+    // decision panel, which is the only place that knows which moves are actually available.
     await seedReport({ number: "MD-AE/2026/9055", status: "awaiting_second_assessor" });
     await seedReport({ number: "MD-AE/2026/9056", status: "awaiting_decision" });
 
     const body = (await get("/workload", manager.cookie)).body;
 
-    expect(body).toContain(bucketStat("Assign next assessor", 1));
-    expect(body).toContain(bucketStat("Decision", 1));
+    expect(body).toContain(bucketStat("Decision", 2));
     expect(rowCount(body)).toBe(2);
   });
 
@@ -544,8 +557,8 @@ describe.skipIf(!INTEGRATION_ENABLED)("what a row shows", () => {
     // The enum's caption, not the stored value.
     expect(body).toContain("Hospitalization");
     // The state's word, not the status'. `awaiting_second_assessor` names a step of the machine;
-    // what the reader has to do is name the next assessor, and that is what the cell says.
-    expect(body).toContain('<span class="tag muted">Assign next assessor</span>');
+    // what the reader has to do is decide, and that is what the cell says.
+    expect(body).toContain('<span class="tag muted">Decision</span>');
     expect(body).not.toContain("Awaiting next assessor");
     expect(body).not.toContain("Awaiting decision");
   });
@@ -606,18 +619,16 @@ describe.skipIf(!INTEGRATION_ENABLED)("what a row shows", () => {
   it("names the row's way in after the move being asked for", async () => {
     const manager = await signedInAs("manager", "Grace Mollel");
 
-    // Decide, not Review: the manager arriving here approves the report and sends the work out,
-    // or sends it round again. Naming that "Review" is what made it indistinguishable from the
-    // handover below, which is a different move entirely.
+    // Decide, for both ways a report reaches the manager. The row does not try to say WHICH
+    // decision: that depends on rules the report page owns, and a bar that guessed at them would
+    // be a second, quieter copy of those rules waiting to fall out of step.
     await seedReport({ number: "MD-AE/2026/9094", status: "awaiting_decision" });
+    await seedReport({ number: "MD-AE/2026/9096", status: "awaiting_second_assessor" });
     const deciding = (await get("/workload?stage=decision", manager.cookie)).body;
+    expect(rowCount(deciding)).toBe(2);
     expect(deciding).toContain(">Decide</a>");
     expect(deciding).not.toContain(">Open</a>");
-
-    await seedReport({ number: "MD-AE/2026/9096", status: "awaiting_second_assessor" });
-    const handing = (await get("/workload?stage=assign-next-assessor", manager.cookie)).body;
-    expect(handing).toContain(">Assign</a>");
-    expect(handing).not.toContain(">Decide</a>");
+    expect(deciding).not.toContain(">Assign</a>");
 
     await seedReport({ number: "MD-AE/2026/9095", status: "received" });
     const resting = (await get("/workload?stage=not-started", manager.cookie)).body;
@@ -697,7 +708,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("what each state holds", () => {
     expect(rowCount(body)).toBe(1);
   });
 
-  it("holds A1 under First assessment and every ordinal above it under Secondary assessment", async () => {
+  it("holds A1 and every ordinal above it under one In progress state", async () => {
     const manager = await signedInAs("manager", "Grace Mollel");
     const first = await signedInAs("assessor", "Asha Mrema");
     const second = await signedInAs("assessor", "Baraka Nyoni");
@@ -719,8 +730,8 @@ describe.skipIf(!INTEGRATION_ENABLED)("what each state holds", () => {
       assessor2: second.id,
     });
 
-    // A3 writing, and A4 writing. Neither needs a tab of its own: a secondary assessment is a
-    // secondary assessment at every ordinal, and the row's Assessment column says which.
+    // A3 writing, and A4 writing. Neither needs a tab of its own, and neither does A1: somebody
+    // is writing an assessment on all four, and the row's Assessment column says which one.
     for (const [number, holder, ordinal] of [
       ["MD-AE/2026/9132", third, 3],
       ["MD-AE/2026/9133", fourth, 4],
@@ -737,29 +748,34 @@ describe.skipIf(!INTEGRATION_ENABLED)("what each state holds", () => {
       await seedAssessment(id, holder.id, ordinal);
     }
 
-    const secondary = (await get("/workload?stage=secondary-assessment", manager.cookie)).body;
+    const working = (await get("/workload?stage=in-progress", manager.cookie)).body;
 
-    expect(rowCount(secondary)).toBe(3);
-    for (const number of ["MD-AE/2026/9131", "MD-AE/2026/9132", "MD-AE/2026/9133"]) {
-      expect(secondary, number).toContain(number);
+    // All four, A1's included. "An Officer is writing an assessment" is one fact about a report,
+    // and splitting it by ordinal made the reader navigate by a number they should not have to
+    // know before they can find their work.
+    expect(rowCount(working)).toBe(4);
+    for (const number of [
+      "MD-AE/2026/9130",
+      "MD-AE/2026/9131",
+      "MD-AE/2026/9132",
+      "MD-AE/2026/9133",
+    ]) {
+      expect(working, number).toContain(number);
     }
-    // A1's own report is not here: somebody is writing an assessment on it, but it is the first.
-    expect(secondary).not.toContain("MD-AE/2026/9130");
 
-    // One state for A2, A3 and A4 alike, and the ordinal beside each to say which is which.
-    expect(secondary).toContain("<td>A2</td>");
-    expect(secondary).toContain("<td>A4</td>");
-    expect(secondary).toContain(bucketStat("Secondary assessment", 3));
+    // The ordinal is a column, which is where A1/A2/A3/A4 belongs.
+    for (const cell of ["<td>A1</td>", "<td>A2</td>", "<td>A3</td>", "<td>A4</td>"]) {
+      expect(working, cell).toContain(cell);
+    }
+    expect(working).toContain(bucketStat("In progress", 4));
 
-    const firstAssessment = (await get("/workload?stage=first-assessment", manager.cookie)).body;
-
-    expect(rowCount(firstAssessment)).toBe(1);
-    expect(firstAssessment).toContain("MD-AE/2026/9130");
-    expect(firstAssessment).toContain("<td>A1</td>");
-    expect(firstAssessment).toContain(bucketStat("First assessment", 1));
+    // And the tabs the ordinals used to be are gone from the bar entirely.
+    for (const tab of FORBIDDEN_TABS) {
+      expect(working, tab).not.toContain(`>${tab}<`);
+    }
   });
 
-  it("holds the report waiting for a handover apart from the one waiting for a decision", async () => {
+  it("holds both reports waiting on the manager under one Decision state", async () => {
     const manager = await signedInAs("manager", "Grace Mollel");
     const first = await signedInAs("assessor", "Asha Mrema");
     const second = await signedInAs("assessor", "Baraka Nyoni");
@@ -781,23 +797,26 @@ describe.skipIf(!INTEGRATION_ENABLED)("what each state holds", () => {
     await seedAssessment(afterSecond, first.id, 1, { submitted: true });
     await seedAssessment(afterSecond, second.id, 2, { submitted: true });
 
-    // Straight after A1 the manager has one move: name who assesses it next.
-    const handover = (await get("/workload?stage=assign-next-assessor", manager.cookie)).body;
-
-    expect(rowCount(handover)).toBe(1);
-    expect(handover).toContain("MD-AE/2026/9140");
-    expect(handover).not.toContain("MD-AE/2026/9141");
-    // The latest assessment on it, which is what the manager is being asked to respond to.
-    expect(handover).toContain("<td>A1</td>");
-
-    // Once a secondary assessment is in, the move is a decision — and the report is under the tab
-    // that says so, not under the one it arrived through.
+    // Both are the same fact: an assessment has been submitted and the report is waiting on the
+    // manager. Which move is available — another assessor, or approve and assign the work — is
+    // decided on the report's own decision panel, where the rules about it already live.
     const decision = (await get("/workload?stage=decision", manager.cookie)).body;
 
-    expect(rowCount(decision)).toBe(1);
+    expect(rowCount(decision)).toBe(2);
+    expect(decision).toContain("MD-AE/2026/9140");
     expect(decision).toContain("MD-AE/2026/9141");
-    expect(decision).not.toContain("MD-AE/2026/9140");
+    expect(decision).toContain(bucketStat("Decision", 2));
+
+    // The latest assessment on each, which is what the manager is being asked to respond to.
+    expect(decision).toContain("<td>A1</td>");
     expect(decision).toContain("<td>A2</td>");
+
+    // Both rows lead into the report, where the decision is actually made. The bar carries no
+    // decision control of its own — it would have to repeat rules that live on that page.
+    expect(decision).toContain(`href="/reports/${afterFirst}"`);
+    expect(decision).toContain(`href="/reports/${afterSecond}"`);
+    expect(decision).not.toContain("/assign-next-assessor");
+    expect(decision).not.toContain("/assign-work-officer");
   });
 
   it("holds what the manager has approved under Assigned for work", async () => {

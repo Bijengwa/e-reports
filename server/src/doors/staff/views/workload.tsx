@@ -2,18 +2,17 @@ import { SEVERITY_LABELS, severityTone } from "./reports.js";
 import { StaffShell } from "./shell.js";
 
 /**
- * The manager's view of the whole pipeline.
+ * The manager's view of the whole pipeline, in four states.
  *
- * Six states, named for what is happening rather than for what the status column stores. The tabs
- * are the manager's own vocabulary: a report is not started, or somebody is writing its first
- * assessment, or it is back and needs the next assessor named, or somebody is writing a secondary
- * one, or it is back and needs deciding, or it has gone out for work.
+ * Four, not six, and the two that went are the reason: "First assessment" and "Secondary
+ * assessment" were the same fact about a report — somebody is assessing it — split by an ordinal
+ * the reader was being asked to navigate by. "Assign next assessor" and "Decision" were likewise
+ * one fact: an assessment is in and the manager has to act on it. Naming the workflow's internal
+ * steps as navigation categories made the bar a diagram of the state machine rather than a list of
+ * what needs doing.
  *
- * The two that matter most are the two that ask something of the reader, and they are deliberately
- * apart. "Assign next assessor" is *name who reads this next*; "Decision" is *approve it and send
- * the work out, or send it round again*. Folded into one tab — as they were — the bar could not
- * tell a manager which of the two moves was being asked of them, and they had to open a report to
- * find out. Closing that is the whole point of this page.
+ * What is left is the only distinction a manager acts on: nothing has started, somebody is working
+ * on it, it is waiting on me, or it has gone out for work.
  *
  * Which assessment and which assessor is a column, not a tab. `A2` beside `Josh Edward` says which
  * ordinal a report is on without asking the reader to learn A1/A2/A3 as navigation.
@@ -23,7 +22,7 @@ import { StaffShell } from "./shell.js";
  */
 
 /**
- * The six tab icons, drawn to the same contract as the rail's and the Officer's own tabs.
+ * The four tab icons, drawn to the same contract as the rail's and the Officer's own tabs.
  *
  * A 24-unit box, no `fill`, and no colour of their own: `stroke: currentcolor` in the stylesheet
  * means the active tab's green reaches the icon through the rule that already paints its label.
@@ -43,29 +42,6 @@ function IconInProgress(): JSX.Element {
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17v3z" />
       <path d="M14.5 7.5l3 3" />
-    </svg>
-  );
-}
-
-/** A handover: one person, and the arrow that passes the work on to the next. */
-function IconAssignNext(): JSX.Element {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <circle cx="8.5" cy="8" r="3.4" />
-      <path d="M2.5 20a6 6 0 0 1 10.2-4.3" />
-      <path d="M14 17.5h7" />
-      <path d="M18 14.5l3 3-3 3" />
-    </svg>
-  );
-}
-
-/** A second sheet behind the first: the same document, being read again by somebody else. */
-function IconSecondary(): JSX.Element {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="M9 3h6l4 4v10a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
-      <path d="M15 3v5h4" />
-      <path d="M5 7v13a1 1 0 0 0 1 1h9" />
     </svg>
   );
 }
@@ -106,7 +82,7 @@ export type Bucket = {
 };
 
 /**
- * The six states a manager reads the pipeline in, in pipeline order.
+ * The four states a manager reads the pipeline in, in pipeline order.
  *
  * `statuses` is the set each one folds together, and it is the only place that mapping is written
  * — the route filters by it and counts by it, so the tab, the figure and the list cannot come to
@@ -117,11 +93,13 @@ export type Bucket = {
  * there is room to name who is being waited on. `state` is what one row says about itself.
  * `action` is what the reader will be doing when they follow the row.
  *
- * One status per state, deliberately, and that is the change that made the page legible: every
- * status the workflow can hold is a state a manager can name, so no tab hides a distinction its
- * reader would have to open a report to discover. `second_assessment` is the one state that spans
- * several ordinals — A2, A3, A4 and every one after — because they are the same fact about the
- * report, and the row's own Assessment column is what tells them apart.
+ * Two states fold several statuses together, and both folds are deliberate. "In progress" holds
+ * `first_assessment` and `second_assessment` because they are one fact — an Officer is writing an
+ * assessment — and which ordinal it is belongs in the row's own Assessment column, not in the
+ * navigation. "Decision" holds `awaiting_second_assessor` and `awaiting_decision` because those
+ * are one fact too: an assessment has been submitted and the report is waiting on the manager. The
+ * manager's actual choice — another assessor, or approve and assign the work — is made on the
+ * report's own decision panel, where the rules about which choices are available already live.
  *
  * `closed` is in no bucket. Nothing in this slice writes it and the MVP has no closing workflow,
  * so a tab for it would be a stage of a pipeline that does not run yet.
@@ -132,49 +110,29 @@ export const BUCKETS: readonly Bucket[] = [
     label: "Not started",
     heading: "Not started",
     state: "Not started",
-    hint: "Received. The first assessor has not begun.",
+    hint: "Received. Assessment work has not begun.",
     action: "Open",
     statuses: ["received"],
     Icon: IconNotStarted,
   },
   {
-    id: "first-assessment",
-    label: "First assessment",
-    heading: "First assessment",
-    state: "First assessment",
-    hint: "The first assessor is working on these now.",
+    id: "in-progress",
+    label: "In progress",
+    heading: "In progress",
+    state: "In progress",
+    hint: "An Officer is writing an assessment. The Assessment column says which one.",
     action: "Open",
-    statuses: ["first_assessment"],
+    statuses: ["first_assessment", "second_assessment"],
     Icon: IconInProgress,
-  },
-  {
-    id: "assign-next-assessor",
-    label: "Assign next assessor",
-    heading: "Waiting on you — assign the next assessor",
-    state: "Assign next assessor",
-    hint: "The assessment is in. Name the Officer who assesses it next.",
-    action: "Assign",
-    statuses: ["awaiting_second_assessor"],
-    Icon: IconAssignNext,
-  },
-  {
-    id: "secondary-assessment",
-    label: "Secondary assessment",
-    heading: "Secondary assessment",
-    state: "Secondary assessment",
-    hint: "A second, third or later assessor is working on these now.",
-    action: "Open",
-    statuses: ["second_assessment"],
-    Icon: IconSecondary,
   },
   {
     id: "decision",
     label: "Decision",
     heading: "Waiting on you — decision",
     state: "Decision",
-    hint: "A secondary assessment is in. Approve and assign the work, or send it round again.",
+    hint: "An assessment is in. Open the report to assign the next assessor, or approve it and assign the work.",
     action: "Decide",
-    statuses: ["awaiting_decision"],
+    statuses: ["awaiting_second_assessor", "awaiting_decision"],
     Icon: IconDecision,
   },
   {
@@ -182,7 +140,7 @@ export const BUCKETS: readonly Bucket[] = [
     label: "Assigned for work",
     heading: "Assigned for work",
     state: "Assigned for work",
-    hint: "Approved, and with an Officer to carry out.",
+    hint: "Approved, with a final document and an Officer to carry it out.",
     action: "Open",
     statuses: ["assigned_for_work"],
     Icon: IconAssignedForWork,
@@ -200,7 +158,7 @@ export function bucketOfStatus(status: string): Bucket | undefined {
 /**
  * What the way into one row is called, read from the row's own state.
  *
- * Three words across six states, and which one a row gets is the shortest honest answer to "what
+ * Two words across four states, and which one a row gets is the shortest honest answer to "what
  * will I be doing when I get there": naming the next assessor, deciding, or simply reading. Taken
  * from the bucket rather than from a condition here, so a state added to the table above arrives
  * with its own verb instead of silently falling back to "Open".

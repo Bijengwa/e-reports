@@ -9,6 +9,7 @@ import { myAssessmentsRoutes } from "./routes/assessments.js";
 import { changePasswordRoutes } from "./routes/change-password.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
 import { decisionRoutes } from "./routes/decisions.js";
+import { finalDocumentRoutes } from "./routes/final-document.js";
 import { loginRoutes } from "./routes/login.js";
 import { logoutRoutes } from "./routes/logout.js";
 import { myWorkRoutes } from "./routes/my-work.js";
@@ -80,6 +81,12 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
       // administrator's extra powers are over accounts, not over who may read a report.
       await active.register(reportsRoutes);
 
+      // The Final Document, beside the register and for the same readers. A manager approved it,
+      // the Officer named on that approval is carrying it out, and an administrator can already
+      // read every report — it is the clean version of one, not a new class of secret. Read-only:
+      // the document is written by the approval and by nothing else.
+      await active.register(finalDocumentRoutes);
+
       await active.register(async (registration) => {
         // Narrower, and in the other direction from the scope below: registering a report that
         // arrived by email is the Officer's work, so an administrator is refused it exactly as a
@@ -113,8 +120,9 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
         // unchanged by this slice, exactly as `reportsRoutes`'s own comment already argues.
         requireRole(management, ["manager"]);
 
-        // Where a manager lands and works: the whole pipeline, six buckets deep. It replaces the
-        // dashboard for this role, which showed them one of those six and nothing about the rest.
+        // Where a manager lands and works: the whole pipeline, in the four states a manager acts
+        // on. It replaces the dashboard for this role, which showed them one stage and nothing
+        // about the rest.
         await management.register(workloadRoutes);
 
         // The manager's review of a submitted first assessment, beside the handover it precedes.
