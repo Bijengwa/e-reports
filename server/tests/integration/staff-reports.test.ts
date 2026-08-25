@@ -303,15 +303,15 @@ describe.skipIf(!INTEGRATION_ENABLED)("the dashboard", () => {
     expect(officer).not.toContain("active accounts");
   });
 
-  it("sends a manager to their own page rather than showing them this one", async () => {
-    const res = await get("/dashboard", await signedInAs("manager"));
+it("shows the manager dashboard", async () => {
+  const res = await get("/dashboard", await signedInAs("manager"));
 
-    // Sign-in and the forced password change both land every role here, so the redirect is what
-    // keeps a manager off a page their own rail no longer links to. What `/workload` then shows
-    // them is `staff-second-assessor`'s to pin, not this suite's.
-    expect(res.statusCode).toBe(302);
-    expect(res.headers.location).toBe("/workload");
-  });
+  expect(res.statusCode).toBe(200);
+  expect(res.body).toContain("Not started");
+  expect(res.body).toContain("In progress");
+  expect(res.body).toContain("Decision");
+  expect(res.body).toContain("Assigned for work");
+});
 
   it("tells an officer what is waiting instead of what is coming later", async () => {
     await seedReport();
@@ -392,19 +392,23 @@ describe.skipIf(!INTEGRATION_ENABLED)("the dashboard", () => {
     expect(body).not.toContain("<table");
   });
 
-  it("gives the queue to nobody but an officer", async () => {
-    await seedReport();
+it("shows the received queue only to an officer", async () => {
+  const manager = await get(
+    "/dashboard",
+    await signedInAs("manager"),
+  );
 
-    // A manager never reaches this page at all, so the queue cannot be on it for them. Asserted as
-    // the redirect rather than as an absent string, which an empty body would satisfy by accident.
-    expect((await get("/dashboard", await signedInAs("manager"))).statusCode).toBe(302);
+  expect(manager.statusCode).toBe(200);
+  expect(manager.body).not.toContain("Received reports");
 
-    const admin = (await get("/dashboard", await signedInAs("administrator"))).body;
+  const officer = await get(
+    "/dashboard",
+    await signedInAs("assessor"),
+  );
 
-    expect(admin).not.toContain("Received reports");
-    expect(admin).not.toContain('<span class="eyebrow">Received</span>');
-    expect(admin).not.toContain("Nothing is waiting to be assessed.");
-  });
+  expect(officer.statusCode).toBe(200);
+  expect(officer.body).toContain("Received reports");
+});
 
   it("shows an administrator the last few things that happened", async () => {
     const cookie = await signedInAs("administrator");
