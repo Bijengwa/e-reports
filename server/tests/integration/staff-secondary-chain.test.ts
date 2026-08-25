@@ -839,8 +839,11 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
     const body = (await get(`/reports/${report.id}`, manager.cookie)).body;
 
     // One F004, not three: the document is rendered once and each assessor's position is folded
-    // in beside the item it is about.
-    expect(body.match(/Adverse events \/ incidents of medical devices/g) ?? []).toHaveLength(1);
+    // in beside the item it is about. Matched on the form's own official title, which is what the
+    // masthead prints — see `F004_TITLE`.
+    expect(
+      body.match(/Adverse Events \/ Incidents of Medical Devices/g) ?? [],
+    ).toHaveLength(1);
 
     // Both findings are on the page, each attributable to its own assessor.
     expect(body).toContain("Not serious on these facts.");

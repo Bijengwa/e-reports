@@ -474,6 +474,70 @@ describe.skipIf(!INTEGRATION_ENABLED)("the manager's review of assessment 1", ()
     expect(first?.conclusion).toBe("Recommend risk communication and enhanced monitoring.");
     expect(first?.submitted_at).not.toBeNull();
   });
+
+  /*
+   * The review closes when the manager acts on it, and stays closed.
+   *
+   * It is written for the next assessor — "What the next assessor should know before starting" —
+   * so naming that Officer is the moment it has been delivered. The page went on offering the box
+   * afterwards, which invited a manager to rewrite a note somebody had already read and acted on,
+   * on a stage the report had long since left.
+   *
+   * What must survive is everything that is a record rather than a control.
+   */
+  it("closes the review once the report is with the next assessor, keeping what was written", async () => {
+    const { manager, report } = await secondAssessmentAssigned();
+
+    const page = await get(`/reports/${report.id}`, manager.cookie);
+    expect(page.statusCode).toBe(200);
+
+    // Gone: the box and the button.
+    expect(page.body).not.toContain(`action="/reports/${report.id}/assessment-1/comment"`);
+    expect(page.body).not.toContain('name="comment"');
+    expect(page.body).not.toContain("Your review of this assessment");
+    expect(page.body).not.toContain("Replace your review of this assessment");
+
+    // Kept: the review itself, and a line saying why there is nothing to write in.
+    expect(page.body).toContain("Manager review");
+    expect(page.body).toContain(REVIEW);
+    expect(page.body).toContain("closed to further review");
+
+    // And the rule is the route's, not the page's: a stale tab cannot save over it.
+    const refused = await comment(report, manager.cookie, "Rewritten after the handover.");
+    expect(refused.statusCode).toBe(403);
+
+    const [first] = await assessmentsOf(report.id);
+    expect(first?.manager_comment).toBe(REVIEW);
+  });
+
+  it("keeps it closed through approval, beside the final F004", async () => {
+    const { manager, other, report } = await secondAssessmentAssigned();
+
+    // A2 submits, so the report comes back for a decision — still not a moment to rewrite A1's
+    // review, because what the manager writes now belongs to the decision they are about to make.
+    await post(`/reports/${report.id}/secondary-assessment`, other.cookie, completeSecond());
+    expect((await reportRow(report.id)).status).toBe("awaiting_decision");
+
+    const deciding = await get(`/reports/${report.id}`, manager.cookie);
+    expect(deciding.body).not.toContain(`action="/reports/${report.id}/assessment-1/comment"`);
+    // The decision controls for THIS stage are the ones on offer instead.
+    expect(deciding.body).toContain(`action="/reports/${report.id}/assign-work-officer"`);
+
+    const approved = await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
+      officer_id: other.id,
+    });
+    expect(approved.statusCode).toBe(302);
+    expect((await reportRow(report.id)).status).toBe("assigned_for_work");
+
+    const done = await get(`/reports/${report.id}`, manager.cookie);
+    expect(done.body).not.toContain(`action="/reports/${report.id}/assessment-1/comment"`);
+    expect(done.body).toContain(REVIEW);
+    // The decision history and the way to the approved document both survive.
+    expect(done.body).toContain("for work");
+    expect(done.body).toContain(`href="/reports/${report.id}/final-document"`);
+
+    expect((await comment(report, manager.cookie, "Too late.")).statusCode).toBe(403);
+  });
 });
 
 describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {

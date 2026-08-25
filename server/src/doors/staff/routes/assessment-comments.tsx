@@ -65,6 +65,15 @@ export async function assessmentCommentRoutes(app: FastifyInstance): Promise<voi
     // Nothing to comment on yet. 403 rather than 404: the report is real and the manager sees it.
     if (found.assessment1 === null) return forbid(reply, session.role);
 
+    // The same test the report page makes before it draws the box, made again here.
+    //
+    // The page hiding a control is a courtesy to the reader; this is the rule. A manager who left
+    // the report open in a tab, decided on it in another, and then saved the stale form would
+    // otherwise rewrite a review the next assessor has already read and acted on — the one case
+    // where "the UI does not offer it" is no protection at all. Same discipline as
+    // `assign-next-assessor`, which re-checks the status a POST claims to be acting from.
+    if (found.report.status !== "awaiting_second_assessor") return forbid(reply, session.role);
+
     const body = (request.body ?? {}) as Record<string, unknown>;
     const posted = Body.safeParse(typeof body.body === "string" ? body.body : "");
 

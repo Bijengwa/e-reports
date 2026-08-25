@@ -302,9 +302,13 @@ function IconComment(): JSX.Element {
  * pattern rather than a compromise. It also keeps the count readable while the panel is shut,
  * which is what a manager scanning eight sections actually wants.
  *
- * Rendered only where `action` is given — the manager's read of a submitted assessment. On the
- * Officer's own live form there is no action and this draws nothing at all, so the form they fill
- * in is unchanged.
+ * Drawn when there is something to say or somewhere to say it. On the Officer's own live form
+ * there is neither, so this renders nothing at all and the form they fill in is unchanged.
+ *
+ * `action` absent with comments present is the third case, and the one this exists for: the notes
+ * a manager wrote at a stage the report has since moved past. They stay readable — they are part
+ * of how the decision was reached — but the box to add to them is gone, because that stage is
+ * over and a control that writes into a finished stage is a control that lies about it.
  */
 function SectionComments({
   no,
@@ -313,7 +317,7 @@ function SectionComments({
 }: {
   no: string;
   comments: readonly SectionComment[];
-  action: string;
+  action?: string;
 }): JSX.Element {
   return (
     <details class="f4-notes">
@@ -342,15 +346,19 @@ function SectionComments({
 
       {/* Outside the F004's own form — a form cannot nest — and posting to its own address, so a
           comment on section 3 can only ever be a comment on section 3. */}
-      <form method="POST" action={action} class="f4-note-write">
-        <label class="vh" for={`note-${no}`}>
-          Comment on section {no}
-        </label>
-        <textarea id={`note-${no}`} name="body" rows="2" placeholder="Write a comment…"></textarea>
-        <button type="submit" class="btn btn-sm">
-          Send
-        </button>
-      </form>
+      {action === undefined ? (
+        <></>
+      ) : (
+        <form method="POST" action={action} class="f4-note-write">
+          <label class="vh" for={`note-${no}`}>
+            Comment on section {no}
+          </label>
+          <textarea id={`note-${no}`} name="body" rows="2" placeholder="Write a comment…"></textarea>
+          <button type="submit" class="btn btn-sm">
+            Send
+          </button>
+        </form>
+      )}
     </details>
   );
 }
@@ -374,8 +382,12 @@ function Bar({
         </span>
         <span safe>{title}</span>
       </div>
-      {action !== undefined && (
+      {/* Either there is somewhere to write, or there is something already written. A section
+          with neither draws nothing — which is every section of an Officer's own live form. */}
+      {action !== undefined || (comments?.length ?? 0) > 0 ? (
         <SectionComments no={no} comments={comments ?? []} action={action} />
+      ) : (
+        <></>
       )}
     </>
   );

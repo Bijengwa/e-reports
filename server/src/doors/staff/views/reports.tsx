@@ -739,6 +739,20 @@ export function ReportPage({
             />
           )}
 
+          {/* Why there is nothing to write in. Without this the controls simply vanish once the
+              report moves on, and a manager who wrote a review last week and came back to amend it
+              would be left wondering whether the page had failed to load. It names the stage the
+              report is actually at and points at the record of how it got there. */}
+          {canComment ? (
+            <></>
+          ) : (
+            <p class="hint">
+              This assessment is closed to further review — the report is now{" "}
+              <span safe>{caption(STATUS_LABELS, report.status)}</span>. What was written about it
+              stays above, and the decisions that moved it on are below.
+            </p>
+          )}
+
           {canComment && (
             <form
               method="POST"

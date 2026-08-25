@@ -440,6 +440,27 @@ describe.skipIf(!INTEGRATION_ENABLED)("the manager's notes on a section", () => 
     expect(first.submitted_at).not.toBeNull();
   });
 
+  it("stops taking notes once the report has moved on, without losing the ones already there", async () => {
+    const { manager, other, report } = await firstAssessmentSubmitted();
+
+    await note(report, manager.cookie, "7", "One note beside the verdict.");
+    expect((await assign(report, manager.cookie, other.id)).statusCode).toBe(302);
+
+    // The margin notes are the same kind of writing as the review they sit beside, so they close
+    // at the same moment. What was written stays readable; the box to add to it is gone.
+    const page = await get(`/reports/${report.id}`, manager.cookie);
+    expect(page.body).toContain("One note beside the verdict.");
+    expect(page.body).not.toContain("/assessment-1/sections/7/comments");
+    expect(page.body).not.toContain("Write a comment…");
+
+    // The route makes the same test, so a stale tab cannot post one either.
+    const refused = await note(report, manager.cookie, "7", "Added after the handover.");
+    expect(refused.statusCode).toBe(403);
+    expect(await notesOf(report.id)).toEqual([
+      { section: "7", body: "One note beside the verdict." },
+    ]);
+  });
+
   it("records the section in the trail without repeating the words", async () => {
     const { manager, report } = await firstAssessmentSubmitted();
 

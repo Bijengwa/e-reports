@@ -294,6 +294,25 @@ export async function renderReport(
 
   const isManager = session.role === "manager";
 
+  // The one status at which the manager's review of the first assessment is still a live piece of
+  // work, and the reason it is only one.
+  //
+  // That review is written FOR the next assessor — its own box says "What the next assessor should
+  // know before starting" — so it is actionable in the window between A1 arriving and the manager
+  // naming who reads it next, and in no other. The moment they name that Officer the report leaves
+  // `awaiting_second_assessor`, the review has been delivered, and editing it afterwards would be
+  // rewriting a note somebody has already acted on.
+  //
+  // `awaiting_decision` is deliberately NOT here. A report is back with the manager at that point,
+  // but what they are deciding is what happens next — another assessment, or approval — and the
+  // words that go with either decision are the decision's own `comment`, which the next assessor
+  // reads as their instruction. Reopening A1's review there would offer a second, quieter channel
+  // for the same thing, pointed at the wrong assessment.
+  //
+  // Everything after that — `second_assessment`, `assigned_for_work` — is a stage the manager has
+  // already advanced past. The record stays readable; it stops being writable.
+  const reviewIsActionable = found.report.status === "awaiting_second_assessor";
+
   // The manager's notes against individual sections of the primary assessment. Unchanged by this
   // generalization: that mechanism is legitimately A1-only, commentary on the primary document
   // before any secondary assessor exists, and stays exactly where it was.
@@ -329,8 +348,13 @@ export async function renderReport(
           device: prefillDeviceRows(found.report.payload, found.report),
           event: prefillEventRows(found.report.payload),
           sectionComments,
-          commentAction: (section: string) =>
-            `/reports/${found.report.id}/assessment-1/sections/${section}/comments`,
+          // Undefined once the stage is over, which leaves the notes on screen and takes the box
+          // to add to them away — see `SectionComments` in `f004.tsx`. The margin notes are the
+          // same kind of writing as the review above them and go read-only at the same moment.
+          commentAction: reviewIsActionable
+            ? (section: string) =>
+                `/reports/${found.report.id}/assessment-1/sections/${section}/comments`
+            : undefined,
         }
       : undefined;
 
@@ -416,7 +440,7 @@ export async function renderReport(
         workOfficerPicker={workOfficerPicker}
         decisions={found.decisions}
         hasFinalDocument={finalDocument.length > 0}
-        canComment={isManager && found.assessment1 !== null}
+        canComment={isManager && found.assessment1 !== null && reviewIsActionable}
       />,
     );
 }
