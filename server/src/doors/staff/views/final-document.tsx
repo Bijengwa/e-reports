@@ -59,6 +59,21 @@ export type FinalDocumentPageProps = {
   backLabel: string;
 };
 
+/**
+ * The resolved statements that have nowhere to live in the F004's own fields.
+ *
+ * `provenance` is where the resolver parks a clarification whose item carries no comment box —
+ * 1.3, 4.2, the IMDRF grids. It is not history: only the statement that survived the chain is
+ * here, one per item at most, exactly as the answers above carry only the value that survived.
+ */
+function resolvedNotes(document: FinalDocument): Record<string, string> {
+  const notes: Record<string, string> = {};
+  for (const [key, entry] of Object.entries(document.provenance)) {
+    if (entry.note !== undefined && entry.note.trim() !== "") notes[key] = entry.note;
+  }
+  return notes;
+}
+
 export function FinalDocumentPage({
   report,
   viewerRole,
@@ -127,6 +142,9 @@ export function FinalDocumentPage({
       <F004Form
         reportId={report.id}
         answers={document.answers as F004Answers}
+        // The clarifications the F004 has no comment box for. Everything else a clarification
+        // touched is already inside `answers`, written there by the resolver.
+        resolvedNotes={resolvedNotes(document)}
         device={device}
         event={event}
         assessorName={assessorName}
@@ -136,10 +154,23 @@ export function FinalDocumentPage({
         // The approved F004 is a document, not a filled-in form: the answer is shown, the
         // twenty-odd options it was chosen from are not. See `documentMode` in `f004.tsx`.
         documentMode
-        // 7.2 is one secondary assessor's concluding block. This document has no single secondary
-        // assessor — it may have resolved three — and every one of their findings is already in
-        // the answers above, so a block naming one of them would misattribute the rest.
-        omitSecond
+        // 7.2, as the last assessor in the chain concluded it — the one the manager was finally
+        // satisfied with. Not a merge of every secondary assessor's remarks and not a history of
+        // them; see `second` in `final-document.ts`.
+        //
+        // A document snapshotted before 7.2 was collected has none, and leaves the section out
+        // altogether rather than printing the form's "pending" block, which would be untrue of a
+        // document that has already been approved.
+        omitSecond={document.secondAssessor === undefined}
+        secondSection={
+          document.secondAssessor === undefined
+            ? undefined
+            : {
+                answers: document.second,
+                ordinal: document.secondAssessor.ordinal,
+                signedOn: approvedOn,
+              }
+        }
         issues={[]}
       />
     </StaffShell>

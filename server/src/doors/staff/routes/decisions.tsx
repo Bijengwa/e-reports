@@ -139,6 +139,27 @@ export async function decisionRoutes(app: FastifyInstance): Promise<void> {
     // resolved from an absent first assessment would be an approved document of nothing.
     if (found.assessment1 === null) return forbid(reply, session.role);
 
+    /*
+     * A first assessment is never approved on its own.
+     *
+     * The office's rule is that A1 is always read by a second assessor before anything is decided,
+     * so the shortest legitimate path is A1 → assign A2 → A2 submits → approve. There is no
+     * A1 → approve, and this is where that is enforced rather than left to the status.
+     *
+     * Counted off the assessment rows, not off `ordinal = 2` and not off the status. The status
+     * says where the report is; the rows say what has actually been submitted, and the rule is
+     * about the work. Any submitted secondary satisfies it, at whatever ordinal the chain reached
+     * — a report resolved through A4 is as approvable as one resolved through A2.
+     *
+     * The second half refuses while a secondary assessment is still open. `assign-next-assessor`
+     * moves the report to `second_assessment` and the status test above already covers today's
+     * path, but an assessment nobody has finished is not a finding, and approving over one would
+     * freeze a Final F004 that omits work already commissioned.
+     */
+    const submittedSecondary = found.secondaryAssessments.filter((a) => a.submitted).length;
+    const openSecondary = found.secondaryAssessments.some((a) => !a.submitted);
+    if (submittedSecondary < 1 || openSecondary) return forbid(reply, session.role);
+
     const body = (request.body ?? {}) as Record<string, unknown>;
     const posted = UserId.safeParse(body.officer_id);
     if (!posted.success) return forbid(reply, session.role);

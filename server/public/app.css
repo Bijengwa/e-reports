@@ -2924,3 +2924,26 @@ ul.f4-card-c li { margin-bottom: 3px; }
 .f4-document textarea {
   white-space: pre-wrap;
 }
+
+/*
+ * A resolved clarification, printed where the F004 gives the item no comment box of its own.
+ *
+ * Eight of the twenty-one review items carry a comment field on the paper, and a clarification
+ * against one of those simply becomes that field's text. The other thirteen — a bare choice, or an
+ * IMDRF grid — have nowhere, so their resolved statement is carried in the snapshot's provenance
+ * and printed here. Styled as the form's other statements are, because it is one: not a badge, not
+ * a history entry, and never labelled with the degree that produced it.
+ */
+.f4-resolved-note {
+  margin-top: 8px;
+}
+
+.f4-resolved-note .f4-k {
+  margin-bottom: 2px;
+}
+
+.f4-resolved-note p:last-child {
+  font-size: 14px;
+  color: var(--f4-ink);
+  white-space: pre-wrap;
+}

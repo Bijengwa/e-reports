@@ -393,9 +393,14 @@ export async function renderReport(
     : undefined;
 
   // The work-officer picker is offered once there is at least one finished secondary review to be
-  // satisfied with. Unfiltered by design — carrying out recommended work is not a conflict of
-  // interest with having assessed the report.
-  const canAssignWork = isManager && found.report.status === "awaiting_decision";
+  // satisfied with, and none still open. The same test `assign-work-officer` makes, so the page
+  // never draws a control the route would refuse — A1 alone is not approvable, and the manager's
+  // one move after a first assessment is to name who reads it next.
+  const canAssignWork =
+    isManager &&
+    found.report.status === "awaiting_decision" &&
+    found.secondaryAssessments.some((a) => a.submitted) &&
+    !found.secondaryAssessments.some((a) => !a.submitted);
 
   const workOfficerPicker: AssessorOption[] | undefined = canAssignWork
     ? (

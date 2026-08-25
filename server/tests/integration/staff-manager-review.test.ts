@@ -184,7 +184,7 @@ function completeAssessment(signature: string) {
  * Disagree carrying a corrected value and a statement, and Required clarification carrying a statement
  * alone. The keys are the A1 field numbers, which is what the payload is keyed by.
  */
-function completeSecond(overrides: Record<string, string | string[]> = {}) {
+function completeSecond(signature = "", overrides: Record<string, string | string[]> = {}) {
   return {
     intent: "submit",
     "a2_degree_1.3": "agree",
@@ -211,6 +211,11 @@ function completeSecond(overrides: Record<string, string | string[]> = {}) {
     "a2_degree_7.1_actions": "clarification",
     "a2_statement_7.1_actions": "Clarify the monitoring action before the final decision.",
     "a2_degree_7.1_conclusion": "agree",
+    // 7.2 — this assessor's own concluding remarks, actions and signature. Required on submit
+    // since the secondary assessment started collecting its own half of the F004.
+    actions_2: "monitoring",
+    conclusion_2: "Concur with the first assessment subject to the noted correction.",
+    signature_2: signature,
     ...overrides,
   };
 }
@@ -515,7 +520,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the manager's review of assessment 1", ()
 
     // A2 submits, so the report comes back for a decision — still not a moment to rewrite A1's
     // review, because what the manager writes now belongs to the decision they are about to make.
-    await post(`/reports/${report.id}/secondary-assessment`, other.cookie, completeSecond());
+    await post(`/reports/${report.id}/secondary-assessment`, other.cookie, completeSecond(other.name));
     expect((await reportRow(report.id)).status).toBe("awaiting_decision");
 
     const deciding = await get(`/reports/${report.id}`, manager.cookie);
@@ -554,7 +559,11 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
     // Keyed by the A1 answer the decision is about, and drawn inline beside it.
     expect(page.body).toContain('name="a2_degree_2.6"');
     expect(page.body).toContain('name="a2_degree_7.1_conclusion"');
-    expect(page.body).not.toContain('name="conclusion_2"');
+    // 7.2 is this assessor's own half of the F004 and is theirs to write. It used to be absent
+    // here and stored as NULL, which is why every secondary assessment had no concluding remarks.
+    expect(page.body).toContain('name="conclusion_2"');
+    expect(page.body).toContain('name="signature_2"');
+    expect(page.body).toContain("Secondary assessor (A2) concluding remarks");
   });
 
   it("ignores first-assessment fields smuggled into the body", async () => {
@@ -563,7 +572,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
     // A hand-edited body naming 7.1's own fields. The page never offers them, and the route keeps
     // only what the second assessment owns — so this must leave assessment 1 exactly as it was.
     const submitted = await post(`/reports/${report.id}/secondary-assessment`, other.cookie, {
-      ...completeSecond(),
+      ...completeSecond(other.name),
       conclusion: "Overwritten by the second assessor.",
       signature: other.name,
       seriousness: "not_serious",
@@ -606,7 +615,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
         403,
       );
       expect(
-        (await post(`/reports/${report.id}/secondary-assessment`, who.cookie, completeSecond()))
+        (await post(`/reports/${report.id}/secondary-assessment`, who.cookie, completeSecond(who.name)))
           .statusCode,
       ).toBe(403);
     }
@@ -665,7 +674,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
     const withoutClarification = await post(
       `/reports/${report.id}/secondary-assessment`,
       other.cookie,
-      completeSecond({ "a2_statement_7.1_actions": "" }),
+      completeSecond(other.name, { "a2_statement_7.1_actions": "" }),
     );
 
     expect(withoutClarification.statusCode).toBe(422);
@@ -673,7 +682,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
     const withoutDisagreement = await post(
       `/reports/${report.id}/secondary-assessment`,
       other.cookie,
-      completeSecond({ "a2_statement_2.6": "" }),
+      completeSecond(other.name, { "a2_statement_2.6": "" }),
     );
 
     expect(withoutDisagreement.statusCode).toBe(422);
@@ -686,7 +695,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
     const refused = await post(
       `/reports/${report.id}/secondary-assessment`,
       other.cookie,
-      completeSecond({ "a2_value_2.6": "" }),
+      completeSecond(other.name, { "a2_value_2.6": "" }),
     );
 
     expect(refused.statusCode).toBe(422);
@@ -696,7 +705,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
     const accepted = await post(
       `/reports/${report.id}/secondary-assessment`,
       other.cookie,
-      completeSecond({ "a2_degree_2.6": "clarification", "a2_value_2.6": "" }),
+      completeSecond(other.name, { "a2_degree_2.6": "clarification", "a2_value_2.6": "" }),
     );
 
     expect(accepted.statusCode).toBe(302);
@@ -708,7 +717,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
     const submitted = await post(
       `/reports/${report.id}/secondary-assessment`,
       other.cookie,
-      completeSecond(),
+      completeSecond(other.name),
     );
 
     expect(submitted.statusCode).toBe(302);
@@ -717,7 +726,10 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
     const [first, second] = await assessmentsOf(report.id);
     expect(second?.ordinal).toBe(2);
     expect(second?.assessor_id).toBe(other.id);
-    expect(second?.conclusion).toBeNull();
+    // 7.1 at ordinal 1, 7.2 above it — the column's documented meaning, finally written.
+    expect(second?.conclusion).toBe(
+      "Concur with the first assessment subject to the noted correction.",
+    );
     expect(second?.payload).toMatchObject({
       kind: "a2_section_review",
       responses: {
@@ -760,7 +772,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
     const before = await get(`/reports/${report.id}`, manager.cookie);
     expect(before.body).toContain("Pending secondary assessment");
 
-    await post(`/reports/${report.id}/secondary-assessment`, other.cookie, completeSecond());
+    await post(`/reports/${report.id}/secondary-assessment`, other.cookie, completeSecond(other.name));
 
     const after = await get(`/reports/${report.id}`, manager.cookie);
     expect(after.body).toContain("Clarify the monitoring action before the final decision.");
@@ -791,11 +803,11 @@ describe.skipIf(!INTEGRATION_ENABLED)("the second Officer's assessment", () => {
   it("refuses a second submission of an assessment already sent", async () => {
     const { other, report } = await secondAssessmentAssigned();
 
-    await post(`/reports/${report.id}/secondary-assessment`, other.cookie, completeSecond());
+    await post(`/reports/${report.id}/secondary-assessment`, other.cookie, completeSecond(other.name));
     const again = await post(
       `/reports/${report.id}/secondary-assessment`,
       other.cookie,
-      completeSecond(),
+      completeSecond(other.name),
     );
 
     expect(again.statusCode).toBe(403);

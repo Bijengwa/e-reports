@@ -143,6 +143,20 @@ export type SecondaryReviewResponse = {
 export type SecondaryReviewPayload = {
   kind: "a2_section_review";
   responses: Record<string, SecondaryReviewResponse>;
+  /**
+   * Section 7.2 — this assessor's own concluding remarks, actions and signature.
+   *
+   * The other half of a secondary assessment, and a different kind of thing from `responses`:
+   * those are positions on what A1 wrote, this is what this assessor concludes in their own name.
+   * The paper F004 prints both, 7.1 for the first assessor and 7.2 for the second, and every
+   * secondary assessment in the chain fills its own 7.2 — A3's is A3's, not a rewrite of A2's.
+   *
+   * Held in the payload rather than in new columns because `assessments.payload` is already this
+   * assessment's document and the three fields are already named by `F004_SECONDARY_FIELDS`. The
+   * `conclusion` column is written alongside it with the same text, which is what the schema has
+   * always said that column is for: 7.1 at ordinal 1, 7.2 above it.
+   */
+  second?: F004Answers;
 };
 
 function isA2Degree(value: string): value is A2Degree {
@@ -1089,7 +1103,10 @@ export function collectSecondaryReview(
         : { degree, value: postedValue(item, fields), statement };
   }
 
-  return { kind: "a2_section_review", responses };
+  // 7.2, through the same collector A1's own fields go through. Always present, even empty: a
+  // draft is allowed to be as blank as the assessor likes, and `validateSecondaryForSubmit` is
+  // what decides whether it is finished enough to submit.
+  return { kind: "a2_section_review", responses, second: collectSecondary(fields) };
 }
 
 /** The replacement A1 answer as posted, in whichever of the three shapes the item takes. */
@@ -1139,11 +1156,26 @@ export function normalizeSecondaryReview(payload: unknown): SecondaryReviewPaylo
   const raw = (payload ?? {}) as {
     kind?: unknown;
     responses?: Record<string, { degree?: unknown; value?: unknown; statement?: unknown }>;
+    second?: unknown;
   };
   const responses: SecondaryReviewPayload["responses"] = {};
 
+  // Read through `F004_SECONDARY_FIELDS` rather than trusted, exactly as the responses below are:
+  // a payload written before 7.2 existed simply has no `second`, and reads back as an empty one.
+  const second: F004Answers = {};
+  const storedSecond = (
+    typeof raw.second === "object" && raw.second !== null ? raw.second : {}
+  ) as Record<string, unknown>;
+  for (const field of F004_SECONDARY_FIELDS) {
+    const entry = storedSecond[field];
+    if (typeof entry === "string") second[field] = entry;
+    else if (Array.isArray(entry)) {
+      second[field] = entry.filter((one): one is string => typeof one === "string");
+    }
+  }
+
   if (raw.kind !== "a2_section_review" || typeof raw.responses !== "object") {
-    return { kind: "a2_section_review", responses };
+    return { kind: "a2_section_review", responses, second };
   }
 
   for (const [key, response] of Object.entries(raw.responses)) {
@@ -1175,7 +1207,7 @@ export function normalizeSecondaryReview(payload: unknown): SecondaryReviewPaylo
         : { degree, value: storedValue(item, response.value), statement };
   }
 
-  return { kind: "a2_section_review", responses };
+  return { kind: "a2_section_review", responses, second };
 }
 
 /**

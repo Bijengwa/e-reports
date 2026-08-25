@@ -12,6 +12,7 @@ import {
   prefillDeviceRows,
   prefillEventRows,
   validateForSubmit,
+  validateSecondaryForSubmit,
   validateSecondaryReviewForSubmit,
   value,
 } from "../../../domain/f004.js";
@@ -275,8 +276,15 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
     const answers = collectSecondaryReview(posted, first.answers);
     const submitting = value(posted, "intent") === "submit";
 
+    // Both halves of a secondary assessment: the positions on A1, and this assessor's own 7.2.
+    // `validateSecondaryForSubmit` has existed since the form did and was never called — 7.2 was
+    // rendered nowhere and stored as NULL, so a secondary assessment could be submitted without
+    // the concluding remarks and signature the paper F004 asks every assessor for.
     const issues: Issue[] = submitting
-      ? validateSecondaryReviewForSubmit(answers, first.answers)
+      ? [
+          ...validateSecondaryReviewForSubmit(answers, first.answers),
+          ...validateSecondaryForSubmit(answers.second ?? {}, session.fullName),
+        ]
       : [];
 
     if (issues.length > 0) {
@@ -318,12 +326,18 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
 
     const assessorId = session.userId;
 
+    // The column the schema has always described as "7.1 for the first assessor, 7.2 for the
+    // second". It held NULL for every secondary assessment because nothing collected 7.2; now
+    // that something does, the column says what it was always meant to say. The payload carries
+    // the same text plus the actions and the signature beside it.
+    const conclusion = value(answers.second ?? {}, "conclusion_2").trim();
+
     await app.db.transaction(async (tx) => {
       await tx.execute(sql`
         INSERT INTO assessments (report_id, assessor_id, ordinal, form_version, payload,
                                  conclusion, submitted_at)
         VALUES (${found.report.id}, ${assessorId}, ${ordinal}, ${F004_VERSION},
-                ${JSON.stringify(answers)}::jsonb, NULL,
+                ${JSON.stringify(answers)}::jsonb, ${conclusion === "" ? null : conclusion},
                 ${submitting ? sql`now()` : sql`NULL`})
         ON CONFLICT (report_id, ordinal) DO UPDATE
            SET payload      = EXCLUDED.payload,

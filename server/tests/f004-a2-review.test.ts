@@ -189,7 +189,9 @@ describe("collecting an A2 review from a posted body", () => {
       FILLED_A1_ANSWERS,
     );
 
-    expect(review).toEqual({ kind: "a2_section_review", responses: {} });
+    // `second` is section 7.2, collected alongside the positions and empty when nothing was
+    // posted for it — a draft may leave it as blank as the assessor likes.
+    expect(review).toEqual({ kind: "a2_section_review", responses: {}, second: {} });
   });
 
   it("reads no degree at all for an item A1 left blank, only a2_value", () => {

@@ -60,6 +60,19 @@ export type FinalDocument = {
   answers: F004Answers;
   /** One entry per review item, keyed by the item's own key — "2.6", "7.1_conclusion". */
   provenance: Record<string, FinalProvenance>;
+  /**
+   * Section 7.2, as the last assessor in the chain concluded it.
+   *
+   * Not a merge and not a history. 7.2 is one assessor's concluding remarks in their own name, so
+   * there is nothing to resolve between A2's and A3's — the question the final document answers is
+   * "what did the office conclude", and the answer is what the assessor the manager was finally
+   * satisfied with wrote. Everyone before them stays in `assessments`, readable in full.
+   *
+   * Empty for a document resolved from A1 alone, and for one snapshotted before 7.2 was collected.
+   */
+  second: F004Answers;
+  /** Who wrote that 7.2, and at which ordinal — the strip the F004 prints beside it. */
+  secondAssessor?: { ordinal: number };
 };
 
 /** One submitted assessment in the chain, as the resolver needs to read it. */
@@ -203,7 +216,17 @@ export function resolveFinalDocument(
     }
   }
 
-  return { kind: FINAL_DOCUMENT_KIND, answers, provenance };
+  // 7.2 belongs to the last assessor in the chain, whole. See `second` above for why it is taken
+  // rather than merged.
+  const last = ordered[ordered.length - 1];
+
+  return {
+    kind: FINAL_DOCUMENT_KIND,
+    answers,
+    provenance,
+    second: last?.review.second ?? {},
+    ...(last === undefined ? {} : { secondAssessor: { ordinal: last.ordinal } }),
+  };
 }
 
 /**
@@ -222,10 +245,12 @@ export function normalizeFinalDocument(payload: unknown): FinalDocument {
     kind?: unknown;
     answers?: unknown;
     provenance?: Record<string, { ordinal?: unknown; degree?: unknown; note?: unknown }>;
+    second?: unknown;
+    secondAssessor?: { ordinal?: unknown };
   };
 
   if (raw.kind !== FINAL_DOCUMENT_KIND) {
-    return { kind: FINAL_DOCUMENT_KIND, answers: {}, provenance: {} };
+    return { kind: FINAL_DOCUMENT_KIND, answers: {}, provenance: {}, second: {} };
   }
 
   const answers: F004Answers = {};
@@ -256,5 +281,26 @@ export function normalizeFinalDocument(payload: unknown): FinalDocument {
     provenance[item.key] = { ordinal, degree, ...(note === undefined ? {} : { note }) };
   }
 
-  return { kind: FINAL_DOCUMENT_KIND, answers, provenance };
+  // Absent on every snapshot written before 7.2 was collected, which reads back as an empty 7.2 —
+  // the truthful answer for a document approved when nothing recorded one.
+  const second: F004Answers = {};
+  const storedSecond = (
+    typeof raw.second === "object" && raw.second !== null ? raw.second : {}
+  ) as Record<string, unknown>;
+  for (const [key, entry] of Object.entries(storedSecond)) {
+    if (typeof entry === "string") second[key] = entry;
+    else if (Array.isArray(entry)) {
+      second[key] = entry.filter((one): one is string => typeof one === "string");
+    }
+  }
+
+  const ordinal = raw.secondAssessor?.ordinal;
+
+  return {
+    kind: FINAL_DOCUMENT_KIND,
+    answers,
+    provenance,
+    second,
+    ...(typeof ordinal === "number" ? { secondAssessor: { ordinal } } : {}),
+  };
 }

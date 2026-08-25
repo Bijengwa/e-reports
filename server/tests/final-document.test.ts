@@ -399,6 +399,8 @@ describe("normalizeFinalDocument", () => {
       kind: FINAL_DOCUMENT_KIND,
       answers: {},
       provenance: {},
+      // 7.2 with nothing in it, which is what a document of the wrong kind carries.
+      second: {},
     });
     expect(normalizeFinalDocument(null).answers).toEqual({});
   });

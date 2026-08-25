@@ -35,6 +35,11 @@ export type SecondaryAssessmentPageProps = {
   issues: readonly Issue[];
 };
 
+/** Today, for the date printed beside this assessor's own signature in 7.2. */
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export function SecondaryAssessmentPage({
   report,
   viewerRole,
@@ -123,13 +128,16 @@ export function SecondaryAssessmentPage({
             assessedOn={first.submittedOn}
             submitted
             readOnly
-            omitSecond
             issues={issues}
+            // No `omitSecond`: 7.2 is this assessor's own half of the F004, and it renders live
+            // inside the same form their positions on A1 post from.
             a2Review={{
               action: `/reports/${report.id}/secondary-assessment`,
               review,
               submitted,
               ordinal,
+              assessorName: viewerName,
+              assessedOn: today(),
             }}
             priorReviews={priorReviews}
           />

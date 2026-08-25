@@ -168,7 +168,7 @@ function completeAssessment(signature: string) {
 }
 
 /** A secondary review that agrees with everything, unless an override says otherwise. */
-function completeSecondary(overrides: Record<string, string> = {}) {
+function completeSecondary(signature = "", overrides: Record<string, string> = {}) {
   return {
     intent: "submit",
     "a2_degree_1.3": "agree",
@@ -191,6 +191,11 @@ function completeSecondary(overrides: Record<string, string> = {}) {
     a2_degree_6: "agree",
     "a2_degree_7.1_actions": "agree",
     "a2_degree_7.1_conclusion": "agree",
+    // 7.2 — this assessor's own concluding remarks, actions and signature. Required on submit
+    // since the secondary assessment started collecting its own half of the F004.
+    actions_2: "monitoring",
+    conclusion_2: "Concur with the first assessment subject to the noted correction.",
+    signature_2: signature,
     ...overrides,
   };
 }
@@ -215,6 +220,13 @@ type Snapshot = {
   form_version: string;
   approved_by_user_id: string;
 };
+
+async function statusOf(reportId: string): Promise<string> {
+  const rows = await owner.db.execute(sql`
+    SELECT status::text AS status FROM reports WHERE id = ${reportId}
+  `);
+  return (rows[0] as { status: string }).status;
+}
 
 async function snapshotOf(reportId: string): Promise<Snapshot | null> {
   const rows = await owner.db.execute(sql`
@@ -289,7 +301,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
       assessor_id: second.id,
       comment: "Please review it.",
     });
-    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary(second.name));
 
     // A2 is in too. Still nothing: submitting an assessment is not approving one.
     expect(await snapshotOf(report.id)).toBeNull();
@@ -322,7 +334,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
     await post(
       `/reports/${report.id}/secondary-assessment`,
       second.cookie,
-      completeSecondary({
+      completeSecondary(second.name, {
         "a2_degree_4.1": "disagree",
         "a2_value_4.1": "expected",
         "a2_statement_4.1": "Listed in the manufacturer's IFU.",
@@ -344,7 +356,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
     await post(
       `/reports/${report.id}/secondary-assessment`,
       third.cookie,
-      completeSecondary({
+      completeSecondary(third.name, {
         a2_degree_6: "disagree",
         a2_value_6: "medium",
         a2_statement_6: "Cause identified, but the lot is still in the field.",
@@ -404,7 +416,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
     await post(
       `/reports/${report.id}/secondary-assessment`,
       second.cookie,
-      completeSecondary({
+      completeSecondary(second.name, {
         "a2_degree_2.6": "disagree",
         "a2_value_2.6": "non_serious",
         "a2_statement_2.6": "Outpatient review only.",
@@ -434,7 +446,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
       assessor_id: second.id,
       comment: "Please review it.",
     });
-    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary(second.name));
     await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
       officer_id: worker.id,
     });
@@ -463,7 +475,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
     await post(
       `/reports/${report.id}/secondary-assessment`,
       second.cookie,
-      completeSecondary({
+      completeSecondary(second.name, {
         a2_degree_6: "disagree",
         a2_value_6: "low",
         a2_statement_6: "Isolated incident with a known cause.",
@@ -521,7 +533,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
       assessor_id: second.id,
       comment: "Please review it.",
     });
-    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary(second.name));
     await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
       officer_id: worker.id,
     });
@@ -544,6 +556,62 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
     expect((await get("/my-work", worker.cookie)).body).toContain(report.number);
   });
 
+  /*
+   * A1 is never approved on its own.
+   *
+   * The office's rule is that a first assessment is always read by a second assessor before
+   * anything is decided, so the shortest legitimate path is A1 → assign A2 → A2 submits → approve.
+   * Nothing about the status alone said so: `awaiting_decision` was reachable only through a
+   * secondary submission in practice, and the route trusted that rather than checking it.
+   */
+  it("refuses to approve off A1 alone, and allows it once a secondary assessment is in", async () => {
+    const { manager, rest, report } = await afterFirstAssessment();
+    const [second, worker] = rest;
+    if (second === undefined || worker === undefined) throw new Error("need two Officers");
+
+    // A1 is submitted and the report is with the manager — but there is nothing to approve yet.
+    expect(await statusOf(report.id)).toBe("awaiting_second_assessor");
+    const early = await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
+      officer_id: worker.id,
+    });
+    expect(early.statusCode).toBe(403);
+    expect(await snapshotOf(report.id)).toBeNull();
+    expect(await statusOf(report.id)).toBe("awaiting_second_assessor");
+
+    // The page does not offer it either, so the refusal is never a surprise.
+    const beforePage = await get(`/reports/${report.id}`, manager.cookie);
+    expect(beforePage.body).not.toContain(`action="/reports/${report.id}/assign-work-officer"`);
+    expect(beforePage.body).toContain(`action="/reports/${report.id}/assign-next-assessor"`);
+
+    await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
+      assessor_id: second.id,
+      comment: "Please take the second assessment.",
+    });
+
+    // Assigned but not yet submitted: still nothing to approve, because an open assessment is not
+    // a finding and a document frozen over one would omit work already commissioned.
+    const midway = await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
+      officer_id: worker.id,
+    });
+    expect(midway.statusCode).toBe(403);
+    expect(await snapshotOf(report.id)).toBeNull();
+
+    await post(
+      `/reports/${report.id}/secondary-assessment`,
+      second.cookie,
+      completeSecondary(second.name),
+    );
+    expect(await statusOf(report.id)).toBe("awaiting_decision");
+
+    // Now it is approvable, and the document is written.
+    const approved = await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
+      officer_id: worker.id,
+    });
+    expect(approved.statusCode).toBe(302);
+    expect(await statusOf(report.id)).toBe("assigned_for_work");
+    expect(await snapshotOf(report.id)).not.toBeNull();
+  });
+
   it("indexes the approved document for the manager, and refuses the list to an Officer", async () => {
     const { manager, first, rest, report } = await afterFirstAssessment();
     const [second, worker] = rest;
@@ -559,7 +627,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
       assessor_id: second.id,
       comment: "Please review it.",
     });
-    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary(second.name));
     await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
       officer_id: worker.id,
     });
@@ -619,7 +687,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
       assessor_id: second.id,
       comment: "Please review it.",
     });
-    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary(second.name));
     await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
       officer_id: worker.id,
     });

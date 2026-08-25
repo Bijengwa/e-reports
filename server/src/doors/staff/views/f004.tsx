@@ -99,6 +99,21 @@ export type F004FormProps = {
    * about the assessment, and filling it with "—" would be this page inventing an answer.
    */
   documentMode?: boolean;
+  /**
+   * Resolved clarification statements, keyed by review-item key — "1.3", "4.2", "3.1.1".
+   *
+   * Only for the approved final document, and only for the items the F004 gives no comment box
+   * of its own. Everything else a clarification touches is already in `answers`, because the
+   * resolver wrote it into the field the form reads.
+   */
+  resolvedNotes?: Record<string, string>;
+  /**
+   * A finished section 7.2 to print, with no secondary-assessment UI around it.
+   *
+   * For the approved final document, which carries the last assessor's concluding remarks but must
+   * not carry the agree/clarify/disagree blocks that `a2Review` drags through the whole form.
+   */
+  secondSection?: { answers: F004Answers; ordinal: number; signedOn: string };
   /** The manager's notes per section, keyed "1"…"8". Absent on the Officer's live form. */
   sectionComments?: Record<string, SectionComment[]>;
   /** Where a note on a given section is posted. Absent means the form draws no comment UI. */
@@ -850,22 +865,54 @@ function A2InlineDecision({
   review,
   locked,
   priorReviews,
+  notes,
 }: {
   itemKey: string;
   answers: F004Answers;
   review?: SecondaryReviewPayload;
   locked: boolean;
   priorReviews?: readonly PriorSecondaryReview[];
+  notes?: Record<string, string>;
 }): JSX.Element {
   const item = SECONDARY_REVIEW_ITEMS.find((candidate) => candidate.key === itemKey);
   if (item === undefined) return <span hidden />;
 
   const history = <PriorReviewHistory itemKey={itemKey} priorReviews={priorReviews} />;
 
+  /*
+   * A clarification that the F004 has nowhere else to print.
+   *
+   * Eight of the twenty-one review items carry a comment box on the paper, and a clarification
+   * against one of those lands in it — 2.6's words go to `c2_6`, and the final document shows them
+   * without help. The other thirteen are a bare choice or a coded grid: 1.3, 4.2, the IMDRF rows.
+   * The resolver keeps their statements rather than dropping them, but there is no F004 field to
+   * put them in, so before this they were held in provenance and shown to nobody — which is the
+   * "empty area" a reader met under an item somebody had explicitly clarified.
+   *
+   * Printed in the form's own comment style, under the answer it is about, so it reads as the
+   * statement beside that answer and not as a second mechanism. Only the resolved one: the
+   * argument that produced it stays in `assessments`.
+   */
+  const note = notes?.[itemKey];
+  const resolved =
+    note === undefined || note.trim() === "" ? (
+      <span hidden />
+    ) : (
+      <div class="f4-comment f4-resolved-note">
+        <p class="f4-k">Statement</p>
+        <p safe>{note}</p>
+      </div>
+    );
+
   if (review === undefined) {
-    // The manager's page, or any reader with nothing of their own to write: still show the
-    // accumulated history even though there is no active review to annotate it with.
-    return history;
+    // The manager's page, the approved final document, or any reader with nothing of their own to
+    // write: the accumulated history, and the resolved statement where there is one.
+    return (
+      <>
+        {history}
+        {resolved}
+      </>
+    );
   }
 
   const response = review.responses[item.key];
@@ -1000,12 +1047,14 @@ function AssessedDeviceField({
   locked,
   a2Review,
   priorReviews,
+  resolvedNotes,
 }: {
   row: DeviceRow;
   answers: F004Answers;
   locked: boolean;
   a2Review?: { review: SecondaryReviewPayload; submitted: boolean; ordinal?: number };
   priorReviews?: readonly PriorSecondaryReview[];
+  resolvedNotes?: Record<string, string>;
 }): JSX.Element {
   const a2Locked = a2Review?.submitted ?? true;
   const a2: A2Choice | undefined = a2Review && {
@@ -1059,6 +1108,7 @@ function AssessedDeviceField({
         review={a2Review?.review}
         locked={a2Locked}
         priorReviews={priorReviews}
+        notes={resolvedNotes}
       />
     </div>
   );
@@ -1074,6 +1124,8 @@ export function F004Form({
   submitted,
   readOnly,
   documentMode,
+  resolvedNotes,
+  secondSection,
   sectionComments,
   commentAction,
   omitSecond,
@@ -1252,6 +1304,7 @@ export function F004Form({
                   locked={locked}
                   a2Review={a2Review}
                   priorReviews={priorReviews}
+                  resolvedNotes={resolvedNotes}
                 />
               ) : (
                 <FactRow no={row.no} label={row.label} filled={device[row.key] ?? ""} />
@@ -1315,6 +1368,7 @@ export function F004Form({
                 review={a2Review?.review}
                 locked={a2Review?.submitted ?? true}
                 priorReviews={priorReviews}
+                notes={resolvedNotes}
               />
             </div>
 
@@ -1351,6 +1405,7 @@ export function F004Form({
                 review={a2Review?.review}
                 locked={a2Review?.submitted ?? true}
                 priorReviews={priorReviews}
+                notes={resolvedNotes}
               />
             </div>
 
@@ -1379,6 +1434,7 @@ export function F004Form({
                 review={a2Review?.review}
                 locked={a2Review?.submitted ?? true}
                 priorReviews={priorReviews}
+                notes={resolvedNotes}
               />
             </div>
           </section>
@@ -1440,6 +1496,7 @@ export function F004Form({
                       review={a2Review?.review}
                       locked={a2Review?.submitted ?? true}
                       priorReviews={priorReviews}
+                      notes={resolvedNotes}
                     />
                   </div>
                 ))}
@@ -1487,6 +1544,7 @@ export function F004Form({
                 review={a2Review?.review}
                 locked={a2Review?.submitted ?? true}
                 priorReviews={priorReviews}
+                notes={resolvedNotes}
               />
             </div>
 
@@ -1535,6 +1593,7 @@ export function F004Form({
                 review={a2Review?.review}
                 locked={a2Review?.submitted ?? true}
                 priorReviews={priorReviews}
+                notes={resolvedNotes}
               />
             </div>
 
@@ -1552,6 +1611,7 @@ export function F004Form({
                 review={a2Review?.review}
                 locked={a2Review?.submitted ?? true}
                 priorReviews={priorReviews}
+                notes={resolvedNotes}
               />
             </div>
           </section>
@@ -1601,6 +1661,7 @@ export function F004Form({
                 review={a2Review?.review}
                 locked={a2Review?.submitted ?? true}
                 priorReviews={priorReviews}
+                notes={resolvedNotes}
               />
             </div>
           </section>
@@ -1664,6 +1725,7 @@ export function F004Form({
                 review={a2Review?.review}
                 locked={a2Review?.submitted ?? true}
                 priorReviews={priorReviews}
+                notes={resolvedNotes}
               />
             </div>
           </section>
@@ -1730,6 +1792,7 @@ export function F004Form({
                 review={a2Review?.review}
                 locked={a2Review?.submitted ?? true}
                 priorReviews={priorReviews}
+                notes={resolvedNotes}
               />
               <A2InlineDecision
                 itemKey="7.1_conclusion"
@@ -1737,6 +1800,7 @@ export function F004Form({
                 review={a2Review?.review}
                 locked={a2Review?.submitted ?? true}
                 priorReviews={priorReviews}
+                notes={resolvedNotes}
               />
             </div>
 
@@ -1745,7 +1809,28 @@ export function F004Form({
               disabled and empty, and every control here carries no `name`. A disabled field is
               not submitted regardless, but omitting the name too means there is no field in this
               block the request body could ever carry a value under, whatever reaches the server. */}
-            {!omitSecond && (
+            {/* The real 7.2 once a secondary assessment owns this page: their own actions,
+                concluding remarks and signature, posting inside the same form their positions on
+                A1 post from. `F004Second` has existed since the form did and was rendered nowhere,
+                which is why every secondary assessment stored `conclusion = NULL`.
+
+                Locked once that assessment is submitted, so the manager reads back exactly what
+                was written. A1 passes `omitSecond` and gets none of it — 7.2 is not theirs. */}
+            {omitSecond ? (
+              <></>
+            ) : secondSection !== undefined ? (
+              <div class="f4-block">
+                <div class="f4-blocktitle">
+                  <span class="f4-no">7.2</span>{" "}
+                  {`Secondary assessor (A${String(secondSection.ordinal)}) concluding remarks`}
+                </div>
+                <F004Second
+                  answers={secondSection.answers}
+                  signedOn={secondSection.signedOn}
+                  locked
+                />
+              </div>
+            ) : a2Review === undefined ? (
               <div class="f4-block f4-locked">
                 <div class="f4-blocktitle">
                   <span class="f4-no">7.2</span> Secondary assessor concluding remarks
@@ -1771,6 +1856,18 @@ export function F004Form({
                     placeholder="(To be completed by the secondary assessor upon review)"
                   />
                 </div>
+              </div>
+            ) : (
+              <div class="f4-block">
+                <div class="f4-blocktitle">
+                  <span class="f4-no">7.2</span>{" "}
+                  {`Secondary assessor (A${String(a2Ordinal)}) concluding remarks`}
+                </div>
+                <F004Second
+                  answers={a2Review.review.second ?? {}}
+                  signedOn={a2Review.assessedOn ?? assessedOn}
+                  locked={a2Review.submitted}
+                />
               </div>
             )}
           </section>

@@ -713,7 +713,9 @@ export function ReportPage({
             readOnly
             sectionComments={assessment1Review.sectionComments}
             commentAction={assessment1Review.commentAction}
-            omitSecond={submitted.length > 0}
+            // No `omitSecond`: with a submitted secondary review in `a2Review` below, 7.2 renders
+            // locked with that assessor's own concluding remarks. With none, it is the "pending"
+            // placeholder, which is the true state of the document at that point.
             // The most recently submitted secondary review is shown through the same slot the
             // active-review UI would use, so its option badges render inline exactly as they do
             // on the reviewer's own page. Everything earlier is `priorReviews` — collapsed

@@ -176,7 +176,7 @@ function completeAssessment(signature: string) {
 }
 
 /** A complete secondary review: Agree on every one of A1's answers. */
-function completeSecondary() {
+function completeSecondary(signature = "") {
   return {
     intent: "submit",
     "a2_degree_1.3": "agree",
@@ -199,6 +199,11 @@ function completeSecondary() {
     a2_degree_6: "agree",
     "a2_degree_7.1_actions": "agree",
     "a2_degree_7.1_conclusion": "agree",
+    // 7.2 — this assessor's own concluding remarks, actions and signature. Required on submit
+    // since the secondary assessment started collecting its own half of the F004.
+    actions_2: "monitoring",
+    conclusion_2: "Concur with the first assessment subject to the noted correction.",
+    signature_2: signature,
   };
 }
 
@@ -254,7 +259,7 @@ async function assignedForWork(deviceName = "Philips IntelliVue MX450"): Promise
     assessor_id: second.id,
     comment: "Please take the second assessment.",
   });
-  await post(`/reports/${filed.id}/secondary-assessment`, second.cookie, completeSecondary());
+  await post(`/reports/${filed.id}/secondary-assessment`, second.cookie, completeSecondary(second.name));
 
   await post(`/reports/${filed.id}/assign-work-officer`, manager.cookie, {
     officer_id: worker.id,
