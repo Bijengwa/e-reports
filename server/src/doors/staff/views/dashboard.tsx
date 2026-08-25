@@ -130,9 +130,25 @@ export function DashboardPage({
 
       <p class="dash-note">
         {/* The pipeline first for a manager: the figures above say how much, and the workload is
-            where they act on it. The register is beside it, not replaced by it. */}
-        {managerSummary === undefined ? (
-          <></>
+            where they act on it. The register is beside it, not replaced by it.
+
+            An Officer gets their own two lists instead. The register is not theirs — it lists
+            every report in the office, and `reportsRoutes` refuses it to them — so a button
+            offering it here would be a button that answers 403. `received` is the flag, because
+            it is defined for exactly one role and this page already reads it that way. */}
+        {received !== undefined ? (
+          <>
+            <a href="/assessments" class="btn">
+              My assessments
+            </a>{" "}
+            <a href="/my-work" class="btn ghost">
+              My work
+            </a>
+          </>
+        ) : managerSummary === undefined ? (
+          <a href="/reports" class="btn">
+            Open the reports list
+          </a>
         ) : (
           <>
             <a href="/workload" class="btn">
@@ -141,11 +157,11 @@ export function DashboardPage({
             <a href="/final-reports" class="btn ghost">
               Final reports
             </a>{" "}
+            <a href="/reports" class="btn ghost">
+              Open the reports list
+            </a>
           </>
         )}
-        <a href="/reports" class={managerSummary === undefined ? "btn" : "btn ghost"}>
-          Open the reports list
-        </a>
       </p>
 
       {received !== undefined && (

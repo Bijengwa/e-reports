@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
+import { FINAL_DOCUMENT_MIN_ORDINAL } from "../../../domain/final-document.js";
 import { currentSession } from "../session-guard.js";
 import { type FinalReportRow, FinalReportsPage } from "../views/final-reports.js";
 
@@ -54,6 +55,14 @@ function toRow(raw: unknown): FinalReportRow {
  *
  * Nothing here writes, and the route file having no INSERT or UPDATE in it is the honest form of
  * that: migration 0014 grants this role SELECT on the table, and this page needs nothing more.
+ *
+ * A1-only snapshots are filtered out rather than repaired or removed. Every document the live
+ * approval writes resolves through at least A2 — `assign-work-officer` refuses otherwise — so the
+ * only rows this excludes are legacy ones the backfill resolved from a chain of one, and they are
+ * not concluded assessments. The rows stay where they are, immutable; what changes is that this
+ * register stops calling them Final Reports. `backfill:final-documents` names them, so the repair
+ * is the workflow — assign A2, take the assessment, approve — and not an edit to the table. See
+ * `isConcludedFinalDocument`.
  */
 export async function finalReportsRoutes(app: FastifyInstance): Promise<void> {
   app.get("/final-reports", async (request, reply) => {
@@ -69,6 +78,7 @@ export async function finalReportsRoutes(app: FastifyInstance): Promise<void> {
         JOIN users approver ON approver.id = f.approved_by_user_id
         JOIN report_decisions d ON d.id = f.decision_id
         LEFT JOIN users wo ON wo.id = d.work_officer_user_id
+       WHERE f.resolved_through_ordinal >= ${FINAL_DOCUMENT_MIN_ORDINAL}
        ORDER BY f.approved_at DESC, r.number DESC
        LIMIT ${FINAL_REPORTS_LIMIT}
     `);

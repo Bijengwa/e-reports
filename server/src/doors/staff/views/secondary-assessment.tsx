@@ -72,8 +72,14 @@ export function SecondaryAssessmentPage({
         <label for="a1-drawer" class="btn a1-open orange-action">
           Orange Report
         </label>
-        <a href={`/reports/${report.id}`} class="btn ghost">
-          ← Back to the report page
+        {/* My assessments, not the report page. This is an Officer's own workspace and their own
+            queue is where they came from; the report page is the general workflow, and once the
+            manager has approved and handed the work out `reportsRoutes` refuses it to them — a
+            back button that works until the case closes and then answers 403 is worse than one
+            that always goes somewhere theirs. The Orange Report is a drawer on this page already,
+            so nothing they need is behind that link. */}
+        <a href="/assessments" class="btn ghost">
+          ← Back to my assessments
         </a>
       </div>
 

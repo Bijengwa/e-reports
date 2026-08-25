@@ -59,6 +59,27 @@ const LETTERS = "abcdefghij";
  * assessor to remember a regulatory standard instead of applying one.
  */
 
+/**
+ * Which of the two documents this rendering IS.
+ *
+ * `"assessment"` is the working F004 — an assessor's own, or a manager reading one back. It names
+ * its assessors, carries 7.2 and ends in the assessors' signature block, because all of that is
+ * what an assessment is.
+ *
+ * `"final"` is the concluded F004 a manager approved. The answers are the same answers, rendered by
+ * the same components, and the paper is recognisably the same paper — but everything that belongs
+ * to *how* the office reached them is gone: no assessor strip, no assessor dates, no 7.2, no
+ * secondary-assessor slot, and a signature section naming the manager who approved it rather than
+ * anybody who assessed it. The working record stays where it has always been, in `assessments`,
+ * readable on the report page by the people entitled to read it.
+ *
+ * A mode over one renderer rather than a second component, for the reason `documentMode` gives one
+ * level down: a final F004 that did not come out of the F004 renderer would be a second form to
+ * keep in step with the first, and the moment the two drifted, the authoritative document would be
+ * the one nobody was maintaining.
+ */
+export type F004Presentation = "assessment" | "final";
+
 export type F004FormProps = {
   reportId: string;
   answers: F004Answers;
@@ -69,6 +90,21 @@ export type F004FormProps = {
   assessorName: string;
   /** The date beside the first assessor's name: today, or the day it was submitted. */
   assessedOn: string;
+  /**
+   * Which document this is. Defaults to the working assessment, which is every caller but one.
+   *
+   * `"final"` suppresses the assessment-only material listed on `F004Presentation` and is the only
+   * thing that does; the answers, the section bars and the numbering are untouched by it.
+   */
+  presentation?: F004Presentation;
+  /**
+   * Who approved this document and when — section 8's whole content in `"final"` presentation.
+   *
+   * The manager, always. They are the only signature a concluded F004 carries: the assessors wrote
+   * the assessment, the manager approved the result, and it is the approval that makes this the
+   * office's position rather than one officer's opinion.
+   */
+  approval?: { byName: string; on: string };
   /** Once submitted the document is closed: everything disabled, and the buttons gone. */
   submitted: boolean;
   /**
@@ -368,7 +404,12 @@ function SectionComments({
           <label class="vh" for={`note-${no}`}>
             Comment on section {no}
           </label>
-          <textarea id={`note-${no}`} name="body" rows="2" placeholder="Write a comment…"></textarea>
+          <textarea
+            id={`note-${no}`}
+            name="body"
+            rows="2"
+            placeholder="Write a comment…"
+          ></textarea>
           <button type="submit" class="btn btn-sm">
             Send
           </button>
@@ -1121,6 +1162,8 @@ export function F004Form({
   event,
   assessorName,
   assessedOn,
+  presentation,
+  approval,
   submitted,
   readOnly,
   documentMode,
@@ -1133,6 +1176,9 @@ export function F004Form({
   priorReviews,
   issues,
 }: F004FormProps): JSX.Element {
+  // The concluded document rather than the working one. See `F004Presentation` for what it drops
+  // and, more to the point, for what it deliberately does not: every answer on the paper.
+  const isFinal = presentation === "final";
   const causality = value(answers, "causality");
   const risk = value(answers, "risk_level");
   // Card-style and tick-style choices pair A2's option in beside A1's own rather than through
@@ -1176,55 +1222,64 @@ export function F004Form({
         </div>
 
         {/* The assessor strip. The name is the signed-in Officer and the date is the system's: an
-            assessment signed in somebody else's name would be worth nothing. */}
-        <div class="f4-assessors">
-          <div>
-            <span class="f4-k">1st Assessor</span>
-            <span class="f4-v" safe>
-              {assessorName}
-            </span>
-          </div>
-          <div>
-            <span class="f4-k">Date</span>
-            <span class="f4-v" safe>
-              {assessedOn}
-            </span>
-          </div>
-          {/* Dropped entirely by `omitSecond`, on the same argument that drops 7.2 and the second
+            assessment signed in somebody else's name would be worth nothing.
+
+            Dropped whole in `"final"` presentation. Who assessed the report is a fact about the
+            assessment, not about the concluded document — the office's position is the office's,
+            and printing three officers' names across the top of it would put the argument back on
+            the face of the thing that exists precisely to have settled it. */}
+        {isFinal ? (
+          <></>
+        ) : (
+          <div class="f4-assessors">
+            <div>
+              <span class="f4-k">1st Assessor</span>
+              <span class="f4-v" safe>
+                {assessorName}
+              </span>
+            </div>
+            <div>
+              <span class="f4-k">Date</span>
+              <span class="f4-v" safe>
+                {assessedOn}
+              </span>
+            </div>
+            {/* Dropped entirely by `omitSecond`, on the same argument that drops 7.2 and the second
               signature: a page with no secondary assessment must not print a secondary assessor's
               slot. On the first assessor's own workspace those two cells were a permanent "—"
               beside their name, implying a second assessor the report may never have and asking a
               question the page has no way to answer. */}
-          {omitSecond === true ? (
-            <></>
-          ) : (
-            <>
-              <div class={a2Review?.submitted === true ? undefined : "f4-muted"}>
-                <span class="f4-k">Secondary assessor</span>
-                <span class="f4-v" safe>
-                  {a2Review?.submitted === true ? (a2Review.assessorName ?? "—") : "—"}
-                </span>
-              </div>
-              <div class={a2Review?.submitted === true ? undefined : "f4-muted"}>
-                <span class="f4-k">Date</span>
-                <span class="f4-v" safe>
-                  {a2Review?.submitted === true ? (a2Review.assessedOn ?? "—") : "—"}
-                </span>
-              </div>
-            </>
-          )}
-          {/* A running count rather than a name-per-ordinal strip: the masthead has room for one
+            {omitSecond === true ? (
+              <></>
+            ) : (
+              <>
+                <div class={a2Review?.submitted === true ? undefined : "f4-muted"}>
+                  <span class="f4-k">Secondary assessor</span>
+                  <span class="f4-v" safe>
+                    {a2Review?.submitted === true ? (a2Review.assessorName ?? "—") : "—"}
+                  </span>
+                </div>
+                <div class={a2Review?.submitted === true ? undefined : "f4-muted"}>
+                  <span class="f4-k">Date</span>
+                  <span class="f4-v" safe>
+                    {a2Review?.submitted === true ? (a2Review.assessedOn ?? "—") : "—"}
+                  </span>
+                </div>
+              </>
+            )}
+            {/* A running count rather than a name-per-ordinal strip: the masthead has room for one
               more fact, not for a row that grows with every secondary assessment a report ends up
               with. `Assessment history` on the report page is where each one is named. */}
-          {priorReviews !== undefined && priorReviews.length > 0 && (
-            <div>
-              <span class="f4-k">Earlier secondary assessments</span>
-              <span class="f4-v" safe>
-                {String(priorReviews.length)}
-              </span>
-            </div>
-          )}
-        </div>
+            {priorReviews !== undefined && priorReviews.length > 0 && (
+              <div>
+                <span class="f4-k">Earlier secondary assessments</span>
+                <span class="f4-v" safe>
+                  {String(priorReviews.length)}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/*
@@ -1816,7 +1871,12 @@ export function F004Form({
 
                 Locked once that assessment is submitted, so the manager reads back exactly what
                 was written. A1 passes `omitSecond` and gets none of it — 7.2 is not theirs. */}
-            {omitSecond ? (
+            {/* `isFinal` drops it on its own argument, separate from `omitSecond`'s: 7.2 is one
+                assessor's concluding remarks in their own name, and a concluded document that
+                carried them would be signing the office's position with an assessor's words. The
+                remarks are not deleted — they stay in `assessments` and in the approved snapshot,
+                readable by the manager on the report page. */}
+            {omitSecond || isFinal ? (
               <></>
             ) : secondSection !== undefined ? (
               <div class="f4-block">
@@ -1879,33 +1939,68 @@ export function F004Form({
               comments={sectionComments?.["8"]}
               action={commentAction?.("8")}
             />
-            <div class="f4-sign">
-              <div class="f4-field">
-                <label for="signature">1st Assessor — type your name to sign</label>
-                <input
-                  id="signature"
-                  name="signature"
-                  value={value(answers, "signature")}
-                  placeholder={assessorName}
-                  autocomplete="off"
-                  disabled={locked}
-                />
-                <p class="f4-note">
-                  Typed, not uploaded. It must match the name above, which is the account you are
-                  signed in as.
-                </p>
-              </div>
-              {!omitSecond && (
-                <div class="f4-field f4-muted">
-                  <label for="signature-2">Secondary assessor</label>
-                  <input id="signature-2" value="" disabled placeholder="Not yet assessed" />
+            {/*
+              Section 8 is a signature block either way; whose signature differs.
+
+              On a working assessment it is the assessors' own — typed, matching the account they
+              are signed in as. On the concluded document it is the manager's approval, and only
+              theirs: the assessors signed their assessments, and those signatures sit on those
+              assessments. Reprinting one here would put an assessor's name under a document they
+              did not settle and, in the `documentMode` rendering, under answers a later assessor
+              may have replaced.
+            */}
+            {isFinal ? (
+              <div class="f4-sign f4-approved">
+                <div class="f4-field">
+                  <span class="f4-k">Approved by</span>
+                  <span class="f4-v" safe>
+                    {approval?.byName ?? ""}
+                  </span>
                 </div>
-              )}
-            </div>
+                <div class="f4-field">
+                  <span class="f4-k">Date of approval</span>
+                  <span class="f4-v" safe>
+                    {approval?.on ?? ""}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div class="f4-sign">
+                <div class="f4-field">
+                  <label for="signature">1st Assessor — type your name to sign</label>
+                  <input
+                    id="signature"
+                    name="signature"
+                    value={value(answers, "signature")}
+                    placeholder={assessorName}
+                    autocomplete="off"
+                    disabled={locked}
+                  />
+                  <p class="f4-note">
+                    Typed, not uploaded. It must match the name above, which is the account you are
+                    signed in as.
+                  </p>
+                </div>
+                {!omitSecond && (
+                  <div class="f4-field f4-muted">
+                    <label for="signature-2">Secondary assessor</label>
+                    <input id="signature-2" value="" disabled placeholder="Not yet assessed" />
+                  </div>
+                )}
+              </div>
+            )}
           </section>
         </fieldset>
 
-        {a2Review?.submitted === true ? (
+        {/* The concluded document says nothing about itself here.
+
+            All three sentences below describe an assessment's state — submitted, read-only, with
+            the manager, awaiting a decision — and every one of them is false of a document the
+            manager has already approved. The approval is stated where it belongs: in section 8
+            above, and in the card over the form. */}
+        {isFinal ? (
+          <></>
+        ) : a2Review?.submitted === true ? (
           <p class="hint">
             This secondary assessment has been submitted and is now read-only. The report is with
             the manager for a decision.

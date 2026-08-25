@@ -3,12 +3,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import { currentSession } from "../session-guard.js";
 import { ForbiddenPage } from "../views/forbidden.js";
-import {
-  MyWorkItemPage,
-  MyWorkPage,
-  type WorkAssessmentRead,
-  type WorkRow,
-} from "../views/my-work.js";
+import { MyWorkItemPage, MyWorkPage, type WorkRow } from "../views/my-work.js";
 import { loadReport } from "./reports.js";
 
 /** Same reason as every other page's: a uuid column compared against arbitrary text raises 22P02. */
@@ -132,29 +127,6 @@ export async function myWorkRoutes(app: FastifyInstance): Promise<void> {
     const found = await loadReport(app, target.data);
     if (found === null) return forbid(reply, session.role, 404);
 
-    // A1 and every secondary assessment, oldest first — how the report reached a decision.
-    // `loadReport` has already read both halves, so this is a shape change and not a query.
-    const assessments: WorkAssessmentRead[] = [
-      ...(found.assessment1 === null
-        ? []
-        : [
-            {
-              ordinal: 1,
-              assessorName: found.assessment1.assessorName,
-              submittedOn: found.assessment1.submittedOn,
-              conclusion: found.assessment1.conclusion,
-            },
-          ]),
-      ...found.secondaryAssessments.map((a) => ({
-        ordinal: a.ordinal,
-        assessorName: a.assessorName,
-        submittedOn: a.submittedOn,
-        // Only ordinal 1 writes that column. A secondary assessor's position is the review payload
-        // itself, which the full report page renders and this summary deliberately does not.
-        conclusion: null,
-      })),
-    ];
-
     return reply.html(
       <MyWorkItemPage
         report={found.report}
@@ -163,8 +135,6 @@ export async function myWorkRoutes(app: FastifyInstance): Promise<void> {
         assignedByName={assignment.assigned_by_name}
         assignedAt={new Date(assignment.assigned_at).toISOString().slice(0, 10)}
         instruction={assignment.comment}
-        assessments={assessments}
-        decisions={found.decisions}
       />,
     );
   });

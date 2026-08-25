@@ -67,6 +67,16 @@ export type AssignmentRow = {
   /** 1 for the first assessment, 2, 3, 4 … for each secondary one. */
   ordinal: number;
   state: AssignmentState;
+  /**
+   * Whether this Officer may still open the report page behind the number.
+   *
+   * False once the manager has approved and assigned the work: at that point the report page is
+   * the settled record of an argument that is over, carrying every assessor's document and the
+   * manager's whole decision history, and `reportsRoutes` refuses it to an Officer. The number
+   * stays on the row and stops being a link, which is the honest rendering of "this is no longer
+   * yours to open" — a link that answers 403 would be worse.
+   */
+  reportOpen: boolean;
 };
 
 /** What one row says about itself. The same three words at every ordinal — that is the point. */
@@ -132,9 +142,13 @@ function AssignmentRows({
           {rows.map((row) => (
             <tr>
               <td>
-                <a href={`/reports/${row.reportId}`} safe>
-                  {row.number}
-                </a>
+                {row.reportOpen ? (
+                  <a href={`/reports/${row.reportId}`} safe>
+                    {row.number}
+                  </a>
+                ) : (
+                  <span safe>{row.number}</span>
+                )}
               </td>
               <td>{day(row.receivedAt)}</td>
               <td safe>{row.deviceName}</td>

@@ -560,7 +560,10 @@ describe.skipIf(!INTEGRATION_ENABLED)("the activity trail", () => {
     // Rendered closed — <dialog> hides itself — so nothing flashes before the script runs.
     expect(body).toContain("data-signout-dialog");
     expect(body).toContain('<h2 id="signout-title">Sign out</h2>');
-    expect(body).toContain("You will need your password to come back.");
+    expect(body).toContain("will need your password to come back");
+    // The confirming action is destructive and is styled as such; Cancel stays neutral.
+    expect(body).toContain('class="btn danger"');
+    expect(body).toContain('class="btn ghost"');
     // The name is in the title bar already; the question does not repeat it.
     expect(body).not.toContain("You are signed in as");
     // Cancel closes the dialog without submitting, which needs no script of its own — the same

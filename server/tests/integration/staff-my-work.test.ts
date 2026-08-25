@@ -259,7 +259,11 @@ async function assignedForWork(deviceName = "Philips IntelliVue MX450"): Promise
     assessor_id: second.id,
     comment: "Please take the second assessment.",
   });
-  await post(`/reports/${filed.id}/secondary-assessment`, second.cookie, completeSecondary(second.name));
+  await post(
+    `/reports/${filed.id}/secondary-assessment`,
+    second.cookie,
+    completeSecondary(second.name),
+  );
 
   await post(`/reports/${filed.id}/assign-work-officer`, manager.cookie, {
     officer_id: worker.id,
@@ -299,7 +303,16 @@ describe.skipIf(!INTEGRATION_ENABLED)("an Officer's own assigned work", () => {
     expect(body).not.toContain("<table");
   });
 
-  it("shows the report, the assessments and the manager's decisions on one work item", async () => {
+  /*
+   * The work item carries the assignment, the approved document and the report — and no more.
+   *
+   * It used to carry "How it was assessed", naming every assessor with their dates, and the
+   * manager's whole decision history underneath it. Both are gone. An Officer carrying out an
+   * approved recommendation has no business with the internal record of how the office argued its
+   * way there or with who was overruled getting there; the Final F004 is the office's position in
+   * full, and that is what they are given.
+   */
+  it("shows the assignment, the Final F004 and the report as filed, and nothing of the assessments", async () => {
     const { manager, first, second, worker, report } = await assignedForWork();
 
     const res = await get(`/my-work/${report.id}`, worker.cookie);
@@ -311,19 +324,21 @@ describe.skipIf(!INTEGRATION_ENABLED)("an Officer's own assigned work", () => {
     expect(res.body).toContain("Issue the risk communication and set up enhanced monitoring.");
     expect(res.body).toContain(manager.name);
 
-    // How it was assessed: every ordinal, and A1's own recommendation.
-    expect(res.body).toContain("A1");
-    expect(res.body).toContain(first.name);
-    expect(res.body).toContain("A2");
-    expect(res.body).toContain(second.name);
-    expect(res.body).toContain("Recommend risk communication and enhanced monitoring.");
-
-    // The decision history, the same list the manager reads on the report.
-    expect(res.body).toContain("Manager decision history");
-    expect(res.body).toContain("Please take the second assessment.");
+    // The approved document, which is the one assessment document this reader is given.
+    expect(res.body).toContain(`href="/reports/${report.id}/final-document"`);
 
     // The report as filed is on the page, not merely linked to.
     expect(res.body).toContain("Muhimbili National Hospital");
+
+    // The working record is not. No assessor is named, no decision history is printed, and there
+    // is no way from here into the general report page — which `reportsRoutes` refuses an Officer
+    // at this status anyway.
+    expect(res.body).not.toContain("How it was assessed");
+    expect(res.body).not.toContain("Manager decision history");
+    expect(res.body).not.toContain("Please take the second assessment.");
+    expect(res.body).not.toContain(first.name);
+    expect(res.body).not.toContain(second.name);
+    expect(res.body).not.toContain(`href="/reports/${report.id}"`);
   });
 
   it("carries no work lifecycle: nothing to start, submit or close", async () => {

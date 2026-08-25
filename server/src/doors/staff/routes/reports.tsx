@@ -10,6 +10,7 @@ import {
 } from "../../../domain/f004.js";
 import { currentSession } from "../session-guard.js";
 import type { SectionComment } from "../views/f004.js";
+import { ForbiddenPage } from "../views/forbidden.js";
 import {
   type AssessorOption,
   type DecisionEntry,
@@ -450,12 +451,99 @@ export async function renderReport(
     );
 }
 
+/**
+ * Whether this Officer has any standing to open this report's page at all.
+ *
+ * Three ways in, and they are the three ways an Officer is a party to a report rather than a reader
+ * of the register: they hold the first assessment, they hold a secondary one at any ordinal, or
+ * they keyed the report in and were sent straight to it. Nothing else counts — being assigned the
+ * WORK that came out of a report is not on this list, because that reader's document is the Final
+ * F004 and their page is My work.
+ *
+ * One query over the places an assignment lives, rather than a `loadReport` and a check afterwards.
+ * The route asks this before it reads anything about the report, which is what makes "edit the id
+ * in the address" answer 403 rather than somebody else's case.
+ */
+async function officerIsPartyTo(
+  app: FastifyInstance,
+  reportId: string,
+  officerId: string,
+): Promise<boolean> {
+  const rows = await app.db.execute(sql`
+    SELECT 1
+      FROM reports r
+     WHERE r.id = ${reportId}
+       AND (
+         r.assessor1_user_id = ${officerId}
+         OR r.entered_by_user_id = ${officerId}
+         OR EXISTS (
+           SELECT 1 FROM assessments a
+            WHERE a.report_id = r.id AND a.assessor_id = ${officerId}
+         )
+       )
+  `);
+
+  return rows.length > 0;
+}
+
+/**
+ * The register, and one report on it.
+ *
+ * Registered in the broad signed-in scope because a manager and an administrator both belong here,
+ * and authorized per request for the third role, which does not. An Officer has no business with
+ * the register: it lists every report in the office, and the report page beneath it carries every
+ * assessment, every manager decision and the whole record of how a conclusion was reached. Their
+ * own work is `/assessments` and `/my-work`, and both are lists of theirs alone.
+ *
+ * What an Officer keeps is the report page of a case they are actually working — they need the
+ * Orange Report and their own F004 workspace, and that page is where both are. What they lose is
+ * the register, everyone else's cases, and their own case once it is over: at `assigned_for_work`
+ * the argument is settled, the decision history is complete, and the only thing an Officer should
+ * be reading then is the Final F004 their own assignment points at.
+ *
+ * A scope hook cannot express any of that, because "is this reader a party to this report" is a
+ * question about the row. So the two routes ask it, server-side, on every request.
+ */
 export async function reportsRoutes(app: FastifyInstance): Promise<void> {
-  app.get("/reports", async (request, reply) => renderReports(app, request, reply, 200));
+  const forbid = (reply: FastifyReply, role: string) =>
+    reply.status(403).html(ForbiddenPage({ role }));
+
+  app.get("/reports", async (request, reply) => {
+    const session = currentSession(request);
+
+    // The register is every report in the office. There is no Officer-shaped version of it: the
+    // two lists that ARE theirs already exist, and are reached from their own rail.
+    if (session.role === "assessor") return forbid(reply, session.role);
+
+    return renderReports(app, request, reply, 200);
+  });
 
   app.get("/reports/:id", async (request, reply) => {
+    const session = currentSession(request);
+
     const target = ReportId.safeParse((request.params as { id: string }).id);
-    if (!target.success) return renderReports(app, request, reply, 404, NOT_FOUND);
+    if (!target.success) {
+      // A manager or an administrator is shown the register with the stale link explained; an
+      // Officer cannot be, because they may not see it. They get the same refusal a real report
+      // they are not party to would give them, which also tells a prober nothing about whether
+      // the id exists.
+      if (session.role === "assessor") return forbid(reply, session.role);
+      return renderReports(app, request, reply, 404, NOT_FOUND);
+    }
+
+    if (session.role === "assessor") {
+      if (!(await officerIsPartyTo(app, target.data, session.userId))) {
+        return forbid(reply, session.role);
+      }
+
+      // Their own case, but over. Asked here rather than inside `renderReport` so the refusal sits
+      // beside the ownership test it belongs with, and ahead of every read the page would do.
+      const rows = await app.db.execute(sql`
+        SELECT status::text AS status FROM reports WHERE id = ${target.data}
+      `);
+      const status = (rows[0] as { status: string } | undefined)?.status;
+      if (status === "assigned_for_work") return forbid(reply, session.role);
+    }
 
     return renderReport(app, request, reply, target.data);
   });

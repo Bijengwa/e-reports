@@ -37,6 +37,29 @@
 
   if (stored() === "1") root.classList.add("rail-collapsed");
 
+  /*
+   * A page restored from the back-forward cache asks the server again.
+   *
+   * The server is the authority on whether a session is still live, and it stays the authority:
+   * this builds no client-side authentication, holds no token and decides nothing. Every page
+   * behind the session gate is already sent with `Cache-Control: no-store`, which is what forbids
+   * the history cache — but not every engine treats no-store as disqualifying for BFCache, and a
+   * page that IS restored is redrawn from a memory snapshot without a request being made at all.
+   * The result was the reported defect: sign out, press Back, and the last report is on screen,
+   * fully drawn, belonging to a session that no longer exists.
+   *
+   * `event.persisted` is true only for that case — a genuine BFCache restore — so an ordinary
+   * navigation, a reload and a first paint are all untouched. Reloading asks the server, and the
+   * session guard answers: still signed in, the same page comes back; signed out or expired, it
+   * redirects to the sign-in page. Nothing on screen survives a revalidation it fails.
+   *
+   * Registered here rather than in a file of its own because this script is already loaded by
+   * every page inside the staff shell, and by nothing outside it.
+   */
+  window.addEventListener("pageshow", function (event) {
+    if (event.persisted) window.location.reload();
+  });
+
   function ready(fn) {
     if (document.readyState !== "loading") fn();
     else document.addEventListener("DOMContentLoaded", fn);

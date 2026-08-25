@@ -125,10 +125,19 @@ export function ReceivedRows({ reports }: { reports: ReceivedRow[] }): JSX.Eleme
         <tbody>
           {reports.map((report) => (
             <tr>
+              {/* An orphan's number is not a link. On an Officer's dashboard this list carries
+                  their own unstarted reports and the ones nobody holds yet, and `reportsRoutes`
+                  opens a report page only to somebody who is a party to it — so the number of a
+                  report they have not been given goes nowhere rather than to a refusal. The same
+                  argument as the Assessment cell below, one column over. */}
               <td>
-                <a href={`/reports/${report.id}`} safe>
-                  {report.number}
-                </a>
+                {report.mine ? (
+                  <a href={`/reports/${report.id}`} safe>
+                    {report.number}
+                  </a>
+                ) : (
+                  <span safe>{report.number}</span>
+                )}
               </td>
               <td>{day(report.receivedAt)}</td>
               <td safe>{report.deviceName}</td>

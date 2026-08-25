@@ -269,16 +269,27 @@ export function StaffShell({
               </a>
             )}
 
-            {/* Everyone's, because everyone may read the register. What differs by role is what
-                a person may do with a report, and this slice gives nobody anything to do. */}
-            <a
-              href="/reports"
-              class={active === "reports" ? "on" : ""}
-              aria-current={active === "reports" ? "page" : undefined}
-            >
-              <IconReports />
-              <span class="rail-label">Reports</span>
-            </a>
+            {/* The register — and not everyone's after all.
+
+                It used to be here for every role on the argument that everyone may read a report.
+                That was true of a slice where nobody could do anything with one; it is not true of
+                a workflow whose report page now carries every assessment, every manager decision
+                and the whole record of how a conclusion was reached. An Officer's own work is the
+                two lists below, and this entry is gone for them.
+
+                Presentation only, as ever — `reportsRoutes` refuses an Officer the register, and
+                refuses them any report they are not a party to, whatever the rail shows. The two
+                agree so that no link answers 403 when clicked. */}
+            {!isOfficer && (
+              <a
+                href="/reports"
+                class={active === "reports" ? "on" : ""}
+                aria-current={active === "reports" ? "page" : undefined}
+              >
+                <IconReports />
+                <span class="rail-label">Reports</span>
+              </a>
+            )}
 
             {/* The index over every approved F004, and the manager's alone — they are the only
                 role that approves one. An Officer reaches the final document of their own
@@ -447,16 +458,22 @@ export function StaffShell({
           treat "target is the dialog" as "the backdrop was clicked" without catching clicks that
           merely landed on the box's own padding.
         */}
+        {/* Signing out ends the session on the server, so the confirming button is styled as what
+            it is: destructive. Cancel stays neutral and stays first, so the quiet answer is the one
+            under the thumb and the red one has to be reached for. */}
         <dialog class="modal" data-signout-dialog aria-labelledby="signout-title">
           <div class="modal-body">
             <h2 id="signout-title">Sign out</h2>
-            <p class="hint">You will need your password to come back.</p>
+            <p class="hint">
+              You will be signed out of AE Reports on this device and will need your password to
+              come back.
+            </p>
 
             <form method="POST" action="/logout" class="bar modal-actions">
               <button type="submit" formmethod="dialog" class="btn ghost">
                 Cancel
               </button>
-              <button type="submit" class="btn">
+              <button type="submit" class="btn danger">
                 Sign out
               </button>
             </form>

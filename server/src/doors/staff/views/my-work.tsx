@@ -1,7 +1,5 @@
 import { OrangeReportIdentity, OrangeReportSurface } from "./orange-report.js";
 import {
-  type DecisionEntry,
-  DecisionHistory,
   day,
   type ReportDetail,
   ReportDocument,
@@ -140,15 +138,19 @@ export function MyWorkPage({ viewerRole, viewerName, rows }: MyWorkPageProps): J
   );
 }
 
-/** One assessment the report went through, as the Officer carrying out the work reads it. */
-export type WorkAssessmentRead = {
-  ordinal: number;
-  assessorName: string;
-  submittedOn: string | null;
-  /** Section 7.1 for the first assessment. Null wherever the column holds nothing. */
-  conclusion: string | null;
-};
-
+/**
+ * What the Officer carrying out the work is given, and it is deliberately short.
+ *
+ * The report as filed, the assignment, and the Final F004. Nothing about the assessments and
+ * nothing about the decisions — this page used to carry both, naming every assessor and printing
+ * the manager's whole decision history, which handed one Officer the internal record of how the
+ * office argued its way to a position and who was overruled getting there. That record belongs to
+ * the manager and to the audit trail.
+ *
+ * The Officer is not being kept in the dark about their own task: the Final F004 IS the office's
+ * position, in full, on the form it belongs on, and it is the thing they have been asked to carry
+ * out. What they no longer see is the working out.
+ */
 export type MyWorkItemPageProps = {
   report: ReportDetail;
   viewerRole: string;
@@ -158,19 +160,14 @@ export type MyWorkItemPageProps = {
   assignedAt: string;
   /** The manager's instruction on the assignment itself, where they wrote one. */
   instruction: string | null;
-  /** Every assessment the report went through, oldest first — A1 and each secondary one. */
-  assessments: WorkAssessmentRead[];
-  /** The whole decision history, the same list the manager reads on the report. */
-  decisions: DecisionEntry[];
 };
 
 /**
  * One assigned report, as the Officer who has to act on it needs to read it.
  *
- * The report as filed, then how it was assessed, then what the manager decided — in that order,
- * because that is the order the case happened in. The assessments are a summary rather than four
- * full F004s: this reader is carrying out a recommendation, not auditing the assessment, and the
- * whole document is one link away for the reader who wants it.
+ * Who assigned it and why, the approved F004 they are carrying out, and the report as the reporter
+ * filed it. That is the whole page, and the order is the order the reader needs it in: the
+ * instruction first, because it is why they are here, then the document, then the source.
  *
  * Nothing here is a control. There is no Start and no Complete, because the MVP has no work
  * lifecycle — see the note at the top of this file.
@@ -182,8 +179,6 @@ export function MyWorkItemPage({
   assignedByName,
   assignedAt,
   instruction,
-  assessments,
-  decisions,
 }: MyWorkItemPageProps): JSX.Element {
   return (
     <StaffShell
@@ -221,10 +216,10 @@ export function MyWorkItemPage({
         )}
       </div>
 
-      {/* The approved outcome, before the working history. This reader is carrying out what the
-          manager approved, so the approved document is the thing they need first — the assessments
-          below are context for it, not a substitute. Always present: a report only reaches this
-          page through the approval that writes the final document. */}
+      {/* The approved outcome, and the only assessment document on this page. This reader is
+          carrying out what the manager approved, so the approved document is the thing they need
+          — and the only one they are shown. Always present: a report only reaches this page
+          through the approval that writes the final document. */}
       <p class="hint">
         <a href={`/reports/${report.id}/final-document`}>
           Open the final F004 — the approved assessment of this report
@@ -236,40 +231,14 @@ export function MyWorkItemPage({
         <ReportDocument report={report} />
       </OrangeReportSurface>
 
-      <h2 class="report-heading">How it was assessed</h2>
-      {assessments.length === 0 ? (
-        <p class="hint">No assessment is recorded against this report.</p>
-      ) : (
-        <ol class="decision-history">
-          {assessments.map((a) => (
-            <li class="review">
-              <p class="hint">
-                <span safe>{`A${a.ordinal}`}</span> · <span safe>{a.assessorName}</span>
-                {a.submittedOn === null ? (
-                  <span> · not submitted</span>
-                ) : (
-                  <span safe>{` · submitted ${a.submittedOn}`}</span>
-                )}
-              </p>
-              {a.conclusion && (
-                <p class="review-text" safe>
-                  {a.conclusion}
-                </p>
-              )}
-            </li>
-          ))}
-        </ol>
-      )}
+      {/* Nothing follows.
 
-      <DecisionHistory decisions={decisions} />
-
-      {/* The full document, for a reader who wants the assessment itself rather than its outcome.
-          A link rather than a second copy of the report page: that page already exists, already
-          decides what each role may see on it, and duplicating it here would mean two answers to
-          the same question. */}
-      <p class="hint">
-        <a href={`/reports/${report.id}`}>Open the full report and assessments</a>
-      </p>
+          "How it was assessed" and the decision history used to, and both are gone: the first
+          named every assessor on the report and the second printed the manager's whole record of
+          what was decided and why, to a reader whose business is carrying out the conclusion. The
+          way to the general report page went with them — `/reports/:id` is the assessment
+          workflow, and an Officer whose report has reached `assigned_for_work` is refused it by
+          `reportsRoutes` regardless, so a link to it here would be a dead end drawn on purpose. */}
     </StaffShell>
   );
 }

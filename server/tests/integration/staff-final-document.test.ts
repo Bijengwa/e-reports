@@ -282,6 +282,61 @@ async function afterFirstAssessment() {
   return { manager, first, rest, report };
 }
 
+/**
+ * One whole report taken from filing to approval, with every part of it named.
+ *
+ * Its own manager and its own four Officers, so two calls produce two reports that share nobody.
+ * That is the point for the cross-officer test below: a refusal that only held because the two
+ * readers happened to be different people would prove nothing about the rule being asked for.
+ */
+async function approvedReport(label: string) {
+  const manager = await signedInAs("manager", `Manager ${label}`);
+  const pool = [
+    await signedInAs("assessor", `${label} One`),
+    await signedInAs("assessor", `${label} Two`),
+    await signedInAs("assessor", `${label} Three`),
+    await signedInAs("assessor", `${label} Four`),
+  ];
+
+  await fileAtThePublicDoor();
+
+  const rows = await owner.db.execute(sql`
+    SELECT id, number, assessor1_user_id FROM reports ORDER BY received_at DESC, number DESC LIMIT 1
+  `);
+  const report = rows[0] as Report;
+
+  const a1 = pool.find((one) => one.id === report.assessor1_user_id);
+  if (a1 === undefined) throw new Error("intake assigned nobody this suite knows");
+  const rest = pool.filter((one) => one.id !== a1.id);
+  const [secondAssessor, worker] = rest;
+  if (secondAssessor === undefined || worker === undefined) throw new Error("need two Officers");
+
+  await post(`/reports/${report.id}/assessment-1`, a1.cookie, completeAssessment(a1.name));
+  await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
+    assessor_id: secondAssessor.id,
+    comment: "Please review it.",
+  });
+  await post(
+    `/reports/${report.id}/secondary-assessment`,
+    secondAssessor.cookie,
+    completeSecondary(secondAssessor.name),
+  );
+  const approved = await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
+    officer_id: worker.id,
+  });
+  expect(approved.statusCode).toBe(302);
+
+  return {
+    manager,
+    a1,
+    secondAssessor,
+    worker,
+    id: report.id,
+    number: report.number,
+    finalDocumentUrl: `/reports/${report.id}/final-document`,
+  };
+}
+
 describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
   beforeEach(start);
 
@@ -301,7 +356,11 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
       assessor_id: second.id,
       comment: "Please review it.",
     });
-    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary(second.name));
+    await post(
+      `/reports/${report.id}/secondary-assessment`,
+      second.cookie,
+      completeSecondary(second.name),
+    );
 
     // A2 is in too. Still nothing: submitting an assessment is not approving one.
     expect(await snapshotOf(report.id)).toBeNull();
@@ -446,7 +505,11 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
       assessor_id: second.id,
       comment: "Please review it.",
     });
-    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary(second.name));
+    await post(
+      `/reports/${report.id}/secondary-assessment`,
+      second.cookie,
+      completeSecondary(second.name),
+    );
     await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
       officer_id: worker.id,
     });
@@ -464,7 +527,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
   });
 
   it("shows the manager what they approved, and never re-resolves it", async () => {
-    const { manager, rest, report } = await afterFirstAssessment();
+    const { manager, first, rest, report } = await afterFirstAssessment();
     const [second, worker] = rest;
     if (second === undefined || worker === undefined) throw new Error("need two Officers");
 
@@ -502,9 +565,34 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
     expect(page.body).toContain("Orange Report · F001");
     expect(page.body).toContain(report.number);
 
-    // The approval itself, named.
+    // The approval itself, named — and it is the only name on the document.
     expect(page.body).toContain("Grace Mollel");
-    expect(page.body).toContain("A1 – A2");
+    expect(page.body).toContain("Approved by");
+    expect(page.body).toContain("Date of approval");
+
+    // The concluded F004 says it once. The title bar carries "Final F004"; the page does not
+    // repeat it, and the sentence that used to explain the document is gone.
+    expect(page.body).not.toContain("<h2>Final F004</h2>");
+    expect(page.body).not.toContain("resolved to one answer per question");
+
+    // No assessor reaches this page at all — not A1, not the secondary assessor, not their dates,
+    // not the strip that names them, and not the secondary assessor's slot or their 7.2.
+    expect(page.body).not.toContain("1st Assessor");
+    expect(page.body).not.toContain("Secondary assessor");
+    expect(page.body).not.toContain(first.name);
+    expect(page.body).not.toContain(second.name);
+    expect(page.body).not.toContain("concluding remarks");
+
+    // The work officer is the one person named beside the manager, and only in the card above the
+    // document — metadata about the report, never a signatory of the F004.
+    expect(page.body).toContain(worker.name);
+    expect(page.body).toContain("Assigned for work to");
+    // How far the chain ran belongs on the Final Reports register, not on the document.
+    expect(page.body).not.toContain("Assessments resolved");
+
+    // The way out is named for what it opens, and it opens the Orange Report.
+    expect(page.body).toContain("Open Orange Report");
+    expect(page.body).not.toContain("Back to the report");
 
     // The resolved answer is what the form's own control shows as chosen: A2 replaced High with
     // Low, so the Low radio is the checked one and High is not.
@@ -533,7 +621,11 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
       assessor_id: second.id,
       comment: "Please review it.",
     });
-    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary(second.name));
+    await post(
+      `/reports/${report.id}/secondary-assessment`,
+      second.cookie,
+      completeSecondary(second.name),
+    );
     await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
       officer_id: worker.id,
     });
@@ -554,6 +646,162 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
     expect((await get(`/my-work/${report.id}`, first.cookie)).statusCode).toBe(403);
     expect((await get("/my-work", first.cookie)).body).not.toContain(report.number);
     expect((await get("/my-work", worker.cookie)).body).toContain(report.number);
+
+    // Neither page offers the Officer a way into the general workflow, and the work item no
+    // longer carries the working record: no assessor named, no decision history, no report page.
+    expect(theirs.body).not.toContain(`href="/reports/${report.id}"`);
+    expect(item.body).not.toContain(`href="/reports/${report.id}"`);
+    expect(item.body).not.toContain("How it was assessed");
+    expect(item.body).not.toContain("Open the full report and assessments");
+    expect(item.body).not.toContain(second.name);
+  });
+
+  /*
+   * Changing the uuid in the address is the whole attack, and it is the whole test.
+   *
+   * Two Officers, two approved reports, and neither may read the other's document. The check is
+   * not "is this reader an Officer" and not "does this report have a final document" — it is
+   * whether the `assign_work_officer` decision THIS document was written from names this reader,
+   * asked of the row that was actually loaded. Nothing about the address is trusted.
+   */
+  it("refuses one Officer the Final F004 of another Officer's assigned work", async () => {
+    const alpha = await approvedReport("Alpha");
+    const bravo = await approvedReport("Bravo");
+
+    // Each reads their own.
+    expect((await get(alpha.finalDocumentUrl, alpha.worker.cookie)).statusCode).toBe(200);
+    expect((await get(bravo.finalDocumentUrl, bravo.worker.cookie)).statusCode).toBe(200);
+
+    // Neither reads the other's, whichever way round the swap is made.
+    expect((await get(bravo.finalDocumentUrl, alpha.worker.cookie)).statusCode).toBe(403);
+    expect((await get(alpha.finalDocumentUrl, bravo.worker.cookie)).statusCode).toBe(403);
+
+    // Nothing of the refused document leaks into the refusal.
+    const refused = await get(bravo.finalDocumentUrl, alpha.worker.cookie);
+    expect(refused.body).not.toContain(bravo.number);
+
+    // Having assessed a report is not being assigned the work that came out of it: A1 and the
+    // secondary assessor are refused the document too, on the same rule.
+    expect((await get(alpha.finalDocumentUrl, alpha.a1.cookie)).statusCode).toBe(403);
+    expect((await get(alpha.finalDocumentUrl, alpha.secondAssessor.cookie)).statusCode).toBe(403);
+
+    // A manager reads either one. They approve these documents and hold the register of them.
+    expect((await get(alpha.finalDocumentUrl, alpha.manager.cookie)).statusCode).toBe(200);
+    expect((await get(bravo.finalDocumentUrl, alpha.manager.cookie)).statusCode).toBe(200);
+  });
+
+  /*
+   * The register is not an Officer's, and neither is the report page once the case is over.
+   *
+   * Dropping the rail entry is presentation. This is the part that holds when somebody types the
+   * address: `/reports` is refused outright, a report the Officer is not a party to is refused,
+   * and their own case is refused once it reaches `assigned_for_work` — which is exactly when the
+   * report page starts carrying the settled decision history and every assessor's document.
+   */
+  it("keeps an Officer out of the register, and out of the report page once the work is assigned", async () => {
+    const { manager, first, rest, report } = await afterFirstAssessment();
+    const [second, worker, stranger] = rest;
+    if (second === undefined || worker === undefined || stranger === undefined) {
+      throw new Error("need three Officers");
+    }
+
+    // The register itself: never, at any stage.
+    expect((await get("/reports", first.cookie)).statusCode).toBe(403);
+    expect((await get("/reports", worker.cookie)).statusCode).toBe(403);
+    expect((await get("/reports", manager.cookie)).statusCode).toBe(200);
+
+    // Their own case, while it is live: A1 may open it, an unrelated Officer may not.
+    expect((await get(`/reports/${report.id}`, first.cookie)).statusCode).toBe(200);
+    expect((await get(`/reports/${report.id}`, stranger.cookie)).statusCode).toBe(403);
+
+    await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
+      assessor_id: second.id,
+      comment: "Please review it.",
+    });
+    await post(
+      `/reports/${report.id}/secondary-assessment`,
+      second.cookie,
+      completeSecondary(second.name),
+    );
+    await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
+      officer_id: worker.id,
+    });
+
+    // Approved. The workflow is over for every Officer on it — the two who assessed it and the
+    // one carrying out the work alike.
+    expect(await statusOf(report.id)).toBe("assigned_for_work");
+    for (const who of [first, second, worker]) {
+      expect((await get(`/reports/${report.id}`, who.cookie)).statusCode).toBe(403);
+    }
+
+    // The manager keeps it, because the record of how it was decided is theirs.
+    expect((await get(`/reports/${report.id}`, manager.cookie)).statusCode).toBe(200);
+
+    // And My assessments stops offering a link it knows would be refused.
+    const queue = await get("/assessments", first.cookie);
+    expect(queue.statusCode).toBe(200);
+    expect(queue.body).toContain(report.number);
+    expect(queue.body).not.toContain(`href="/reports/${report.id}"`);
+  });
+
+  /*
+   * A snapshot resolved from A1 alone is history, not a concluded Final F004.
+   *
+   * The live approval cannot write one — `assign-work-officer` refuses. `backfill-final-documents`
+   * could, before it was taught the same rule, and the rows it wrote are still in the table. They
+   * stay there: what this pins is the read side, which is that such a row is neither listed as a
+   * Final Report nor served as a Final F004, to anybody.
+   */
+  it("does not expose an A1-only legacy snapshot as a Final Report", async () => {
+    const { manager, first, rest, report } = await afterFirstAssessment();
+    const [second, worker] = rest;
+    if (second === undefined || worker === undefined) throw new Error("need two Officers");
+
+    await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
+      assessor_id: second.id,
+      comment: "Please review it.",
+    });
+    await post(
+      `/reports/${report.id}/secondary-assessment`,
+      second.cookie,
+      completeSecondary(second.name),
+    );
+    await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
+      officer_id: worker.id,
+    });
+
+    // A real, valid document first, so the only difference below is the ordinal.
+    expect((await get("/final-reports", manager.cookie)).body).toContain(report.number);
+    expect((await get(`/reports/${report.id}/final-document`, manager.cookie)).statusCode).toBe(
+      200,
+    );
+
+    // Now make the row look like what the old backfill wrote: resolved through A1 alone. It is
+    // otherwise untouched — same payload, same decision, same approver.
+    await owner.db.execute(sql`
+      UPDATE report_final_documents SET resolved_through_ordinal = 1
+       WHERE report_id = ${report.id}
+    `);
+
+    // Gone from the register, and the document itself answers 404 rather than presenting an
+    // unreviewed first assessment as the office's settled position.
+    const listed = await get("/final-reports", manager.cookie);
+    expect(listed.statusCode).toBe(200);
+    expect(listed.body).not.toContain(report.number);
+    expect(listed.body).toContain("No final report yet");
+
+    expect((await get(`/reports/${report.id}/final-document`, manager.cookie)).statusCode).toBe(
+      404,
+    );
+    // Not served to the assigned Officer either: it is not a permissions question for them.
+    expect((await get(`/reports/${report.id}/final-document`, worker.cookie)).statusCode).toBe(404);
+    // An Officer who is not the work officer is still refused before the ordinal is even reached.
+    expect((await get(`/reports/${report.id}/final-document`, first.cookie)).statusCode).toBe(403);
+
+    // And the row is still there. Nothing deleted it and nothing rewrote its payload.
+    const snapshot = await snapshotOf(report.id);
+    expect(snapshot).not.toBeNull();
+    expect(snapshot?.payload.kind).toBe("final_document_v1");
   });
 
   /*
@@ -627,7 +875,11 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
       assessor_id: second.id,
       comment: "Please review it.",
     });
-    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary(second.name));
+    await post(
+      `/reports/${report.id}/secondary-assessment`,
+      second.cookie,
+      completeSecondary(second.name),
+    );
     await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
       officer_id: worker.id,
     });
@@ -650,7 +902,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
     expect((await get("/final-reports", first.cookie)).statusCode).toBe(403);
   });
 
-  it("puts Dashboard, Workload, Reports and Final Reports in the manager's rail alone", async () => {
+  it("puts Workload, Reports and Final Reports in the manager's rail alone", async () => {
     const { manager, first } = await afterFirstAssessment();
 
     // A manager's dashboard renders for them now instead of redirecting to the workload, and the
@@ -668,12 +920,14 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
     expect(dashboard.body).not.toContain("awaiting_second_assessor");
     expect(dashboard.body).not.toContain("assigned_for_work");
 
-    // The Officer's own rail is untouched, and carries no way to a page they would be refused.
+    // The Officer's rail carries their own lists and nothing else. The register is gone from it:
+    // it lists every report in the office, and `reportsRoutes` refuses it to them anyway.
     const officer = await get("/dashboard", first.cookie);
     expect(officer.statusCode).toBe(200);
-    for (const href of ["/dashboard", "/reports", "/assessments", "/my-work", "/reports/new"]) {
+    for (const href of ["/dashboard", "/assessments", "/my-work", "/reports/new"]) {
       expect(officer.body, href).toContain(`href="${href}"`);
     }
+    expect(officer.body).not.toContain('href="/reports"');
     expect(officer.body).not.toContain('href="/final-reports"');
     expect(officer.body).not.toContain('href="/workload"');
   });
@@ -687,7 +941,11 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
       assessor_id: second.id,
       comment: "Please review it.",
     });
-    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary(second.name));
+    await post(
+      `/reports/${report.id}/secondary-assessment`,
+      second.cookie,
+      completeSecondary(second.name),
+    );
     await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
       officer_id: worker.id,
     });

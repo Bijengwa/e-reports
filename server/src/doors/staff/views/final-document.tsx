@@ -25,6 +25,12 @@ import { StaffShell } from "./shell.js";
  * report page and in the audit trail, and this document carries only the answer it settled on.
  * `sectionComments` and `commentAction` are omitted for the same reason.
  *
+ * `presentation="final"` is the rest of it, and it is the form's own flag rather than this page
+ * hiding things after the fact — see `F004Presentation` in `f004.tsx`. No assessor is named on this
+ * document, no assessment date is printed on it, 7.2 is absent, and section 8 is the manager's
+ * approval. Nothing about who assessed the report reaches this component at all, which is a
+ * stronger statement than not rendering it.
+ *
  * `readOnly` and `submitted` together mean there is no form element at all — nothing on this page
  * is editable, and nothing on it advertises a route that would refuse the reader.
  */
@@ -33,26 +39,22 @@ export type FinalDocumentPageProps = {
   report: ReportDetail;
   viewerRole: string;
   viewerName: string;
+  /** Which rail entry this page belongs under, decided by who is reading it. */
+  active: "final-reports" | "my-work";
   document: FinalDocument;
   /** Section 1's device rows and section 2's event rows, off the Orange Report. Read, not typed. */
   device: Record<string, string>;
   event: Record<string, string>;
-  /**
-   * The F004's own "1st Assessor" strip: who wrote the assessment this document resolves, and
-   * when they submitted it.
-   *
-   * A1's, not the manager's. The manager approved the document; they did not assess the report,
-   * and a form that named them as its assessor would be saying something untrue on the one line
-   * that has to be exactly true. Who approved it is the card above, where it belongs.
-   */
-  assessorName: string;
-  assessedOn: string;
   /** Who approved it and when — the moment this document became authoritative. */
   approvedByName: string;
   approvedOn: string;
-  /** The last assessment folded in: 3 for a report resolved through A3. */
-  resolvedThroughOrdinal: number;
-  /** The Officer the work went to, named on the same decision. */
+  /**
+   * The Officer the work went to, named on the same decision.
+   *
+   * Metadata about the report, printed in the card above the document and never inside it. Being
+   * handed the work is not having assessed it, and the F004 has no box that means "the officer who
+   * will act on this".
+   */
   workOfficerName: string | null;
   /** Where the reader came from, so the way back is the way they arrived. */
   backHref: string;
@@ -78,14 +80,12 @@ export function FinalDocumentPage({
   report,
   viewerRole,
   viewerName,
+  active,
   document,
   device,
   event,
-  assessorName,
-  assessedOn,
   approvedByName,
   approvedOn,
-  resolvedThroughOrdinal,
   workOfficerName,
   backHref,
   backLabel,
@@ -96,17 +96,15 @@ export function FinalDocumentPage({
       pageTitle="Final F004"
       role={viewerRole}
       fullName={viewerName}
-      active="reports"
+      active={active}
       f4Find
     >
+      {/* The title bar above already says "Final F004" once. A heading here said it a second time
+          twenty pixels below the first, and the sentence under that explained a document that
+          explains itself — this page IS the approved assessment, and the identity card, the
+          approval card and the form say so in the only way that matters. */}
       <div class="staff-head">
-        <div class="sp">
-          <h2>Final F004</h2>
-          <p class="hint">
-            The approved assessment of this report, resolved to one answer per question. The working
-            assessments behind it stay on the report page.
-          </p>
-        </div>
+        <div class="sp"></div>
         <a href={backHref} class="btn ghost" safe>
           {backLabel}
         </a>
@@ -117,6 +115,11 @@ export function FinalDocumentPage({
           the reporter's own facts, read from the same immutable payload. */}
       <OrangeReportIdentity report={report} />
 
+      {/* The approval, and who is carrying it out. Metadata about the document, outside the
+          document — how far the assessment chain ran is a fact about the working record and is
+          printed on the Final Reports register, which is the manager's index over it. It has no
+          place on the concluded F004, where it would be the one line still describing the
+          argument. */}
       <div class="card card-b fd-approval">
         <dl>
           <dt>Approved by</dt>
@@ -124,9 +127,6 @@ export function FinalDocumentPage({
 
           <dt>Approved on</dt>
           <dd safe>{approvedOn}</dd>
-
-          <dt>Assessments resolved</dt>
-          <dd>{resolvedThroughOrdinal <= 1 ? "A1" : `A1 – A${String(resolvedThroughOrdinal)}`}</dd>
 
           {workOfficerName === null ? (
             <></>
@@ -147,30 +147,19 @@ export function FinalDocumentPage({
         resolvedNotes={resolvedNotes(document)}
         device={device}
         event={event}
-        assessorName={assessorName}
-        assessedOn={assessedOn}
+        // Nothing. The concluded document names no assessor and carries no assessment date, and
+        // the honest way to say that is to have nothing to say it with — see `presentation` below.
+        assessorName=""
+        assessedOn=""
+        // The concluded F004, not a working assessment: no assessor strip, no assessor dates, no
+        // 7.2, no secondary-assessor slot, and section 8 signed by the manager who approved it.
+        presentation="final"
+        approval={{ byName: approvedByName, on: approvedOn }}
         submitted
         readOnly
         // The approved F004 is a document, not a filled-in form: the answer is shown, the
         // twenty-odd options it was chosen from are not. See `documentMode` in `f004.tsx`.
         documentMode
-        // 7.2, as the last assessor in the chain concluded it — the one the manager was finally
-        // satisfied with. Not a merge of every secondary assessor's remarks and not a history of
-        // them; see `second` in `final-document.ts`.
-        //
-        // A document snapshotted before 7.2 was collected has none, and leaves the section out
-        // altogether rather than printing the form's "pending" block, which would be untrue of a
-        // document that has already been approved.
-        omitSecond={document.secondAssessor === undefined}
-        secondSection={
-          document.secondAssessor === undefined
-            ? undefined
-            : {
-                answers: document.second,
-                ordinal: document.secondAssessor.ordinal,
-                signedOn: approvedOn,
-              }
-        }
         issues={[]}
       />
     </StaffShell>

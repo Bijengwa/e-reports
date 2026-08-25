@@ -30,6 +30,32 @@ import {
 export const FINAL_DOCUMENT_KIND = "final_document_v1";
 
 /**
+ * The lowest ordinal a concluded Final F004 can honestly resolve through.
+ *
+ * A1 is never approved on its own. The office's rule is that a first assessment is always read by a
+ * second assessor before anything is decided, and `assign-work-officer` enforces it — no snapshot
+ * written by the live approval can resolve through A1 alone.
+ *
+ * Older ones can. `backfill-final-documents.ts` repaired reports that had reached
+ * `assigned_for_work` under a system that took no snapshot at all, and it resolved whatever chain
+ * it found — including a chain of one. Those rows are real history and stay exactly where they are;
+ * what they are not is a concluded Final F004, and this is the line that says so.
+ */
+export const FINAL_DOCUMENT_MIN_ORDINAL = 2;
+
+/**
+ * Whether a stored snapshot may be presented as a valid Final F004.
+ *
+ * A read-side boundary and nothing more. It mutates nothing, deletes nothing and repairs nothing:
+ * an A1-only row stays in `report_final_documents`, immutable, and is simply not offered as a
+ * document the office concluded. The repair for one is the workflow — assign A2, take the second
+ * assessment, approve — and no filter here can stand in for that.
+ */
+export function isConcludedFinalDocument(resolvedThroughOrdinal: number): boolean {
+  return resolvedThroughOrdinal >= FINAL_DOCUMENT_MIN_ORDINAL;
+}
+
+/**
  * Which assessment settled one answer, and how.
  *
  * Not the history — that stays in `assessments` and `report_decisions`, in full, forever. This is

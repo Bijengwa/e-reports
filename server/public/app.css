@@ -185,6 +185,24 @@ a {
   background: #ecf2ed;
 }
 
+/*
+ * The destructive variant.
+ *
+ * `--flag` is already the palette's alarm colour — it is what a life-threatening severity tag is
+ * painted in — so a red button borrows it rather than introducing a second red for the same
+ * meaning. Used where a click ends something: signing out is the only one today.
+ */
+.btn.danger {
+  background: var(--flag);
+  border-color: var(--flag);
+  color: #fff;
+}
+
+.btn.danger:hover {
+  background: #8c2b19;
+  border-color: #8c2b19;
+}
+
 .btn.orange {
   background: var(--orange);
   border-color: var(--orange);
@@ -1607,37 +1625,50 @@ textarea[aria-invalid="true"] {
  * it and no page flashes the dialog before the script runs.
  */
 .modal {
+  /* Centred in the viewport, said outright rather than left to the user agent. `dialog:modal`
+     centres itself in every current browser, but the box has a width and a max-width of its own
+     and the auto margins are what turn those into a centred box — writing them down is cheaper
+     than depending on a default that differs across engines. `fixed` keeps it centred on the
+     viewport rather than on a page that may be several F004s long. */
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  height: fit-content;
   border: 1px solid var(--rule);
-  border-radius: 7px;
+  border-radius: 10px;
   /* No padding here: see the note in the shell. It belongs to .modal-body so that a click whose
      target is the dialog means the backdrop and nothing else. */
   padding: 0;
-  max-width: 400px;
+  max-width: 420px;
   width: calc(100% - 32px);
   background: var(--card);
   color: var(--ink);
+  box-shadow: 0 18px 48px rgb(12 59 30 / 22%);
 }
 
+/* Dark enough to actually cover the page behind it. At 45% the report showed through clearly
+   enough that the question read as an overlay on work still in progress rather than as a stop. */
 .modal::backdrop {
-  background: rgb(12 59 30 / 45%);
+  background: rgb(12 59 30 / 62%);
 }
 
 .modal-body {
-  padding: 22px 24px;
+  padding: 24px 26px;
 }
 
 .modal h2 {
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
 
 .modal .hint {
-  margin-top: 5px;
+  margin-top: 7px;
+  line-height: 1.5;
 }
 
 .modal-actions {
-  margin-top: 20px;
+  margin-top: 22px;
   justify-content: flex-end;
 }
 
@@ -2758,6 +2789,36 @@ ul.f4-card-c li { margin-bottom: 3px; }
   margin: 0;
   font-size: 14px;
   color: var(--ink);
+}
+
+/*
+ * Section 8 on the concluded F004: the manager's approval, where the assessors' signatures sit on
+ * a working assessment.
+ *
+ * Two labelled facts rather than two disabled inputs. There is nothing to sign here — the approval
+ * already happened, and drawing an empty signature box under it would invite a reader to look for
+ * a pen. Laid out on `.f4-sign`'s own grid so the block keeps the paper's shape.
+ */
+.f4-approved .f4-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.f4-approved .f4-k {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--f4-ink-2);
+}
+
+.f4-approved .f4-v {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--f4-ink);
+  border-bottom: 1px solid var(--f4-line);
+  padding-bottom: 5px;
+  min-height: 1.6lh;
 }
 
 /* ---------- the Orange Report's own surface ---------- */

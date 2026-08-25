@@ -130,6 +130,17 @@ async function idOf(role: Role): Promise<string> {
 const EVERY_ROLE: Role[] = ["administrator", "manager", "assessor"];
 
 /**
+ * The roles the register itself belongs to.
+ *
+ * An Officer is not one of them. The register lists every report in the office, and the report page
+ * beneath it carries every assessment and the manager's whole decision history; an Officer's own
+ * work is `/assessments` and `/my-work`, and `reportsRoutes` refuses them both addresses here.
+ * Their own live case they still open — that boundary is `staff-final-document`'s to pin, beside
+ * the rest of it.
+ */
+const REGISTER_ROLES: Role[] = ["administrator", "manager"];
+
+/**
  * The Received figure exactly as the stat prints it.
  *
  * Asserted as markup rather than by looking for the word: "Received" is also a status caption and
@@ -148,10 +159,10 @@ function rowCount(body: string): number {
 describe.skipIf(!INTEGRATION_ENABLED)("the register", () => {
   beforeEach(start);
 
-  it("lists a report for every signed-in role", async () => {
+  it("lists a report for a manager and an administrator, and refuses the list to an Officer", async () => {
     const id = await seedReport();
 
-    for (const role of EVERY_ROLE) {
+    for (const role of REGISTER_ROLES) {
       const res = await get("/reports", await signedInAs(role));
 
       // A 500 here is the shape a missing GRANT takes, so the status is the 42501 check.
@@ -160,18 +171,30 @@ describe.skipIf(!INTEGRATION_ENABLED)("the register", () => {
       expect(res.body).toContain("Muhimbili National Hospital");
       expect(res.body).toContain(`/reports/${id}`);
     }
+
+    // The register is every report in the office, and that is precisely why it is not an
+    // Officer's. Refused, rather than filtered down to a version of the register that is theirs.
+    const officer = await get("/reports", await signedInAs("assessor"));
+    expect(officer.statusCode).toBe(403);
+    expect(officer.body).not.toContain(NUMBER);
   });
 
-  it("opens a report for every signed-in role", async () => {
+  it("opens a report for a manager and an administrator, and refuses one an Officer is not party to", async () => {
     const id = await seedReport();
 
-    for (const role of EVERY_ROLE) {
+    for (const role of REGISTER_ROLES) {
       const res = await get(`/reports/${id}`, await signedInAs(role));
 
       expect(res.statusCode, role).toBe(200);
       expect(res.body).toContain(NUMBER);
       expect(res.body).toContain("TMDA/DMD/MDV/F/001 Rev 06");
     }
+
+    // This report is seeded with no assessor, so no Officer is a party to it — and the page it
+    // would open carries every assessment and the manager's decision history.
+    const officer = await get(`/reports/${id}`, await signedInAs("assessor"));
+    expect(officer.statusCode).toBe(403);
+    expect(officer.body).not.toContain("TMDA/DMD/MDV/F/001 Rev 06");
   });
 
   it("captions the enums rather than printing their stored values", async () => {
@@ -188,7 +211,9 @@ describe.skipIf(!INTEGRATION_ENABLED)("the register", () => {
 
   it("escapes every value the public form supplied", async () => {
     const id = await seedReport();
-    const cookie = await signedInAs("assessor");
+    // A manager, because this report has no assessor and the report page is no longer an
+    // Officer's to open. The escaping is the shell's and is the same for whoever reads it.
+    const cookie = await signedInAs("manager");
 
     const body = (await get(`/reports/${id}`, cookie)).body;
 
@@ -246,14 +271,19 @@ describe.skipIf(!INTEGRATION_ENABLED)("the register", () => {
     expect(res.headers.location).toBe("/");
   });
 
-  it("offers Reports in the rail to every role", async () => {
-    // Asked of the register itself rather than the dashboard: every role can open this one, and a
-    // manager's dashboard is now a redirect to their own page.
-    for (const role of EVERY_ROLE) {
+  it("offers Reports in the rail to the roles the register belongs to, and to no other", async () => {
+    for (const role of REGISTER_ROLES) {
       const body = (await get("/reports", await signedInAs(role))).body;
 
       expect(body, role).toContain('href="/reports"');
     }
+
+    // Asked of a page the Officer can actually open, because the register itself now refuses
+    // them. The rail and the routes agree: no entry, and nothing behind it either.
+    const officer = (await get("/dashboard", await signedInAs("assessor"))).body;
+    expect(officer).not.toContain('href="/reports"');
+    expect(officer).toContain('href="/assessments"');
+    expect(officer).toContain('href="/my-work"');
   });
 });
 
@@ -297,13 +327,22 @@ describe.skipIf(!INTEGRATION_ENABLED)("the dashboard", () => {
     expect(body).not.toContain("Recent activity");
   });
 
-  it("lists the waiting reports for an officer, each one openable", async () => {
+  /*
+   * An orphan is listed, and it is not a link.
+   *
+   * This report carries no assessor, so nobody is a party to it yet and `reportsRoutes` would
+   * refuse an Officer its page. The queue still shows it — that is the point of the queue, and
+   * whoever picks it up gets it — but the number goes nowhere rather than to a 403, which is the
+   * same rule the Assessment column beside it has always followed with "Unassigned".
+   */
+  it("lists the waiting reports for an officer, and does not link an orphan to a page they cannot open", async () => {
     const id = await seedReport();
 
     const body = (await get("/dashboard", await signedInAs("assessor"))).body;
 
     expect(body).toContain(NUMBER);
-    expect(body).toContain(`href="/reports/${id}"`);
+    expect(body).not.toContain(`href="/reports/${id}"`);
+    expect(body).toContain("Unassigned");
     expect(rowCount(body)).toBe(1);
     // The device name reaches the dashboard, so the escaping the register does must hold here too.
     expect(body).toContain("&lt;script");

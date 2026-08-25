@@ -14,6 +14,7 @@ type Row = {
   received_at: Date;
   device_name: string;
   severity: string;
+  status: string;
   ordinal: number;
   started: boolean;
   submitted: boolean;
@@ -50,6 +51,11 @@ function toRow(raw: unknown): AssignmentRow {
     severity: row.severity,
     ordinal: row.ordinal,
     state: stateOf(row),
+    // Whether the report page is still open to this Officer, decided by the same rule
+    // `reportsRoutes` decides it by. Once the manager has approved and handed the work out, the
+    // assessment workflow is over for an Officer and the page is refused them — so the number
+    // stops being a link rather than becoming one that answers 403.
+    reportOpen: row.status !== "assigned_for_work",
   };
 }
 
@@ -76,7 +82,7 @@ export async function myAssessmentsRoutes(app: FastifyInstance): Promise<void> {
     const session = currentSession(request);
 
     const rows = await app.db.execute(sql`
-      SELECT r.id, r.number, r.received_at, r.device_name, r.severity,
+      SELECT r.id, r.number, r.received_at, r.device_name, r.severity, r.status::text AS status,
              1 AS ordinal,
              (coalesce(a.payload, '{}'::jsonb) IS DISTINCT FROM '{}'::jsonb) AS started,
              (a.submitted_at IS NOT NULL) AS submitted
@@ -86,7 +92,7 @@ export async function myAssessmentsRoutes(app: FastifyInstance): Promise<void> {
 
        UNION ALL
 
-      SELECT r.id, r.number, r.received_at, r.device_name, r.severity,
+      SELECT r.id, r.number, r.received_at, r.device_name, r.severity, r.status::text AS status,
              a.ordinal,
              (coalesce(a.payload, '{}'::jsonb) IS DISTINCT FROM '{}'::jsonb) AS started,
              (a.submitted_at IS NOT NULL) AS submitted
