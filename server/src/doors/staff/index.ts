@@ -10,6 +10,7 @@ import { changePasswordRoutes } from "./routes/change-password.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
 import { decisionRoutes } from "./routes/decisions.js";
 import { finalDocumentRoutes } from "./routes/final-document.js";
+import { finalReportsRoutes } from "./routes/final-reports.js";
 import { loginRoutes } from "./routes/login.js";
 import { logoutRoutes } from "./routes/logout.js";
 import { myWorkRoutes } from "./routes/my-work.js";
@@ -124,6 +125,12 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
         // on. It replaces the dashboard for this role, which showed them one stage and nothing
         // about the rest.
         await management.register(workloadRoutes);
+
+        // The index over every approved F004. Beside the workload because it is the other half of
+        // the same job: the workload is what still needs deciding, this is what has been decided.
+        // Manager-only for the same reason approving is — an Officer reaches the one document
+        // their own assigned work produced from My work, and has no business with the register's.
+        await management.register(finalReportsRoutes);
 
         // The manager's review of a submitted first assessment, beside the handover it precedes.
         // Same scope and same reason: reviewing an Officer's assessment is the manager's alone.

@@ -544,6 +544,72 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
     expect((await get("/my-work", worker.cookie)).body).toContain(report.number);
   });
 
+  it("indexes the approved document for the manager, and refuses the list to an Officer", async () => {
+    const { manager, first, rest, report } = await afterFirstAssessment();
+    const [second, worker] = rest;
+    if (second === undefined || worker === undefined) throw new Error("need two Officers");
+
+    // Empty before any approval, and saying so rather than drawing a header over nothing.
+    const before = await get("/final-reports", manager.cookie);
+    expect(before.statusCode).toBe(200);
+    expect(before.body).toContain("No final report yet");
+    expect(before.body).not.toContain(report.number);
+
+    await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
+      assessor_id: second.id,
+      comment: "Please review it.",
+    });
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
+    await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
+      officer_id: worker.id,
+    });
+
+    const listed = await get("/final-reports", manager.cookie);
+    expect(listed.statusCode).toBe(200);
+    expect(listed.body).toContain(report.number);
+    // Both ways in: the document itself, and the Orange Report it was assessed from.
+    expect(listed.body).toContain(`href="/reports/${report.id}/final-document"`);
+    expect(listed.body).toContain(`href="/reports/${report.id}"`);
+    expect(listed.body).toContain("Orange Report");
+    // Who approved it, who is carrying it out, and how far the chain ran.
+    expect(listed.body).toContain("Grace Mollel");
+    expect(listed.body).toContain(worker.name);
+    expect(listed.body).toContain("A1 – A2");
+    expect(listed.body).toContain("Assigned for work");
+
+    // The list is the manager's. An Officer is refused it rather than shown the register's.
+    expect((await get("/final-reports", worker.cookie)).statusCode).toBe(403);
+    expect((await get("/final-reports", first.cookie)).statusCode).toBe(403);
+  });
+
+  it("puts Dashboard, Workload, Reports and Final Reports in the manager's rail alone", async () => {
+    const { manager, first } = await afterFirstAssessment();
+
+    // A manager's dashboard renders for them now instead of redirecting to the workload, and the
+    // rail carries both — the summary and the queue answer different questions.
+    const dashboard = await get("/dashboard", manager.cookie);
+    expect(dashboard.statusCode).toBe(200);
+    for (const href of ["/dashboard", "/workload", "/reports", "/final-reports"]) {
+      expect(dashboard.body, href).toContain(`href="${href}"`);
+    }
+    // The four states, under the words the workload page already uses for them, and never a
+    // database status.
+    for (const label of ["Not started", "In progress", "Decision", "Assigned for work"]) {
+      expect(dashboard.body, label).toContain(label);
+    }
+    expect(dashboard.body).not.toContain("awaiting_second_assessor");
+    expect(dashboard.body).not.toContain("assigned_for_work");
+
+    // The Officer's own rail is untouched, and carries no way to a page they would be refused.
+    const officer = await get("/dashboard", first.cookie);
+    expect(officer.statusCode).toBe(200);
+    for (const href of ["/dashboard", "/reports", "/assessments", "/my-work", "/reports/new"]) {
+      expect(officer.body, href).toContain(`href="${href}"`);
+    }
+    expect(officer.body).not.toContain('href="/final-reports"');
+    expect(officer.body).not.toContain('href="/workload"');
+  });
+
   it("is never served from the browser cache, signed in or out", async () => {
     const { manager, rest, report } = await afterFirstAssessment();
     const [second, worker] = rest;

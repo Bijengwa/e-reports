@@ -33,6 +33,7 @@ export type StaffShellProps = {
   active?:
     | "dashboard"
     | "workload"
+    | "final-reports"
     | "assessments"
     | "my-work"
     | "reports"
@@ -61,6 +62,23 @@ function IconDashboard(): JSX.Element {
   );
 }
 
+/**
+ * The pipeline: work standing in columns, at different heights.
+ *
+ * Its own mark rather than a second copy of the dashboard's. The rail collapses to icons alone,
+ * and two entries sharing one glyph would leave a manager counting positions to tell their
+ * summary from their queue.
+ */
+function IconWorkload(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <rect x="3" y="9" width="4.5" height="12" rx="1.2" />
+      <rect x="9.75" y="4" width="4.5" height="17" rx="1.2" />
+      <rect x="16.5" y="13" width="4.5" height="8" rx="1.2" />
+    </svg>
+  );
+}
+
 function IconReports(): JSX.Element {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -68,6 +86,17 @@ function IconReports(): JSX.Element {
       <path d="M14 3v5h5" />
       <path d="M9 13h6" />
       <path d="M9 17h4" />
+    </svg>
+  );
+}
+
+/** The register's sheet with a tick on it: a report whose assessment is finished and approved. */
+function IconFinalReports(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M6 3h8l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+      <path d="M14 3v5h5" />
+      <path d="M8 14l2 2 5-5" />
     </svg>
   );
 }
@@ -213,27 +242,30 @@ export function StaffShell({
           </div>
 
           <nav class="rail-nav" aria-label="Staff navigation">
-            {/* A manager's landing page is the pipeline, not the dashboard: the dashboard told
-                them the size of the register and one stage of it, and the workload page tells
-                them every stage. The other roles keep the dashboard, which is still about
-                their own work. Presentation only — `requireRole` decides what opens. */}
-            {isManager ? (
+            {/* Everyone lands on the dashboard, the manager included. It used to redirect them
+                to `/workload` on the argument that the pipeline is what a manager works from —
+                which is true, and is why Workload sits directly under it — but it left the one
+                role accountable for the whole register with no summary of it at all. The two
+                answer different questions: the dashboard says how much of what there is, the
+                workload says which of it needs doing. Presentation only — `requireRole` decides
+                what actually opens. */}
+            <a
+              href="/dashboard"
+              class={active === "dashboard" ? "on" : ""}
+              aria-current={active === "dashboard" ? "page" : undefined}
+            >
+              <IconDashboard />
+              <span class="rail-label">Dashboard</span>
+            </a>
+
+            {isManager && (
               <a
                 href="/workload"
                 class={active === "workload" ? "on" : ""}
                 aria-current={active === "workload" ? "page" : undefined}
               >
-                <IconDashboard />
+                <IconWorkload />
                 <span class="rail-label">Workload</span>
-              </a>
-            ) : (
-              <a
-                href="/dashboard"
-                class={active === "dashboard" ? "on" : ""}
-                aria-current={active === "dashboard" ? "page" : undefined}
-              >
-                <IconDashboard />
-                <span class="rail-label">Dashboard</span>
               </a>
             )}
 
@@ -247,6 +279,20 @@ export function StaffShell({
               <IconReports />
               <span class="rail-label">Reports</span>
             </a>
+
+            {/* The index over every approved F004, and the manager's alone — they are the only
+                role that approves one. An Officer reaches the final document of their own
+                assigned work from My work, which is the one they have business with. */}
+            {isManager && (
+              <a
+                href="/final-reports"
+                class={active === "final-reports" ? "on" : ""}
+                aria-current={active === "final-reports" ? "page" : undefined}
+              >
+                <IconFinalReports />
+                <span class="rail-label">Final Reports</span>
+              </a>
+            )}
 
             {/* The Officer's, because registering a report that arrived by email is the Officer's
                 work. Presentation only, as above: `requireRole` refuses the route whatever the

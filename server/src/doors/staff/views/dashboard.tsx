@@ -7,6 +7,23 @@ export type DashboardPageProps = {
   role: string;
   /** Every report in the register. Shown to everyone, because everyone can open the list. */
   reportCount: number;
+  /**
+   * Managers only: the register folded into the four states the workload page is divided by, and
+   * how many reports have reached an approved F004.
+   *
+   * The same four meanings and the same words as the workload's own tabs, deliberately — a
+   * manager reading "Decision: 3" here and opening that tab must find those three. Undefined for
+   * every other role, whose dashboard does not run the query behind it.
+   */
+  managerSummary?:
+    | {
+        notStarted: number;
+        inProgress: number;
+        decision: number;
+        assignedForWork: number;
+        finalReports: number;
+      }
+    | undefined;
   /** Administrators only; undefined for anyone else, who is not shown the staff figure. */
   activeStaff?: number | undefined;
   /**
@@ -28,13 +45,15 @@ export type DashboardPageProps = {
  * happened. An Officer gets what is waiting — the size of the received queue and the newest of it,
  * which is the nearest thing to "your work" that is true before anything assigns it.
  *
- * No manager branch: a manager is redirected to `/workload`, which is about the whole pipeline
- * rather than the one bucket of it this page used to show them.
+ * A manager gets the shape of the register: how much is at each stage, and how much has been
+ * approved. It is a summary and stays one — the rows behind every figure are a click away on the
+ * workload page, and a second table of them here would be that page with a different heading.
  */
 export function DashboardPage({
   fullName,
   role,
   reportCount,
+  managerSummary,
   activeStaff,
   received,
   recent,
@@ -62,6 +81,44 @@ export function DashboardPage({
           </div>
         )}
 
+        {/* The four states, in pipeline order, under the words the workload page already uses for
+            them. A status the database stores is never printed: `awaiting_second_assessor` is a
+            step of the machine, and what a manager needs to read is that three reports are
+            waiting on them. */}
+        {managerSummary !== undefined && (
+          <>
+            <div class="stat">
+              <span class="eyebrow">Not started</span>
+              <b>{managerSummary.notStarted}</b>
+              <span class="hint">assessment not begun</span>
+            </div>
+
+            <div class="stat">
+              <span class="eyebrow">In progress</span>
+              <b>{managerSummary.inProgress}</b>
+              <span class="hint">being assessed now</span>
+            </div>
+
+            <div class="stat">
+              <span class="eyebrow">Decision</span>
+              <b>{managerSummary.decision}</b>
+              <span class="hint">waiting on you</span>
+            </div>
+
+            <div class="stat">
+              <span class="eyebrow">Assigned for work</span>
+              <b>{managerSummary.assignedForWork}</b>
+              <span class="hint">approved and handed out</span>
+            </div>
+
+            <div class="stat">
+              <span class="eyebrow">Final reports</span>
+              <b>{managerSummary.finalReports}</b>
+              <span class="hint">approved F004 documents</span>
+            </div>
+          </>
+        )}
+
         {activeStaff !== undefined && (
           <div class="stat">
             <span class="eyebrow">Staff</span>
@@ -72,7 +129,21 @@ export function DashboardPage({
       </div>
 
       <p class="dash-note">
-        <a href="/reports" class="btn">
+        {/* The pipeline first for a manager: the figures above say how much, and the workload is
+            where they act on it. The register is beside it, not replaced by it. */}
+        {managerSummary === undefined ? (
+          <></>
+        ) : (
+          <>
+            <a href="/workload" class="btn">
+              Open workload
+            </a>{" "}
+            <a href="/final-reports" class="btn ghost">
+              Final reports
+            </a>{" "}
+          </>
+        )}
+        <a href="/reports" class={managerSummary === undefined ? "btn" : "btn ghost"}>
           Open the reports list
         </a>
       </p>

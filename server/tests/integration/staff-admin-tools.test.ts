@@ -245,9 +245,9 @@ describe.skipIf(!INTEGRATION_ENABLED)("deactivating and reactivating", () => {
     await act(`/users/${target.id}/deactivate`, admin.cookie);
     await act(`/users/${target.id}/reactivate`, admin.cookie);
 
-    // `/workload` rather than `/dashboard`: the target is a manager, and a manager's dashboard is
-    // now a redirect to their own page — a 302 would prove nothing about being let back in.
-    expect((await get("/workload", await cookieFor(target.email))).statusCode).toBe(200);
+    // The front door itself. A manager's dashboard renders for them again — it used to redirect
+    // to `/workload`, and a 302 would have proved nothing about being let back in.
+    expect((await get("/dashboard", await cookieFor(target.email))).statusCode).toBe(200);
   });
 
   it("records both directions with the administrator as actor", async () => {

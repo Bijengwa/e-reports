@@ -39,11 +39,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
   app.get("/dashboard", async (request, reply) => {
     const session = currentSession(request);
 
-    // A manager's landing page is `/workload` now, and this one has nothing left to tell them.
-    // Redirected rather than left to render: sign-in and the forced password change both send
-    // every role here, so without this a manager would land on a page their own rail no longer
-    // links to. `/workload` is registered in the manager scope, so this cannot send anyone else.
-    if (session.role === "manager") return reply.redirect("/workload", 302);
+    const isManager = session.role === "manager";
     const isAdministrator = session.role === "administrator";
     // The enum, not the caption. `assessor` is what the column stores; "Officer" is what the page
     // calls it, and a branch written against the caption would break the day the caption changes.
@@ -88,6 +84,56 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         `)
       : [];
 
+    /*
+     * The manager's summary: the whole register, folded into the four states their own workload
+     * page is divided by, plus how many have been approved.
+     *
+     * One query, and one `FILTER` per state rather than five round trips, because five counts
+     * taken separately are five different moments — a report that moved between them would be
+     * counted twice or not at all, and the figures on a summary page have to add up to the total
+     * printed beside them.
+     *
+     * The mapping is `BUCKETS`' own, restated here because SQL cannot read it: `received` is not
+     * started, either assessment status is in progress, either waiting-on-the-manager status is a
+     * decision, and `assigned_for_work` is done. `closed` is in none of them, exactly as the
+     * workload bar has no tab for it — nothing writes it and the MVP has no closing workflow. It
+     * is therefore counted in `reports` and in no state, which is the honest answer.
+     */
+    const summaryRows = isManager
+      ? await app.db.execute(sql`
+          SELECT
+            count(*) FILTER (WHERE status = 'received')::int AS not_started,
+            count(*) FILTER (
+              WHERE status IN ('first_assessment', 'second_assessment')
+            )::int AS in_progress,
+            count(*) FILTER (
+              WHERE status IN ('awaiting_second_assessor', 'awaiting_decision')
+            )::int AS decision,
+            count(*) FILTER (WHERE status = 'assigned_for_work')::int AS assigned_for_work,
+            (SELECT count(*) FROM report_final_documents)::int AS final_reports
+          FROM reports
+        `)
+      : [];
+
+    const managerSummary = isManager
+      ? (() => {
+          const row = summaryRows[0] as {
+            not_started: number;
+            in_progress: number;
+            decision: number;
+            assigned_for_work: number;
+            final_reports: number;
+          };
+          return {
+            notStarted: row.not_started,
+            inProgress: row.in_progress,
+            decision: row.decision,
+            assignedForWork: row.assigned_for_work,
+            finalReports: row.final_reports,
+          };
+        })()
+      : undefined;
+
     const received = isOfficer
       ? {
           // No rows is nothing waiting. The window count only exists on a row, so an empty result
@@ -102,6 +148,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         fullName={session.fullName}
         role={session.role}
         reportCount={reportCount}
+        managerSummary={managerSummary}
         activeStaff={activeStaff}
         received={received}
         recent={recent}
