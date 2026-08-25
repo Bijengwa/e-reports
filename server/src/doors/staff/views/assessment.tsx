@@ -1,6 +1,6 @@
 import type { F004Answers, Issue } from "../../../domain/f004.js";
 import { F004Form } from "./f004.js";
-import { OrangeReportIdentity } from "./orange-report.js";
+import { OrangeReportIdentity, OrangeReportSurface } from "./orange-report.js";
 import { type ReportDetail, ReportDocument } from "./reports.js";
 import { StaffShell } from "./shell.js";
 
@@ -48,8 +48,10 @@ export function Assessment1Page({
 }: Assessment1PageProps): JSX.Element {
   return (
     <StaffShell
-      title={`Assessment 1 — ${report.number}`}
-      pageTitle="Assessment 1"
+      title={`Assessment 1 — F004 — ${report.number}`}
+      // Short, because the title bar is one line on a phone. The document says what it is in its
+      // own masthead, which is where a reader looks for a form's identity anyway.
+      pageTitle="Assessment 1 — F004"
       role={viewerRole}
       fullName={viewerName}
       active="assessments"
@@ -64,11 +66,11 @@ export function Assessment1Page({
         </div>
         {/* A label, not a button: it drives the checkbox below, so it opens the drawer with or
             without a script running. */}
-        <label for="a1-drawer" class="btn ghost a1-open">
-          The report
+        <label for="a1-drawer" class="btn a1-open orange-action">
+          Orange Report
         </label>
         <a href={`/reports/${report.id}`} class="btn ghost">
-          ← Back to the report
+          ← Back to the report page
         </a>
       </div>
 
@@ -84,6 +86,12 @@ export function Assessment1Page({
           assessorName={viewerName}
           assessedOn={assessedOn}
           submitted={submitted}
+          // 7.2, the secondary assessor's name and the second signature row are all a secondary
+          // assessment's business, and there is no secondary assessment here — this route reads
+          // and writes ordinal 1 and nothing else. Drawn on A1 they were empty boxes implying a
+          // second assessor the report may never have, on a form the first assessor is trying to
+          // fill in. The official F004 keeps 7.2; the page that shows it is the one that owns it.
+          omitSecond
           issues={issues}
         />
 
@@ -101,8 +109,9 @@ export function Assessment1Page({
               Close
             </label>
           </div>
-          <OrangeReportIdentity report={report} compact />
-          <ReportDocument report={report} />
+          <OrangeReportSurface report={report} withIdentity>
+            <ReportDocument report={report} />
+          </OrangeReportSurface>
         </aside>
       </div>
     </StaffShell>

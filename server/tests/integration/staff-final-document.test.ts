@@ -487,7 +487,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
     expect(page.body).not.toContain(`action="/reports/${report.id}/secondary-assessment"`);
 
     // The Orange Report's identity, as the source document being assessed.
-    expect(page.body).toContain("Orange Adverse Event Report");
+    expect(page.body).toContain("Orange Report · F001");
     expect(page.body).toContain(report.number);
 
     // The approval itself, named.
@@ -535,7 +535,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
     const item = await get(`/my-work/${report.id}`, worker.cookie);
     expect(item.statusCode).toBe(200);
     expect(item.body).toContain(`href="/reports/${report.id}/final-document"`);
-    expect(item.body).toContain("Orange Adverse Event Report");
+    expect(item.body).toContain("Orange Report · F001");
 
     // My Work is one Officer's own list and nobody else's. A1 assessed this report and is still
     // refused: assessing it is not being assigned the work that came out of it.

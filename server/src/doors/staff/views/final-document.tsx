@@ -133,6 +133,9 @@ export function FinalDocumentPage({
         assessedOn={assessedOn}
         submitted
         readOnly
+        // The approved F004 is a document, not a filled-in form: the answer is shown, the
+        // twenty-odd options it was chosen from are not. See `documentMode` in `f004.tsx`.
+        documentMode
         // 7.2 is one secondary assessor's concluding block. This document has no single secondary
         // assessor — it may have resolved three — and every one of their findings is already in
         // the answers above, so a block naming one of them would misattribute the rest.

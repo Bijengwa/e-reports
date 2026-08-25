@@ -214,7 +214,7 @@ async function assigned(): Promise<{ officer: Staff; report: Report }> {
 describe.skipIf(!INTEGRATION_ENABLED)("opening the F004", () => {
   beforeEach(start);
 
-  it("shows the assignee the whole form and the report, without a 7.2 editor", async () => {
+  it("shows the assignee their own half of the form, and no trace of a second assessor", async () => {
     const { officer, report } = await assigned();
 
     const res = await get(`/reports/${report.id}/assessment-1`, officer.cookie);
@@ -236,10 +236,17 @@ describe.skipIf(!INTEGRATION_ENABLED)("opening the F004", () => {
     // The orange report is on the same page.
     expect(res.body).toContain("Submitted answers");
     expect(res.body).toContain("Muhimbili National Hospital");
-    // 7.2 is named as the second assessor's and carries nothing to type into.
-    expect(res.body).toContain("Secondary assessor concluding remarks");
+    // Nothing about a secondary assessment appears here at all. This route reads and writes
+    // ordinal 1 and nothing else, and a report may never have a second assessor — so 7.2, the
+    // second signature row and the masthead's secondary-assessor cells were all empty boxes
+    // implying a person who does not exist, on a form the first assessor is trying to fill in.
+    // The secondary assessment has a page of its own, which is where all of it lives.
+    expect(res.body).not.toContain("Secondary assessor");
     expect(res.body).not.toContain('name="conclusion_2"');
     expect(res.body).not.toContain('name="c7_2"');
+    expect(res.body).not.toContain('id="signature-2"');
+    // The first assessor's own strip stays, and is the only one.
+    expect(res.body).toContain("1st Assessor");
   });
 
   it("offers jump targets for all eight sections", async () => {
@@ -256,19 +263,23 @@ describe.skipIf(!INTEGRATION_ENABLED)("opening the F004", () => {
     expect(body.indexOf('class="f4-jump"')).toBeLessThan(body.indexOf("<form"));
   });
 
-  it("carries no name= attribute anywhere inside 7.2", async () => {
+  it("cannot post a secondary assessor's fields, because it never draws them", async () => {
     const { officer, report } = await assigned();
 
     const body = (await get(`/reports/${report.id}/assessment-1`, officer.cookie)).body;
 
-    // Broader than checking a couple of guessed field names: nothing in this block may ever be
-    // able to post a value, whatever a future edit to 7.2's markup ends up calling its fields.
-    const start = body.indexOf("Secondary assessor concluding remarks");
-    const end = body.indexOf("</section>", start);
-    expect(start).toBeGreaterThan(-1);
+    // This replaces a narrower guarantee. 7.2 used to be drawn here disabled and nameless, and the
+    // test swept the block for any `name=` that could carry a value. Not drawing the block at all
+    // is the stronger form of the same rule: there is no markup to sweep, so no future edit to
+    // 7.2 can give this page a field it did not have.
+    expect(body).not.toContain("Secondary assessor concluding remarks");
+    for (const field of ["conclusion_2", "actions_2", "signature_2", "c7_2"]) {
+      expect(body, field).not.toContain(`name="${field}"`);
+    }
 
-    const block = body.slice(start, end);
-    expect(block).not.toMatch(/name="/);
+    // 7.1 — the half that IS this Officer's — is untouched and still writable.
+    expect(body).toContain('name="conclusion"');
+    expect(body).toContain('name="actions"');
   });
 
   it("prefills 1.1 from the reporter's full name when no brand was given", async () => {

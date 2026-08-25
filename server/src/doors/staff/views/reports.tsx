@@ -2,7 +2,7 @@ import type { F004Answers, SecondaryReviewPayload } from "../../../domain/f004.j
 import { STEP_FIELDS, STEPS } from "../../../domain/form-schema.js";
 import { type MessageKey, translatorFor } from "../../../i18n/index.js";
 import { F004Form, type PriorSecondaryReview, type SectionComment } from "./f004.js";
-import { CHANNEL_LABELS, OrangeReportIdentity } from "./orange-report.js";
+import { CHANNEL_LABELS, OrangeReportIdentity, OrangeReportSurface } from "./orange-report.js";
 import { StaffShell } from "./shell.js";
 
 /**
@@ -695,7 +695,9 @@ export function ReportPage({
         </div>
       )}
 
-      <ReportDocument report={report} />
+      <OrangeReportSurface report={report}>
+        <ReportDocument report={report} />
+      </OrangeReportSurface>
 
       {assessment1Review && (
         <>

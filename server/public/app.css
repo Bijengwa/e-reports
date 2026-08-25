@@ -2072,23 +2072,51 @@ textarea[aria-invalid="true"] {
  * the real form would make Enter press the first submit button — which is Save draft. Nothing in
  * here is a field of the assessment, so nothing is lost by keeping it out.
  */
+/*
+ * The letterhead of a regulatory form, not the header of a web page.
+ *
+ * The hierarchy is the paper's own and reads top-down in one pass: the authority that issues the
+ * form, then the form's own title, then the code and revision that identify which form and which
+ * printing of it. The rule under the title is what a printed form has there, and it is what stops
+ * the block reading as a card with some text in it.
+ *
+ * Restrained on purpose. This is a document a regulator works through, so the masthead's job is to
+ * say what the document is and then get out of the way of section 1 — anything more decorative
+ * would be competing with the form for the reader's attention every time they scroll past it.
+ */
 .f4-doc-head {
   background: var(--card); border: 1px solid var(--rule); border-radius: var(--r);
-  padding: 14px 16px; margin-bottom: 16px;
+  padding: 18px 20px 0; margin-bottom: 16px;
 }
 .f4-head {
   display: flex; gap: 18px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap;
-  border-bottom: 1px solid var(--rule); padding-bottom: 12px;
+  border-bottom: 2px solid var(--f4-bar); padding-bottom: 14px;
 }
-.f4-authority { font-size: 11px; letter-spacing: 0.03em; color: var(--f4-ink-3); font-weight: 500; }
-.f4-authority + .f4-authority { font-weight: 600; color: var(--f4-ink-2); }
-.f4-title { font-size: 15px; font-weight: 600; color: var(--f4-ink); margin-top: 5px; max-width: 46ch; line-height: 1.35; }
-.f4-stamp { font-size: 11px; color: var(--f4-ink-3); text-align: right; white-space: nowrap; }
+.f4-authority {
+  font-size: 10.5px; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--f4-ink-3); font-weight: 600;
+}
+/* The authority itself, one step louder than the ministry above it. */
+.f4-authority + .f4-authority { color: var(--f4-accent-ink); }
+.f4-title {
+  font-size: 16px; font-weight: 700; color: var(--f4-ink);
+  margin-top: 8px; max-width: 52ch; line-height: 1.3; letter-spacing: -0.005em;
+}
+/* The form's own code and revision, set as a stamp: right-aligned, monospaced digits, and boxed
+   off from the title so the two are read as separate facts rather than as one running line. */
+.f4-stamp {
+  font-size: 11px; color: var(--f4-ink-2); text-align: right; white-space: nowrap;
+  font-variant-numeric: tabular-nums; line-height: 1.6;
+  border-left: 3px solid var(--f4-badge); padding-left: 12px;
+}
+.f4-stamp > div:first-child { font-weight: 700; color: var(--f4-ink); }
 
 /* The assessor strip. A row of facts, on the same surface every other staff page states facts on. */
 .f4-assessors {
   display: flex; flex-wrap: wrap; gap: 6px 26px;
-  border-bottom: 1px solid var(--rule); padding: 10px 0;
+  border-bottom: 1px solid var(--rule); padding: 11px 0;
+  background: var(--f4-assessors-bg);
+  margin: 0 -20px; padding-left: 20px; padding-right: 20px;
 }
 .f4-assessors > div { display: flex; gap: 6px; align-items: baseline; }
 .f4-k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--f4-ink-3); }
@@ -2730,4 +2758,169 @@ ul.f4-card-c li { margin-bottom: 3px; }
   margin: 0;
   font-size: 14px;
   color: var(--ink);
+}
+
+/* ---------- the Orange Report's own surface ---------- */
+/*
+ * The F001's content, wearing the F001's colours.
+ *
+ * The identity card alone was not enough: a reader who scrolled past it met the report's answers
+ * in the staff app's green-and-white cards, indistinguishable from an assessment. The paper F001
+ * is orange all the way down, and the whole point of the identity is that reporter-supplied
+ * information is recognisable on sight.
+ *
+ * Every rule here is scoped under `.orange-report-surface`. `.card`, `.btn` and `.report-group`
+ * are shared staff components that the assessment workflow is built out of, so repainting them
+ * globally would turn the whole application orange and destroy the distinction this draws. The
+ * scope is what keeps the treatment on the F001 and off everything else.
+ */
+.orange-report-surface {
+  background: var(--orange-bg);
+  border: 1px solid var(--orange-line);
+  border-radius: var(--r);
+  padding: 14px;
+  margin-bottom: 18px;
+}
+
+/* The document's own official title, printed where the reader is looking at the document. */
+.orange-doc-title {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--orange-d);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* The identity card is already orange; inside the surface it needs no second background. */
+.orange-report-surface .orange-id {
+  background: transparent;
+  border-left-color: var(--orange-deep);
+  padding-left: 12px;
+  margin-bottom: 10px;
+}
+
+.orange-report-surface .card {
+  background: #fff;
+  border-color: var(--orange-line);
+}
+
+.orange-report-surface .report-heading {
+  color: var(--orange-d);
+  border-left: 4px solid var(--orange);
+  padding-left: 10px;
+}
+
+.orange-report-surface .report-group dl {
+  border-color: var(--orange-line);
+}
+
+/* The label column carries the colour; the value stays on white so it is easy to read. */
+.orange-report-surface .report-group dt {
+  background: var(--orange-bg);
+  color: var(--orange-d);
+  border-bottom-color: var(--orange-line);
+}
+
+.orange-report-surface .report-group dd {
+  background: #fff;
+  border-bottom-color: var(--orange-line);
+}
+
+.orange-report-surface .report-facts dt {
+  color: var(--orange-d);
+}
+
+.orange-report-surface a {
+  color: var(--orange-d);
+}
+
+/*
+ * A control that opens or belongs to the Orange Report, wearing its colour.
+ *
+ * Applied by name — `.orange-action` — rather than to every `.btn` inside the surface, so a button
+ * is orange because it is about the F001 and not merely because of where it happens to sit.
+ */
+.btn.orange-action {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #fff;
+}
+
+.btn.orange-action:hover {
+  background: var(--orange-deep);
+  border-color: var(--orange-deep);
+}
+
+/* ---------- an F004 rendered as a finished document ---------- */
+/*
+ * `readOnly` closes every control. This is the further step of not drawing them as controls.
+ *
+ * A form shows the whole question — every option, with a mark against the chosen one — because the
+ * reader might change the answer. A document shows the answer. Four unticked risk cards under one
+ * ticked one are the working form saying "these were the choices"; on the approved F004 they are
+ * noise, and in the PDF that comes out of it they would be wrong.
+ *
+ * One rule does it, because every choice on this form — radio row, criteria card, action tick — is
+ * a `.f4-choice-pair` around a real input whose `checked` is the stored answer. What to keep is
+ * already in the DOM and what to drop is everything without a mark in it.
+ */
+.f4-document .f4-choice-pair:not(:has(input:checked)) {
+  display: none;
+}
+
+/* The mark itself goes too: the surviving option IS the answer, and a lone disabled radio beside
+   it only invites a reader to try clicking it. */
+.f4-document .f4-choice-pair input {
+  display: none;
+}
+
+.f4-document .f4-card,
+.f4-document .f4-tick {
+  cursor: default;
+}
+
+/*
+ * A question nobody answered keeps its space and stays blank.
+ *
+ * Every option is hidden when none is chosen, which would otherwise collapse the group to nothing
+ * and make an unanswered question look like a question the form never asked. Blank is a fact about
+ * the assessment; filling it with "—" would be this page inventing an answer.
+ */
+.f4-document .f4-radio-group,
+.f4-document .f4-cards,
+.f4-document .f4-ticks {
+  min-height: 1.6lh;
+}
+
+/* Likewise for a value the reporter never supplied: the row keeps its height and says nothing. */
+.f4-document .f4-blank {
+  visibility: hidden;
+}
+
+/*
+ * Fields print as written text rather than as boxes.
+ *
+ * `field-sizing: content` lets a textarea take the height of what is in it, so a long conclusion is
+ * not clipped behind a scrollbar the way a fixed `rows` would clip it — which matters here more
+ * than on the working form, because this is the document that gets printed.
+ */
+.f4-document input:not([type="radio"]):not([type="checkbox"]),
+.f4-document textarea {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--f4-line);
+  border-radius: 0;
+  padding-left: 0;
+  padding-right: 0;
+  color: var(--f4-ink);
+  resize: none;
+  overflow: hidden;
+  field-sizing: content;
+  min-height: 1.6lh;
+}
+
+.f4-document textarea {
+  white-space: pre-wrap;
 }

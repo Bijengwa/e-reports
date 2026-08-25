@@ -6,7 +6,7 @@ import {
   type ReportDetail,
   ReportDocument,
 } from "./reports.js";
-import { OrangeReportIdentity } from "./orange-report.js";
+import { OrangeReportIdentity, OrangeReportSurface } from "./orange-report.js";
 import { StaffShell } from "./shell.js";
 
 /** What a secondary assessor reads before annotating: A1's submitted F004. */
@@ -64,11 +64,11 @@ export function SecondaryAssessmentPage({
               one document. */}
           <OrangeReportIdentity report={report} />
         </div>
-        <label for="a1-drawer" class="btn ghost a1-open">
-          The report
+        <label for="a1-drawer" class="btn a1-open orange-action">
+          Orange Report
         </label>
         <a href={`/reports/${report.id}`} class="btn ghost">
-          ← Back to the report
+          ← Back to the report page
         </a>
       </div>
 
@@ -146,8 +146,9 @@ export function SecondaryAssessmentPage({
               Close
             </label>
           </div>
-          <OrangeReportIdentity report={report} compact />
-          <ReportDocument report={report} />
+          <OrangeReportSurface report={report} withIdentity>
+            <ReportDocument report={report} />
+          </OrangeReportSurface>
         </aside>
       </div>
     </StaffShell>

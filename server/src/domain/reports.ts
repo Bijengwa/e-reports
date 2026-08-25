@@ -8,6 +8,17 @@ import { normalizePhone } from "./phone.js";
 /** The paper form this data was collected on. Stored per report so old reports stay readable. */
 export const FORM_VERSION = "TMDA/DMD/MDV/F/001 Rev 06";
 
+/**
+ * The document's own title, as TMDA prints it on the paper.
+ *
+ * The staff app calls this document the "Orange Report" everywhere, and will keep doing so — it is
+ * what the office calls it and what the colour on screen means. This is the name the document
+ * actually carries, shown wherever the reader is looking at the document itself rather than at a
+ * reference to it.
+ */
+export const FORM_TITLE =
+  "Medical Devices and In Vitro Diagnostics Adverse Event/Incident Reporting Form for Consumers and Healthcare Facilities";
+
 export type { Answers };
 
 /** One attachment already written to object storage, waiting to be tied to a report. */

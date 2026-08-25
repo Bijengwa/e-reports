@@ -1,5 +1,7 @@
 // Type-only, and that matters: `reports.tsx` imports the component below, so a value import here
 // would close a runtime cycle between the two modules. A type import is erased.
+import type { Children } from "@kitajs/html";
+import { FORM_TITLE } from "../../../domain/reports.js";
 import type { ReportDetail } from "./reports.js";
 
 /**
@@ -25,6 +27,52 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 export function receivedDay(at: Date): string {
   const on = new Date(at);
   return `${String(on.getUTCDate()).padStart(2, "0")} ${MONTHS[on.getUTCMonth()]} ${on.getUTCFullYear()}`;
+}
+
+/**
+ * The surface the Orange Report is read on, wherever its content is shown.
+ *
+ * The identity card alone was not enough. A reader who scrolled past it met the report's own
+ * answers rendered in the staff app's green-and-white cards, indistinguishable from an assessment
+ * — so the colour said "this is the Orange Report" for one card and then stopped saying it for the
+ * document itself. The F001 on paper is orange all the way down, and the whole point of the
+ * identity is that F001 data is recognisable on sight.
+ *
+ * A scope class, never a change to `.card`, `.btn` or `.report-group` themselves. Those are shared
+ * staff components and the assessment workflow is built out of them; repainting them globally
+ * would make the entire application orange and destroy the distinction this exists to draw. Every
+ * rule lives under `.orange-report-surface` in the stylesheet, so the treatment reaches exactly
+ * what is inside this element and nothing else.
+ *
+ * The official document title is printed here rather than in the identity card because this is
+ * where the reader is looking at the document. The card is a reference to it and stays short.
+ */
+export function OrangeReportSurface({
+  report,
+  withIdentity,
+  children,
+}: {
+  report: Pick<ReportDetail, "number" | "receivedAt" | "channel" | "formVersion" | "deviceName">;
+  /**
+   * Print the identity card at the top of the surface.
+   *
+   * For the drawers, where this surface is the only thing on screen and the reader has nothing
+   * else telling them which report they opened. The report page and the officer's work item carry
+   * the full identity in their own headers a few lines above, and a second copy of the number
+   * under it would be the page saying the same thing twice.
+   */
+  withIdentity?: boolean;
+  children?: Children;
+}): JSX.Element {
+  return (
+    <div class="orange-report-surface">
+      {withIdentity === true ? <OrangeReportIdentity report={report} compact /> : <></>}
+      <p class="orange-doc-title" safe>
+        {FORM_TITLE}
+      </p>
+      {children}
+    </div>
+  );
 }
 
 /**
@@ -55,7 +103,10 @@ export function OrangeReportIdentity({
 }): JSX.Element {
   return (
     <div class={compact === true ? "orange-id is-compact" : "orange-id"}>
-      <p class="orange-id-kind">Orange Adverse Event Report</p>
+      {/* The nickname the office uses, and the form code that makes it findable on paper. The
+          document's full official title is printed on the surface below, where the reader is
+          looking at the document itself rather than at a reference to it. */}
+      <p class="orange-id-kind">Orange Report · F001</p>
       <p class="orange-id-no" safe>
         {report.number}
       </p>

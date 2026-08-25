@@ -14,6 +14,7 @@ import {
   EVENT_ROWS,
   EXPECTEDNESS_NOTE,
   EXPECTEDNESS_OPTIONS,
+  F004_TITLE,
   F004_VERSION,
   type F004Answers,
   IMDRF_GROUPS,
@@ -79,12 +80,32 @@ export type F004FormProps = {
    * are different reasons for the same rendering.
    */
   readOnly?: boolean;
+  /**
+   * Render as a finished document rather than as a filled-in form.
+   *
+   * `readOnly` already closes every control; this is the further step of not drawing them as
+   * controls at all. A form shows a reader the whole question — every option, with a mark against
+   * the chosen one — because the reader might change the answer. A document shows the answer. Four
+   * unticked risk cards under one ticked one are the working form saying "these were the choices";
+   * on the approved F004 they are noise, and on the PDF that comes out of it they would be wrong.
+   *
+   * Implemented as a scope class over the existing markup rather than as a second set of
+   * components: every choice on this form — radio row, criteria card, action tick — is a
+   * `.f4-choice-pair` around a real input whose `checked` is the stored answer, so what to keep is
+   * already in the DOM and what to drop is `:not(:has(input:checked))`. A parallel renderer would
+   * be a second F004 to keep in step with the first.
+   *
+   * Blank stays blank and keeps its space: an unanswered question on a finished document is a fact
+   * about the assessment, and filling it with "—" would be this page inventing an answer.
+   */
+  documentMode?: boolean;
   /** The manager's notes per section, keyed "1"…"8". Absent on the Officer's live form. */
   sectionComments?: Record<string, SectionComment[]>;
   /** Where a note on a given section is posted. Absent means the form draws no comment UI. */
   commentAction?: (section: string) => string;
   /**
-   * Leave 7.2 and the second signature out of the document entirely.
+   * Leave every trace of a secondary assessment out of the document: 7.2, the second signature,
+   * and the masthead's own secondary-assessor cells.
    *
    * For the one page that renders this form above a live section 7.2 — the second assessor's own.
    * There the placeholder block would be a second, disabled copy of the box they are being asked
@@ -145,16 +166,20 @@ export type PriorSecondaryReview = {
  */
 function Sheet({
   locked,
+  documentMode,
   reportId,
   action,
   children,
 }: {
   locked: boolean;
+  documentMode?: boolean;
   reportId: string;
   action?: string;
   children?: Children;
 }): JSX.Element {
-  if (locked) return <div class="f4">{children}</div>;
+  if (locked) {
+    return <div class={documentMode === true ? "f4 f4-document" : "f4"}>{children}</div>;
+  }
 
   return (
     <form method="POST" action={action ?? `/reports/${reportId}/assessment-1`} class="f4">
@@ -1036,6 +1061,7 @@ export function F004Form({
   assessedOn,
   submitted,
   readOnly,
+  documentMode,
   sectionComments,
   commentAction,
   omitSecond,
@@ -1075,9 +1101,8 @@ export function F004Form({
           <div>
             <div class="f4-authority">The United Republic of Tanzania · Ministry of Health</div>
             <div class="f4-authority">Tanzania Medicines and Medical Devices Authority</div>
-            <h2 class="f4-title">
-              Adverse events / incidents of medical devices / in vitro diagnostics assessment
-              template
+            <h2 class="f4-title" safe>
+              {F004_TITLE}
             </h2>
           </div>
           <div class="f4-stamp">
@@ -1101,18 +1126,29 @@ export function F004Form({
               {assessedOn}
             </span>
           </div>
-          <div class={a2Review?.submitted === true ? undefined : "f4-muted"}>
-            <span class="f4-k">Secondary assessor</span>
-            <span class="f4-v" safe>
-              {a2Review?.submitted === true ? (a2Review.assessorName ?? "—") : "—"}
-            </span>
-          </div>
-          <div class={a2Review?.submitted === true ? undefined : "f4-muted"}>
-            <span class="f4-k">Date</span>
-            <span class="f4-v" safe>
-              {a2Review?.submitted === true ? (a2Review.assessedOn ?? "—") : "—"}
-            </span>
-          </div>
+          {/* Dropped entirely by `omitSecond`, on the same argument that drops 7.2 and the second
+              signature: a page with no secondary assessment must not print a secondary assessor's
+              slot. On the first assessor's own workspace those two cells were a permanent "—"
+              beside their name, implying a second assessor the report may never have and asking a
+              question the page has no way to answer. */}
+          {omitSecond === true ? (
+            <></>
+          ) : (
+            <>
+              <div class={a2Review?.submitted === true ? undefined : "f4-muted"}>
+                <span class="f4-k">Secondary assessor</span>
+                <span class="f4-v" safe>
+                  {a2Review?.submitted === true ? (a2Review.assessorName ?? "—") : "—"}
+                </span>
+              </div>
+              <div class={a2Review?.submitted === true ? undefined : "f4-muted"}>
+                <span class="f4-k">Date</span>
+                <span class="f4-v" safe>
+                  {a2Review?.submitted === true ? (a2Review.assessedOn ?? "—") : "—"}
+                </span>
+              </div>
+            </>
+          )}
           {/* A running count rather than a name-per-ordinal strip: the masthead has room for one
               more fact, not for a row that grows with every secondary assessment a report ends up
               with. `Assessment history` on the report page is where each one is named. */}
@@ -1168,7 +1204,12 @@ export function F004Form({
         </div>
       </div>
 
-      <Sheet locked={sheetLocked} reportId={reportId} action={a2Review?.action}>
+      <Sheet
+        locked={sheetLocked}
+        documentMode={documentMode}
+        reportId={reportId}
+        action={a2Review?.action}
+      >
         {/* One fieldset keeps the document grouped, but the lock is applied to the assessment
             controls themselves. Section comments are live manager controls and must not inherit a
             disabled ancestor. */}

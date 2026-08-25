@@ -1,4 +1,4 @@
-import { OrangeReportIdentity } from "./orange-report.js";
+import { OrangeReportIdentity, OrangeReportSurface } from "./orange-report.js";
 import {
   type DecisionEntry,
   DecisionHistory,
@@ -232,7 +232,9 @@ export function MyWorkItemPage({
       </p>
 
       <h2 class="report-heading">The report as filed</h2>
-      <ReportDocument report={report} />
+      <OrangeReportSurface report={report}>
+        <ReportDocument report={report} />
+      </OrangeReportSurface>
 
       <h2 class="report-heading">How it was assessed</h2>
       {assessments.length === 0 ? (

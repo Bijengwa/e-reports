@@ -442,11 +442,14 @@ describe.skipIf(!INTEGRATION_ENABLED)("the first assessment doorway", () => {
       (action) => !action.includes("/logout"),
     );
     expect(posts).toEqual([`action="/reports/${row.id}/assessment-1"`]);
-    // The second assessor's section is present as the closed part of the document it is, and
-    // carries nothing to fill in on their behalf.
-    expect(body).toContain("Secondary assessor concluding remarks");
+    // The second assessor's section is not here at all: this page is ordinal 1's, and a report
+    // may never have a second assessor. It is drawn on the secondary assessment's own page.
+    expect(body).not.toContain("Secondary assessor");
     expect(body).not.toContain('name="conclusion_2"');
-    expect(body).toContain('id="signature-2"');
-    expect(body).toContain("disabled");
+    expect(body).not.toContain('id="signature-2"');
+    // No stray `disabled` either. It used to be here because 7.2 was the one disabled block on the
+    // page; with 7.2 gone, a live first assessment is entirely writable, and a disabled control
+    // appearing on it would mean something had started rendering somebody else's half again.
+    expect(body).not.toContain("disabled");
   });
 });

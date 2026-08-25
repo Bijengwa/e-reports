@@ -13,6 +13,17 @@
 /** Stamped on every assessment row, so an old assessment stays readable when the form changes. */
 export const F004_VERSION = "TMDA/DMD/MDV/F/004 Rev 05";
 
+/**
+ * The document's own title, capitalised as TMDA prints it on the paper.
+ *
+ * Here rather than in the view because it is a property of the form, like the revision beside it,
+ * and because two places rendering an F004 must not caption it two ways. The F004 is an assessment
+ * TEMPLATE — the office's own working document — and never an adverse event report; a page that
+ * captioned it as one would be telling the reader they were looking at the reporter's submission.
+ */
+export const F004_TITLE =
+  "Adverse Events / Incidents of Medical Devices / In Vitro Diagnostics Assessment Template";
+
 /** 1 = the primary F004. Every ordinal above it is a secondary assessment, however many exist. */
 export const FIRST_ASSESSMENT = 1;
 
