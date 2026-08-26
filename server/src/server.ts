@@ -60,7 +60,15 @@ export async function buildServer(config: Config = loadConfig()): Promise<Fastif
   app.setErrorHandler((error, request, reply) => {
     request.log.error({ err: error }, "unhandled request error");
 
-    const status = error.statusCode && error.statusCode < 500 ? error.statusCode : 500;
+    const clientError =
+      typeof error === "object" &&
+      error !== null &&
+      "statusCode" in error &&
+      typeof error.statusCode === "number" &&
+      error.statusCode < 500
+        ? error.statusCode
+        : undefined;
+    const status = clientError ?? 500;
     const heading = STATUS_CODES[status] ?? STATUS_CODES[500] ?? "Internal Server Error";
     const message =
       status === 429 ? "Please wait a moment and try again." : "Please try again later.";

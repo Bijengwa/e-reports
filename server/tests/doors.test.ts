@@ -324,7 +324,7 @@ describe("orange form wizard", () => {
     });
 
     expect(res.statusCode).toBe(503);
-    expect(res.body).toContain("TMDA's records could not be reached");
+    expect(res.body).toContain("TMDA&#39;s records could not be reached");
     expect(res.body).toContain("this report has NOT been filed");
     expect(res.body).toContain('value="A. Mwita"');
 
