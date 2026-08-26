@@ -20,6 +20,8 @@ export type LoginRoutesOptions = {
  * genuinely mistyped is no worse off — they retype either way.
  */
 const SIGN_IN_FAILED = "Email or password is incorrect.";
+const SIGN_IN_TEMPORARILY_UNAVAILABLE =
+  "Unable to sign you in right now. Please try again later.";
 
 /**
  * The password is bounded before it is hashed.
@@ -82,11 +84,26 @@ export async function loginRoutes(app: FastifyInstance, opts: LoginRoutesOptions
 
     const { email, password } = parsed.data;
 
-    const rows = await app.db.execute(sql`
-      SELECT id, password_hash, must_change_password
-        FROM users
-       WHERE email = ${email} AND is_active
-    `);
+    let rows;
+
+    try {
+      rows = await app.db.execute(sql`
+        SELECT id, password_hash, must_change_password
+          FROM users
+         WHERE email = ${email} AND is_active
+      `);
+    } catch (error) {
+      request.log.error({ err: error }, "staff login failed unexpectedly");
+      return reply
+        .status(503)
+        .html(
+          <LoginPage
+            publicFormUrl={opts.publicFormUrl}
+            error={SIGN_IN_TEMPORARILY_UNAVAILABLE}
+          />,
+        );
+    }
+
     const user = rows[0] as
       | { id: string; password_hash: string; must_change_password: boolean }
       | undefined;

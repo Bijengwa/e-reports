@@ -1,7 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Config } from "../src/config.js";
 import { loadConfig, publicOrigin } from "../src/config.js";
 import { buildServer } from "../src/server.js";
@@ -117,6 +117,24 @@ describe("orange form wizard", () => {
 
   /** Enough of step 1 to get past it. */
   const step1 = { device_name: "Infusion Pump X" };
+  const completeSubmission = {
+    step: "5",
+    action: "submit",
+    device_name: "Infusion Pump X",
+    incident_date: "2026-08-01",
+    incident_type: "Malfunction",
+    incident_narrative: "Pump stopped mid-infusion.",
+    event_type: "Hospitalization",
+    event_narrative: "Patient kept overnight for observation.",
+    measures_taken: "Taken out of service.",
+    informed_supplier: "No",
+    reporter_name: "A. Mwita",
+    facility_address: "Muhimbili National Hospital",
+    location: "Dar es Salaam",
+    phone: "+255 700 000 000",
+    report_date: "2026-08-02",
+    device_location: "Sealed in the biomedical workshop",
+  } as const;
 
   it("moves forward a step on Continue", async () => {
     const res = await post({ step: "1", action: "next", device_name: "Infusion Pump X" });
@@ -295,6 +313,23 @@ describe("orange form wizard", () => {
     expect(res.body).not.toContain('value="" autofocus onfocus="');
     expect(res.body).toContain("&#34;");
   });
+
+  it("keeps the existing not-filed message when final storage fails", async () => {
+    const transaction = vi.spyOn(app.db, "transaction").mockRejectedValueOnce(
+      new Error("Failed query: INSERT INTO reports"),
+    );
+
+    const res = await post({
+      ...completeSubmission,
+    });
+
+    expect(res.statusCode).toBe(503);
+    expect(res.body).toContain("TMDA&#39;s records could not be reached");
+    expect(res.body).toContain("this report has NOT been filed");
+    expect(res.body).toContain('value="A. Mwita"');
+
+    transaction.mockRestore();
+  });
 });
 
 describe("staff sign-in", () => {
@@ -335,6 +370,75 @@ describe("staff sign-in", () => {
 
     expect(missingPassword.body).toContain("Email or password is incorrect");
     expect(missingEmail.body).toContain("Email or password is incorrect");
+  });
+
+  it("hides database failures behind a generic sign-in message", async () => {
+    const execute = vi.spyOn(app.db, "execute").mockRejectedValueOnce(
+      new Error(
+        "Failed query: SELECT id, password_hash, must_change_password FROM users params: a@tmda.go.tz\n    at /srv/app/server.ts:99:1",
+      ),
+    );
+
+    const res = await signIn({ email: "a@tmda.go.tz", password: "correct horse battery staple" });
+
+    expect(res.statusCode).toBe(503);
+    expect(res.body).toContain("Unable to sign you in right now. Please try again later.");
+    expect(res.body).not.toContain("SELECT");
+    expect(res.body).not.toContain("password_hash");
+    expect(res.body).not.toContain("users");
+    expect(res.body).not.toContain("params");
+    expect(res.body).not.toContain("PostgreSQL");
+    expect(res.body).not.toContain("/srv/app/server.ts");
+
+    execute.mockRestore();
+  });
+});
+
+describe("global request error handling", () => {
+  it("returns a safe HTML page for unhandled browser errors", async () => {
+    const testApp = await buildServer(config);
+
+    testApp.get("/boom", async () => {
+      throw new Error("SELECT * FROM users\nparams: staff@tmda.go.tz\n    at /srv/app/server.ts:101:2");
+    });
+
+    await testApp.ready();
+
+    const res = await testApp.inject({
+      url: "/boom",
+      headers: { accept: "text/html" },
+    });
+
+    expect(res.statusCode).toBe(500);
+    expect(res.headers["content-type"]).toContain("text/html");
+    expect(res.body).toContain("Something went wrong");
+    expect(res.body).toContain("Please try again later.");
+    expect(res.body).not.toContain("SELECT");
+    expect(res.body).not.toContain("users");
+    expect(res.body).not.toContain("params");
+    expect(res.body).not.toContain("/srv/app/server.ts");
+
+    await testApp.close();
+  });
+
+  it("returns a safe JSON payload for non-HTML requests", async () => {
+    const testApp = await buildServer(config);
+
+    testApp.get("/boom-json", async () => {
+      throw new Error("stack trace with Failed query: SELECT * FROM users");
+    });
+
+    await testApp.ready();
+
+    const res = await testApp.inject({
+      url: "/boom-json",
+      headers: { accept: "application/json" },
+    });
+
+    expect(res.statusCode).toBe(500);
+    expect(res.json()).toEqual({ error: "Internal Server Error" });
+
+    await testApp.close();
   });
 });
 
