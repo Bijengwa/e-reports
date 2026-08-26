@@ -1,4 +1,5 @@
 import path from "node:path";
+import { STATUS_CODES } from "node:http";
 import { fileURLToPath } from "node:url";
 import cookie from "@fastify/cookie";
 import formbody from "@fastify/formbody";
@@ -12,6 +13,7 @@ import { createDatabase } from "./db/client.js";
 import { publicDoor } from "./doors/public/index.js";
 import { staffDoor } from "./doors/staff/index.js";
 import { createStorage, MAX_ATTACHMENTS } from "./storage/index.js";
+import { RequestErrorPage } from "./views/shared/request-error-page.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 /** Resolves to <project>/public from both src (tsx) and dist (node). */
@@ -54,6 +56,29 @@ export async function buildServer(config: Config = loadConfig()): Promise<Fastif
   await app.register(cookie);
   await app.register(formbody);
   await app.register(fastifyKitaHtml);
+
+  app.setErrorHandler((error, request, reply) => {
+    request.log.error({ err: error }, "unhandled request error");
+
+    const clientError =
+      typeof error === "object" &&
+      error !== null &&
+      "statusCode" in error &&
+      typeof error.statusCode === "number" &&
+      error.statusCode < 500
+        ? error.statusCode
+        : undefined;
+    const status = clientError ?? 500;
+    const heading = STATUS_CODES[status] ?? STATUS_CODES[500] ?? "Internal Server Error";
+    const message =
+      status === 429 ? "Please wait a moment and try again." : "Please try again later.";
+
+    if (request.headers.accept?.includes("text/html")) {
+      return reply.status(status).html(RequestErrorPage({ heading, message }));
+    }
+
+    return reply.status(status).send({ error: heading });
+  });
 
   // Attachments arrive only on the last step of the orange form. The limits are enforced here
   // rather than in the route, so a hostile upload is cut off while it streams instead of after
