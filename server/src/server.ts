@@ -1,4 +1,5 @@
 import path from "node:path";
+import { STATUS_CODES } from "node:http";
 import { fileURLToPath } from "node:url";
 import cookie from "@fastify/cookie";
 import formbody from "@fastify/formbody";
@@ -59,11 +60,16 @@ export async function buildServer(config: Config = loadConfig()): Promise<Fastif
   app.setErrorHandler((error, request, reply) => {
     request.log.error({ err: error }, "unhandled request error");
 
+    const status = error.statusCode && error.statusCode < 500 ? error.statusCode : 500;
+    const heading = STATUS_CODES[status] ?? STATUS_CODES[500] ?? "Internal Server Error";
+    const message =
+      status === 429 ? "Please wait a moment and try again." : "Please try again later.";
+
     if (request.headers.accept?.includes("text/html")) {
-      return reply.status(500).html(RequestErrorPage({}));
+      return reply.status(status).html(RequestErrorPage({ heading, message }));
     }
 
-    return reply.status(500).send({ error: "Internal Server Error" });
+    return reply.status(status).send({ error: heading });
   });
 
   // Attachments arrive only on the last step of the orange form. The limits are enforced here

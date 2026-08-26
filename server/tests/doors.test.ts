@@ -117,6 +117,24 @@ describe("orange form wizard", () => {
 
   /** Enough of step 1 to get past it. */
   const step1 = { device_name: "Infusion Pump X" };
+  const completeSubmission = {
+    step: "5",
+    action: "submit",
+    device_name: "Infusion Pump X",
+    incident_date: "2026-08-01",
+    incident_type: "Malfunction",
+    incident_narrative: "Pump stopped mid-infusion.",
+    event_type: "Hospitalization",
+    event_narrative: "Patient kept overnight for observation.",
+    measures_taken: "Taken out of service.",
+    informed_supplier: "No",
+    reporter_name: "A. Mwita",
+    facility_address: "Muhimbili National Hospital",
+    location: "Dar es Salaam",
+    phone: "+255 700 000 000",
+    report_date: "2026-08-02",
+    device_location: "Sealed in the biomedical workshop",
+  } as const;
 
   it("moves forward a step on Continue", async () => {
     const res = await post({ step: "1", action: "next", device_name: "Infusion Pump X" });
@@ -302,22 +320,7 @@ describe("orange form wizard", () => {
     );
 
     const res = await post({
-      step: "5",
-      action: "submit",
-      device_name: "Infusion Pump X",
-      incident_date: "2026-08-01",
-      incident_type: "Malfunction",
-      incident_narrative: "Pump stopped mid-infusion.",
-      outcome: "Recovered",
-      event_type: "Malfunction or deterioration in the characteristics or performance of the device",
-      measures_taken: "Set it aside",
-      informed_supplier: "No",
-      reporter_name: "A. Mwita",
-      facility_address: "Muhimbili National Hospital",
-      location: "Dar es Salaam",
-      phone: "712345678",
-      report_date: "2026-08-02",
-      device_location: "Biomedical workshop",
+      ...completeSubmission,
     });
 
     expect(res.statusCode).toBe(503);
