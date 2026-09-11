@@ -106,11 +106,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     const rows = await getRegisterData(app);
 
     return reply.html(
-      <RegisterPage
-        rows={rows}
-        viewerRole={session.role}
-        viewerName={session.fullName}
-      />,
+      <RegisterPage rows={rows} viewerRole={session.role} viewerName={session.fullName} />,
     );
   });
 }
