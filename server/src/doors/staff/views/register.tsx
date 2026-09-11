@@ -129,8 +129,8 @@ const COLUMNS: ReadonlyArray<{
   { header: "Acknowledgement / Feedback", width: 190, cell: (r) => r.acknowledgement_feedback },
 ];
 
-/** The first three columns stay put while the rest scroll — see `.rg-c1..3` in the stylesheet. */
-const STICKY_COUNT = 3;
+/** Only S/N stays put while every later column — TMDA report number, date received, and the rest — scrolls. See `.rg-c1` in the stylesheet. */
+const STICKY_COUNT = 1;
 
 function stickyClass(index: number): string | undefined {
   return index < STICKY_COUNT ? `rg-c${index + 1}` : undefined;
@@ -145,74 +145,76 @@ export function RegisterPage({ rows, viewerRole, viewerName }: RegisterPageProps
       fullName={viewerName}
       active="register"
     >
-      <div class="staff-head">
-        <div class="sp">
-          <p class="register-title" safe>
-            MEDICAL DEVICE AND IN VITRO DIAGNOSTIC ADVERSE EVENTS/INCIDENTS REGISTER
-          </p>
-          <p class="hint">
-            TMDA/DMD/MDV/R/002 Rev #: 01 · {rows.length} record{rows.length === 1 ? "" : "s"}
-          </p>
+      <div class="register-page">
+        <div class="staff-head">
+          <div class="sp">
+            <p class="register-title" safe>
+              MEDICAL DEVICE AND IN VITRO DIAGNOSTIC ADVERSE EVENTS/INCIDENTS REGISTER
+            </p>
+            <p class="hint">
+              TMDA/DMD/MDV/R/002 Rev #: 01 · {rows.length} record{rows.length === 1 ? "" : "s"}
+            </p>
+          </div>
+          <div class="register-toolbar">
+            <input
+              type="search"
+              class="register-search"
+              placeholder="Search report number, device, manufacturer…"
+              id="search-register"
+              aria-label="Search the register"
+            />
+          </div>
         </div>
-        <div class="register-toolbar">
-          <input
-            type="search"
-            class="register-search"
-            placeholder="Search report number, device, manufacturer…"
-            id="search-register"
-            aria-label="Search the register"
-          />
-        </div>
-      </div>
 
-      {rows.length === 0 ? (
-        <p class="hint">No adverse events or incidents have been recorded yet.</p>
-      ) : (
-        // Wider than a narrow window on purpose — see `.tscroll`/`.register-scroll` in the
-        // stylesheet. This box scrolls sideways; the page around it does not.
-        <div class="tscroll register-scroll">
-          <table class="register-table">
-            {/* `width` as the plain HTML attribute, not a CSS `style`: this browser's
+        {rows.length === 0 ? (
+          <p class="hint">No adverse events or incidents have been recorded yet.</p>
+        ) : (
+          // Wider than a narrow window on purpose — see `.tscroll`/`.register-scroll` in the
+          // stylesheet. This box scrolls sideways; the page around it does not.
+          <div class="tscroll register-scroll">
+            <table class="register-table">
+              {/* `width` as the plain HTML attribute, not a CSS `style`: this browser's
                 `table-layout: fixed` column-sizing algorithm silently ignores a `<col>`'s CSS
                 `width` and falls back to distributing space by each cell's content, which is
                 exactly the "columns overlap, headers get clipped" failure this page had. The
                 legacy attribute is what the fixed-layout algorithm actually keys off. */}
-            <colgroup>
-              {COLUMNS.map((col) => {
-                // kitajs/html's `col` type omits the legacy `width` attribute (it's deprecated
-                // HTML), but it is what the fixed-layout algorithm actually reads — see the
-                // comment above — so it is cast in explicitly rather than left off.
-                const colProps = { width: String(col.width) } as JSX.IntrinsicElements["col"];
-                return <col {...colProps} />;
-              })}
-            </colgroup>
-            <thead>
-              <tr>
-                {COLUMNS.map((col, i) => (
-                  <th class={stickyClass(i)} safe>
-                    {col.header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
+              <colgroup>
+                {COLUMNS.map((col) => {
+                  // kitajs/html's `col` type omits the legacy `width` attribute (it's deprecated
+                  // HTML), but it is what the fixed-layout algorithm actually reads — see the
+                  // comment above — so it is cast in explicitly rather than left off.
+                  const colProps = { width: String(col.width) } as JSX.IntrinsicElements["col"];
+                  return <col {...colProps} />;
+                })}
+              </colgroup>
+              <thead>
                 <tr>
-                  {COLUMNS.map((col, i) => {
-                    const value = col.cell(row);
-                    const isEmpty = value === "" || value === null || value === undefined;
-                    return (
-                      <td class={stickyClass(i)}>
-                        {isEmpty ? <span class="rg-empty">—</span> : <span safe>{value}</span>}
-                      </td>
-                    );
-                  })}
+                  {COLUMNS.map((col, i) => (
+                    <th class={stickyClass(i)} safe>
+                      {col.header}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr>
+                    {COLUMNS.map((col, i) => {
+                      const value = col.cell(row);
+                      const isEmpty = value === "" || value === null || value === undefined;
+                      return (
+                        <td class={stickyClass(i)}>
+                          {isEmpty ? <span class="rg-empty">—</span> : <span safe>{value}</span>}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       <script>{`
         const search = document.getElementById('search-register');

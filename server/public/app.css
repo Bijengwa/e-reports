@@ -1298,7 +1298,14 @@ textarea[aria-invalid="true"] {
  * The register is `.tscroll` again — same box, same reason: a table this wide must scroll inside
  * itself rather than push the page sideways. Only the offset changes, because the header above it
  * is taller than a plain `.staff-head` line.
+ *
+ * The ordinary staff column is 1100px, which leaves most of the workspace empty next to a
+ * fifty-column sheet. On this page the main pane takes 90% of the workspace beside the rail.
  */
+.staff-main:has(.register-page) {
+  max-width: 90%;
+}
+
 .register-scroll {
   max-height: calc(100vh - 232px);
 }
@@ -1421,50 +1428,30 @@ textarea[aria-invalid="true"] {
 }
 
 /*
- * The three columns a reader uses to find a row — S/N, report number, date received — stay in
- * view while the other ~45 scroll underneath. `left` is the running total of the sticky columns'
- * own widths, matching the `<col>` widths set in the view. Sticky cells need their own opaque
- * background or the scrolling columns behind them would show through; the header corner needs a
- * higher `z-index` than both the plain sticky header row and the plain sticky body column so it
- * sits above whichever the reader scrolls past first.
+ * Only S/N stays in view. TMDA report number, date received, and every later column scroll
+ * together under it. Sticky cells need their own opaque background or the scrolling columns
+ * behind them would show through; the header corner needs a higher `z-index` than both the
+ * plain sticky header row and the plain sticky body column so it sits above whichever the
+ * reader scrolls past first. The edge shadow marks the freeze line.
  */
-.register-table .rg-c1,
-.register-table .rg-c2,
-.register-table .rg-c3 {
+.register-table .rg-c1 {
   position: sticky;
+  left: 0;
   z-index: 1;
   background: var(--card);
-}
-
-.register-table .rg-c1 {
-  left: 0;
-}
-
-.register-table .rg-c2 {
-  left: 56px;
-}
-
-.register-table .rg-c3 {
-  left: 206px;
   box-shadow: 2px 0 4px -2px rgba(16, 25, 19, 0.18);
 }
 
-.register-table th.rg-c1,
-.register-table th.rg-c2,
-.register-table th.rg-c3 {
+.register-table th.rg-c1 {
   z-index: 3;
   background: var(--green-bg);
 }
 
-.register-table tbody tr:nth-child(even) td.rg-c1,
-.register-table tbody tr:nth-child(even) td.rg-c2,
-.register-table tbody tr:nth-child(even) td.rg-c3 {
+.register-table tbody tr:nth-child(even) td.rg-c1 {
   background: var(--green-bg);
 }
 
-.register-table tbody tr:hover td.rg-c1,
-.register-table tbody tr:hover td.rg-c2,
-.register-table tbody tr:hover td.rg-c3 {
+.register-table tbody tr:hover td.rg-c1 {
   background: #eaf1ec;
 }
 
