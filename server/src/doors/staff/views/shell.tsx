@@ -34,6 +34,7 @@ export type StaffShellProps = {
     | "dashboard"
     | "workload"
     | "final-reports"
+    | "register"
     | "assessments"
     | "my-work"
     | "reports"
@@ -97,6 +98,19 @@ function IconFinalReports(): JSX.Element {
       <path d="M6 3h8l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
       <path d="M14 3v5h5" />
       <path d="M8 14l2 2 5-5" />
+    </svg>
+  );
+}
+
+/** The institutional register: a tabular view of all adverse events/incidents. */
+function IconRegister(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M4 4h16a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" />
+      <path d="M4 10h16" />
+      <path d="M4 14h16" />
+      <path d="M10 4v16" />
+      <path d="M14 4v16" />
     </svg>
   );
 }
@@ -304,6 +318,18 @@ export function StaffShell({
                 <span class="rail-label">Final Reports</span>
               </a>
             )}
+
+            {/* The institutional register: read-only record of all adverse events/incidents,
+                automatically populated from the Orange Report → Assessment → Manager Decision
+                workflow. Accessible to all authenticated staff. */}
+            <a
+              href="/register"
+              class={active === "register" ? "on" : ""}
+              aria-current={active === "register" ? "page" : undefined}
+            >
+              <IconRegister />
+              <span class="rail-label">Register</span>
+            </a>
 
             {/* The Officer's, because registering a report that arrived by email is the Officer's
                 work. Presentation only, as above: `requireRole` refuses the route whatever the

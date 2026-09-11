@@ -11,6 +11,7 @@ import { dashboardRoutes } from "./routes/dashboard.js";
 import { decisionRoutes } from "./routes/decisions.js";
 import { finalDocumentRoutes } from "./routes/final-document.js";
 import { finalReportsRoutes } from "./routes/final-reports.js";
+import { registerRoutes } from "./routes/register.js";
 import { loginRoutes } from "./routes/login.js";
 import { logoutRoutes } from "./routes/logout.js";
 import { myWorkRoutes } from "./routes/my-work.js";
@@ -87,6 +88,11 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
       // read every report — it is the clean version of one, not a new class of secret. Read-only:
       // the document is written by the approval and by nothing else.
       await active.register(finalDocumentRoutes);
+
+      // The Register: institutional read-only record of adverse events/incidents, automatically
+      // populated from the Orange Report → Assessment → Manager Decision workflow. Accessible
+      // to all authenticated staff roles. Read-only enforcement via UI and role-based access.
+      await active.register(registerRoutes);
 
       await active.register(async (registration) => {
         // Narrower, and in the other direction from the scope below: registering a report that
