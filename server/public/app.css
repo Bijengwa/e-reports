@@ -2474,6 +2474,27 @@ textarea[aria-invalid="true"] {
 ul.f4-card-c { padding-left: 18px; list-style: disc; }
 ul.f4-card-c li { margin-bottom: 3px; }
 
+/*
+ * 4.2's causality options: a radio + title on the left, its full explanation on the right, one row
+ * per option — not side-by-side cards. The long criteria text was forcing a lot of vertical
+ * scrolling when stacked inside a narrow card; a row lets it breathe without shrinking the option
+ * titles. Scoped to `.f4-causality` rather than the base `.f4-cards` grid, which the risk section
+ * (`.f4-cards.f4-risk`) still uses unchanged.
+ */
+.f4-causality { display: block; }
+.f4-causality .f4-choice-pair + .f4-choice-pair { margin-top: 10px; }
+.f4-causality .f4-card {
+  display: grid; grid-template-columns: 200px 1fr; gap: 4px 20px; align-items: start;
+}
+.f4-causality .f4-card-h { margin-bottom: 0; }
+
+/*
+ * Section 6's four risk levels: a fixed 2x2, not the auto-fit grid's "however many 250px cards
+ * fit" — which left a lone fourth card wrapped onto its own row under the other three. Four
+ * options divide evenly into two rows of two at any width wide enough for two columns at all.
+ */
+.f4-cards.f4-risk { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
 /* The left accent is the only cue that survives a glance: critical/high/medium/low in one colour
    sweep, matched to the severity so red reads as the worst outcome without reading the label. */
 .f4-risk .f4-card { border-left-width: 6px; }
@@ -2514,6 +2535,11 @@ ul.f4-card-c li { margin-bottom: 3px; }
 .f4-jump-links a:hover, .f4-jump-links a:focus-visible {
   background: var(--green-bg); border-color: var(--green); outline: none;
 }
+/* Which section is on screen right now, kept in sync with scroll by f4-find.js. Solid fill rather
+   than the hover tint, so "here" reads differently from "hovering" at a glance. */
+.f4-jump-links a.on {
+  background: var(--f4-bar); border-color: var(--f4-bar); color: #fff;
+}
 
 .f4-find-wrap { display: flex; align-items: center; gap: 6px; margin-left: auto; }
 .f4-find { width: 190px; font-size: 12px; padding: 5px 10px; }
@@ -2542,6 +2568,12 @@ ul.f4-card-c li { margin-bottom: 3px; }
   .f4-find { flex: 1; width: auto; }
   /* The bar wraps to two rows down here, so a jump has more sticky height to clear. */
   .f4-section { scroll-margin-top: 168px; }
+  /* The causality row's two columns stack rather than squeeze a 200px label column and its
+     explanation into a narrow viewport. */
+  .f4-causality .f4-card { grid-template-columns: 1fr; }
+  /* The risk section's 2x2 stacks to one column rather than squeezing two cards into half a
+     narrow viewport each. */
+  .f4-cards.f4-risk { grid-template-columns: 1fr; }
 }
 @media print {
   .rail, .top, .f4-buttons, .f4-jump, .a1-open { display: none !important; }

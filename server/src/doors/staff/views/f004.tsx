@@ -1608,7 +1608,7 @@ export function F004Form({
                 <span class="f4-no">4.2</span> Establish whether there is a link between the device
                 and the event
               </div>
-              <div class="f4-cards">
+              <div class="f4-cards f4-causality">
                 {CAUSALITY_OPTIONS.map((option) => (
                   <div class="f4-choice-pair">
                     <label class={causality === option.value ? "f4-card on" : "f4-card"}>
