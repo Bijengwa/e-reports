@@ -31,6 +31,76 @@
       });
     }
 
+    /* ---- section nav active state ------------------------------------------ */
+
+    var jumpLinks = document.querySelectorAll(".f4-jump-links a");
+    var sections = document.querySelectorAll(".f4-section[id]");
+
+    if (jumpLinks.length && sections.length && "IntersectionObserver" in window) {
+      var linkForId = {};
+      for (var li = 0; li < jumpLinks.length; li++) {
+        var href = jumpLinks[li].getAttribute("href") || "";
+        if (href.charAt(0) === "#") linkForId[href.slice(1)] = jumpLinks[li];
+      }
+
+      function setActiveSection(id) {
+        for (var i2 = 0; i2 < jumpLinks.length; i2++) {
+          jumpLinks[i2].classList.remove("on");
+          jumpLinks[i2].removeAttribute("aria-current");
+        }
+        var link = linkForId[id];
+        if (link) {
+          link.classList.add("on");
+          link.setAttribute("aria-current", "true");
+        }
+      }
+
+      // Whichever observed section currently has the most of itself in the band between the sticky
+      // header/jump row and the bottom of the viewport wins — not just "first one intersecting",
+      // which flickers between two short sections crossing the same boundary at once.
+      var ratioById = {};
+
+      var sectionObserver = new IntersectionObserver(
+        function (entries) {
+          for (var e = 0; e < entries.length; e++) {
+            var entry = entries[e];
+            if (entry.isIntersecting) ratioById[entry.target.id] = entry.intersectionRatio;
+            else delete ratioById[entry.target.id];
+          }
+
+          var bestId = null;
+          var bestRatio = -1;
+          for (var id in ratioById) {
+            if (ratioById[id] > bestRatio) {
+              bestRatio = ratioById[id];
+              bestId = id;
+            }
+          }
+          if (bestId) setActiveSection(bestId);
+        },
+        {
+          // Matches the sticky staff header + jump row height so a section only counts once it has
+          // actually cleared them, and ignores the bottom third of the viewport so the *next*
+          // section doesn't start winning the moment its top peeks into view.
+          rootMargin: "-120px 0px -60% 0px",
+          threshold: [0, 0.25, 0.5, 0.75, 1],
+        },
+      );
+
+      for (var s = 0; s < sections.length; s++) sectionObserver.observe(sections[s]);
+
+      // Clicking a link scrolls (native anchor behaviour, untouched); mark it active immediately
+      // rather than waiting for the observer to catch up once the scroll settles.
+      for (var lj = 0; lj < jumpLinks.length; lj++) {
+        jumpLinks[lj].addEventListener("click", function (event) {
+          var targetHref = event.currentTarget.getAttribute("href") || "";
+          if (targetHref.charAt(0) === "#") setActiveSection(targetHref.slice(1));
+        });
+      }
+
+      setActiveSection(sections[0].id);
+    }
+
     /* ---- find in this F004 ------------------------------------------------ */
 
     var input = document.querySelector("[data-f4-find]");
