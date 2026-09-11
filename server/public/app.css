@@ -1293,6 +1293,181 @@ textarea[aria-invalid="true"] {
   }
 }
 
+/* ---------- register ---------- */
+/*
+ * The register is `.tscroll` again — same box, same reason: a table this wide must scroll inside
+ * itself rather than push the page sideways. Only the offset changes, because the header above it
+ * is taller than a plain `.staff-head` line.
+ */
+.register-scroll {
+  max-height: calc(100vh - 232px);
+}
+
+@media (max-width: 620px) {
+  .register-scroll {
+    max-height: calc(100vh - 210px);
+  }
+}
+
+.register-title {
+  margin: 0 0 2px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.register-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.register-search {
+  width: 280px;
+  max-width: 100%;
+  padding: 7px 11px;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r);
+  background: var(--card);
+}
+
+.register-search:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 1px;
+}
+
+/*
+ * `.utable` holds every column to its own content width, which is right for a handful of columns
+ * and wrong for fifty: a couple of long ones would swallow the row and the rest would starve.
+ * `table-layout: fixed` plus an explicit width per `<col>` gives every column a deliberate size
+ * instead, and — unlike `.utable`'s `white-space: nowrap` — lets both headers and long values wrap
+ * inside the width they are given rather than forcing the row onto one endless line.
+ *
+ * `width: max-content` is what makes the table exactly as wide as the sum of its columns: a plain
+ * block element sized `auto` would just fill `.register-scroll`, and there would be nothing left
+ * for that box to scroll. `min-width: 100%` is the fallback for the case a live register ever has
+ * so few columns that the sum is narrower than the screen.
+ */
+.register-table {
+  width: max-content;
+  min-width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  font-size: 12.5px;
+}
+
+.register-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  vertical-align: bottom;
+  padding: 8px 10px;
+  background: var(--green-bg);
+  border-bottom: 1px solid var(--rule);
+  border-right: 1px solid var(--rule);
+  text-align: left;
+  text-transform: uppercase;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: 0.05em;
+  color: var(--ink-3);
+  white-space: normal;
+  word-break: break-word;
+}
+
+.register-table thead tr:first-child th:first-child {
+  border-top-left-radius: var(--r);
+}
+
+.register-table thead tr:first-child th:last-child {
+  border-top-right-radius: var(--r);
+}
+
+.register-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--rule);
+  border-right: 1px solid var(--rule);
+  vertical-align: top;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.register-table th:last-child,
+.register-table td:last-child {
+  border-right: 0;
+}
+
+.register-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.register-table tbody tr:nth-child(even) {
+  background: var(--green-bg);
+}
+
+.register-table tbody tr:hover td {
+  background: #eaf1ec;
+}
+
+/* A field the workflow has not populated yet, so a blank cell reads as "not recorded" rather than
+   as a rendering fault. */
+.register-table .rg-empty {
+  color: var(--ink-3);
+}
+
+/*
+ * The three columns a reader uses to find a row — S/N, report number, date received — stay in
+ * view while the other ~45 scroll underneath. `left` is the running total of the sticky columns'
+ * own widths, matching the `<col>` widths set in the view. Sticky cells need their own opaque
+ * background or the scrolling columns behind them would show through; the header corner needs a
+ * higher `z-index` than both the plain sticky header row and the plain sticky body column so it
+ * sits above whichever the reader scrolls past first.
+ */
+.register-table .rg-c1,
+.register-table .rg-c2,
+.register-table .rg-c3 {
+  position: sticky;
+  z-index: 1;
+  background: var(--card);
+}
+
+.register-table .rg-c1 {
+  left: 0;
+}
+
+.register-table .rg-c2 {
+  left: 56px;
+}
+
+.register-table .rg-c3 {
+  left: 206px;
+  box-shadow: 2px 0 4px -2px rgba(16, 25, 19, 0.18);
+}
+
+.register-table th.rg-c1,
+.register-table th.rg-c2,
+.register-table th.rg-c3 {
+  z-index: 3;
+  background: var(--green-bg);
+}
+
+.register-table tbody tr:nth-child(even) td.rg-c1,
+.register-table tbody tr:nth-child(even) td.rg-c2,
+.register-table tbody tr:nth-child(even) td.rg-c3 {
+  background: var(--green-bg);
+}
+
+.register-table tbody tr:hover td.rg-c1,
+.register-table tbody tr:hover td.rg-c2,
+.register-table tbody tr:hover td.rg-c3 {
+  background: #eaf1ec;
+}
+
 /* ---------- the application mark ---------- */
 /*
  * Geometry from the prototype's <template id="logo">; only the fills change between surfaces.
