@@ -42,6 +42,12 @@ export type RegisterRow = {
   investigation_type_codes: string;
   investigation_finding_level_1: string;
   investigation_finding_codes: string;
+  investigation_finding_level_2: string;
+  investigation_type_cause_level_2: string;
+  investigation_type_cause_level_3: string;
+  investigation_conclusion_codes: string;
+  investigation_conclusion_level_1: string;
+  investigation_conclusion_level_2: string;
   investigation_status: string;
   causality_assessment: string;
   risk_assessment: string;
@@ -64,6 +70,9 @@ export type RegisterPageProps = {
  *
  * A single source of truth for the header row, the `<colgroup>` and each body row, so the three
  * can never drift out of sync — the failure mode the previous version had no guard against.
+ *
+ * Header strings mirror the TMDA Adverse Events/Incidents Register worksheet
+ * (TMDA/DMD/MDV/R/002) column-for-column, with typos in the worksheet corrected.
  */
 const COLUMNS: ReadonlyArray<{
   header: string;
@@ -80,52 +89,186 @@ const COLUMNS: ReadonlyArray<{
   { header: "Device Type", width: 90, cell: (r) => r.device_type },
   { header: "Manufacturing Date", width: 105, cell: (r) => r.manufacturing_date },
   { header: "Expiry Date", width: 105, cell: (r) => r.expiry_date },
-  { header: "Manufacturer (Name & Address)", width: 220, cell: (r) => r.manufacturer_name_address },
+  {
+    header: "Name and Physical Address of Manufacturer",
+    width: 220,
+    cell: (r) => r.manufacturer_name_address,
+  },
   { header: "Manufacturing Country", width: 120, cell: (r) => r.manufacturing_country },
-  { header: "Supplier", width: 130, cell: (r) => r.supplier_name },
+  {
+    header: "Name of the Supplier (If applicable)",
+    width: 160,
+    cell: (r) => r.supplier_name,
+  },
   {
     header: "Adverse Event(s)/Incident(s) Description",
     width: 220,
     cell: (r) => r.event_description,
   },
-  { header: "Date of Onset", width: 105, cell: (r) => r.date_onset_event },
-  { header: "Date of the Report", width: 105, cell: (r) => r.date_report },
-  { header: "Place/Location of Event(s)", width: 140, cell: (r) => r.event_location },
+  {
+    header: "Date of Onset of Event(s)/Incident(s)",
+    width: 140,
+    cell: (r) => r.date_onset_event,
+  },
+  { header: "Date of the Report", width: 120, cell: (r) => r.date_report },
+  {
+    header: "Place/Location of Event(s)/Incident(s)",
+    width: 180,
+    cell: (r) => r.event_location,
+  },
   { header: "Region", width: 100, cell: (r) => r.region },
   { header: "Type of Report", width: 100, cell: (r) => r.type_of_report },
-  { header: "Reporter Details", width: 200, cell: (r) => r.reporter_details },
-  { header: "Event Seriousness", width: 100, cell: (r) => r.event_seriousness },
-  { header: "Device Component — Level 1", width: 130, cell: (r) => r.device_component_level_1 },
-  { header: "Device Component — Level 2", width: 130, cell: (r) => r.device_component_level_2 },
-  { header: "Device Component — Level 3", width: 130, cell: (r) => r.device_component_level_3 },
-  { header: "Device Component IMDRF Code", width: 100, cell: (r) => r.device_component_codes },
-  { header: "Device Problem — Level 1", width: 130, cell: (r) => r.device_problem_level_1 },
-  { header: "Device Problem — Level 2", width: 130, cell: (r) => r.device_problem_level_2 },
-  { header: "Device Problem — Level 3", width: 130, cell: (r) => r.device_problem_level_3 },
-  { header: "Device Problem IMDRF Code", width: 100, cell: (r) => r.device_problem_codes },
-  { header: "Clinical Sign — Level 1", width: 130, cell: (r) => r.clinical_sign_level_1 },
-  { header: "Clinical Sign — Level 2", width: 130, cell: (r) => r.clinical_sign_level_2 },
-  { header: "Clinical Sign — Level 3", width: 130, cell: (r) => r.clinical_sign_level_3 },
-  { header: "Clinical Sign IMDRF Code", width: 100, cell: (r) => r.clinical_sign_codes },
-  { header: "Health Impact — Level 1", width: 130, cell: (r) => r.health_impact_level_1 },
-  { header: "Health Impact — Level 2", width: 130, cell: (r) => r.health_impact_level_2 },
-  { header: "Health Impact — Level 3", width: 130, cell: (r) => r.health_impact_level_3 },
-  { header: "Health Impact IMDRF Code", width: 100, cell: (r) => r.health_impact_codes },
-  { header: "Investigation Type IMDRF Code", width: 110, cell: (r) => r.investigation_type_codes },
-  { header: "Investigation Finding", width: 140, cell: (r) => r.investigation_finding_level_1 },
   {
-    header: "Investigation Finding IMDRF Code",
-    width: 110,
+    header: "Reporter Details (Name / Contact Information)",
+    width: 220,
+    cell: (r) => r.reporter_details,
+  },
+  { header: "Event Seriousness (Yes/No)", width: 120, cell: (r) => r.event_seriousness },
+  {
+    header: "Preferred Term - Device Component Level 1",
+    width: 160,
+    cell: (r) => r.device_component_level_1,
+  },
+  {
+    header: "Preferred Term - Device Component Level 2",
+    width: 160,
+    cell: (r) => r.device_component_level_2,
+  },
+  {
+    header: "Preferred Term - Device Component Level 3",
+    width: 160,
+    cell: (r) => r.device_component_level_3,
+  },
+  {
+    header: "Device Component IMDRF Codes #",
+    width: 130,
+    cell: (r) => r.device_component_codes,
+  },
+  {
+    header: "Preferred Term - Device Problem Level 1",
+    width: 160,
+    cell: (r) => r.device_problem_level_1,
+  },
+  {
+    header: "Preferred Term - Device Problem Level 2",
+    width: 160,
+    cell: (r) => r.device_problem_level_2,
+  },
+  {
+    header: "Preferred Term - Device Problem Level 3",
+    width: 160,
+    cell: (r) => r.device_problem_level_3,
+  },
+  {
+    header: "Device Problem IMDRF Codes #",
+    width: 130,
+    cell: (r) => r.device_problem_codes,
+  },
+  {
+    header: "Preferred Term - Clinical Sign Level 1",
+    width: 160,
+    cell: (r) => r.clinical_sign_level_1,
+  },
+  {
+    header: "Preferred Term - Clinical Sign Level 2",
+    width: 160,
+    cell: (r) => r.clinical_sign_level_2,
+  },
+  {
+    header: "Preferred Term - Clinical Sign Level 3",
+    width: 160,
+    cell: (r) => r.clinical_sign_level_3,
+  },
+  {
+    header: "Clinical Signs IMDRF Codes #",
+    width: 130,
+    cell: (r) => r.clinical_sign_codes,
+  },
+  {
+    header: "Preferred Term - Health Impact Level 1",
+    width: 160,
+    cell: (r) => r.health_impact_level_1,
+  },
+  {
+    header: "Preferred Term - Health Impact Level 2",
+    width: 160,
+    cell: (r) => r.health_impact_level_2,
+  },
+  {
+    header: "Preferred Term - Health Impact Level 3",
+    width: 160,
+    cell: (r) => r.health_impact_level_3,
+  },
+  {
+    header: "Health Impact IMDRF Codes #",
+    width: 130,
+    cell: (r) => r.health_impact_codes,
+  },
+  {
+    header: "Cause of Investigation - Type of Investigation IMDRF Codes #",
+    width: 170,
+    cell: (r) => r.investigation_type_codes,
+  },
+  {
+    header: "Preferred Term - Investigation Finding Level 1",
+    width: 170,
+    cell: (r) => r.investigation_finding_level_1,
+  },
+  {
+    header: "Cause of Investigation - Investigation Finding IMDRF Codes #",
+    width: 170,
     cell: (r) => r.investigation_finding_codes,
   },
-  { header: "Investigation Status", width: 110, cell: (r) => r.investigation_status },
-  { header: "Causality Assessment", width: 110, cell: (r) => r.causality_assessment },
-  { header: "Risk Assessment", width: 100, cell: (r) => r.risk_assessment },
+  {
+    header: "Preferred Term - Investigation Finding Level 2",
+    width: 170,
+    cell: (r) => r.investigation_finding_level_2,
+  },
+  {
+    header: "Preferred Term - Type/Cause of Investigation Level 2",
+    width: 170,
+    cell: (r) => r.investigation_type_cause_level_2,
+  },
+  {
+    header: "Preferred Term - Type/Cause of Investigation Level 3",
+    width: 170,
+    cell: (r) => r.investigation_type_cause_level_3,
+  },
+  {
+    header: "Cause of Investigation - Investigation Conclusion IMDRF Codes #",
+    width: 170,
+    cell: (r) => r.investigation_conclusion_codes,
+  },
+  {
+    header: "Preferred Term - Investigation Conclusion Level 1",
+    width: 170,
+    cell: (r) => r.investigation_conclusion_level_1,
+  },
+  {
+    header: "Preferred Term - Investigation Conclusion Level 2",
+    width: 170,
+    cell: (r) => r.investigation_conclusion_level_2,
+  },
+  {
+    header: "Investigation Status of the AEs/AIs (Done/Not Done)",
+    width: 150,
+    cell: (r) => r.investigation_status,
+  },
+  {
+    header: "Causality Assessment (Unrelated, Possible, Probable & Certain)",
+    width: 170,
+    cell: (r) => r.causality_assessment,
+  },
+  {
+    header: "Risk Assessment (Critical/High/Medium/Low)",
+    width: 150,
+    cell: (r) => r.risk_assessment,
+  },
   { header: "Regulatory Action(s) Taken", width: 210, cell: (r) => r.regulatory_action },
   { header: "1st Assessor Name", width: 140, cell: (r) => r.assessor_1_name },
-  { header: "Date of Assessment (1st)", width: 105, cell: (r) => r.date_assessment_1 },
+  { header: "Date of Assessment", width: 120, cell: (r) => r.date_assessment_1 },
   { header: "2nd Assessor Name", width: 140, cell: (r) => r.assessor_2_name },
-  { header: "Date of Assessment (2nd)", width: 105, cell: (r) => r.date_assessment_2 },
+  { header: "Date of Assessment", width: 120, cell: (r) => r.date_assessment_2 },
   { header: "Acknowledgement / Feedback", width: 190, cell: (r) => r.acknowledgement_feedback },
 ];
 
