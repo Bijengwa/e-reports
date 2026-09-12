@@ -110,16 +110,29 @@ export function severityOf(eventTypes: readonly string[]): Severity {
 /** The most reports a single financial year's three-digit serial can hold. */
 export const MAX_SERIAL = 999;
 
+/** Reads a `Date`'s calendar year and month as they read on a clock in Dar es Salaam. */
+const tanzaniaYearMonth = new Intl.DateTimeFormat("en-US", {
+  timeZone: "Africa/Dar_es_Salaam",
+  year: "numeric",
+  month: "numeric",
+});
+
 /**
  * Which financial year a date falls in, as `"YYYY-YY"`.
  *
- * The year runs 1 July - 30 June, so a report received on 30 June belongs to the year that is
- * about to end and one received the next day already belongs to the new one.
+ * The year runs 1 July - 30 June *Tanzania time*, not UTC: TMDA's financial year turns over at
+ * midnight in Dar es Salaam, so a report timestamped a few hours either side of that boundary in
+ * UTC must still land in the financial year its own clock was in when it was received. Tanzania
+ * has kept a fixed UTC+3 offset with no daylight saving since 1961, but the lookup goes through
+ * `Intl.DateTimeFormat` with an explicit IANA zone rather than a hand-rolled `+3`, so this stays
+ * correct even if that ever changed and does not silently drift the way a hardcoded offset would.
  */
 export function financialYearOf(date: Date): string {
-  const calendarYear = date.getUTCFullYear();
-  // Months are 0-indexed: 6 is July.
-  const startYear = date.getUTCMonth() >= 6 ? calendarYear : calendarYear - 1;
+  const parts = tanzaniaYearMonth.formatToParts(date);
+  const calendarYear = Number(parts.find((part) => part.type === "year")?.value);
+  const month = Number(parts.find((part) => part.type === "month")?.value); // 1-12
+
+  const startYear = month >= 7 ? calendarYear : calendarYear - 1;
   return `${startYear}-${String((startYear + 1) % 100).padStart(2, "0")}`;
 }
 

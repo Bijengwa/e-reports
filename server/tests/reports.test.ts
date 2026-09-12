@@ -158,12 +158,44 @@ describe("severity", () => {
 });
 
 describe("financial year", () => {
-  it("puts 30 June in the financial year that is ending", () => {
-    expect(financialYearOf(new Date("2026-06-30T23:59:59Z"))).toBe("2025-26");
+  // Instants are built from Tanzania wall-clock time (`+03:00`, Africa/Dar_es_Salaam has no DST)
+  // and then asserted as UTC, so a test cannot accidentally pass by using UTC midnight as if it
+  // were the financial-year boundary.
+
+  it("puts 30 June 2026, just before midnight in Tanzania, in the ending financial year", () => {
+    const instant = new Date("2026-06-30T23:59:59+03:00");
+    expect(instant.toISOString()).toBe("2026-06-30T20:59:59.000Z");
+    expect(financialYearOf(instant)).toBe("2025-26");
   });
 
-  it("puts 1 July in the new financial year", () => {
-    expect(financialYearOf(new Date("2026-07-01T00:00:00Z"))).toBe("2026-27");
+  it("puts 1 July 2026, just after midnight in Tanzania, in the new financial year", () => {
+    const instant = new Date("2026-07-01T00:00:00+03:00");
+    expect(instant.toISOString()).toBe("2026-06-30T21:00:00.000Z");
+    expect(financialYearOf(instant)).toBe("2026-27");
+  });
+
+  it("puts 30 June 2027, just before midnight in Tanzania, in the ending financial year", () => {
+    const instant = new Date("2027-06-30T23:59:59+03:00");
+    expect(instant.toISOString()).toBe("2027-06-30T20:59:59.000Z");
+    expect(financialYearOf(instant)).toBe("2026-27");
+  });
+
+  it("puts 1 July 2027, just after midnight in Tanzania, in the new financial year", () => {
+    const instant = new Date("2027-07-01T00:00:00+03:00");
+    expect(instant.toISOString()).toBe("2027-06-30T21:00:00.000Z");
+    expect(financialYearOf(instant)).toBe("2027-28");
+  });
+
+  it("is not fooled by UTC midnight: 00:30 Tanzania on 1 July is still 30 June in UTC", () => {
+    const instant = new Date("2026-07-01T00:30:00+03:00");
+    expect(instant.toISOString()).toBe("2026-06-30T21:30:00.000Z");
+    expect(financialYearOf(instant)).toBe("2026-27");
+  });
+
+  it("is not fooled by UTC midnight: 23:30 Tanzania on 30 June is still 30 June in UTC", () => {
+    const instant = new Date("2026-06-30T23:30:00+03:00");
+    expect(instant.toISOString()).toBe("2026-06-30T20:30:00.000Z");
+    expect(financialYearOf(instant)).toBe("2025-26");
   });
 
   it("wraps the ending year across a century boundary", () => {

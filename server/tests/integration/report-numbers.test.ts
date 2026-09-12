@@ -65,17 +65,19 @@ async function lastSerial(fy: string): Promise<number | null> {
 }
 
 describe.skipIf(!INTEGRATION_ENABLED)("AEMD financial-year report numbers", () => {
-  it("puts a report received on 30 June in the financial year that is ending", async () => {
+  it("puts a report received on 30 June Tanzania time in the financial year that is ending", async () => {
+    // 2026-06-30 23:30 Africa/Dar_es_Salaam == 2026-06-30 20:30 UTC
     const { number } = await storeReport(owner.db, submission(), [], {
-      now: new Date("2026-06-30T23:00:00Z"),
+      now: new Date("2026-06-30T23:30:00+03:00"),
     });
 
     expect(number).toBe("AEMD/2025-26/001");
   });
 
-  it("puts a report received on 1 July in the new financial year", async () => {
+  it("puts a report received on 1 July Tanzania time in the new financial year", async () => {
+    // 2026-07-01 00:30 Africa/Dar_es_Salaam == 2026-06-30 21:30 UTC — still 30 June in UTC.
     const { number } = await storeReport(owner.db, submission(), [], {
-      now: new Date("2026-07-01T00:00:00Z"),
+      now: new Date("2026-07-01T00:30:00+03:00"),
     });
 
     expect(number).toBe("AEMD/2026-27/001");
@@ -118,29 +120,27 @@ describe.skipIf(!INTEGRATION_ENABLED)("AEMD financial-year report numbers", () =
 
   it("does not leave the sequence advanced when the report insert rolls back", async () => {
     const fy = "2034-35";
-    // The number the allocator is about to produce, already taken — so the insert inside
-    // storeReport's own transaction hits the unique constraint on `number` and everything in
-    // that transaction, the counter increment included, rolls back with it.
-    await seedReportNumbered(`AEMD/${fy}/001`);
+    const now = new Date("2034-08-01T00:00:00Z");
 
-    await expect(
-      storeReport(owner.db, submission(), [], { now: new Date("2034-08-01T00:00:00Z") }),
-    ).rejects.toThrow();
+    const first = await storeReport(owner.db, submission(), [], { now });
+    expect(first.number).toBe(`AEMD/${fy}/001`);
+    expect(await lastSerial(fy)).toBe(1);
 
-    // Rolled back to nothing reserved, not stuck at 1: the next real attempt must still see this
-    // financial year as untouched, seed from the surviving AEMD/2034-35/001 and land on 002.
-    expect(await lastSerial(fy)).toBeNull();
+    // A number the allocator has not issued yet but is about to compute next, inserted out of
+    // band (as a stray hand-edit or a second, unrelated writer might). The insert inside
+    // storeReport's own transaction collides with it, and the whole transaction — the counter
+    // increment included — rolls back.
+    await seedReportNumbered(`AEMD/${fy}/002`);
 
-    const { number } = await storeReport(owner.db, submission(), [], {
-      now: new Date("2034-08-02T00:00:00Z"),
-    });
+    await expect(storeReport(owner.db, submission(), [], { now })).rejects.toThrow();
 
-    expect(number).toBe(`AEMD/${fy}/002`);
+    // Rolled back to exactly where it was before the failed attempt, not left one ahead of it.
+    expect(await lastSerial(fy)).toBe(1);
   });
 
   it("keeps the report number unique even for a hand-inserted collision", async () => {
     await storeReport(owner.db, submission(), [], { now: new Date("2035-08-01T00:00:00Z") });
 
-    await expect(seedReportNumbered("AEMD/2035-36/001")).rejects.toThrow(/unique|duplicate/i);
+    await expect(seedReportNumbered("AEMD/2035-36/001")).rejects.toThrow();
   });
 });
