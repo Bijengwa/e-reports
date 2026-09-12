@@ -219,8 +219,12 @@ const COLUMNS: ReadonlyArray<{
     width: 170,
     cell: (r) => r.investigation_finding_codes,
   },
+  // Excel AO carries the same label as AM (TMDA worksheet has a duplicate
+  // "Level 1" header here); kept verbatim so the register matches the source
+  // document column-for-column. The backing field is the second investigation
+  // finding column and is stored separately from AM.
   {
-    header: "Preferred Term - Investigation Finding Level 2",
+    header: "Preferred Term - Investigation Finding Level 1",
     width: 170,
     cell: (r) => r.investigation_finding_level_2,
   },
