@@ -1,13 +1,51 @@
 import { sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
+import {
+  f004AnswersForRegister,
+  formatReporterDetails,
+  mapF004ToRegisterCells,
+} from "../../../domain/register.js";
 import { currentSession } from "../session-guard.js";
 import { RegisterPage, type RegisterRow } from "../views/register.js";
+
+type RegisterQueryRow = {
+  report_id: string;
+  tmda_report_number: string | null;
+  date_received: string | null;
+  device_brand_name: string | null;
+  device_name: string | null;
+  size: string | null;
+  batch_lot_serial_number: string | null;
+  device_type: string | null;
+  manufacturing_date: string | null;
+  expiry_date: string | null;
+  manufacturer_name_address: string | null;
+  manufacturing_country: string | null;
+  supplier_name: string | null;
+  event_description: string | null;
+  date_onset_event: string | null;
+  date_report: string | null;
+  event_location: string | null;
+  region: string | null;
+  reporter_name: string | null;
+  reporter_phone: string | null;
+  event_seriousness: string | null;
+  final_payload: unknown;
+  a1_payload: unknown;
+  assessor_1_name: string | null;
+  date_assessment_1: string | null;
+  assessor_2_name: string | null;
+  date_assessment_2: string | null;
+};
+
+function cell(value: string | null | undefined): string {
+  return value ?? "";
+}
 
 async function getRegisterData(app: FastifyInstance): Promise<ReadonlyArray<RegisterRow>> {
   const rows = await app.db.execute(sql`
     SELECT
       r.id as report_id,
-      ROW_NUMBER() OVER (ORDER BY r.received_at DESC, r.number DESC) as sn,
       r.number as tmda_report_number,
       TO_CHAR(r.received_at, 'YYYY-MM-DD') as date_received,
       (r.payload->>'brand_name')::text as device_brand_name,
@@ -25,17 +63,15 @@ async function getRegisterData(app: FastifyInstance): Promise<ReadonlyArray<Regi
       (r.payload->>'report_date')::text as date_report,
       (r.payload->>'device_location')::text as event_location,
       (r.payload->>'location')::text as region,
-      r.channel as type_of_report,
-      CONCAT(COALESCE((r.payload->>'reporter_name'), ''), ' ', COALESCE((r.payload->>'phone'), ''))::text as reporter_details,
+      (r.payload->>'reporter_name')::text as reporter_name,
+      (r.payload->>'phone')::text as reporter_phone,
       CASE WHEN r.severity != 'other' THEN 'Yes' ELSE 'No' END as event_seriousness,
-      COALESCE(f.payload->'answers'->>'causality', '')::text as causality_assessment,
-      COALESCE(f.payload->'answers'->>'risk_level', '')::text as risk_assessment,
-      COALESCE(f.payload->'answers'->>'regulatory_action', '')::text as regulatory_action,
+      f.payload as final_payload,
+      CASE WHEN a1.submitted_at IS NOT NULL THEN a1.payload ELSE NULL END as a1_payload,
       COALESCE(u1.full_name, '')::text as assessor_1_name,
       TO_CHAR(a1.submitted_at, 'DD/MM/YYYY') as date_assessment_1,
       COALESCE(u2.full_name, '')::text as assessor_2_name,
-      TO_CHAR(a2.submitted_at, 'DD/MM/YYYY') as date_assessment_2,
-      ''::text as acknowledgement_feedback
+      TO_CHAR(a2.submitted_at, 'DD/MM/YYYY') as date_assessment_2
     FROM reports r
     LEFT JOIN report_final_documents f ON f.report_id = r.id
     LEFT JOIN assessments a1 ON a1.report_id = r.id AND a1.ordinal = 1
@@ -46,58 +82,39 @@ async function getRegisterData(app: FastifyInstance): Promise<ReadonlyArray<Regi
     LIMIT 500
   `);
 
-  return rows.map((row: any, idx) => ({
-    reportId: row.report_id,
-    sn: idx + 1,
-    tmda_report_number: row.tmda_report_number || "",
-    date_received: row.date_received || "",
-    device_brand_name: row.device_brand_name || "",
-    device_common_name: row.device_name || "",
-    size: row.size || "",
-    batch_lot_serial_number: row.batch_lot_serial_number || "",
-    device_type: row.device_type || "",
-    manufacturing_date: row.manufacturing_date || "",
-    expiry_date: row.expiry_date || "",
-    manufacturer_name_address: row.manufacturer_name_address || "",
-    manufacturing_country: row.manufacturing_country || "",
-    supplier_name: row.supplier_name || "",
-    event_description: row.event_description || "",
-    date_onset_event: row.date_onset_event || "",
-    date_report: row.date_report || "",
-    event_location: row.event_location || "",
-    region: row.region || "",
-    type_of_report: row.type_of_report || "",
-    reporter_details: row.reporter_details || "",
-    event_seriousness: row.event_seriousness || "",
-    device_component_level_1: "",
-    device_component_level_2: "",
-    device_component_level_3: "",
-    device_component_codes: "",
-    device_problem_level_1: "",
-    device_problem_level_2: "",
-    device_problem_level_3: "",
-    device_problem_codes: "",
-    clinical_sign_level_1: "",
-    clinical_sign_level_2: "",
-    clinical_sign_level_3: "",
-    clinical_sign_codes: "",
-    health_impact_level_1: "",
-    health_impact_level_2: "",
-    health_impact_level_3: "",
-    health_impact_codes: "",
-    investigation_type_codes: "",
-    investigation_finding_level_1: "",
-    investigation_finding_codes: "",
-    investigation_status: "",
-    causality_assessment: row.causality_assessment || "",
-    risk_assessment: row.risk_assessment || "",
-    regulatory_action: row.regulatory_action || "",
-    assessor_1_name: row.assessor_1_name || "",
-    date_assessment_1: row.date_assessment_1 || "",
-    assessor_2_name: row.assessor_2_name || "",
-    date_assessment_2: row.date_assessment_2 || "",
-    acknowledgement_feedback: row.acknowledgement_feedback || "",
-  }));
+  return rows.map((raw, idx) => {
+    const row = raw as RegisterQueryRow;
+    const f004 = mapF004ToRegisterCells(f004AnswersForRegister(row.final_payload, row.a1_payload));
+
+    return {
+      reportId: row.report_id,
+      sn: idx + 1,
+      tmda_report_number: cell(row.tmda_report_number),
+      date_received: cell(row.date_received),
+      device_brand_name: cell(row.device_brand_name),
+      device_common_name: cell(row.device_name),
+      size: cell(row.size),
+      batch_lot_serial_number: cell(row.batch_lot_serial_number),
+      device_type: cell(row.device_type),
+      manufacturing_date: cell(row.manufacturing_date),
+      expiry_date: cell(row.expiry_date),
+      manufacturer_name_address: cell(row.manufacturer_name_address),
+      manufacturing_country: cell(row.manufacturing_country),
+      supplier_name: cell(row.supplier_name),
+      event_description: cell(row.event_description),
+      date_onset_event: cell(row.date_onset_event),
+      date_report: cell(row.date_report),
+      event_location: cell(row.event_location),
+      region: cell(row.region),
+      reporter_details: formatReporterDetails(cell(row.reporter_name), cell(row.reporter_phone)),
+      event_seriousness: cell(row.event_seriousness),
+      assessor_1_name: cell(row.assessor_1_name),
+      date_assessment_1: cell(row.date_assessment_1),
+      assessor_2_name: cell(row.assessor_2_name),
+      date_assessment_2: cell(row.date_assessment_2),
+      ...f004,
+    };
+  });
 }
 
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
