@@ -63,5 +63,12 @@ export async function truncateAll(owner: Database): Promise<void> {
   // `reports` is in the list because the reports suite seeds one. It cascades to assessments and
   // attachments, so a seeded report cannot outlive the file that made it and turn up in another
   // suite's count.
-  await owner.execute(sql`TRUNCATE users, sessions, audit_log, reports RESTART IDENTITY CASCADE`);
+  //
+  // `report_counters` is in the list because it is not a child of `reports` (no foreign key, so
+  // CASCADE never reaches it) and yet every report number allocation reads it: leaving it behind
+  // would let one test's financial-year serial bleed into the next test's assertion about what
+  // that serial should be.
+  await owner.execute(
+    sql`TRUNCATE users, sessions, audit_log, reports, report_counters RESTART IDENTITY CASCADE`,
+  );
 }

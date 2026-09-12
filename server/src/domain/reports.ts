@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Database } from "../db/client.js";
-import { attachments, auditLog, reportCounters, reports } from "../db/schema/index.js";
+import { attachments, auditLog, reports } from "../db/schema/index.js";
 import type { Answers } from "./form-schema.js";
 import { normalizePhone } from "./phone.js";
 
@@ -107,9 +107,76 @@ export function severityOf(eventTypes: readonly string[]): Severity {
   return "other";
 }
 
-/** e.g. `MD-AE/2026/0179`. */
-export function formatReportNumber(year: number, issued: number): string {
-  return `MD-AE/${year}/${String(issued).padStart(4, "0")}`;
+/** The most reports a single financial year's three-digit serial can hold. */
+export const MAX_SERIAL = 999;
+
+/**
+ * Which financial year a date falls in, as `"YYYY-YY"`.
+ *
+ * The year runs 1 July - 30 June, so a report received on 30 June belongs to the year that is
+ * about to end and one received the next day already belongs to the new one.
+ */
+export function financialYearOf(date: Date): string {
+  const calendarYear = date.getUTCFullYear();
+  // Months are 0-indexed: 6 is July.
+  const startYear = date.getUTCMonth() >= 6 ? calendarYear : calendarYear - 1;
+  return `${startYear}-${String((startYear + 1) % 100).padStart(2, "0")}`;
+}
+
+/** e.g. `AEMD/2025-26/003`. */
+export function formatReportNumber(fy: string, serial: number): string {
+  return `AEMD/${fy}/${String(serial).padStart(3, "0")}`;
+}
+
+/**
+ * Reserves the next serial for `receivedAt`'s financial year and returns the number it makes.
+ *
+ * Never `SELECT max(...) + 1` as the allocation step itself — two concurrent callers would read
+ * the same max and collide on the unique index. The increment is a single atomic upsert instead:
+ * `INSERT ... ON CONFLICT DO UPDATE` takes the same row lock an `UPDATE` would, so a second caller
+ * for the same financial year blocks until the first commits and then increments what it left
+ * behind, rather than recomputing anything.
+ *
+ * The `max(...)` here runs only the first time a financial year is ever touched, to seed the
+ * counter from whatever AEMD numbers for that year already exist (e.g. carried over by a data
+ * migration) rather than assuming the year starts at 001. Every allocation after that first one
+ * takes the conflict branch and never re-reads `reports` at all.
+ *
+ * Called with the same `tx` that inserts the report row, so a failure anywhere later in that
+ * transaction rolls the reservation back with it — no number is ever burned by a report that did
+ * not end up existing.
+ */
+async function allocateReportNumber(tx: Transaction, receivedAt: Date): Promise<string> {
+  const fy = financialYearOf(receivedAt);
+  const prefix = `AEMD/${fy}/`;
+
+  const rows = await tx.execute(sql`
+    INSERT INTO report_counters (fy, last_serial)
+    VALUES (
+      ${fy},
+      1 + COALESCE(
+        (
+          SELECT max(substring(number from ${prefix.length + 1})::int)
+            FROM reports
+           WHERE number LIKE ${`${prefix}%`}
+        ),
+        0
+      )
+    )
+    ON CONFLICT (fy) DO UPDATE SET last_serial = report_counters.last_serial + 1
+    RETURNING last_serial
+  `);
+
+  const counter = rows[0] as { last_serial: number } | undefined;
+  if (counter === undefined) throw new Error("Could not reserve a report number");
+
+  if (counter.last_serial > MAX_SERIAL) {
+    throw new Error(
+      `Financial year ${fy} has already issued ${MAX_SERIAL} report numbers; cannot allocate another`,
+    );
+  }
+
+  return formatReportNumber(fy, counter.last_serial);
 }
 
 export type ValidationResult =
@@ -223,22 +290,10 @@ export async function storeReport(
   const now = filing.now ?? new Date();
   const channel = filing.channel ?? "online_form";
   const enteredByUserId = filing.enteredByUserId ?? null;
-  const year = now.getUTCFullYear();
 
   return db.transaction(async (tx) => {
     // Atomic: concurrent submissions each get their own number.
-    const [counter] = await tx
-      .insert(reportCounters)
-      .values({ year, issued: 1 })
-      .onConflictDoUpdate({
-        target: reportCounters.year,
-        set: { issued: sql`${reportCounters.issued} + 1` },
-      })
-      .returning({ issued: reportCounters.issued });
-
-    if (counter === undefined) throw new Error("Could not reserve a report number");
-
-    const number = formatReportNumber(year, counter.issued);
+    const number = await allocateReportNumber(tx, now);
 
     // Held until this transaction ends, and taken before the workload is counted rather than
     // after. Two filings landing together would otherwise both read the same counts, both decide
@@ -253,6 +308,10 @@ export async function storeReport(
       .values({
         number,
         channel,
+        // Same clock reading the number's financial year came from, rather than the database's
+        // own `now()` — otherwise a caller passing `filing.now` (as the tests do, to pin a report
+        // to a given financial year) would get a number for one year and a stored date in another.
+        receivedAt: now,
         severity: severityOf(submission.event_type),
         deviceName: submission.device_name,
         facility: submission.facility_address,

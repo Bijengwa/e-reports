@@ -3,6 +3,7 @@ import { firstIncompleteStep, pruneDependents, validateStep } from "../src/domai
 import { normalizePhone } from "../src/domain/phone.js";
 import {
   type Answers,
+  financialYearOf,
   formatReportNumber,
   severityOf,
   validateSubmission,
@@ -156,13 +157,27 @@ describe("severity", () => {
   });
 });
 
-describe("report numbers", () => {
-  it("pads the sequence to four digits", () => {
-    expect(formatReportNumber(2026, 179)).toBe("MD-AE/2026/0179");
-    expect(formatReportNumber(2026, 1)).toBe("MD-AE/2026/0001");
+describe("financial year", () => {
+  it("puts 30 June in the financial year that is ending", () => {
+    expect(financialYearOf(new Date("2026-06-30T23:59:59Z"))).toBe("2025-26");
   });
 
-  it("does not truncate once past four digits", () => {
-    expect(formatReportNumber(2026, 12345)).toBe("MD-AE/2026/12345");
+  it("puts 1 July in the new financial year", () => {
+    expect(financialYearOf(new Date("2026-07-01T00:00:00Z"))).toBe("2026-27");
+  });
+
+  it("wraps the ending year across a century boundary", () => {
+    expect(financialYearOf(new Date("2099-08-01T00:00:00Z"))).toBe("2099-00");
+  });
+});
+
+describe("report numbers", () => {
+  it("pads the serial to three digits", () => {
+    expect(formatReportNumber("2025-26", 3)).toBe("AEMD/2025-26/003");
+    expect(formatReportNumber("2025-26", 1)).toBe("AEMD/2025-26/001");
+  });
+
+  it("does not truncate once past three digits", () => {
+    expect(formatReportNumber("2025-26", 1234)).toBe("AEMD/2025-26/1234");
   });
 });

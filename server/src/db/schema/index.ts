@@ -174,15 +174,16 @@ export const reports = pgTable(
 );
 
 /**
- * Hands out the sequential part of a report number, one counter per year.
+ * Hands out the sequential part of a report number, one counter per financial year (1 July - 30
+ * June, keyed as e.g. `"2025-26"`).
  *
  * A `count(*) + 1` over `reports` would race: two reporters submitting at the same moment would
- * read the same count and one insert would die on the unique index. Incrementing a row and
+ * read the same count and one insert would die on the unique index. Upserting this row and
  * returning the new value is atomic, so concurrent submissions get distinct numbers.
  */
 export const reportCounters = pgTable("report_counters", {
-  year: integer("year").primaryKey(),
-  issued: integer("issued").notNull().default(0),
+  fy: text("fy").primaryKey(),
+  lastSerial: integer("last_serial").notNull().default(0),
 });
 
 export const assessments = pgTable(
