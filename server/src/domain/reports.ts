@@ -156,7 +156,7 @@ async function allocateReportNumber(tx: Transaction, receivedAt: Date): Promise<
       ${fy},
       1 + COALESCE(
         (
-          SELECT max(substring(number from ${prefix.length + 1})::int)
+          SELECT max(substring(number from ${prefix.length + 1}::int)::int)
             FROM reports
            WHERE number LIKE ${`${prefix}%`}
         ),
