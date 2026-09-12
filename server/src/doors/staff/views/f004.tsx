@@ -143,25 +143,17 @@ export type F004FormProps = {
    * resolver wrote it into the field the form reads.
    */
   resolvedNotes?: Record<string, string>;
-  /**
-   * A finished section 7.2 to print, with no secondary-assessment UI around it.
-   *
-   * For the approved final document, which carries the last assessor's concluding remarks but must
-   * not carry the agree/clarify/disagree blocks that `a2Review` drags through the whole form.
-   */
-  secondSection?: { answers: F004Answers; ordinal: number; signedOn: string };
   /** The manager's notes per section, keyed "1"…"8". Absent on the Officer's live form. */
   sectionComments?: Record<string, SectionComment[]>;
   /** Where a note on a given section is posted. Absent means the form draws no comment UI. */
   commentAction?: (section: string) => string;
   /**
-   * Leave every trace of a secondary assessment out of the document: 7.2, the second signature,
-   * and the masthead's own secondary-assessor cells.
+   * Leave every trace of a secondary assessment out of the document: the masthead's own
+   * secondary-assessor cells, and Section 8's secondary-assessor signature row.
    *
-   * For the one page that renders this form above a live section 7.2 — the second assessor's own.
-   * There the placeholder block would be a second, disabled copy of the box they are being asked
-   * to fill in, immediately above the real one, and a form that shows a field twice is a form
-   * whose reader has to work out which of the two counts.
+   * For A1's own live page, which has no secondary assessment yet and never writes one — a
+   * placeholder row there would imply a second assessor the report may never have, on a form the
+   * first assessor is trying to fill in.
    */
   omitSecond?: boolean;
   /**
@@ -236,95 +228,6 @@ function Sheet({
     <form method="POST" action={action ?? `/reports/${reportId}/assessment-1`} class="f4">
       {children}
     </form>
-  );
-}
-
-/**
- * Section 7.2 and the second signature: the same eleven actions and the same conclusion box as
- * 7.1, laid out the way the paper lays them out, under names of their own.
- *
- * Here rather than beside either page that draws it, because both do: the second assessor writes
- * it, and the manager reads it back once it is in. One copy of the markup is what keeps the record
- * the manager reads identical to the form the Officer filled.
- *
- * `locked` renders the submitted record — every control disabled, which is what stops a closed
- * assessment being edited by replaying the form, exactly as the document above it does.
- */
-export function F004Second({
-  answers,
-  signedOn,
-  locked,
-}: {
-  answers: F004Answers;
-  signedOn: string;
-  locked?: boolean;
-}): JSX.Element {
-  const chosen = list(answers, "actions_2");
-
-  return (
-    <div class="f4-section">
-      <div class="f4-block">
-        <p class="f4-note">Possible risk mitigation action(s):</p>
-        <div class="f4-ticks f4-11">
-          {ACTIONS.map((action) => (
-            <label class={chosen.includes(action.value) ? "f4-tick on" : "f4-tick"}>
-              <input
-                type="checkbox"
-                name="actions_2"
-                value={action.value}
-                checked={chosen.includes(action.value)}
-                disabled={locked}
-              />
-              <span>
-                <span class="f4-no" safe>
-                  {action.no}
-                </span>{" "}
-                <span safe>{action.label}</span>
-              </span>
-            </label>
-          ))}
-        </div>
-
-        <div class="f4-comment">
-          <label class="vh" for="conclusion_2">
-            Concluding remarks
-          </label>
-          <textarea
-            id="conclusion_2"
-            name="conclusion_2"
-            rows="6"
-            placeholder="Concluding remarks"
-            disabled={locked}
-            safe
-          >
-            {value(answers, "conclusion_2")}
-          </textarea>
-        </div>
-      </div>
-
-      <div class="f4-block">
-        <div class="f4-sign">
-          <div class="f4-field">
-            <label for="signature_2">Secondary assessor — type your name to sign</label>
-            <input
-              id="signature_2"
-              name="signature_2"
-              value={value(answers, "signature_2")}
-              autocomplete="off"
-              disabled={locked}
-            />
-            <p class="f4-note">
-              Typed, not uploaded. It must match the name above, which is the account you are signed
-              in as.
-            </p>
-          </div>
-          <div class="f4-field f4-muted">
-            <label for="assessed-on-2">Date</label>
-            <input id="assessed-on-2" value={signedOn} disabled />
-          </div>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -707,7 +610,6 @@ export function a2FillInOptions(item: A2ReviewItem): readonly { value: string; l
   if (item.key === "4.2") return CAUSALITY_OPTIONS;
   if (item.key === "5") return SIGNAL_OPTIONS;
   if (item.key === "6") return RISK_OPTIONS;
-  if (item.key === "7.1_actions") return ACTIONS;
   return [];
 }
 
@@ -1168,7 +1070,6 @@ export function F004Form({
   readOnly,
   documentMode,
   resolvedNotes,
-  secondSection,
   sectionComments,
   commentAction,
   omitSecond,
@@ -1194,6 +1095,9 @@ export function F004Form({
   const locked = submitted || readOnly === true;
   const writingA2 = a2Review !== undefined && !a2Review.submitted;
   const sheetLocked = locked && !writingA2;
+  // A1's own live, unsubmitted page: the one rendering with nobody's secondary assessment active
+  // and nothing of this assessor's own yet closed. Used only by Section 8's own signature button.
+  const writingA1 = a2Review === undefined && !locked;
 
   return (
     <>
@@ -1792,10 +1696,11 @@ export function F004Form({
               comments={sectionComments?.["7"]}
               action={commentAction?.("7")}
             />
+
             <div class="f4-block">
               <div class="f4-blocktitle">
-                <span class="f4-no">7.1</span> First assessor's recommendations and conclusion,
-                including proposed regulatory action(s)
+                <span class="f4-no">7.1</span> Assessor's recommendations and conclusion, including
+                proposed regulatory action(s)
               </div>
               <p class="f4-note">Possible risk mitigation action(s):</p>
               <div class="f4-ticks f4-11">
@@ -1858,78 +1763,6 @@ export function F004Form({
                 notes={resolvedNotes}
               />
             </div>
-
-            {/* 7.2 belongs to the second assessor. Shown so the document is recognisably the whole
-              form — the same eleven actions and a conclusion box, laid out exactly as 7.1 is — but
-              disabled and empty, and every control here carries no `name`. A disabled field is
-              not submitted regardless, but omitting the name too means there is no field in this
-              block the request body could ever carry a value under, whatever reaches the server. */}
-            {/* The real 7.2 once a secondary assessment owns this page: their own actions,
-                concluding remarks and signature, posting inside the same form their positions on
-                A1 post from. `F004Second` has existed since the form did and was rendered nowhere,
-                which is why every secondary assessment stored `conclusion = NULL`.
-
-                Locked once that assessment is submitted, so the manager reads back exactly what
-                was written. A1 passes `omitSecond` and gets none of it — 7.2 is not theirs. */}
-            {/* `isFinal` drops it on its own argument, separate from `omitSecond`'s: 7.2 is one
-                assessor's concluding remarks in their own name, and a concluded document that
-                carried them would be signing the office's position with an assessor's words. The
-                remarks are not deleted — they stay in `assessments` and in the approved snapshot,
-                readable by the manager on the report page. */}
-            {omitSecond || isFinal ? (
-              <></>
-            ) : secondSection !== undefined ? (
-              <div class="f4-block">
-                <div class="f4-blocktitle">
-                  <span class="f4-no">7.2</span>{" "}
-                  {`Secondary assessor (A${String(secondSection.ordinal)}) concluding remarks`}
-                </div>
-                <F004Second
-                  answers={secondSection.answers}
-                  signedOn={secondSection.signedOn}
-                  locked
-                />
-              </div>
-            ) : a2Review === undefined ? (
-              <div class="f4-block f4-locked">
-                <div class="f4-blocktitle">
-                  <span class="f4-no">7.2</span> Secondary assessor concluding remarks
-                </div>
-                <p class="f4-pending">Pending secondary assessment</p>
-                <div class="f4-ticks f4-11">
-                  {ACTIONS.map((action) => (
-                    <label class="f4-tick f4-tick-locked">
-                      <input type="checkbox" disabled />
-                      <span>
-                        <span class="f4-no" safe>
-                          {action.no}
-                        </span>{" "}
-                        <span safe>{action.label}</span>
-                      </span>
-                    </label>
-                  ))}
-                </div>
-                <div class="f4-field">
-                  <textarea
-                    rows="3"
-                    disabled
-                    placeholder="(To be completed by the secondary assessor upon review)"
-                  />
-                </div>
-              </div>
-            ) : (
-              <div class="f4-block">
-                <div class="f4-blocktitle">
-                  <span class="f4-no">7.2</span>{" "}
-                  {`Secondary assessor (A${String(a2Ordinal)}) concluding remarks`}
-                </div>
-                <F004Second
-                  answers={a2Review.review.second ?? {}}
-                  signedOn={a2Review.assessedOn ?? assessedOn}
-                  locked={a2Review.submitted}
-                />
-              </div>
-            )}
           </section>
 
           <section class="f4-section" id="section-8">
@@ -1966,28 +1799,104 @@ export function F004Form({
               </div>
             ) : (
               <div class="f4-sign">
-                <div class="f4-field">
-                  <label for="signature">1st Assessor — type your name to sign</label>
-                  <input
-                    id="signature"
-                    name="signature"
-                    value={value(answers, "signature")}
-                    placeholder={assessorName}
-                    autocomplete="off"
-                    disabled={locked}
-                  />
-                  <p class="f4-note">
-                    Typed, not uploaded. It must match the name above, which is the account you are
-                    signed in as.
-                  </p>
-                </div>
-                {!omitSecond && (
-                  <div class="f4-field f4-muted">
-                    <label for="signature-2">Secondary assessor</label>
-                    <input id="signature-2" value="" disabled placeholder="Not yet assessed" />
+                {/* A1's row: read-only once submitted, wherever this document is read — their
+                    own live page revisited, the secondary assessor's page, or the manager's. */}
+                {submitted && (
+                  <>
+                    <div class="f4-field">
+                      <span class="f4-k">Assessor (A1)</span>
+                      <span class="f4-v" safe>
+                        {assessorName}
+                      </span>
+                      <span class="f4-signed">Signed ✓</span>
+                    </div>
+                    <div class="f4-field">
+                      <span class="f4-k">Date</span>
+                      <span class="f4-v" safe>
+                        {assessedOn}
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                {/* A1's own live, unsubmitted page: nobody has typed a name here since Rev 05 —
+                    the button opens the password modal below, and the authenticated account is
+                    what ends up recorded once it confirms. See `resolveMine`/`assessmentRoutes`
+                    for the identity this signature actually comes from. */}
+                {writingA1 && (
+                  <div class="f4-field">
+                    <span class="f4-k">Assessor</span>
+                    <button type="button" class="btn" data-f4-sign-open>
+                      Sign assessment
+                    </button>
                   </div>
                 )}
+
+                {/* The secondary assessor's own row — whichever ordinal this rendering's
+                    secondary assessment actually is. Never drawn on A1's own page (`omitSecond`),
+                    read-only once submitted, and the same sign button as A1's own otherwise. */}
+                {!omitSecond &&
+                  (a2Review?.submitted === true ? (
+                    <>
+                      <div class="f4-field">
+                        <span class="f4-k" safe>{`Assessor (A${String(a2Ordinal)})`}</span>
+                        <span class="f4-v" safe>
+                          {a2Review.assessorName ?? "—"}
+                        </span>
+                        <span class="f4-signed">Signed ✓</span>
+                      </div>
+                      <div class="f4-field">
+                        <span class="f4-k">Date</span>
+                        <span class="f4-v" safe>
+                          {a2Review.assessedOn ?? "—"}
+                        </span>
+                      </div>
+                    </>
+                  ) : writingA2 ? (
+                    <div class="f4-field">
+                      <span class="f4-k">Assessor</span>
+                      <button type="button" class="btn" data-f4-sign-open>
+                        Sign assessment
+                      </button>
+                    </div>
+                  ) : (
+                    <div class="f4-field f4-muted">
+                      <span class="f4-k">Assessor</span>
+                      <span class="f4-v">Pending secondary assessment</span>
+                    </div>
+                  ))}
               </div>
+            )}
+
+            {/* The signing modal itself: one password field, verified server-side against the
+                authenticated account resolving this ordinal — never a typed name, and never the
+                old 7.2 field. `showModal()` is what supplies the backdrop, the focus trap and
+                Escape-to-close; see `f4-find.js`. Its own submit button is the form's real
+                `intent=submit` control — "Sign assessment" above only opens this. */}
+            {(writingA1 || writingA2) && (
+              <dialog class="modal" data-f4-sign-dialog aria-labelledby="f4-sign-title">
+                <div class="modal-body">
+                  <h2 id="f4-sign-title">Sign assessment</h2>
+                  <p class="hint">Enter your password to confirm your identity.</p>
+                  <div class="f4-field">
+                    <label for="signing_password">Password</label>
+                    <input
+                      type="password"
+                      id="signing_password"
+                      name="signing_password"
+                      autocomplete="current-password"
+                    />
+                  </div>
+                  <div class="bar modal-actions">
+                    <button type="button" class="btn ghost" data-f4-sign-cancel>
+                      Cancel
+                    </button>
+                    <button type="submit" name="intent" value="submit" class="btn">
+                      Confirm and sign
+                    </button>
+                  </div>
+                </div>
+              </dialog>
             )}
           </section>
         </fieldset>
@@ -2010,10 +1919,6 @@ export function F004Form({
             <button type="submit" name="intent" value="save" class="btn ghost">
               Save draft
             </button>
-            <div class="sp"></div>
-            <button type="submit" name="intent" value="submit" class="btn">
-              Submit assessment
-            </button>
           </div>
         ) : submitted ? (
           <p class="hint">
@@ -2021,15 +1926,11 @@ export function F004Form({
             who decides whether another assessor reviews it.
           </p>
         ) : (
-          // Only ever reached on the live path, where `Sheet` is a real form for these to submit.
+          // Only ever reached on the live path, where `Sheet` is a real form for this to submit.
           !locked && (
             <div class="bar f4-buttons">
               <button type="submit" name="intent" value="save" class="btn ghost">
                 Save draft
-              </button>
-              <div class="sp"></div>
-              <button type="submit" name="intent" value="submit" class="btn">
-                Submit assessment
               </button>
             </div>
           )
