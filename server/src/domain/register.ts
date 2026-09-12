@@ -70,14 +70,6 @@ function textOf(answers: F004Answers, key: string): string {
   return "";
 }
 
-/** Several preferred-term levels in one cell, dropping blanks rather than leaving gaps. */
-function joined(answers: F004Answers, keys: readonly string[]): string {
-  return keys
-    .map((key) => textOf(answers, key))
-    .filter((part) => part !== "")
-    .join("; ");
-}
-
 function optionLabel(options: readonly { value: string; label: string }[], stored: string): string {
   const trimmed = stored.trim();
   if (trimmed === "") return "";
@@ -189,29 +181,23 @@ export function mapF004ToRegisterCells(answers: F004Answers): RegisterAssessment
     health_impact_level_2: textOf(answers, "imdrf_health_impact_l2"),
     health_impact_level_3: textOf(answers, "imdrf_health_impact_l3"),
     health_impact_codes: textOf(answers, "imdrf_health_impact_code"),
+    // 3.3.1 type of investigation: F004 collects one preferred-term level + a code. The Register
+    // only has a codes column for this item (AL). There is no Type L1 preferred-term column.
     investigation_type_codes: textOf(answers, "imdrf_investigation_type_code"),
+    // 3.3.2 findings: L1, codes, then the worksheet's second "Finding Level 1" header (AO),
+    // which the Register stores as findings L2. Findings L3 has no Register column.
     investigation_finding_level_1: textOf(answers, "imdrf_investigation_findings_l1"),
     investigation_finding_codes: textOf(answers, "imdrf_investigation_findings_code"),
-    // AO is the worksheet's second "Finding Level 1" column. F004 findings have three preferred-
-    // term levels and only two Register columns after the codes, so L2 and L3 share AO rather
-    // than dropping L3.
-    investigation_finding_level_2: joined(answers, [
-      "imdrf_investigation_findings_l2",
-      "imdrf_investigation_findings_l3",
-    ]),
-    // AP is labelled "Type/Cause … Level 2". F004 3.3.1 only collects one preferred-term level
-    // for type of investigation; that term has no other Register column (AL is the codes).
-    investigation_type_cause_level_2: textOf(answers, "imdrf_investigation_type_l1"),
-    // F004 type of investigation has no level 3.
+    investigation_finding_level_2: textOf(answers, "imdrf_investigation_findings_l2"),
+    // AP/AQ are Type/Cause L2/L3. F004 3.3.1 has levels: 1, so there is no stored L2 or L3.
+    investigation_type_cause_level_2: "",
     investigation_type_cause_level_3: "",
+    // 3.3.3 conclusion: code + two preferred-term levels.
     investigation_conclusion_codes: textOf(answers, "imdrf_investigation_conclusion_code"),
     investigation_conclusion_level_1: textOf(answers, "imdrf_investigation_conclusion_l1"),
     investigation_conclusion_level_2: textOf(answers, "imdrf_investigation_conclusion_l2"),
-    // Official Done/Not Done is a distinct completion flag. F004 3.3 records the kind of
-    // investigation, 7.1.8 may propose a field investigation, and `assigned_for_work` means a
-    // manager assigned the follow-up work — none of those is "the investigation is done".
-    // `closed` was reserved for a later work-finished step and nothing writes it. Blank until
-    // the workflow records completion.
+    // AU1 cannot yet be populated because the current workflow has no persisted authoritative
+    // Investigation Done/Not Done field.
     investigation_status: "",
     causality_assessment: optionLabel(CAUSALITY_OPTIONS, value(answers, "causality")),
     risk_assessment: riskLabelOf(value(answers, "risk_level")),

@@ -66,50 +66,64 @@ describe("Register Type of Report", () => {
 describe("Register V–AW F004/IMDRF mapping", () => {
   const cells = mapF004ToRegisterCells(ANSWERS);
 
-  it("maps device component preferred terms and codes", () => {
+  it("maps F004 3.1.1 device component preferred terms and codes to V–Y", () => {
     expect(cells.device_component_level_1).toBe("Battery");
     expect(cells.device_component_level_2).toBe("Cell");
     expect(cells.device_component_level_3).toBe("Contact");
     expect(cells.device_component_codes).toBe("E1204");
   });
 
-  it("maps device problem preferred terms and codes", () => {
+  it("maps F004 3.1.2 device problem preferred terms and codes to Z–AC", () => {
     expect(cells.device_problem_level_1).toBe("Battery depletion");
     expect(cells.device_problem_level_2).toBe("Premature end of life");
     expect(cells.device_problem_level_3).toBe("Cannot charge");
     expect(cells.device_problem_codes).toBe("A0501");
   });
 
-  it("maps clinical sign preferred terms and codes from imdrf_clinical_signs_*", () => {
+  it("maps F004 3.2.2 clinical signs preferred terms and codes to AD–AG", () => {
     expect(cells.clinical_sign_level_1).toBe("None observed");
     expect(cells.clinical_sign_level_2).toBe("No rash");
     expect(cells.clinical_sign_level_3).toBe("No fever");
     expect(cells.clinical_sign_codes).toBe("E0101");
   });
 
-  it("maps health impact preferred terms and codes from imdrf_health_impact_*", () => {
+  it("maps F004 3.2.1 health impact preferred terms and codes to AH–AK", () => {
     expect(cells.health_impact_level_1).toBe("No clinical signs");
     expect(cells.health_impact_level_2).toBe("No deterioration");
     expect(cells.health_impact_level_3).toBe("Recovered");
     expect(cells.health_impact_codes).toBe("E2301");
   });
 
-  it("maps investigation type codes and the one preferred-term level F004 collects", () => {
+  it("maps F004 3.3.1 type of investigation to AL codes only", () => {
     expect(cells.investigation_type_codes).toBe("A05");
-    expect(cells.investigation_type_cause_level_2).toBe("Manufacturer investigation");
+    // F004 3.3.1 has one preferred-term level and no L2/L3. Type L1 is not AP.
+    expect(cells.investigation_type_cause_level_2).toBe("");
     expect(cells.investigation_type_cause_level_3).toBe("");
   });
 
-  it("maps investigation findings, keeping L3 rather than dropping it", () => {
+  it("maps F004 3.3.2 findings L1, codes, and L2 without combining L3 into AO", () => {
     expect(cells.investigation_finding_level_1).toBe("Cell fault confirmed");
     expect(cells.investigation_finding_codes).toBe("A0702");
-    expect(cells.investigation_finding_level_2).toBe("Separator tear; Internal short");
+    expect(cells.investigation_finding_level_2).toBe("Separator tear");
+    expect(cells.investigation_finding_level_2).not.toContain("Internal short");
   });
 
-  it("maps investigation conclusion preferred terms and codes", () => {
+  it("maps F004 3.3.3 conclusion preferred terms and codes", () => {
+    expect(cells.investigation_conclusion_codes).toBe("A0803");
     expect(cells.investigation_conclusion_level_1).toBe("Device to be replaced");
     expect(cells.investigation_conclusion_level_2).toBe("Lot withdrawn");
-    expect(cells.investigation_conclusion_codes).toBe("A0803");
+  });
+
+  it("does not put type of investigation L1 into Type/Cause Level 2 or findings L3 into Type/Cause columns", () => {
+    const squeezed = mapF004ToRegisterCells({
+      imdrf_investigation_type_l1: "Manufacturer investigation",
+      imdrf_investigation_type_code: "A05",
+      imdrf_investigation_findings_l3: "Internal short",
+    });
+    expect(squeezed.investigation_type_cause_level_2).toBe("");
+    expect(squeezed.investigation_type_cause_level_3).toBe("");
+    expect(squeezed.investigation_finding_level_2).toBe("");
+    expect(squeezed.investigation_type_codes).toBe("A05");
   });
 
   it("maps causality and risk as the Register's labels, not the stored values", () => {
@@ -125,12 +139,11 @@ describe("Register V–AW F004/IMDRF mapping", () => {
 });
 
 describe("Register investigation status", () => {
-  it("is not fabricated from IMDRF investigation fields being filled", () => {
+  it("stays blank because the workflow has no Done/Not Done field", () => {
     expect(mapF004ToRegisterCells(ANSWERS).investigation_status).toBe("");
-  });
-
-  it("is not fabricated as Not Done when investigation fields are empty", () => {
     expect(mapF004ToRegisterCells({}).investigation_status).toBe("");
+    expect(mapF004ToRegisterCells(ANSWERS).investigation_status).not.toBe("Done");
+    expect(mapF004ToRegisterCells({}).investigation_status).not.toBe("Not Done");
   });
 });
 
