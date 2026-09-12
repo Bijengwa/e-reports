@@ -125,9 +125,10 @@ function post(url: string, cookie: string, form: Record<string, string>) {
 }
 
 /** Everything a submission must carry, so a case can leave one out on purpose. */
-function completeAssessment(signature: string, over: Record<string, string> = {}) {
+function completeAssessment(over: Record<string, string> = {}) {
   return {
     intent: "submit",
+    signing_password: PASSWORD,
     device_type: "md",
     registration_number: "TMDA-REG-0001",
     device_class: "B",
@@ -165,7 +166,6 @@ function completeAssessment(signature: string, over: Record<string, string> = {}
     c6: "Serious outcome with an unresolved cause.",
     actions: "monitoring",
     conclusion: "Recommend risk communication and enhanced monitoring.",
-    signature,
     ...over,
   };
 }
@@ -421,11 +421,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("submitting", () => {
     await post(url, officer.cookie, { intent: "save", conclusion: "Draft." });
 
     // Everything but the risk level, which a submission may not go without.
-    const res = await post(
-      url,
-      officer.cookie,
-      completeAssessment(officer.name, { risk_level: "" }),
-    );
+    const res = await post(url, officer.cookie, completeAssessment({ risk_level: "" }));
 
     expect(res.statusCode).toBe(422);
     expect(res.body).toContain("Risk assessment is required");
@@ -442,7 +438,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("submitting", () => {
     const res = await post(
       `/reports/${report.id}/assessment-1`,
       officer.cookie,
-      completeAssessment(officer.name, { signal_status: "" }),
+      completeAssessment({ signal_status: "" }),
     );
 
     expect(res.statusCode).toBe(422);
@@ -463,7 +459,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("submitting", () => {
     const res = await post(
       `/reports/${report.id}/assessment-1`,
       officer.cookie,
-      completeAssessment(officer.name, { signal_status: "signal" }),
+      completeAssessment({ signal_status: "signal" }),
     );
 
     expect(res.statusCode).toBe(302);
@@ -480,7 +476,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("submitting", () => {
     const res = await post(
       `/reports/${report.id}/assessment-1`,
       officer.cookie,
-      completeAssessment(officer.name, { signal_status: "not_signal" }),
+      completeAssessment({ signal_status: "not_signal" }),
     );
 
     expect(res.statusCode).toBe(302);
@@ -491,16 +487,32 @@ describe.skipIf(!INTEGRATION_ENABLED)("submitting", () => {
     expect(row.submitted_at).not.toBeNull();
   });
 
-  it("refuses a signature that is not the assessor's own name", async () => {
+  it("refuses to sign with the wrong password", async () => {
     const { officer, report } = await assigned();
 
     const res = await post(
       `/reports/${report.id}/assessment-1`,
       officer.cookie,
-      completeAssessment("Somebody Else"),
+      completeAssessment({ signing_password: "not the right password" }),
     );
 
     expect(res.statusCode).toBe(422);
+    expect(res.body).toContain("Incorrect password");
+    expect(await assessmentCount()).toBe(0);
+    expect((await theReport()).status).toBe("received");
+  });
+
+  it("refuses to sign with no password at all", async () => {
+    const { officer, report } = await assigned();
+
+    const res = await post(
+      `/reports/${report.id}/assessment-1`,
+      officer.cookie,
+      completeAssessment({ signing_password: "" }),
+    );
+
+    expect(res.statusCode).toBe(422);
+    expect(res.body).toContain("Enter your password");
     expect(await assessmentCount()).toBe(0);
     expect((await theReport()).status).toBe("received");
   });
@@ -511,7 +523,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("submitting", () => {
     const res = await post(
       `/reports/${report.id}/assessment-1`,
       officer.cookie,
-      completeAssessment(officer.name),
+      completeAssessment(),
     );
 
     expect(res.statusCode).toBe(302);
@@ -529,13 +541,13 @@ describe.skipIf(!INTEGRATION_ENABLED)("submitting", () => {
     const { officer, report } = await assigned();
     const url = `/reports/${report.id}/assessment-1`;
 
-    await post(url, officer.cookie, completeAssessment(officer.name));
+    await post(url, officer.cookie, completeAssessment());
     const first = (await assessments())[0];
 
     const again = await post(
       url,
       officer.cookie,
-      completeAssessment(officer.name, { conclusion: "Changed my mind." }),
+      completeAssessment({ conclusion: "Changed my mind." }),
     );
 
     expect(again.statusCode).toBe(403);
@@ -548,11 +560,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("submitting", () => {
   it("names the Officer in the trail", async () => {
     const { officer, report } = await assigned();
 
-    await post(
-      `/reports/${report.id}/assessment-1`,
-      officer.cookie,
-      completeAssessment(officer.name),
-    );
+    await post(`/reports/${report.id}/assessment-1`, officer.cookie, completeAssessment());
 
     const rows = await owner.db.execute(sql`
       SELECT actor_user_id FROM audit_log WHERE action = 'assessment.submitted'
@@ -571,11 +579,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("what the Officer sees afterwards", () => 
 
     expect((await get("/dashboard", officer.cookie)).body).toContain(report.number);
 
-    await post(
-      `/reports/${report.id}/assessment-1`,
-      officer.cookie,
-      completeAssessment(officer.name),
-    );
+    await post(`/reports/${report.id}/assessment-1`, officer.cookie, completeAssessment());
 
     const dashboard = (await get("/dashboard", officer.cookie)).body;
 

@@ -149,9 +149,10 @@ function fileAtThePublicDoor() {
 }
 
 /** Everything a first assessment must carry to be submitted rather than merely saved. */
-function completeAssessment(signature: string) {
+function completeAssessment() {
   return {
     intent: "submit",
+    signing_password: PASSWORD,
     device_type: "md",
     registration_number: "TMDA-REG-0001",
     device_class: "B",
@@ -186,7 +187,6 @@ function completeAssessment(signature: string) {
     c6: "Serious outcome with an unresolved cause.",
     actions: "monitoring",
     conclusion: "Recommend risk communication and enhanced monitoring.",
-    signature,
   };
 }
 
@@ -259,7 +259,7 @@ async function waiting(): Promise<Waiting> {
   const submitted = await post(
     `/reports/${filed.id}/assessment-1`,
     officer.cookie,
-    completeAssessment(officer.name),
+    completeAssessment(),
   );
   expect(submitted.statusCode).toBe(302);
 
@@ -460,7 +460,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("who the picker offers", () => {
     const submitted = await post(
       `/reports/${filed.id}/assessment-1`,
       officer.cookie,
-      completeAssessment(officer.name),
+      completeAssessment(),
     );
     expect(submitted.statusCode).toBe(302);
 

@@ -136,9 +136,10 @@ function fileAtThePublicDoor() {
  * 1.11 beside it is filled, and must be: the paper marks 1.10 "(If applicable)" and does not mark
  * the device class at all, so an assessment cannot be submitted without one.
  */
-function completeAssessment(signature: string) {
+function completeAssessment() {
   return {
     intent: "submit",
+    signing_password: PASSWORD,
     device_type: "md",
     registration_number: "",
     device_class: "B",
@@ -173,7 +174,6 @@ function completeAssessment(signature: string) {
     c6: "Serious outcome with an unresolved cause.",
     actions: "monitoring",
     conclusion: "Recommend risk communication and enhanced monitoring.",
-    signature,
   };
 }
 
@@ -184,7 +184,7 @@ function completeAssessment(signature: string) {
  * offers the three degrees for it. `validateSecondaryReviewForSubmit` must not ask for one either,
  * whichever ordinal is writing. 1.11 beside it does carry one, A1 having answered it.
  */
-function completeSecondary(signature = "", overrides: Record<string, string> = {}) {
+function completeSecondary(overrides: Record<string, string> = {}) {
   return {
     intent: "submit",
     "a2_degree_1.3": "agree",
@@ -207,11 +207,11 @@ function completeSecondary(signature = "", overrides: Record<string, string> = {
     a2_degree_6: "agree",
     "a2_degree_7.1_actions": "agree",
     "a2_degree_7.1_conclusion": "agree",
-    // 7.2 — this assessor's own concluding remarks, actions and signature. Required on submit
-    // since the secondary assessment started collecting its own half of the F004.
+    // Section 7 — this assessor's own concluding remarks, actions and signature. Required on
+    // submit since the secondary assessment started collecting its own half of the F004.
     actions_2: "monitoring",
     conclusion_2: "Concur with the first assessment subject to the noted correction.",
-    signature_2: signature,
+    signing_password: PASSWORD,
     ...overrides,
   };
 }
@@ -286,7 +286,7 @@ async function afterFirstAssessment() {
   const submitted = await post(
     `/reports/${filed.id}/assessment-1`,
     first.cookie,
-    completeAssessment(first.name),
+    completeAssessment(),
   );
   expect(submitted.statusCode).toBe(302);
   expect(await statusOf(filed.id)).toBe("awaiting_second_assessor");
@@ -329,7 +329,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
       const sent = await post(
         `/reports/${report.id}/secondary-assessment`,
         officer.cookie,
-        completeSecondary(officer.name, {
+        completeSecondary({
           "a2_degree_2.6": "disagree",
           "a2_value_2.6": "non_serious",
           "a2_statement_2.6": `A${ordinal} disagrees with the first assessor on 2.6.`,
@@ -387,7 +387,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
     expect(queue.body).toContain(report.number);
     expect(queue.body).toContain("<td>A2</td>");
 
-    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary(second.name));
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
     await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
       assessor_id: third.id,
       comment: "One more opinion, please.",
@@ -424,7 +424,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
     await post(
       `/reports/${report.id}/secondary-assessment`,
       second.cookie,
-      completeSecondary(second.name, {
+      completeSecondary({
         "a2_degree_2.5": "disagree",
         "a2_value_2.5": "labelling",
         "a2_statement_2.5": "The labelling is the likelier source.",
@@ -450,7 +450,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
     const sent = await post(
       `/reports/${report.id}/secondary-assessment`,
       third.cookie,
-      completeSecondary(third.name, {
+      completeSecondary({
         "a2_degree_2.5": "agree",
         "a2_degree_2.7": "disagree",
         "a2_value_2.7": "yes",
@@ -491,7 +491,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
       assessor_id: second.id,
       comment: "First secondary review, please.",
     });
-    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary(second.name));
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
 
     await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
       assessor_id: third.id,
@@ -542,7 +542,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
     expect(a2Page.body).toContain('<span class="a2-opt-k">A2</span>');
     expect(a2Page.body).not.toContain('<span class="a2-opt-k">A3</span>');
 
-    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary(second.name));
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
     await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
       assessor_id: third.id,
       comment: "Second opinion, please.",
@@ -565,7 +565,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
     await post(
       `/reports/${report.id}/secondary-assessment`,
       second.cookie,
-      completeSecondary(second.name, { "a2_value_1.10": "TMDA-REG-0002" }),
+      completeSecondary({ "a2_value_1.10": "TMDA-REG-0002" }),
     );
 
     await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
@@ -575,7 +575,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
     await post(
       `/reports/${report.id}/secondary-assessment`,
       third.cookie,
-      completeSecondary(third.name, { "a2_value_1.10": "TMDA-REG-0003" }),
+      completeSecondary({ "a2_value_1.10": "TMDA-REG-0003" }),
     );
 
     const rows = await assessmentsOf(report.id);
@@ -605,13 +605,13 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
       assessor_id: second.id,
       comment: "Please review the first assessment.",
     });
-    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary(second.name));
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
 
     await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
       assessor_id: third.id,
       comment: "Not satisfied - one more opinion, please.",
     });
-    await post(`/reports/${report.id}/secondary-assessment`, third.cookie, completeSecondary(third.name));
+    await post(`/reports/${report.id}/secondary-assessment`, third.cookie, completeSecondary());
 
     const decisions = await decisionsOf(report.id);
     expect(decisions).toHaveLength(2);
@@ -652,7 +652,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
       assessor_id: second.id,
       comment: "Please review it.",
     });
-    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary(second.name));
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
     expect(await statusOf(report.id)).toBe("awaiting_decision");
 
     const assigned = await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
@@ -687,7 +687,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
       assessor_id: second.id,
       comment: "Please review it.",
     });
-    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary(second.name));
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
 
     // The same Officer again, and the first assessor: both already hold an assessment here.
     for (const who of [second, first]) {
@@ -711,7 +711,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
       assessor_id: second.id,
       comment: "Please review it.",
     });
-    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary(second.name));
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
 
     // A report already reviewed once: another round has to say why, so the next assessor knows
     // what they are being asked to look at.
@@ -795,14 +795,14 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
       assessor_id: second.id,
       comment: "Please review it.",
     });
-    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary(second.name));
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
 
     const before = await assessmentsOf(report.id);
 
     const again = await post(
       `/reports/${report.id}/secondary-assessment`,
       second.cookie,
-      completeSecondary(second.name, { "a2_degree_2.5": "disagree", "a2_value_2.5": "labelling" }),
+      completeSecondary({ "a2_degree_2.5": "disagree", "a2_value_2.5": "labelling" }),
     );
 
     expect(again.statusCode).toBe(403);
@@ -821,7 +821,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
     await post(
       `/reports/${report.id}/secondary-assessment`,
       second.cookie,
-      completeSecondary(second.name, {
+      completeSecondary({
         "a2_degree_2.6": "disagree",
         "a2_value_2.6": "non_serious",
         "a2_statement_2.6": "Not serious on these facts.",
@@ -835,7 +835,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
     await post(
       `/reports/${report.id}/secondary-assessment`,
       third.cookie,
-      completeSecondary(third.name, {
+      completeSecondary({
         "a2_degree_2.6": "clarification",
         "a2_statement_2.6": "Please confirm the intervention that was required.",
       }),
@@ -846,9 +846,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the secondary-assessment chain", () => {
     // One F004, not three: the document is rendered once and each assessor's position is folded
     // in beside the item it is about. Matched on the form's own official title, which is what the
     // masthead prints — see `F004_TITLE`.
-    expect(
-      body.match(/Adverse Events \/ Incidents of Medical Devices/g) ?? [],
-    ).toHaveLength(1);
+    expect(body.match(/Adverse Events \/ Incidents of Medical Devices/g) ?? []).toHaveLength(1);
 
     // Both findings are on the page, each attributable to its own assessor.
     expect(body).toContain("Not serious on these facts.");
@@ -913,7 +911,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the Officer's own queue, in three states"
 
     // A draft, not a submission.
     const saved = await post(`/reports/${filed.id}/assessment-1`, mine.cookie, {
-      ...completeAssessment(mine.name),
+      ...completeAssessment(),
       intent: "save",
     });
     expect(saved.statusCode).toBe(302);
@@ -951,7 +949,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the Officer's own queue, in three states"
     const saved = await post(
       `/reports/${report.id}/secondary-assessment`,
       second.cookie,
-      completeSecondary(second.name, { intent: "save" }),
+      completeSecondary({ intent: "save" }),
     );
     expect(saved.statusCode).toBe(302);
 
@@ -961,7 +959,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the Officer's own queue, in three states"
     expect(working).toContain("<td>A2</td>");
 
     // Sent on. "Submitted" means submitted, whatever the ordinal — it used to mean "A1 submitted".
-    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary(second.name));
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
 
     const done = (await get("/assessments", second.cookie)).body;
     expect(done).toContain('In progress <span class="mya-count">0</span>');
@@ -1003,7 +1001,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("what a decision does to the manager's sta
       assessor_id: second.id,
       comment: "Please review it.",
     });
-    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary(second.name));
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
 
     // Now both, side by side under one heading, which is the whole of the Decision stage.
     const afterSecond = (await get(`/reports/${report.id}`, manager.cookie)).body;
@@ -1024,7 +1022,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("what a decision does to the manager's sta
       assessor_id: second.id,
       comment: "Please review it.",
     });
-    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary(second.name));
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
 
     // Waiting on the manager, in the one state that means that.
     const waiting = (await get("/workload?stage=decision", manager.cookie)).body;
@@ -1057,7 +1055,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("what a decision does to the manager's sta
       assessor_id: second.id,
       comment: "Please review it.",
     });
-    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary(second.name));
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
 
     await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
       officer_id: worker.id,
@@ -1122,7 +1120,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("a Disagree that repeats A1's own answer",
     const refused = await post(
       `/reports/${report.id}/secondary-assessment`,
       second.cookie,
-      completeSecondary(second.name, {
+      completeSecondary({
         "a2_degree_2.6": "disagree",
         "a2_value_2.6": "serious",
         "a2_statement_2.6": "Posted straight at the route.",
@@ -1145,7 +1143,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("a Disagree that repeats A1's own answer",
     const refused = await post(
       `/reports/${report.id}/secondary-assessment`,
       second.cookie,
-      completeSecondary(second.name, {
+      completeSecondary({
         "a2_degree_4.3": "disagree",
         "a2_value_4.3": "Temporal relationship with device use; no other cause identified.",
         "a2_statement_4.3": "Retyped word for word.",
@@ -1168,7 +1166,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("a Disagree that repeats A1's own answer",
     const accepted = await post(
       `/reports/${report.id}/secondary-assessment`,
       second.cookie,
-      completeSecondary(second.name, {
+      completeSecondary({
         "a2_degree_2.6": "disagree",
         "a2_value_2.6": "non_serious",
         "a2_statement_2.6": "None of the four seriousness criteria is met on this record.",

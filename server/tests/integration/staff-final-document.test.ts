@@ -126,9 +126,10 @@ function fileAtThePublicDoor() {
 }
 
 /** A1's F004, complete and submittable. 2.6 is `serious`, with a comment box beside it. */
-function completeAssessment(signature: string) {
+function completeAssessment() {
   return {
     intent: "submit",
+    signing_password: PASSWORD,
     device_type: "md",
     registration_number: "",
     device_class: "B",
@@ -163,12 +164,11 @@ function completeAssessment(signature: string) {
     c6: "Serious outcome with an unresolved cause.",
     actions: "monitoring",
     conclusion: "Recommend risk communication and enhanced monitoring.",
-    signature,
   };
 }
 
 /** A secondary review that agrees with everything, unless an override says otherwise. */
-function completeSecondary(signature = "", overrides: Record<string, string> = {}) {
+function completeSecondary(overrides: Record<string, string> = {}) {
   return {
     intent: "submit",
     "a2_degree_1.3": "agree",
@@ -191,11 +191,11 @@ function completeSecondary(signature = "", overrides: Record<string, string> = {
     a2_degree_6: "agree",
     "a2_degree_7.1_actions": "agree",
     "a2_degree_7.1_conclusion": "agree",
-    // 7.2 — this assessor's own concluding remarks, actions and signature. Required on submit
-    // since the secondary assessment started collecting its own half of the F004.
+    // Section 7 — this assessor's own concluding remarks, actions and signature. Required on
+    // submit since the secondary assessment started collecting its own half of the F004.
     actions_2: "monitoring",
     conclusion_2: "Concur with the first assessment subject to the noted correction.",
-    signature_2: signature,
+    signing_password: PASSWORD,
     ...overrides,
   };
 }
@@ -275,7 +275,7 @@ async function afterFirstAssessment() {
   const submitted = await post(
     `/reports/${report.id}/assessment-1`,
     first.cookie,
-    completeAssessment(first.name),
+    completeAssessment(),
   );
   expect(submitted.statusCode).toBe(302);
 
@@ -311,7 +311,7 @@ async function approvedReport(label: string) {
   const [secondAssessor, worker] = rest;
   if (secondAssessor === undefined || worker === undefined) throw new Error("need two Officers");
 
-  await post(`/reports/${report.id}/assessment-1`, a1.cookie, completeAssessment(a1.name));
+  await post(`/reports/${report.id}/assessment-1`, a1.cookie, completeAssessment());
   await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
     assessor_id: secondAssessor.id,
     comment: "Please review it.",
@@ -319,7 +319,7 @@ async function approvedReport(label: string) {
   await post(
     `/reports/${report.id}/secondary-assessment`,
     secondAssessor.cookie,
-    completeSecondary(secondAssessor.name),
+    completeSecondary(),
   );
   const approved = await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
     officer_id: worker.id,
@@ -356,11 +356,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
       assessor_id: second.id,
       comment: "Please review it.",
     });
-    await post(
-      `/reports/${report.id}/secondary-assessment`,
-      second.cookie,
-      completeSecondary(second.name),
-    );
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
 
     // A2 is in too. Still nothing: submitting an assessment is not approving one.
     expect(await snapshotOf(report.id)).toBeNull();
@@ -393,7 +389,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
     await post(
       `/reports/${report.id}/secondary-assessment`,
       second.cookie,
-      completeSecondary(second.name, {
+      completeSecondary({
         "a2_degree_4.1": "disagree",
         "a2_value_4.1": "expected",
         "a2_statement_4.1": "Listed in the manufacturer's IFU.",
@@ -415,7 +411,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
     await post(
       `/reports/${report.id}/secondary-assessment`,
       third.cookie,
-      completeSecondary(third.name, {
+      completeSecondary({
         a2_degree_6: "disagree",
         a2_value_6: "medium",
         a2_statement_6: "Cause identified, but the lot is still in the field.",
@@ -475,7 +471,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
     await post(
       `/reports/${report.id}/secondary-assessment`,
       second.cookie,
-      completeSecondary(second.name, {
+      completeSecondary({
         "a2_degree_2.6": "disagree",
         "a2_value_2.6": "non_serious",
         "a2_statement_2.6": "Outpatient review only.",
@@ -505,11 +501,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
       assessor_id: second.id,
       comment: "Please review it.",
     });
-    await post(
-      `/reports/${report.id}/secondary-assessment`,
-      second.cookie,
-      completeSecondary(second.name),
-    );
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
     await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
       officer_id: worker.id,
     });
@@ -538,7 +530,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
     await post(
       `/reports/${report.id}/secondary-assessment`,
       second.cookie,
-      completeSecondary(second.name, {
+      completeSecondary({
         a2_degree_6: "disagree",
         a2_value_6: "low",
         a2_statement_6: "Isolated incident with a known cause.",
@@ -621,11 +613,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
       assessor_id: second.id,
       comment: "Please review it.",
     });
-    await post(
-      `/reports/${report.id}/secondary-assessment`,
-      second.cookie,
-      completeSecondary(second.name),
-    );
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
     await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
       officer_id: worker.id,
     });
@@ -718,11 +706,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
       assessor_id: second.id,
       comment: "Please review it.",
     });
-    await post(
-      `/reports/${report.id}/secondary-assessment`,
-      second.cookie,
-      completeSecondary(second.name),
-    );
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
     await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
       officer_id: worker.id,
     });
@@ -761,11 +745,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
       assessor_id: second.id,
       comment: "Please review it.",
     });
-    await post(
-      `/reports/${report.id}/secondary-assessment`,
-      second.cookie,
-      completeSecondary(second.name),
-    );
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
     await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
       officer_id: worker.id,
     });
@@ -844,11 +824,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
     expect(midway.statusCode).toBe(403);
     expect(await snapshotOf(report.id)).toBeNull();
 
-    await post(
-      `/reports/${report.id}/secondary-assessment`,
-      second.cookie,
-      completeSecondary(second.name),
-    );
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
     expect(await statusOf(report.id)).toBe("awaiting_decision");
 
     // Now it is approvable, and the document is written.
@@ -875,11 +851,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
       assessor_id: second.id,
       comment: "Please review it.",
     });
-    await post(
-      `/reports/${report.id}/secondary-assessment`,
-      second.cookie,
-      completeSecondary(second.name),
-    );
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
     await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
       officer_id: worker.id,
     });
@@ -941,11 +913,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
       assessor_id: second.id,
       comment: "Please review it.",
     });
-    await post(
-      `/reports/${report.id}/secondary-assessment`,
-      second.cookie,
-      completeSecondary(second.name),
-    );
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
     await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
       officer_id: worker.id,
     });

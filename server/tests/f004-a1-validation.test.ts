@@ -14,9 +14,12 @@ import {
  * no reasoning behind it. The rules are read off `SECONDARY_REVIEW_ITEMS`, so the cases here are
  * driven from that metadata rather than from a second copy of the field names, which is the whole
  * point of validating from it.
+ *
+ * The signature itself is no longer this module's business: it is a password now, verified
+ * against the signed-in account by the route, which needs the database and so is out of scope for
+ * a pure-function suite like this one. Section 7's own two requirements — at least one mitigation
+ * action, and a conclusion whenever the assessor's outcome is Agree — are, and are covered below.
  */
-
-const ASSESSOR = "Asha Mrema";
 
 /** Every item's answer AND the comment the paper prints beside it. The baseline that must pass. */
 const COMPLETE: F004Answers = {
@@ -41,7 +44,6 @@ const COMPLETE: F004Answers = {
   c6: "Serious outcome and an unresolved cause.",
   actions: ["monitoring"],
   conclusion: "Recommend risk communication and enhanced monitoring.",
-  signature: ASSESSOR,
 };
 
 /** The same, minus the named fields. */
@@ -52,7 +54,7 @@ function without(...fields: string[]): F004Answers {
 }
 
 function fieldsFlagged(answers: F004Answers): string[] {
-  return validateForSubmit(answers, ASSESSOR).map((issue) => issue.field);
+  return validateForSubmit(answers).map((issue) => issue.field);
 }
 
 /** Every item whose answer the paper pairs with a comment box, read from the metadata itself. */
@@ -112,7 +114,7 @@ function filledWith(row: ImdrfBoxes): F004Answers {
 
 describe("a complete first assessment", () => {
   it("is accepted", () => {
-    expect(validateForSubmit(COMPLETE, ASSESSOR)).toEqual([]);
+    expect(validateForSubmit(COMPLETE)).toEqual([]);
   });
 
   it("leaves every optional item untouched, and is still accepted", () => {
@@ -120,7 +122,7 @@ describe("a complete first assessment", () => {
     for (const item of OPTIONAL_ITEMS) {
       for (const field of item.a1Fields) expect(COMPLETE[field]).toBeUndefined();
     }
-    expect(validateForSubmit(COMPLETE, ASSESSOR)).toEqual([]);
+    expect(validateForSubmit(COMPLETE)).toEqual([]);
   });
 
   it("pairs a comment box with more than one answer", () => {
@@ -133,7 +135,7 @@ describe("an answer without the comment beside it", () => {
     "is refused for %s",
     (_label, item) => {
       const commentField = item.commentField as string;
-      const issues = validateForSubmit(without(commentField), ASSESSOR);
+      const issues = validateForSubmit(without(commentField));
 
       expect(issues.map((issue) => issue.field)).toContain(commentField);
       expect(issues.some((issue) => issue.message.startsWith(item.no))).toBe(true);
@@ -167,7 +169,7 @@ describe("a missing answer", () => {
   });
 
   it("does not also demand the comment, which would be two complaints about one gap", () => {
-    const issues = validateForSubmit(without("seriousness", "c2_6"), ASSESSOR);
+    const issues = validateForSubmit(without("seriousness", "c2_6"));
     const forItem = issues.filter((issue) => issue.message.startsWith("2.6"));
 
     expect(forItem).toHaveLength(1);
@@ -190,30 +192,26 @@ describe('an "(If applicable)" item', () => {
 
   it("is accepted when it is filled in completely", () => {
     expect(
-      validateForSubmit(
-        { ...COMPLETE, imdrf_component_l1: "Battery", imdrf_component_code: "E1204" },
-        ASSESSOR,
-      ),
+      validateForSubmit({
+        ...COMPLETE,
+        imdrf_component_l1: "Battery",
+        imdrf_component_code: "E1204",
+      }),
     ).toEqual([]);
   });
 
   it("does not demand the deeper terminology levels the paper leaves open", () => {
     expect(
-      validateForSubmit(
-        {
-          ...COMPLETE,
-          imdrf_device_problem_l1: "Battery depletion",
-          imdrf_device_problem_code: "A0501",
-        },
-        ASSESSOR,
-      ),
+      validateForSubmit({
+        ...COMPLETE,
+        imdrf_device_problem_l1: "Battery depletion",
+        imdrf_device_problem_code: "A0501",
+      }),
     ).toEqual([]);
   });
 
   it("is accepted when 1.10 is filled, having no comment box to owe", () => {
-    expect(
-      validateForSubmit({ ...COMPLETE, registration_number: "TMDA-REG-0001" }, ASSESSOR),
-    ).toEqual([]);
+    expect(validateForSubmit({ ...COMPLETE, registration_number: "TMDA-REG-0001" })).toEqual([]);
   });
 });
 
@@ -241,14 +239,14 @@ describe('an IMDRF group the paper marks "(If applicable)"', () => {
     "is accepted with %s left completely blank",
     (_boxes, row) => {
       for (const field of row.fields) expect(COMPLETE[field]).toBeUndefined();
-      expect(validateForSubmit(COMPLETE, ASSESSOR)).toEqual([]);
+      expect(validateForSubmit(COMPLETE)).toEqual([]);
     },
   );
 
   it.each(
     OPTIONAL_IMDRF.flatMap((row) => row.fields.map((field) => [row.boxes, field, row] as const)),
   )("is refused when %s carries %s and nothing else", (_boxes, field, row) => {
-    const issues = validateForSubmit({ ...COMPLETE, [field]: "Battery depletion" }, ASSESSOR);
+    const issues = validateForSubmit({ ...COMPLETE, [field]: "Battery depletion" });
 
     // One complaint, and it names a box of this row: starting a group is starting all of it.
     expect(issues).toHaveLength(1);
@@ -258,7 +256,7 @@ describe('an IMDRF group the paper marks "(If applicable)"', () => {
   it.each(OPTIONAL_IMDRF.map((row) => [row.boxes, row] as const))(
     "is accepted with %s filled to every level it carries",
     (_boxes, row) => {
-      expect(validateForSubmit(filledWith(row), ASSESSOR)).toEqual([]);
+      expect(validateForSubmit(filledWith(row))).toEqual([]);
     },
   );
 
@@ -269,10 +267,7 @@ describe('an IMDRF group the paper marks "(If applicable)"', () => {
       const code = row.fields[row.fields.length - 1] as string;
 
       expect(
-        validateForSubmit(
-          { ...COMPLETE, [level1]: "Battery depletion", [code]: "A0501" },
-          ASSESSOR,
-        ),
+        validateForSubmit({ ...COMPLETE, [level1]: "Battery depletion", [code]: "A0501" }),
       ).toEqual([]);
     },
   );
@@ -365,12 +360,9 @@ describe("the required IMDRF row, 3.3.1 Type of Investigation with its coding at
   });
 });
 
-describe("the signature", () => {
-  it("is still required", () => {
-    expect(fieldsFlagged(without("signature"))).toContain("signature");
-  });
-
-  it("must still be the assessor's own name", () => {
-    expect(fieldsFlagged({ ...COMPLETE, signature: "Someone Else" })).toContain("signature");
-  });
-});
+/**
+ * Section 7's own outcome: Agree, Disagree or Required clarification, chosen once for the whole
+ * conclusion rather than per item. Agree is what every fixture above already is — `outcome` is
+ * absent from `COMPLETE`, and absent reads exactly as Agree, which is what let every case above
+ * keep asserting a conclusion is required without knowing this field exists at all.
+ */

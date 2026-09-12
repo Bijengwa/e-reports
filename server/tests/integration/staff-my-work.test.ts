@@ -134,9 +134,10 @@ function fileAtThePublicDoor(deviceName: string) {
 }
 
 /** A submitted F004, filled in enough to pass `validateForSubmit`. */
-function completeAssessment(signature: string) {
+function completeAssessment() {
   return {
     intent: "submit",
+    signing_password: PASSWORD,
     device_type: "md",
     registration_number: "",
     device_class: "B",
@@ -171,12 +172,11 @@ function completeAssessment(signature: string) {
     c6: "Serious outcome with an unresolved cause.",
     actions: "monitoring",
     conclusion: "Recommend risk communication and enhanced monitoring.",
-    signature,
   };
 }
 
 /** A complete secondary review: Agree on every one of A1's answers. */
-function completeSecondary(signature = "") {
+function completeSecondary() {
   return {
     intent: "submit",
     "a2_degree_1.3": "agree",
@@ -199,11 +199,11 @@ function completeSecondary(signature = "") {
     a2_degree_6: "agree",
     "a2_degree_7.1_actions": "agree",
     "a2_degree_7.1_conclusion": "agree",
-    // 7.2 — this assessor's own concluding remarks, actions and signature. Required on submit
-    // since the secondary assessment started collecting its own half of the F004.
+    // Section 7 — this assessor's own concluding remarks, actions and signature. Required on
+    // submit since the secondary assessment started collecting its own half of the F004.
     actions_2: "monitoring",
     conclusion_2: "Concur with the first assessment subject to the noted correction.",
-    signature_2: signature,
+    signing_password: PASSWORD,
   };
 }
 
@@ -254,16 +254,12 @@ async function assignedForWork(deviceName = "Philips IntelliVue MX450"): Promise
   const [second, worker] = pool.filter((s) => s.id !== first.id);
   if (second === undefined || worker === undefined) throw new Error("need two more Officers");
 
-  await post(`/reports/${filed.id}/assessment-1`, first.cookie, completeAssessment(first.name));
+  await post(`/reports/${filed.id}/assessment-1`, first.cookie, completeAssessment());
   await post(`/reports/${filed.id}/assign-next-assessor`, manager.cookie, {
     assessor_id: second.id,
     comment: "Please take the second assessment.",
   });
-  await post(
-    `/reports/${filed.id}/secondary-assessment`,
-    second.cookie,
-    completeSecondary(second.name),
-  );
+  await post(`/reports/${filed.id}/secondary-assessment`, second.cookie, completeSecondary());
 
   await post(`/reports/${filed.id}/assign-work-officer`, manager.cookie, {
     officer_id: worker.id,
