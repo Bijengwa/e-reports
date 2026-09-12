@@ -31,6 +31,36 @@
       });
     }
 
+    /* ---- sign assessment dialog -------------------------------------------- */
+
+    // Same idiom as the staff shell's own sign-out dialog (see rail.js): a native <dialog>,
+    // opened with showModal() for the backdrop, the focus trap and Escape-to-close it buys for
+    // free, and closed by its own default if the script never runs. The password field inside it
+    // is a real descendant of the F004's <form> — a <dialog> does not start a new form scope — so
+    // "Confirm and sign" submits the whole assessment exactly as "Save draft" does.
+
+    var signOpen = document.querySelector("[data-f4-sign-open]");
+    var signDialog = document.querySelector("[data-f4-sign-dialog]");
+    var signCancel = document.querySelector("[data-f4-sign-cancel]");
+
+    if (signOpen && signDialog && typeof signDialog.showModal === "function") {
+      signOpen.addEventListener("click", function () {
+        signDialog.showModal();
+      });
+
+      if (signCancel) {
+        signCancel.addEventListener("click", function () {
+          signDialog.close();
+        });
+      }
+
+      // Clicking the backdrop means the click's target is the dialog itself, never one of its
+      // children — see the note on `.modal-body` padding in app.css.
+      signDialog.addEventListener("click", function (event) {
+        if (event.target === signDialog) signDialog.close();
+      });
+    }
+
     /* ---- section nav active state ------------------------------------------ */
 
     var jumpLinks = document.querySelectorAll(".f4-jump-links a");
