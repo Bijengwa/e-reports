@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
+import { verifyPassword } from "../../../auth/password.js";
 import {
   collect,
   collectSecondaryReview,
@@ -12,10 +13,10 @@ import {
   prefillDeviceRows,
   prefillEventRows,
   validateForSubmit,
-  validateSecondaryForSubmit,
   validateSecondaryReviewForSubmit,
   value,
 } from "../../../domain/f004.js";
+import { notifyAssessmentSubmitted } from "../../../notifications/index.js";
 import { currentSession } from "../session-guard.js";
 import { Assessment1Page } from "../views/assessment.js";
 import { ForbiddenPage } from "../views/forbidden.js";
@@ -62,6 +63,38 @@ async function loadDraft(app: FastifyInstance, reportId: string): Promise<Draft>
     submittedOn:
       row.submitted_at === null ? null : new Date(row.submitted_at).toISOString().slice(0, 10),
   };
+}
+
+/**
+ * The one check the old typed-name signature used to make, done properly: the password of the
+ * account the session actually is, never a name typed into the page and compared as text.
+ *
+ * Reuses the exact pattern `change-password` already verifies a current password with — the same
+ * column, the same `verifyPassword`, no second authentication mechanism invented beside it. Returns
+ * an `Issue` rather than throwing, so a wrong password reads exactly like any other reason this
+ * assessment cannot be submitted yet: back to the same page, with the reason and nothing lost.
+ */
+async function verifySigningPassword(
+  app: FastifyInstance,
+  userId: string,
+  posted: Record<string, string | string[]>,
+): Promise<Issue | null> {
+  const password = value(posted, "signing_password");
+
+  if (password.trim() === "") {
+    return { field: "signing_password", message: "Enter your password to sign." };
+  }
+
+  const rows = await app.db.execute(sql`
+    SELECT password_hash FROM users WHERE id = ${userId}
+  `);
+  const row = rows[0] as { password_hash: string } | undefined;
+
+  if (row === undefined || !(await verifyPassword(row.password_hash, password))) {
+    return { field: "signing_password", message: "Incorrect password. Try again." };
+  }
+
+  return null;
 }
 
 export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
@@ -114,7 +147,12 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
     const answers = collect(posted);
     const submitting = value(posted, "intent") === "submit";
 
-    const issues: Issue[] = submitting ? validateForSubmit(answers, session.fullName) : [];
+    const issues: Issue[] = submitting ? validateForSubmit(answers) : [];
+
+    if (submitting && issues.length === 0) {
+      const passwordIssue = await verifySigningPassword(app, session.userId, posted);
+      if (passwordIssue !== null) issues.push(passwordIssue);
+    }
 
     const page = (status: 200 | 422, shown: readonly Issue[]) =>
       reply
@@ -134,6 +172,11 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
         );
 
     if (issues.length > 0) return page(422, issues);
+
+    // The authenticated account is the signature now, not whatever name was typed — there is no
+    // longer a `signature` input on the page at all. Stamped only on a real submission: a draft
+    // carries no signature, the same as it always carried none until this assessor was ready.
+    if (submitting) answers.signature = session.fullName;
 
     const conclusion = value(answers, "conclusion").trim();
     const assessorId = found.assessor1UserId;
@@ -174,6 +217,17 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
       { report: found.report.number, ordinal: FIRST_ASSESSMENT, submitted: submitting },
       "assessment saved",
     );
+
+    if (submitting) {
+      await notifyAssessmentSubmitted(request.log, {
+        reportNumber: found.report.number,
+        ordinal: FIRST_ASSESSMENT,
+        officerName: session.fullName,
+        officerEmail: session.email,
+        submittedOn: today(),
+        reportUrl: `${request.protocol}://${request.hostname}/reports/${found.report.id}`,
+      });
+    }
 
     return reply.redirect(
       submitting ? `/reports/${found.report.id}` : `/reports/${found.report.id}/assessment-1`,
@@ -276,16 +330,16 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
     const answers = collectSecondaryReview(posted, first.answers);
     const submitting = value(posted, "intent") === "submit";
 
-    // Both halves of a secondary assessment: the positions on A1, and this assessor's own 7.2.
-    // `validateSecondaryForSubmit` has existed since the form did and was never called — 7.2 was
-    // rendered nowhere and stored as NULL, so a secondary assessment could be submitted without
-    // the concluding remarks and signature the paper F004 asks every assessor for.
+    // Every reviewable item, Section 7's own actions and conclusion included — the same
+    // agree/disagree/clarify position on each that sections 1-6 already ask for.
     const issues: Issue[] = submitting
-      ? [
-          ...validateSecondaryReviewForSubmit(answers, first.answers),
-          ...validateSecondaryForSubmit(answers.second ?? {}, session.fullName),
-        ]
+      ? validateSecondaryReviewForSubmit(answers, first.answers)
       : [];
+
+    if (submitting && issues.length === 0) {
+      const passwordIssue = await verifySigningPassword(app, session.userId, posted);
+      if (passwordIssue !== null) issues.push(passwordIssue);
+    }
 
     if (issues.length > 0) {
       const priorReviews = found.secondaryAssessments
@@ -326,11 +380,24 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
 
     const assessorId = session.userId;
 
-    // The column the schema has always described as "7.1 for the first assessor, 7.2 for the
-    // second". It held NULL for every secondary assessment because nothing collected 7.2; now
-    // that something does, the column says what it was always meant to say. The payload carries
-    // the same text plus the actions and the signature beside it.
-    const conclusion = value(answers.second ?? {}, "conclusion_2").trim();
+    // The authenticated account is the signature now, not whatever name was typed — there is no
+    // longer a `signature_2` input on the page at all. Stamped only on a real submission, into
+    // this assessor's own half of the payload, exactly as A1's own signature is stamped above.
+    if (submitting) {
+      answers.second = { ...(answers.second ?? {}), signature_2: session.fullName };
+    }
+
+    // This assessor's position on 7.1's own conclusion, read the same way the Final Document's
+    // resolver reads it: Agree leaves A1's words standing, so there is nothing new to file under
+    // this ordinal; Disagree's replacement and Required clarification's statement are both prose
+    // for this one item, so either is the row's own "conclusion" when either was given.
+    const conclusionResponse = answers.responses["7.1_conclusion"];
+    const conclusion =
+      conclusionResponse?.degree === "disagree"
+        ? (typeof conclusionResponse.value === "string" ? conclusionResponse.value : "").trim()
+        : conclusionResponse?.degree === "clarification"
+          ? (conclusionResponse.statement ?? "").trim()
+          : "";
 
     await app.db.transaction(async (tx) => {
       await tx.execute(sql`
@@ -364,6 +431,17 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
       { report: found.report.number, ordinal, submitted: submitting },
       "secondary assessment saved",
     );
+
+    if (submitting) {
+      await notifyAssessmentSubmitted(request.log, {
+        reportNumber: found.report.number,
+        ordinal,
+        officerName: session.fullName,
+        officerEmail: session.email,
+        submittedOn: today(),
+        reportUrl: `${request.protocol}://${request.hostname}/reports/${found.report.id}`,
+      });
+    }
 
     return reply.redirect(
       submitting
