@@ -144,17 +144,9 @@ export type SecondaryReviewPayload = {
   kind: "a2_section_review";
   responses: Record<string, SecondaryReviewResponse>;
   /**
-   * Section 7.2 — this assessor's own concluding remarks, actions and signature.
-   *
-   * The other half of a secondary assessment, and a different kind of thing from `responses`:
-   * those are positions on what A1 wrote, this is what this assessor concludes in their own name.
-   * The paper F004 prints both, 7.1 for the first assessor and 7.2 for the second, and every
-   * secondary assessment in the chain fills its own 7.2 — A3's is A3's, not a rewrite of A2's.
-   *
-   * Held in the payload rather than in new columns because `assessments.payload` is already this
-   * assessment's document and the three fields are already named by `F004_SECONDARY_FIELDS`. The
-   * `conclusion` column is written alongside it with the same text, which is what the schema has
-   * always said that column is for: 7.1 at ordinal 1, 7.2 above it.
+   * This assessor's own signature. Their position on 7.1's actions and conclusion is not held
+   * here — it is their reaction to A1's, the same as every other item, and lives in `responses`
+   * under `"7.1_actions"`/`"7.1_conclusion"` like the rest. See `F004_SECONDARY_FIELDS`.
    */
   second?: F004Answers;
 };
@@ -931,7 +923,7 @@ function imdrfMissing(item: A2ReviewItem, answers: F004Answers): string | undefi
  * their name to is not the same document. It is checked against the signed-in name rather than
  * accepted as free text, because it is a confirmation, not a field.
  */
-export function validateForSubmit(answers: F004Answers, assessorName: string): Issue[] {
+export function validateForSubmit(answers: F004Answers): Issue[] {
   const issues: Issue[] = [];
 
   for (const item of SECONDARY_REVIEW_ITEMS) {
@@ -971,15 +963,10 @@ export function validateForSubmit(answers: F004Answers, assessorName: string): I
     }
   }
 
-  const signature = value(answers, "signature").trim();
-  if (signature === "") {
-    issues.push({ field: "signature", message: "Sign by typing your name to confirm." });
-  } else if (signature.toLowerCase() !== assessorName.trim().toLowerCase()) {
-    issues.push({
-      field: "signature",
-      message: `The signature must be your own name, exactly as "${assessorName}".`,
-    });
-  }
+  // The signature itself is not this function's business any longer. It used to be a typed name
+  // compared against the signed-in Officer's; it is now a password, verified against that same
+  // Officer's account, which needs the database and so is checked in the route before this
+  // assessment is stored — see `assessmentRoutes`.
 
   return issues;
 }
@@ -1018,18 +1005,14 @@ export const F004_FIELDS: readonly string[] = [
 ];
 
 /**
- * Every field the second assessment owns: section 7.2 and the second assessor's signature.
- *
- * Named apart from 7.1's `actions`, `conclusion` and `signature` rather than reusing those under a
- * different ordinal. A report's two assessments are two rows read onto one page, and a shared name
- * is all it would take for the second assessor's remarks to render as the first's — different
- * names make that mix-up inexpressible rather than merely avoided.
+ * The second assessment's own signature. A position on 7.1's own actions and conclusion is not
+ * this assessor's document to keep separately — it is their reaction to A1's, exactly like every
+ * other item, recorded in `responses["7.1_actions"]`/`responses["7.1_conclusion"]` alongside the
+ * rest. This is the one thing left that belongs to this assessor and no earlier one: their own
+ * signature, distinct from `assessments.assessor_id` only in that it is part of the document
+ * itself rather than metadata about the row.
  */
-export const F004_SECONDARY_FIELDS: readonly string[] = [
-  "actions_2",
-  "conclusion_2",
-  "signature_2",
-];
+export const F004_SECONDARY_FIELDS: readonly string[] = ["signature_2"];
 
 /** Keep what the named set owns and drop the rest, so a payload is the document and nothing else. */
 function keep(fields: Record<string, string | string[]>, names: readonly string[]): F004Answers {
@@ -1103,9 +1086,9 @@ export function collectSecondaryReview(
         : { degree, value: postedValue(item, fields), statement };
   }
 
-  // 7.2, through the same collector A1's own fields go through. Always present, even empty: a
-  // draft is allowed to be as blank as the assessor likes, and `validateSecondaryForSubmit` is
-  // what decides whether it is finished enough to submit.
+  // This assessor's own signature, through the same collector A1's own fields go through. Always
+  // present, even empty: a draft carries no signature yet, and the route stamps the real one in
+  // only once the password behind it verifies.
   return { kind: "a2_section_review", responses, second: collectSecondary(fields) };
 }
 
@@ -1208,34 +1191,6 @@ export function normalizeSecondaryReview(payload: unknown): SecondaryReviewPaylo
   }
 
   return { kind: "a2_section_review", responses, second };
-}
-
-/**
- * What a second submission must carry.
- *
- * The same shape of rule as `validateForSubmit`, over the second assessor's half: the concluding
- * remarks the rest of the process reads, and the signature that makes it their finding rather than
- * an anonymous one. The eleven actions are optional here exactly as they are in 7.1 — a second
- * assessor who proposes no new action has still concluded.
- */
-export function validateSecondaryForSubmit(answers: F004Answers, assessorName: string): Issue[] {
-  const issues: Issue[] = [];
-
-  if (value(answers, "conclusion_2").trim() === "") {
-    issues.push({ field: "conclusion_2", message: "7.2 Concluding remarks are required." });
-  }
-
-  const signature = value(answers, "signature_2").trim();
-  if (signature === "") {
-    issues.push({ field: "signature_2", message: "Sign by typing your name to confirm." });
-  } else if (signature.toLowerCase() !== assessorName.trim().toLowerCase()) {
-    issues.push({
-      field: "signature_2",
-      message: `The signature must be your own name, exactly as "${assessorName}".`,
-    });
-  }
-
-  return issues;
 }
 
 /**

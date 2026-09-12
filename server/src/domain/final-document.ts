@@ -84,7 +84,7 @@ export type FinalDocument = {
   kind: typeof FINAL_DOCUMENT_KIND;
   /** The resolved answers, in the first assessor's own field vocabulary. */
   answers: F004Answers;
-  /** One entry per review item, keyed by the item's own key — "2.6", "7.1_conclusion". */
+  /** One entry per review item, keyed by the item's own key — "2.6", "4.2". */
   provenance: Record<string, FinalProvenance>;
   /**
    * Section 7.2, as the last assessor in the chain concluded it.
