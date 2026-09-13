@@ -82,7 +82,8 @@ let reportSeq = 0;
 async function seedA1(
   officerId: string,
   state: "not-started" | "in-progress" | "submitted",
-): Promise<void> {
+  over: { assignedAt?: string; dueAt?: string } = {},
+): Promise<string> {
   reportSeq += 1;
   const rows = await owner.db.execute(sql`
     INSERT INTO reports (number, channel, severity, status, device_name, form_version, payload,
@@ -93,16 +94,30 @@ async function seedA1(
   `);
   const reportId = (rows[0] as { id: string }).id;
 
-  if (state === "not-started") return;
+  // A genuinely not-started assignment with no assignment metadata to assert on keeps matching the
+  // production shape it stands in for: no `assessments` row at all until the Officer's first save.
+  if (state === "not-started" && over.assignedAt === undefined && over.dueAt === undefined) {
+    return reportId;
+  }
+
+  const payload =
+    state === "submitted"
+      ? sql`'{"c2_5":"answered"}'::jsonb`
+      : state === "in-progress"
+        ? sql`'{"c2_5":"draft"}'::jsonb`
+        : sql`'{}'::jsonb`;
 
   await owner.db.execute(sql`
-    INSERT INTO assessments (report_id, assessor_id, ordinal, form_version, payload, submitted_at)
+    INSERT INTO assessments (report_id, assessor_id, ordinal, form_version, payload, submitted_at,
+                             assigned_at, due_at)
     VALUES (
-      ${reportId}, ${officerId}, 1, 'F004',
-      ${state === "submitted" ? sql`'{"c2_5":"answered"}'::jsonb` : sql`'{"c2_5":"draft"}'::jsonb`},
-      ${state === "submitted" ? sql`now()` : sql`NULL`}
+      ${reportId}, ${officerId}, 1, 'F004', ${payload},
+      ${state === "submitted" ? sql`now()` : sql`NULL`},
+      ${over.assignedAt ?? null}, ${over.dueAt ?? null}
     )
   `);
+
+  return reportId;
 }
 
 function get(url: string, cookie: string) {
@@ -157,5 +172,51 @@ describe.skipIf(!INTEGRATION_ENABLED)("the My assessments summary sentence", () 
     await seedA1(officer.id, "in-progress");
     const body = (await get("/assessments", officer.cookie)).body;
     expect(body).toContain("1 assessment assigned to you");
+  });
+});
+
+describe.skipIf(!INTEGRATION_ENABLED)("the Officer's own assignment/deadline timeline", () => {
+  beforeEach(start);
+
+  it("shows the assignment date and a live countdown for an in-progress assessment", async () => {
+    const officer = await signedInAssessor();
+    await seedA1(officer.id, "in-progress", {
+      assignedAt: "2026-08-19T09:00:00Z",
+      dueAt: "2099-01-01T00:00:00Z",
+    });
+
+    const body = (await get("/assessments", officer.cookie)).body;
+
+    // Same ISO date form `day()` prints across every staff queue.
+    expect(body).toContain("2026-08-19");
+    // Reuses the shared Countdown component rather than a second implementation.
+    expect(body).toContain('class="countdown countdown-on-track"');
+  });
+
+  it("reads an overdue assessment through the same Countdown component, not a duplicate", async () => {
+    const officer = await signedInAssessor();
+    await seedA1(officer.id, "in-progress", {
+      assignedAt: "2026-08-19T09:00:00Z",
+      dueAt: "2020-01-01T00:00:00Z",
+    });
+
+    const body = (await get("/assessments", officer.cookie)).body;
+
+    expect(body).toContain('class="countdown countdown-overdue"');
+    expect(body).toContain("OVERDUE");
+  });
+
+  it("shows the completed date instead of a countdown once submitted", async () => {
+    const officer = await signedInAssessor();
+    await seedA1(officer.id, "submitted", {
+      assignedAt: "2026-08-19T09:00:00Z",
+      dueAt: "2026-08-22T09:00:00Z",
+    });
+
+    const body = (await get("/assessments", officer.cookie)).body;
+
+    expect(body).toMatch(/Completed: \d{4}-\d{2}-\d{2}/);
+    // Not a live countdown against a deadline that no longer matters.
+    expect(body).not.toContain('class="countdown countdown-on-track"');
   });
 });

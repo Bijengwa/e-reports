@@ -259,12 +259,14 @@ async function seedAssessment(
   reportId: string,
   assessorId: string,
   ordinal: number,
-  over: { submitted?: boolean } = {},
+  over: { submitted?: boolean; assignedAt?: string; dueAt?: string } = {},
 ): Promise<void> {
   await owner.db.execute(sql`
-    INSERT INTO assessments (report_id, assessor_id, ordinal, form_version, payload, submitted_at)
+    INSERT INTO assessments (report_id, assessor_id, ordinal, form_version, payload, submitted_at,
+                             assigned_at, due_at)
     VALUES (${reportId}, ${assessorId}, ${ordinal}, 'F004', '{"7.1":"seeded"}'::jsonb,
-            ${over.submitted ? sql`now()` : sql`NULL`})
+            ${over.submitted ? sql`now()` : sql`NULL`},
+            ${over.assignedAt ?? null}, ${over.dueAt ?? null})
   `);
 }
 
@@ -830,6 +832,85 @@ describe.skipIf(!INTEGRATION_ENABLED)("what each state holds", () => {
     expect(body).toContain("MD-AE/2026/9150");
     expect(body).not.toContain("MD-AE/2026/9151");
     expect(rowCount(body)).toBe(1);
+  });
+});
+
+describe.skipIf(!INTEGRATION_ENABLED)("the assignment/deadline timeline columns", () => {
+  beforeEach(start);
+
+  it("shows a dash for both columns when nobody has been named", async () => {
+    const manager = await signedInAs("manager", "Grace Mollel");
+    await seedReport({ number: "MD-AE/2026/9300" });
+
+    const body = (await get("/workload", manager.cookie)).body;
+
+    expect(body).toContain("Unassigned");
+    // The row after "Unassigned" carries neither an assignment date nor a deadline.
+    expect(body).toMatch(/Unassigned<\/span>\s*<\/td>\s*<td>—<\/td>\s*<td>—<\/td>/);
+  });
+
+  it("shows the assignment date and a live countdown for an assigned, unsubmitted assessment", async () => {
+    const manager = await signedInAs("manager", "Grace Mollel");
+    const officer = await signedInAs("assessor", "Asha Mrema");
+
+    const id = await seedReport({
+      number: "MD-AE/2026/9301",
+      status: "first_assessment",
+      assessor1: officer.id,
+    });
+    await seedAssessment(id, officer.id, 1, {
+      assignedAt: "2026-08-19T09:00:00Z",
+      dueAt: "2099-01-01T00:00:00Z",
+    });
+
+    const body = (await get("/workload", manager.cookie)).body;
+
+    // Same written-date form the rest of this page already uses.
+    expect(body).toContain("19 Aug 2026");
+    // The shared Countdown component — not a second implementation of it.
+    expect(body).toContain('class="countdown countdown-on-track"');
+    expect(body).toContain('data-due-at="2099-01-01T00:00:00.000Z"');
+  });
+
+  it("reads an overdue assessment through the same Countdown component", async () => {
+    const manager = await signedInAs("manager", "Grace Mollel");
+    const officer = await signedInAs("assessor", "Asha Mrema");
+
+    const id = await seedReport({
+      number: "MD-AE/2026/9302",
+      status: "first_assessment",
+      assessor1: officer.id,
+    });
+    await seedAssessment(id, officer.id, 1, {
+      assignedAt: "2026-08-19T09:00:00Z",
+      dueAt: "2020-01-01T00:00:00Z",
+    });
+
+    const body = (await get("/workload", manager.cookie)).body;
+
+    expect(body).toContain('class="countdown countdown-overdue"');
+    expect(body).toContain("OVERDUE");
+  });
+
+  it("marks a submitted assessment completed rather than counting down", async () => {
+    const manager = await signedInAs("manager", "Grace Mollel");
+    const officer = await signedInAs("assessor", "Asha Mrema");
+
+    const id = await seedReport({
+      number: "MD-AE/2026/9303",
+      status: "awaiting_decision",
+      assessor1: officer.id,
+    });
+    await seedAssessment(id, officer.id, 1, {
+      submitted: true,
+      assignedAt: "2026-08-19T09:00:00Z",
+      dueAt: "2026-08-22T09:00:00Z",
+    });
+
+    const body = (await get("/workload", manager.cookie)).body;
+
+    expect(body).toContain('class="countdown countdown-completed"');
+    expect(body).toContain(">Completed<");
   });
 });
 

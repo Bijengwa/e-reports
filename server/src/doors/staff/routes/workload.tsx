@@ -43,6 +43,9 @@ function toRow(row: unknown): WorkloadRow {
     status: string;
     current_ordinal: number;
     current_assessor_name: string | null;
+    current_assigned_at: Date | null;
+    current_due_at: Date | null;
+    current_submitted_at: Date | null;
   };
 
   return {
@@ -54,6 +57,10 @@ function toRow(row: unknown): WorkloadRow {
     status: report.status,
     currentOrdinal: report.current_ordinal,
     currentAssessorName: report.current_assessor_name,
+    currentAssignedAt: report.current_assigned_at === null ? null : new Date(report.current_assigned_at),
+    currentDueAt: report.current_due_at === null ? null : new Date(report.current_due_at),
+    currentSubmittedAt:
+      report.current_submitted_at === null ? null : new Date(report.current_submitted_at),
   };
 }
 
@@ -123,11 +130,14 @@ export async function workloadRoutes(app: FastifyInstance): Promise<void> {
     const rows = await app.db.execute(sql`
       SELECT r.id, r.number, r.received_at, r.device_name, r.severity, r.status::text AS status,
              coalesce(cur.ordinal, 1) AS current_ordinal,
-             coalesce(cur.full_name, a1.full_name) AS current_assessor_name
+             coalesce(cur.full_name, a1.full_name) AS current_assessor_name,
+             coalesce(cur.assigned_at, r.assessor1_assigned_at) AS current_assigned_at,
+             cur.due_at AS current_due_at,
+             cur.submitted_at AS current_submitted_at
         FROM reports r
         LEFT JOIN users a1 ON a1.id = r.assessor1_user_id
         LEFT JOIN LATERAL (
-          SELECT a.ordinal, u.full_name
+          SELECT a.ordinal, u.full_name, a.assigned_at, a.due_at, a.submitted_at
             FROM assessments a
             JOIN users u ON u.id = a.assessor_id
            WHERE a.report_id = r.id

@@ -1,3 +1,4 @@
+import { Countdown } from "./countdown.js";
 import { SEVERITY_LABELS, severityTone } from "./reports.js";
 import { StaffShell } from "./shell.js";
 
@@ -198,6 +199,13 @@ export type WorkloadRow = {
   status: string;
   currentOrdinal: number;
   currentAssessorName: string | null;
+  /** When the current assessment was handed out. Null exactly when `currentAssessorName` is. */
+  currentAssignedAt: Date | null;
+  /** The current assessment's own deadline, for the same `Countdown` every other page reads it
+   *  with. Null means no deadline was set — a state `Countdown` already renders as "No deadline". */
+  currentDueAt: Date | null;
+  /** When the current assessment was submitted, or null while it is still outstanding. */
+  currentSubmittedAt: Date | null;
 };
 
 export type WorkloadPageProps = {
@@ -297,6 +305,8 @@ export function WorkloadPage({
                 <th>Severity</th>
                 <th>Assessment</th>
                 <th>Assessor</th>
+                <th>Assigned</th>
+                <th>Deadline</th>
                 <th>Status</th>
                 <th>Action</th>
               </tr>
@@ -329,6 +339,20 @@ export function WorkloadPage({
                       <span class="hint">Unassigned</span>
                     ) : (
                       <span safe>{row.currentAssessorName}</span>
+                    )}
+                  </td>
+                  {/* Both blank together with the assessor: an unassigned report has neither an
+                      assignment date nor a deadline yet, and a dash says so without a stray
+                      "No deadline" reading as if someone had been named. */}
+                  <td>{row.currentAssignedAt === null ? "—" : day(row.currentAssignedAt)}</td>
+                  <td>
+                    {row.currentAssessorName === null ? (
+                      "—"
+                    ) : (
+                      <Countdown
+                        dueAt={row.currentDueAt}
+                        completed={row.currentSubmittedAt !== null}
+                      />
                     )}
                   </td>
                   <td>

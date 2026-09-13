@@ -69,6 +69,11 @@ export type AssignmentRow = {
   ordinal: number;
   state: AssignmentState;
   dueAt: Date | null;
+  /** When this assignment was handed out. Null only for a legacy row from before assignment
+   *  metadata was recorded. */
+  assignedAt: Date | null;
+  /** When this assignment was submitted, or null while it is still outstanding. */
+  completedAt: Date | null;
   /**
    * Whether this Officer may still open the report page behind the number.
    *
@@ -137,6 +142,7 @@ function AssignmentRows({
             <th>Assessment</th>
             <th>Assessor</th>
             <th>Status</th>
+            <th>Assigned</th>
             <th>Deadline</th>
             <th>Action</th>
           </tr>
@@ -171,8 +177,13 @@ function AssignmentRows({
                   {STATE_LABELS[row.state]}
                 </span>
               </td>
+              <td>{row.assignedAt === null ? "—" : day(row.assignedAt)}</td>
               <td>
-                <Countdown dueAt={row.dueAt} completed={row.state === "submitted"} />
+                {row.state === "submitted" && row.completedAt !== null ? (
+                  <span class="hint" safe>{`Completed: ${day(row.completedAt)}`}</span>
+                ) : (
+                  <Countdown dueAt={row.dueAt} completed={row.state === "submitted"} />
+                )}
               </td>
               <td>
                 <a href={assignmentHref(row)} class="btn ghost btn-sm" safe>
