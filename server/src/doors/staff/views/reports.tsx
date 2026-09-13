@@ -400,8 +400,29 @@ export function ReportDocument({ report }: { report: ReportDetail }): JSX.Elemen
   );
 }
 
+/**
+ * How an Officer reads in a picker: their name, and their workload where the picker carries one.
+ *
+ * `3 (1 overdue)` rather than two separate figures — a Manager scanning a dropdown reads one
+ * number as "how busy" and the parenthetical as "how much of that is already late", not two
+ * counts to reconcile against each other.
+ */
+function officerOptionLabel(option: AssessorOption): string {
+  if (option.workload === undefined) return option.fullName;
+  return `${option.fullName} — ${option.workload.active} (${option.workload.overdue} overdue)`;
+}
+
 /** One candidate for a next-assessor or work-officer picker: enough to name them. */
-export type AssessorOption = { id: string; fullName: string };
+export type AssessorOption = {
+  id: string;
+  fullName: string;
+  /**
+   * How much of `assessments` is currently this Officer's — undefined for a picker that has no
+   * business showing it (the work-officer picker: carrying out the recommended work is a different
+   * kind of load from an open assessment, and this application does not measure it the same way).
+   */
+  workload?: { active: number; overdue: number };
+};
 
 /**
  * A manager's review of one assessment, as a page prints it.
@@ -838,7 +859,7 @@ export function ReportPage({
                       <select id="first-officer" name="assessor_id" aria-label="First assessor">
                         {firstAssessorPicker.map((option) => (
                           <option value={option.id} safe>
-                            {option.fullName}
+                            {officerOptionLabel(option)}
                           </option>
                         ))}
                       </select>
@@ -909,7 +930,7 @@ export function ReportPage({
                       <select id="next-officer" name="assessor_id" aria-label="Next assessor">
                         {nextAssessorPicker.map((option) => (
                           <option value={option.id} safe>
-                            {option.fullName}
+                            {officerOptionLabel(option)}
                           </option>
                         ))}
                       </select>

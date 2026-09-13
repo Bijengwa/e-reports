@@ -372,14 +372,7 @@ export async function renderReport(
     isManager && found.report.status === "received" && found.assessor1UserId === null;
 
   const firstAssessorPicker: AssessorOption[] | undefined = canAssignFirst
-    ? (
-        await app.db.execute(
-          sql`SELECT id, full_name FROM users WHERE role = 'assessor' AND is_active ORDER BY full_name`,
-        )
-      ).map((r) => {
-        const u = r as { id: string; full_name: string };
-        return { id: u.id, fullName: u.full_name };
-      })
+    ? await officerWorkloadOptions(app)
     : undefined;
 
   // The picker for the next secondary assessor is offered whenever the report is waiting on the
@@ -394,21 +387,7 @@ export async function renderReport(
   // Eligible next assessors: every active Officer except anyone who already holds an assessment on
   // this report, at any ordinal — A1 included.
   const nextAssessorPicker: AssessorOption[] | undefined = canAssignNext
-    ? (
-        await app.db.execute(sql`
-          SELECT id, full_name
-            FROM users
-           WHERE role = 'assessor'
-             AND is_active
-             AND id NOT IN (
-               SELECT assessor_id FROM assessments WHERE report_id = ${found.report.id}
-             )
-           ORDER BY full_name
-        `)
-      ).map((r) => {
-        const u = r as { id: string; full_name: string };
-        return { id: u.id, fullName: u.full_name };
-      })
+    ? await officerWorkloadOptions(app, found.report.id)
     : undefined;
 
   // The work-officer picker is offered once there is at least one finished secondary review to be
@@ -468,6 +447,56 @@ export async function renderReport(
         canComment={isManager && found.assessment1 !== null && reviewIsActionable}
       />,
     );
+}
+
+type WorkloadRow = { id: string; full_name: string; active: string; overdue: string };
+
+/**
+ * Every active Officer, with how much of `assessments` is currently theirs to act on — the figure
+ * a Manager weighs before naming one of them.
+ *
+ * Active: an assessment assigned to them that nobody has submitted yet. Overdue: active, and its
+ * `due_at` has passed. Both counted across every ordinal on every report an Officer holds, not
+ * scoped to the report being assigned — an Officer's workload is one number, not one per report.
+ *
+ * `excludeAssessorsOnReportId`, when given, drops whoever already holds an assessment on that one
+ * report — the same exclusion `nextAssessorPicker` always applied, kept here rather than filtered
+ * afterwards so the count and the eligibility test read off one query.
+ *
+ * Derived entirely from `assessments`; nothing here is its own table. A `LEFT JOIN` rather than an
+ * `EXISTS`, so an Officer with nothing assigned still gets a row — zero, not absent.
+ */
+async function officerWorkloadOptions(
+  app: FastifyInstance,
+  excludeAssessorsOnReportId?: string,
+): Promise<AssessorOption[]> {
+  const rows = await app.db.execute(sql`
+    SELECT u.id, u.full_name,
+           count(a.id) FILTER (WHERE a.submitted_at IS NULL) AS active,
+           count(a.id) FILTER (WHERE a.submitted_at IS NULL AND a.due_at < now()) AS overdue
+      FROM users u
+      LEFT JOIN assessments a ON a.assessor_id = u.id
+     WHERE u.role = 'assessor'
+       AND u.is_active
+       ${
+         excludeAssessorsOnReportId === undefined
+           ? sql``
+           : sql`AND u.id NOT IN (
+                   SELECT assessor_id FROM assessments WHERE report_id = ${excludeAssessorsOnReportId}
+                 )`
+       }
+     GROUP BY u.id, u.full_name
+     ORDER BY u.full_name
+  `);
+
+  return rows.map((r) => {
+    const row = r as WorkloadRow;
+    return {
+      id: row.id,
+      fullName: row.full_name,
+      workload: { active: Number(row.active), overdue: Number(row.overdue) },
+    };
+  });
 }
 
 /**
