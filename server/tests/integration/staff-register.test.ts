@@ -250,17 +250,9 @@ describe.skipIf(!INTEGRATION_ENABLED)("staff Register access and download", () =
       const page = await get("/register", cookie);
       expect(page.statusCode, role).toBe(200);
       expect(page.body).toContain("Download Register");
-      expect(page.body).toContain('href="/register/download/pdf"');
       expect(page.body).toContain('href="/register/download/xlsx"');
-
-      const pdf = await get("/register/download/pdf", cookie);
-      expect(pdf.statusCode, `${role} pdf`).toBe(200);
-      expect(String(pdf.headers["content-type"])).toContain("application/pdf");
-      expect(String(pdf.headers["content-disposition"])).toMatch(
-        /attachment; filename="AEMD-Register-\d{4}-\d{2}-\d{2}\.pdf"/,
-      );
-      expect(Buffer.from(pdf.rawPayload).subarray(0, 4).toString("latin1")).toBe("%PDF");
-      expect(pdf.rawPayload.byteLength).toBeGreaterThan(1000);
+      expect(page.body).not.toContain('href="/register/download/pdf"');
+      expect((await get("/register/download/pdf", cookie)).statusCode, `${role} pdf`).toBe(404);
 
       const xlsx = await get("/register/download/xlsx", cookie);
       expect(xlsx.statusCode, `${role} xlsx`).toBe(200);
@@ -275,8 +267,8 @@ describe.skipIf(!INTEGRATION_ENABLED)("staff Register access and download", () =
 
     const admin = await signedInAs("administrator");
     expect((await get("/register", admin.cookie)).statusCode).toBe(403);
-    expect((await get("/register/download/pdf", admin.cookie)).statusCode).toBe(403);
     expect((await get("/register/download/xlsx", admin.cookie)).statusCode).toBe(403);
+    expect((await get("/register/download/pdf", admin.cookie)).statusCode).toBe(404);
 
     const dashboard = await get("/dashboard", admin.cookie);
     expect(dashboard.statusCode).toBe(200);
@@ -325,11 +317,5 @@ describe.skipIf(!INTEGRATION_ENABLED)("staff Register access and download", () =
     expect(sheet.getRow(2).getCell(39).value).toBe("Cell fault confirmed");
     expect(sheet.getRow(2).getCell(48).value).toBe("Probable");
     expect(sheet.getRow(2).getCell(50).value).toBe("Enhance monitoring");
-
-    const pdf = await get("/register/download/pdf", cookie);
-    expect(Buffer.from(pdf.rawPayload).subarray(0, 4).toString("latin1")).toBe("%PDF");
-    expect(Buffer.from(pdf.rawPayload).toString("latin1")).toContain(
-      "/MediaBox [0 0 1190.55 841.89]",
-    );
   });
 });

@@ -6,7 +6,7 @@ import {
   formatReporterDetails,
   mapF004ToRegisterCells,
 } from "../../../domain/register.js";
-import { buildRegisterPdf, buildRegisterXlsx, registerExportFilename } from "../register-export.js";
+import { buildRegisterXlsx, registerExportFilename } from "../register-export.js";
 import { currentSession } from "../session-guard.js";
 import { RegisterPage, type RegisterRow } from "../views/register.js";
 
@@ -129,20 +129,10 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     );
   });
 
-  app.get("/register/download/pdf", async (_request, reply) => {
-    const rows = await loadRegisterRows(app.db);
-    const body = await buildRegisterPdf(rows);
-    const filename = registerExportFilename("pdf");
-    return reply
-      .header("Content-Type", "application/pdf")
-      .header("Content-Disposition", `attachment; filename="${filename}"`)
-      .send(body);
-  });
-
   app.get("/register/download/xlsx", async (_request, reply) => {
     const rows = await loadRegisterRows(app.db);
     const body = await buildRegisterXlsx(rows);
-    const filename = registerExportFilename("xlsx");
+    const filename = registerExportFilename();
     return reply
       .header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
       .header("Content-Disposition", `attachment; filename="${filename}"`)

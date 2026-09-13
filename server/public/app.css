@@ -1344,45 +1344,6 @@ textarea[aria-invalid="true"] {
   outline-offset: 1px;
 }
 
-.register-download {
-  position: relative;
-}
-
-.register-download > summary {
-  list-style: none;
-}
-
-.register-download > summary::-webkit-details-marker {
-  display: none;
-}
-
-.register-download-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
-  z-index: 6;
-  min-width: 168px;
-  padding: 6px;
-  background: var(--card);
-  border: 1px solid var(--rule-2);
-  border-radius: var(--r);
-  box-shadow: 0 10px 24px rgba(16, 36, 20, 0.12);
-}
-
-.register-download-menu a {
-  display: block;
-  padding: 8px 10px;
-  border-radius: 6px;
-  color: var(--ink);
-  text-decoration: none;
-  font-size: 13.5px;
-}
-
-.register-download-menu a:hover,
-.register-download-menu a:focus-visible {
-  background: #ecf2ed;
-}
-
 /*
  * `.utable` holds every column to its own content width, which is right for a handful of columns
  * and wrong for fifty: a couple of long ones would swallow the row and the rest would starve.
