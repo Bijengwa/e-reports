@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
+import { computeDueAt, DEFAULT_DEADLINE } from "../../../domain/assignment.js";
 import { F004_VERSION } from "../../../domain/f004.js";
 import { resolveFinalDocument } from "../../../domain/final-document.js";
 import { currentSession } from "../session-guard.js";
@@ -84,10 +85,25 @@ export async function decisionRoutes(app: FastifyInstance): Promise<void> {
     `);
     if (candidate.length === 0) return forbid(reply, session.role);
 
+    const now = new Date();
+    const dueAt = computeDueAt(now, DEFAULT_DEADLINE.value, DEFAULT_DEADLINE.unit);
+    // Postgres.js's raw parameter binding accepts a string or a Buffer, not a bare `Date` — every
+    // timestamp interpolated into a template below is its ISO form for that reason alone.
+    const nowIso = now.toISOString();
+    const dueAtIso = dueAt.toISOString();
+
     await app.db.transaction(async (tx) => {
+      // The same generic assignment shape `assign-first-assessor` writes for A1, so a deadline
+      // exists on every ordinal from the moment it is handed out rather than only the first. No
+      // form on this page asks the Manager to choose one yet, so every secondary assessment gets
+      // the same default until it does — a real deadline, not an absent one.
       await tx.execute(sql`
-        INSERT INTO assessments (report_id, assessor_id, ordinal, form_version, payload)
-        VALUES (${found.report.id}, ${chosenId}, ${nextOrdinal}, ${F004_VERSION}, '{}'::jsonb)
+        INSERT INTO assessments (report_id, assessor_id, ordinal, form_version, payload,
+                                 assigned_by_user_id, assigned_at, deadline_value, deadline_unit,
+                                 due_at)
+        VALUES (${found.report.id}, ${chosenId}, ${nextOrdinal}, ${F004_VERSION}, '{}'::jsonb,
+                ${session.userId}, ${nowIso}, ${DEFAULT_DEADLINE.value}, ${DEFAULT_DEADLINE.unit},
+                ${dueAtIso})
       `);
 
       await tx.execute(sql`

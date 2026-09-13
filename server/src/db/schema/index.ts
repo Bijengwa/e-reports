@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   bigint,
   bigserial,
   boolean,
@@ -71,6 +72,18 @@ export const reportStatus = pgEnum("report_status", [
 export const reportDecisionKind = pgEnum("report_decision_kind", [
   "assign_next_assessor",
   "assign_work_officer",
+]);
+
+/**
+ * The units a Manager may set a deadline in, closed the same way `reportStatus` is: the database
+ * refuses a sixth one rather than trusting every future caller to remember the list.
+ */
+export const deadlineUnit = pgEnum("deadline_unit", [
+  "seconds",
+  "minutes",
+  "hours",
+  "days",
+  "weeks",
 ]);
 
 export const users = pgTable("users", {
@@ -206,6 +219,31 @@ export const assessments = pgTable(
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
 
     /**
+     * Who handed this ordinal to this Officer, and when, and by what deadline — the generic
+     * assignment shape every ordinal shares, A1 included.
+     *
+     * Before this, only the report row carried anything like it, and only for ordinal 1
+     * (`assessor1_user_id`/`assessor1_assigned_at`) — a shape that cannot describe A3, let alone
+     * An. This lives here instead because `(report_id, ordinal)` is already this table's identity:
+     * an assignment is a fact about one ordinal of one report, the same as the assessor who holds
+     * it, and belongs beside that column rather than bolted onto `reports` a second time.
+     *
+     * All five nullable, and stay that way for a row created before this migration: nothing before
+     * it ever recorded who assigned an assessment or by when, and a backfilled guess would be worse
+     * than a history that admits what it does not know. For a row created after, an assigning route
+     * sets all five together or none of them — never a deadline without an assigner.
+     *
+     * `dueAt` is the one downstream readers should use. `deadlineValue`/`deadlineUnit` are what the
+     * Manager actually chose (e.g. 3 days), kept so the assignment can be shown back to them in
+     * their own words rather than re-derived from a timestamp difference.
+     */
+    assignedByUserId: uuid("assigned_by_user_id").references(() => users.id),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }),
+    deadlineValue: integer("deadline_value"),
+    deadlineUnit: deadlineUnit("deadline_unit"),
+    dueAt: timestamp("due_at", { withTimezone: true }),
+
+    /**
      * The manager's review of this assessment.
      *
      * Here rather than in a table of its own because the row already says which report and which
@@ -227,6 +265,10 @@ export const assessments = pgTable(
     // "The second assessor must differ from the first" is a domain rule, not expressible here.
     uniqueIndex("assessments_report_ordinal_uq").on(t.reportId, t.ordinal),
     index("assessments_assessor_idx").on(t.assessorId),
+    // Serves the overdue/near-deadline sweep every open assessment is read by, once something
+    // reads one. Unfiltered on `submittedAt`: a partial index would need updating the day a sweep
+    // wants "overdue and unsubmitted" and "completed late" from the same column.
+    index("assessments_due_at_idx").on(t.dueAt),
   ],
 );
 
@@ -425,4 +467,93 @@ export const reportFinalDocuments = pgTable(
     payload: jsonb("payload").notNull(),
   },
   (t) => [index("report_final_documents_approved_at_idx").on(t.approvedAt)],
+);
+
+/**
+ * IMDRF adverse-event terminology, Phase 1.
+ *
+ * Deliberately its own two tables with no foreign key from anything above this comment. Every
+ * table above describes one report's journey through this office's own workflow; these two
+ * describe a vocabulary IMDRF publishes once a year and TMDA merely stores — a fact about the
+ * world, not about a report. Wiring a report or an assessment to a term is Phase 3's job, and
+ * doing it here would make this migration responsible for a workflow decision it has no business
+ * making.
+ *
+ * `draft` / `published` on `imdrfReleases` is the whole lifecycle: an administrator can inspect
+ * and replace a draft as many times as an upload needs correcting, but once published a release
+ * is immutable — the same argument `reportFinalDocuments` makes for a snapshot, applied to a
+ * publication instead of an approval.
+ */
+export const imdrfReleaseStatus = pgEnum("imdrf_release_status", ["draft", "published"]);
+
+export const imdrfReleases = pgTable("imdrf_releases", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  /** The business identifier IMDRF and this office both call a "release" — 2026, 2027, … */
+  releaseYear: smallint("release_year").notNull().unique(),
+  /** e.g. "IMDRF/AE WG/N43", as printed on the source workbook's cover. Admin-entered; nothing in
+   *  the workbook itself carries it reliably enough to scrape. */
+  documentCode: text("document_code"),
+  title: text("title"),
+  /** The uploaded workbook's own filename, kept for audit — "which file produced this release?" */
+  sourceFileName: text("source_file_name").notNull(),
+  status: imdrfReleaseStatus("status").notNull().default("draft"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  /** Null until `publish` is called. Once set, the release's terms are immutable. */
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+});
+
+/**
+ * One term of one release's terminology, at whatever depth its own annex actually has.
+ *
+ * `level` and `parentTermId` are computed at import time from `codeHierarchy` — the source
+ * workbook's own "A|A01|A0101" trail — and never recomputed by a reader. An annex with two levels
+ * and an annex with four both fit the same row shape, because nothing here assumes a maximum.
+ *
+ * `codeHierarchy` is kept verbatim alongside the two derived columns rather than discarded once
+ * `level`/`parentTermId` exist: it is source information, useful for verifying an import against
+ * the workbook it came from, and cheap to keep.
+ */
+export const imdrfTerms = pgTable(
+  "imdrf_terms",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    releaseId: uuid("release_id")
+      .notNull()
+      .references(() => imdrfReleases.id, { onDelete: "cascade" }),
+    /** "A" through "G". Text, not the sheet's position — a future release could reorder sheets. */
+    annex: text("annex").notNull(),
+    code: text("code").notNull(),
+    term: text("term").notNull(),
+    definition: text("definition"),
+    nonImdrfCode: text("non_imdrf_code"),
+    /** Preserved verbatim from the workbook — "New", "Retired (2020)", "Modified (editorial)", or
+     *  absent. Never normalized into an enum: the source text is the fact worth keeping, and IMDRF
+     *  has never held these values to one spelling (Annex C alone carries both "Modified
+     *  (editorial)" and "Modified (Editorial)"). */
+    status: text("status"),
+    statusDescription: text("status_description"),
+    /** Annex E only; null on every other annex's rows. */
+    primaryCategory: text("primary_category"),
+    secondaryCategory: text("secondary_category"),
+    /** The workbook's own "A|A01|A0101" trail. See the table comment. */
+    codeHierarchy: text("code_hierarchy").notNull(),
+    parentTermId: uuid("parent_term_id").references((): AnyPgColumn => imdrfTerms.id),
+    /** `codeHierarchy.split("|").length` at import time. Never assumed to cap at 3. */
+    level: smallint("level").notNull(),
+    /** The workbook's own row order within its annex, so the browser can show terms the way IMDRF
+     *  laid them out rather than in whatever order Postgres happens to return them. */
+    sortOrder: integer("sort_order").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // The same code can recur in a later release (a 2027 workbook reusing "G02002" is expected,
+    // not a collision) — uniqueness is scoped to the release, never global.
+    uniqueIndex("imdrf_terms_release_code_uq").on(t.releaseId, t.code),
+    // Serves both "list an annex's terms in source order" and the annex-count summary.
+    index("imdrf_terms_release_annex_sort_idx").on(t.releaseId, t.annex, t.sortOrder),
+    // Serves "get this term's children", the tree navigation's only query.
+    index("imdrf_terms_release_parent_idx").on(t.releaseId, t.parentTermId),
+    index("imdrf_terms_release_level_idx").on(t.releaseId, t.level),
+    check("imdrf_terms_annex_ck", sql`annex IN ('A','B','C','D','E','F','G')`),
+  ],
 );

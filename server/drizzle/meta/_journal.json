@@ -120,6 +120,27 @@
       "when": 1788186559000,
       "tag": "0016_assign_first_assessor_grant",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1788272959000,
+      "tag": "0017_assessment_assignment_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788359359000,
+      "tag": "0018_imdrf_terminology",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1788445759000,
+      "tag": "0019_imdrf_terminology_grants",
+      "breakpoints": true
     }
   ]
 }

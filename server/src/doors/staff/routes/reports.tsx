@@ -364,6 +364,24 @@ export async function renderReport(
   // Every secondary assessment, submitted or not: the page needs the unsubmitted ones for its
   // assessment-history strip and filters to the submitted ones for the document itself.
 
+  // The picker for Assessment 1 itself, offered exactly while a report is genuinely unclaimed:
+  // freshly received, and named to nobody. The moment either stops being true — an Officer is
+  // assigned, or the report has moved on — this closes, on the same test `assign-first-assessor`
+  // makes for itself.
+  const canAssignFirst =
+    isManager && found.report.status === "received" && found.assessor1UserId === null;
+
+  const firstAssessorPicker: AssessorOption[] | undefined = canAssignFirst
+    ? (
+        await app.db.execute(
+          sql`SELECT id, full_name FROM users WHERE role = 'assessor' AND is_active ORDER BY full_name`,
+        )
+      ).map((r) => {
+        const u = r as { id: string; full_name: string };
+        return { id: u.id, fullName: u.full_name };
+      })
+    : undefined;
+
   // The picker for the next secondary assessor is offered whenever the report is waiting on the
   // manager to name one — the first time (`awaiting_second_assessor`, right after A1) and every
   // time after (`awaiting_decision`, once a secondary review is in). Both end in the same action.
@@ -442,6 +460,7 @@ export async function renderReport(
         assessor1Name={found.assessor1Name}
         assessment1Review={assessment1Review}
         secondaryAssessments={found.secondaryAssessments}
+        firstAssessorPicker={firstAssessorPicker}
         nextAssessorPicker={nextAssessorPicker}
         workOfficerPicker={workOfficerPicker}
         decisions={found.decisions}

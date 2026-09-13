@@ -1,3 +1,4 @@
+import { DEADLINE_UNITS, DEFAULT_DEADLINE } from "../../../domain/assignment.js";
 import type { F004Answers, SecondaryReviewPayload } from "../../../domain/f004.js";
 import { STEP_FIELDS, STEPS } from "../../../domain/form-schema.js";
 import { type MessageKey, translatorFor } from "../../../i18n/index.js";
@@ -525,6 +526,11 @@ export type ReportPageProps = {
   /** Every submitted secondary assessment, oldest first — the manager's accumulated picture. */
   secondaryAssessments: SecondaryAssignment[];
   /**
+   * Who a manager could name as Assessment 1's Officer. Present only while the report is freshly
+   * received and unassigned; undefined otherwise.
+   */
+  firstAssessorPicker?: AssessorOption[];
+  /**
    * Who a manager could hand the next secondary assessment to. Present only once the report is
    * waiting for one; undefined otherwise.
    */
@@ -634,6 +640,7 @@ export function ReportPage({
   assessor1Name,
   assessment1Review,
   secondaryAssessments,
+  firstAssessorPicker,
   nextAssessorPicker,
   workOfficerPicker,
   decisions,
@@ -800,7 +807,7 @@ export function ReportPage({
 
       <DecisionHistory decisions={decisions} />
 
-      {(nextAssessorPicker || workOfficerPicker) && (
+      {(firstAssessorPicker || nextAssessorPicker || workOfficerPicker) && (
         <>
           <h2 class="report-heading">Manager decision</h2>
           {/* What this section is for, said once at the top rather than left implied by two
@@ -808,11 +815,70 @@ export function ReportPage({
               assessments above; this is the line that tells them the next move is theirs, and
               names it. */}
           <p class="hint">
-            {workOfficerPicker
-              ? "Choose one: send the report for another assessment, or approve it and assign the work."
-              : "Name the Officer who will assess this report next."}
+            {firstAssessorPicker
+              ? "Name the Officer who will make the first assessment of this report, and by when."
+              : workOfficerPicker
+                ? "Choose one: send the report for another assessment, or approve it and assign the work."
+                : "Name the Officer who will assess this report next."}
           </p>
           <div class="grid2">
+            {firstAssessorPicker && (
+              <form
+                method="POST"
+                action={`/reports/${report.id}/assign-first-assessor`}
+                class="card card-b review-form"
+              >
+                <h3>Assign first assessor</h3>
+                {firstAssessorPicker.length === 0 ? (
+                  <p class="hint">No active Officer is available to take this report.</p>
+                ) : (
+                  <>
+                    <div class="f">
+                      <label for="first-officer">Assign to</label>
+                      <select id="first-officer" name="assessor_id" aria-label="First assessor">
+                        {firstAssessorPicker.map((option) => (
+                          <option value={option.id} safe>
+                            {option.fullName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div class="f">
+                      <label for="first-deadline-value">Deadline</label>
+                      <div class="bar">
+                        <input
+                          type="number"
+                          id="first-deadline-value"
+                          name="deadline_value"
+                          min="1"
+                          step="1"
+                          value={String(DEFAULT_DEADLINE.value)}
+                          aria-label="Deadline value"
+                        />
+                        <select
+                          id="first-deadline-unit"
+                          name="deadline_unit"
+                          aria-label="Deadline unit"
+                        >
+                          {DEADLINE_UNITS.map((unit) => (
+                            <option value={unit} selected={unit === DEFAULT_DEADLINE.unit}>
+                              {unit}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div class="bar">
+                      <div class="sp"></div>
+                      <button type="submit" class="btn ghost">
+                        Assign first assessor
+                      </button>
+                    </div>
+                  </>
+                )}
+              </form>
+            )}
+
             {nextAssessorPicker && (
               <form
                 method="POST"

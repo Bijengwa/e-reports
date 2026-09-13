@@ -68,7 +68,9 @@ export async function truncateAll(owner: Database): Promise<void> {
   // CASCADE never reaches it) and yet every report number allocation reads it: leaving it behind
   // would let one test's financial-year serial bleed into the next test's assertion about what
   // that serial should be.
+  // `imdrf_releases` cascades to `imdrf_terms` via FK ON DELETE CASCADE, but is listed itself
+  // because nothing else cascades into it — the same reasoning `report_counters` gets above.
   await owner.execute(
-    sql`TRUNCATE users, sessions, audit_log, reports, report_counters RESTART IDENTITY CASCADE`,
+    sql`TRUNCATE users, sessions, audit_log, reports, report_counters, imdrf_releases RESTART IDENTITY CASCADE`,
   );
 }

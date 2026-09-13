@@ -11,6 +11,7 @@ import { dashboardRoutes } from "./routes/dashboard.js";
 import { decisionRoutes } from "./routes/decisions.js";
 import { finalDocumentRoutes } from "./routes/final-document.js";
 import { finalReportsRoutes } from "./routes/final-reports.js";
+import { firstAssessorRoutes } from "./routes/first-assessor.js";
 import { loginRoutes } from "./routes/login.js";
 import { logoutRoutes } from "./routes/logout.js";
 import { myWorkRoutes } from "./routes/my-work.js";
@@ -151,6 +152,11 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
         await management.register(assessmentCommentRoutes);
 
         await management.register(decisionRoutes);
+
+        // Naming Assessment 1's Officer, the one report-level assignment `storeReport` no longer
+        // makes for the manager. Beside `decisionRoutes` because it is the same job at an earlier
+        // point in the pipeline: the manager naming who works on a report next.
+        await management.register(firstAssessorRoutes);
       });
 
       await active.register(async (administration) => {
