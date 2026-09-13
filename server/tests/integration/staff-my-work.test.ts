@@ -245,14 +245,16 @@ async function assignedForWork(deviceName = "Philips IntelliVue MX450"): Promise
   await fileAtThePublicDoor(deviceName);
   const filed = await reportNamed(deviceName);
 
-  // Intake picks A1 itself, so the three roles are read off that choice rather than decided before
-  // it. Naming the work officer up front would sometimes name the Officer intake had just made A1,
-  // and the case below — that assessing a report is not being handed its work — would then be
-  // asserting that somebody is refused their own assignment.
-  const first = pool.find((s) => s.id === filed.assessor1_user_id);
-  if (first === undefined) throw new Error("intake assigned nobody this suite knows");
-  const [second, worker] = pool.filter((s) => s.id !== first.id);
-  if (second === undefined || worker === undefined) throw new Error("need two more Officers");
+  // Intake no longer picks A1; standing in for the Manager's manual assignment until that route
+  // exists. The first pool member becomes A1, and the other two fill the roles below.
+  const [first, second, worker] = pool;
+  if (first === undefined || second === undefined || worker === undefined) {
+    throw new Error("need three Officers");
+  }
+  await owner.db.execute(sql`
+    UPDATE reports SET assessor1_user_id = ${first.id}, assessor1_assigned_at = now()
+     WHERE id = ${filed.id}
+  `);
 
   await post(`/reports/${filed.id}/assessment-1`, first.cookie, completeAssessment());
   await post(`/reports/${filed.id}/assign-next-assessor`, manager.cookie, {

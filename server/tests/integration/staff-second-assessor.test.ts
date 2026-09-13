@@ -252,9 +252,14 @@ async function waiting(): Promise<Waiting> {
   await fileAtThePublicDoor();
   const filed = await onlyReport();
 
-  // Intake chose one of the two; the other is the only valid second assessor here.
-  const officer = filed.assessor1_user_id === a.id ? a : b;
-  const other = filed.assessor1_user_id === a.id ? b : a;
+  // Intake no longer names an Officer; standing in for the Manager's manual assignment until that
+  // route exists. `a` is the first assessor here and `b` is the only valid second assessor.
+  await owner.db.execute(sql`
+    UPDATE reports SET assessor1_user_id = ${a.id}, assessor1_assigned_at = now()
+     WHERE id = ${filed.id}
+  `);
+  const officer = a;
+  const other = b;
 
   const submitted = await post(
     `/reports/${filed.id}/assessment-1`,
@@ -455,7 +460,10 @@ describe.skipIf(!INTEGRATION_ENABLED)("who the picker offers", () => {
 
     await fileAtThePublicDoor();
     const filed = await onlyReport();
-    expect(filed.assessor1_user_id).toBe(officer.id);
+    await owner.db.execute(sql`
+      UPDATE reports SET assessor1_user_id = ${officer.id}, assessor1_assigned_at = now()
+       WHERE id = ${filed.id}
+    `);
 
     const submitted = await post(
       `/reports/${filed.id}/assessment-1`,
@@ -906,12 +914,23 @@ describe.skipIf(!INTEGRATION_ENABLED)("how wide the grant is", () => {
       ["number", sql`UPDATE reports SET number = 'MD-AE/2026/9999' WHERE id = ${id}`],
       ["payload", sql`UPDATE reports SET payload = '{"x":1}'::jsonb WHERE id = ${id}`],
       ["severity", sql`UPDATE reports SET severity = 'death' WHERE id = ${id}`],
-      [
-        "assessor1_user_id",
-        sql`UPDATE reports SET assessor1_user_id = ${officer.id} WHERE id = ${id}`,
-      ],
     ] as const) {
       await expect(restricted.db.execute(statement), column).rejects.toThrow();
     }
+  });
+
+  // Assessment 1 is now the Manager's manual assignment rather than an intake-time INSERT, so the
+  // app role needs UPDATE on exactly these two columns — the pair the migration above `staff-
+  // assignment.test.ts` exercises grants, and no wider than that pair.
+  it("also lets the app role write the two columns a Manager's A1 assignment owns", async () => {
+    restricted ??= openApp();
+
+    const officer = await signedInAs("assessor", "Asha Mrema");
+    const id = await seedReport({ number: "MD-AE/2026/8201", status: "received" });
+
+    await restricted.db.execute(sql`
+      UPDATE reports SET assessor1_user_id = ${officer.id}, assessor1_assigned_at = now()
+       WHERE id = ${id}
+    `);
   });
 });

@@ -275,11 +275,13 @@ describe.skipIf(!INTEGRATION_ENABLED)("filing one", () => {
     await file(officer.cookie, completeForm());
     const row = await onlyReport();
 
-    // Not a queue of its own: a report an Officer typed waits beside every other one.
+    // Not a queue of its own: a report an Officer typed waits beside every other one. Typing it in
+    // does not assign it either, so it appears as an orphan — its number present, but not linked,
+    // the same as any other unassigned report on this list.
     const dashboard = (await get("/dashboard", officer.cookie)).body;
 
     expect(dashboard).toContain(row.number);
-    expect(dashboard).toContain(`href="/reports/${row.id}"`);
+    expect(dashboard).not.toContain(`href="/reports/${row.id}"`);
     expect(dashboard).toContain('<span class="eyebrow">Received</span><b>1</b>');
   });
 
@@ -337,12 +339,15 @@ describe.skipIf(!INTEGRATION_ENABLED)("the public door still files its own", () 
   });
 
   it("shows no Filled by line for a report nobody keyed in", async () => {
-    const officer = await signedInAs("assessor");
+    // A manager, not an Officer: the report is unassigned, and an Officer who is not a party to a
+    // report is refused it outright — a rule this case has nothing to do with. The manager can
+    // always open any report, which is what this case actually needs.
+    const manager = await signedInAs("manager");
 
     await fileAtThePublicDoor(completeForm());
     const row = await onlyReport();
 
-    const body = (await get(`/reports/${row.id}`, officer.cookie)).body;
+    const body = (await get(`/reports/${row.id}`, manager.cookie)).body;
 
     // Omitted, not dashed: an empty "Filled by" would be a field the reader has to interpret.
     expect(body).not.toContain("Filled by");

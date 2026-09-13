@@ -268,9 +268,14 @@ async function afterFirstAssessment() {
   await fileAtThePublicDoor();
   const report = await onlyReport();
 
-  const first = pool.find((s) => s.id === report.assessor1_user_id);
-  if (first === undefined) throw new Error("intake assigned nobody this suite knows");
-  const rest = pool.filter((s) => s.id !== first.id);
+  // Intake no longer names an Officer; standing in for the Manager's manual assignment until that
+  // route exists.
+  const [first, ...rest] = pool;
+  if (first === undefined) throw new Error("need at least one Officer");
+  await owner.db.execute(sql`
+    UPDATE reports SET assessor1_user_id = ${first.id}, assessor1_assigned_at = now()
+     WHERE id = ${report.id}
+  `);
 
   const submitted = await post(
     `/reports/${report.id}/assessment-1`,
@@ -305,11 +310,16 @@ async function approvedReport(label: string) {
   `);
   const report = rows[0] as Report;
 
-  const a1 = pool.find((one) => one.id === report.assessor1_user_id);
-  if (a1 === undefined) throw new Error("intake assigned nobody this suite knows");
-  const rest = pool.filter((one) => one.id !== a1.id);
-  const [secondAssessor, worker] = rest;
-  if (secondAssessor === undefined || worker === undefined) throw new Error("need two Officers");
+  // Intake no longer names an Officer; standing in for the Manager's manual assignment until that
+  // route exists.
+  const [a1, secondAssessor, worker] = pool;
+  if (a1 === undefined || secondAssessor === undefined || worker === undefined) {
+    throw new Error("need three Officers");
+  }
+  await owner.db.execute(sql`
+    UPDATE reports SET assessor1_user_id = ${a1.id}, assessor1_assigned_at = now()
+     WHERE id = ${report.id}
+  `);
 
   await post(`/reports/${report.id}/assessment-1`, a1.cookie, completeAssessment());
   await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {

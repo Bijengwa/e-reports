@@ -278,10 +278,15 @@ async function afterFirstAssessment() {
   await fileAtThePublicDoor();
   const filed = await onlyReport();
 
+  // Intake no longer names an Officer; standing in for the Manager's manual assignment until that
+  // route exists.
   const everyone = [a, b, c, d, e];
-  const first = everyone.find((s) => s.id === filed.assessor1_user_id);
-  if (first === undefined) throw new Error("intake assigned nobody this suite knows");
-  const rest = everyone.filter((s) => s.id !== first.id);
+  const [first, ...rest] = everyone;
+  if (first === undefined) throw new Error("need at least one Officer");
+  await owner.db.execute(sql`
+    UPDATE reports SET assessor1_user_id = ${first.id}, assessor1_assigned_at = now()
+     WHERE id = ${filed.id}
+  `);
 
   const submitted = await post(
     `/reports/${filed.id}/assessment-1`,
@@ -900,8 +905,11 @@ describe.skipIf(!INTEGRATION_ENABLED)("the Officer's own queue, in three states"
 
     await fileAtThePublicDoor();
     const filed = await onlyReport();
-    const mine = [a, b].find((s) => s.id === filed.assessor1_user_id);
-    if (mine === undefined) throw new Error("intake assigned nobody this suite knows");
+    const mine = a;
+    await owner.db.execute(sql`
+      UPDATE reports SET assessor1_user_id = ${mine.id}, assessor1_assigned_at = now()
+       WHERE id = ${filed.id}
+    `);
 
     const fresh = (await get("/assessments", mine.cookie)).body;
     expect(fresh).toContain('Not started <span class="mya-count">1</span>');

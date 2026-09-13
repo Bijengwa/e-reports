@@ -246,8 +246,14 @@ async function firstAssessmentSubmitted(): Promise<Handover> {
   await fileAtThePublicDoor();
   const filed = await onlyReport();
 
-  const officer = filed.assessor1_user_id === a.id ? a : b;
-  const other = filed.assessor1_user_id === a.id ? b : a;
+  // Intake no longer names an Officer; standing in for the Manager's manual assignment until that
+  // route exists.
+  await owner.db.execute(sql`
+    UPDATE reports SET assessor1_user_id = ${a.id}, assessor1_assigned_at = now()
+     WHERE id = ${filed.id}
+  `);
+  const officer = a;
+  const other = b;
 
   const submitted = await post(
     `/reports/${filed.id}/assessment-1`,

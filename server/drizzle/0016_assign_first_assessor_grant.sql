@@ -1,0 +1,23 @@
+-- Assessment 1 is no longer chosen at intake. A report is now filed with assessor1_user_id and
+-- assessor1_assigned_at both null, and stays that way until a Manager names an Officer -- which
+-- means, for the first time, something other than the insert that creates a report needs to
+-- change those two columns after the fact.
+--
+-- Column-scoped UPDATE, the same discipline 0008 applied to `reports.status`: the Manager's
+-- assignment action may set who is waiting on a report and when that was decided, and nothing
+-- else about the row. The number, the payload, the reporter's details and every other column stay
+-- exactly as narrow as they were the moment before this migration.
+--
+-- No route reads or writes through this grant yet. It is prepared ahead of the route that will,
+-- so that worker does not also need to be a migration author -- the same ordering 0005 through
+-- 0009 already establish, where a privilege lands once its caller is designed even if the caller
+-- itself lands in a later change.
+--
+-- Still withheld: UPDATE on every other column of `reports`, and DELETE on everything. Nothing
+-- proposed for Phase 1 has a reason to rewrite a report's number, its payload or its status
+-- through this path, and the privilege to erase a vigilance record should arrive with the first
+-- caller that has a reason to, which is not this one.
+--
+-- This is a privilege change and nothing else. No row is written, no column or constraint moves.
+
+GRANT UPDATE ("assessor1_user_id", "assessor1_assigned_at") ON TABLE "reports" TO "ereports_app";

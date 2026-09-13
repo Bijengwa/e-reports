@@ -206,8 +206,16 @@ async function assessmentCount(): Promise<number> {
 async function assigned(): Promise<{ officer: Staff; report: Report }> {
   const officer = await signedInAs("assessor", "Asha Mrema");
   await fileAtThePublicDoor();
+  const filed = await theReport();
+  // Intake no longer names an Officer; standing in for the Manager's manual assignment until that
+  // route exists.
+  await owner.db.execute(sql`
+    UPDATE reports SET assessor1_user_id = ${officer.id}, assessor1_assigned_at = now()
+     WHERE id = ${filed.id}
+  `);
+  // Re-read rather than patching the snapshot in place, so `report.assessor1_user_id` reflects
+  // what the row actually holds now, not what it held before this function assigned it.
   const report = await theReport();
-  expect(report.assessor1_user_id).toBe(officer.id);
   return { officer, report };
 }
 

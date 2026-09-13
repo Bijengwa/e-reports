@@ -132,12 +132,11 @@ export const reports = pgTable(
     enteredByUserId: uuid("entered_by_user_id").references(() => users.id),
 
     /**
-     * The Officer this report is waiting on, chosen when it was filed.
+     * The Officer this report is waiting on, named by a Manager — never chosen by the application.
      *
-     * Null means nobody could be chosen — no active assessor existed at intake — and the report
-     * is an orphan waiting for one. Deliberately not `NOT NULL`: refusing a vigilance report
-     * because the office is unstaffed would lose the report, which is the one outcome worse than
-     * an unassigned one.
+     * Null at intake, always: a newly filed report is unassigned until a Manager hands it to
+     * someone. Deliberately not `NOT NULL` for that reason — every report starts in the Manager's
+     * unassigned queue, whatever the office's staffing looks like at the moment it arrives.
      *
      * Distinct from `entered_by_user_id` above, which records who typed a report in. The typist
      * and the assessor are often the same person and never mean the same thing, so both columns
@@ -147,7 +146,7 @@ export const reports = pgTable(
      * table yet; whatever does must read this column rather than choose again.
      */
     assessor1UserId: uuid("assessor1_user_id").references(() => users.id),
-    /** When the choice was made. Null exactly when `assessor1_user_id` is. */
+    /** When a Manager made the choice. Null exactly when `assessor1_user_id` is. */
     assessor1AssignedAt: timestamp("assessor1_assigned_at", { withTimezone: true }),
 
     /**
@@ -165,9 +164,9 @@ export const reports = pgTable(
     index("reports_status_idx").on(t.status),
     index("reports_received_at_idx").on(t.receivedAt),
     index("reports_severity_idx").on(t.severity),
-    // Serves the workload count the assignment runs for every candidate on every intake: how many
-    // open reports are this Officer's. Both columns in this order, because the count filters on
-    // the Officer first and the two open statuses second.
+    // Serves the Manager's workload count for each candidate Officer when choosing who to assign:
+    // how many open reports are already theirs. Both columns in this order, because the count
+    // filters on the Officer first and the two open statuses second.
     index("reports_assessor1_status_idx").on(t.assessor1UserId, t.status),
     index("reports_assessor2_status_idx").on(t.assessor2UserId, t.status),
   ],

@@ -12,9 +12,14 @@ import { INTEGRATION_ENABLED, openOwner, requireTestDatabase, truncateAll } from
 /**
  * Who a report belongs to, and what that entitles them to.
  *
- * Two things that are really one: intake decides whose a report is, and the assessment page is the
- * first thing that answer buys. Kept out of `staff-new-report`, which is about whether a report can
- * be filed at all.
+ * Two things that are really one: intake no longer decides whose a report is — a Manager does,
+ * later, through a route that does not exist yet — and the assessment page is the first thing that
+ * decision buys. Kept out of `staff-new-report`, which is about whether a report can be filed at
+ * all.
+ *
+ * Every filing this suite makes must land unassigned, whatever the office's staffing looks like:
+ * one active Officer, several, none, or the person who typed the report in themselves. There is no
+ * longer a "who gets it" question for intake to answer.
  */
 
 const STAFF_HOST = "staff.test";
@@ -143,32 +148,35 @@ function fileAsStaff(cookie: string) {
   });
 }
 
-/** How many reports each person holds, by name, with the unassigned counted as ORPHAN. */
-async function workload(): Promise<Record<string, number>> {
-  const rows = await owner.db.execute(sql`
-    SELECT coalesce(u.full_name, 'ORPHAN') AS who, count(*)::int AS held
-      FROM reports r
-      LEFT JOIN users u ON u.id = r.assessor1_user_id
-     GROUP BY 1
-  `);
-
-  return Object.fromEntries(
-    rows.map((row) => [(row as { who: string }).who, (row as { held: number }).held]),
-  );
-}
-
-type ReportRow = { id: string; number: string; status: string; assessor1_user_id: string | null };
+type ReportRow = {
+  id: string;
+  number: string;
+  status: string;
+  assessor1_user_id: string | null;
+  assessor1_assigned_at: Date | null;
+  entered_by_user_id: string | null;
+};
 
 async function onlyReport(): Promise<ReportRow> {
   const rows = await owner.db.execute(sql`
-    SELECT id, number, status::text AS status, assessor1_user_id FROM reports
+    SELECT id, number, status::text AS status, assessor1_user_id, assessor1_assigned_at,
+           entered_by_user_id
+      FROM reports
   `);
 
   expect(rows.length).toBe(1);
   return rows[0] as ReportRow;
 }
 
-/** Give somebody a report that is already open, so they start the next filing heavier. */
+/** Assign a report the way a Manager will, once that route exists — never through `storeReport`. */
+async function assignManually(reportId: string, officerId: string): Promise<void> {
+  await owner.db.execute(sql`
+    UPDATE reports SET assessor1_user_id = ${officerId}, assessor1_assigned_at = now()
+     WHERE id = ${reportId}
+  `);
+}
+
+/** Give somebody a report that is already open, so a filing after it does not start the pool cold. */
 async function preload(assessorId: string, number: string): Promise<string> {
   const rows = await owner.db.execute(sql`
     INSERT INTO reports (number, channel, severity, status, device_name, form_version, payload,
@@ -183,87 +191,30 @@ async function preload(assessorId: string, number: string): Promise<string> {
 describe.skipIf(!INTEGRATION_ENABLED)("who a new report goes to", () => {
   beforeEach(start);
 
-  it("shares three filings between two Officers without leaving one idle", async () => {
-    const first = await signedInAs("assessor", "Asha Mrema");
-    const second = await signedInAs("assessor", "Baraka Nyoni");
+  it("leaves a filing unassigned even with one active Officer available", async () => {
+    await signedInAs("assessor", "Asha Mrema");
 
-    await fileAtThePublicDoor();
-    await fileAsStaff(first.cookie);
-    await fileAtThePublicDoor();
+    const res = await fileAtThePublicDoor();
+    const row = await onlyReport();
 
-    const held = await workload();
-
-    // Two and one in some order, never three and none. Which of them holds two is settled by the
-    // next case; this one is about the rule refusing to let anybody idle while another stacks up.
-    expect(Object.values(held).sort()).toEqual([1, 2]);
-    expect(held.ORPHAN).toBeUndefined();
-    expect(Object.keys(held).sort()).toEqual([first.name, second.name].sort());
+    expect(res.statusCode).toBe(200);
+    expect(row.assessor1_user_id).toBeNull();
+    expect(row.assessor1_assigned_at).toBeNull();
   });
 
-  it("names the exact Officer when the load is level", async () => {
-    const first = await signedInAs("assessor", "Asha Mrema");
-    const second = await signedInAs("assessor", "Baraka Nyoni");
-
-    // Nobody holds anything and nobody has ever been assigned, so the tie falls to the lower id.
-    const lower = first.id < second.id ? first : second;
-    const higher = first.id < second.id ? second : first;
+  it("leaves a filing unassigned with several active Officers available", async () => {
+    await signedInAs("assessor", "Asha Mrema");
+    await signedInAs("assessor", "Baraka Nyoni");
+    await signedInAs("assessor", "Chausiku Njau");
 
     await fileAtThePublicDoor();
-    expect((await onlyReport()).assessor1_user_id).toBe(lower.id);
+    const row = await onlyReport();
 
-    // Now load breaks the tie instead of the id, so the next goes the other way. A rule that
-    // sorted by id first would hand this one to `lower` again.
-    await fileAtThePublicDoor();
-    expect((await workload())[higher.name]).toBe(1);
+    expect(row.assessor1_user_id).toBeNull();
+    expect(row.assessor1_assigned_at).toBeNull();
   });
 
-  it("does not prefer the Officer who typed it in", async () => {
-    const typist = await signedInAs("assessor", "Asha Mrema");
-    const other = await signedInAs("assessor", "Baraka Nyoni");
-
-    // The typist starts heavier, so the report they key in must go to their colleague.
-    await preload(typist.id, "MD-AE/2026/7001");
-
-    await fileAsStaff(typist.cookie);
-
-    const rows = await owner.db.execute(sql`
-      SELECT assessor1_user_id, entered_by_user_id FROM reports WHERE number <> 'MD-AE/2026/7001'
-    `);
-    const filed = rows[0] as { assessor1_user_id: string; entered_by_user_id: string };
-
-    // Who typed it and who must assess it are different questions, and this is both answers.
-    expect(filed.entered_by_user_id).toBe(typist.id);
-    expect(filed.assessor1_user_id).toBe(other.id);
-  });
-
-  it("never chooses a deactivated assessor", async () => {
-    const active = await signedInAs("assessor", "Asha Mrema");
-    const dormant = await inactiveAssessor();
-
-    // Two filings, so even a rule that merely alternated would have to touch the dormant account.
-    await fileAtThePublicDoor();
-    await fileAtThePublicDoor();
-
-    expect(await workload()).toEqual({ [active.name]: 2 });
-
-    const theirs = await owner.db.execute(sql`
-      SELECT count(*)::int AS n FROM reports WHERE assessor1_user_id = ${dormant}
-    `);
-    expect((theirs[0] as { n: number }).n).toBe(0);
-  });
-
-  it("never chooses a manager or an administrator", async () => {
-    await signedInAs("manager", "Mgr");
-    await signedInAs("administrator", "Adm");
-    const officer = await signedInAs("assessor", "Asha Mrema");
-
-    await fileAtThePublicDoor();
-
-    expect(await workload()).toEqual({ [officer.name]: 1 });
-    expect((await onlyReport()).assessor1_user_id).toBe(officer.id);
-  });
-
-  it("files an orphan rather than refusing when nobody can take it", async () => {
+  it("leaves a filing unassigned when nobody is active", async () => {
     await signedInAs("manager", "Mgr");
     await signedInAs("administrator", "Adm");
     await inactiveAssessor();
@@ -277,56 +228,57 @@ describe.skipIf(!INTEGRATION_ENABLED)("who a new report goes to", () => {
     expect(row.status).toBe("received");
   });
 
-  it("keeps serial filings even, which a stale load count could not", async () => {
-    const a = await signedInAs("assessor", "Asha Mrema");
-    const b = await signedInAs("assessor", "Baraka Nyoni");
+  it("does not prefer, or otherwise involve, the Officer who typed it in", async () => {
+    const typist = await signedInAs("assessor", "Asha Mrema");
 
-    // Each filing is its own transaction and takes the advisory lock before counting, so no two
-    // can act on the same count. Two injected requests cannot truly overlap inside one worker, so
-    // this asserts the arithmetic rather than the lock; the lock itself is asserted below, on the
-    // code that takes it.
-    for (let i = 0; i < 4; i += 1) await fileAtThePublicDoor();
+    await fileAsStaff(typist.cookie);
+    const row = await onlyReport();
 
-    expect(await workload()).toEqual({ [a.name]: 2, [b.name]: 2 });
+    // Who typed it and who must assess it are different questions, and filing no longer answers
+    // the second one at all.
+    expect(row.entered_by_user_id).toBe(typist.id);
+    expect(row.assessor1_user_id).toBeNull();
   });
 
-  it("takes the lock before it counts, not after", async () => {
-    const source = await import("node:fs/promises").then((fs) =>
-      fs.readFile(new URL("../../src/domain/reports.ts", import.meta.url), "utf8"),
-    );
-
-    // A lock taken after the count would exclude nothing: both filings would already have read
-    // the same numbers. Asserted on the source because the ordering is the whole guarantee and no
-    // single-threaded test can observe it.
-    const lock = source.indexOf("pg_advisory_xact_lock");
-    const pick = source.indexOf("await pickFirstAssessor(tx)");
-    const insert = source.indexOf(".insert(reports)");
-
-    expect(lock).toBeGreaterThan(-1);
-    expect(lock).toBeLessThan(pick);
-    expect(pick).toBeLessThan(insert);
-  });
-
-  it("still files a public report as nobody's, but not as nobody's problem", async () => {
-    const officer = await signedInAs("assessor", "Asha Mrema");
+  it("ignores existing workload entirely — an idle Officer gets nothing from filing alone", async () => {
+    const idle = await signedInAs("assessor", "Asha Mrema");
+    const busy = await signedInAs("assessor", "Baraka Nyoni");
+    await preload(busy.id, "MD-AE/2026/7001");
 
     await fileAtThePublicDoor();
 
     const rows = await owner.db.execute(sql`
-      SELECT channel::text AS channel, entered_by_user_id, assessor1_user_id, assessor1_assigned_at
-        FROM reports
+      SELECT assessor1_user_id FROM reports WHERE number <> 'MD-AE/2026/7001'
     `);
-    const row = rows[0] as {
-      channel: string;
-      entered_by_user_id: string | null;
-      assessor1_user_id: string | null;
-      assessor1_assigned_at: Date | null;
-    };
+    const filed = rows[0] as { assessor1_user_id: string | null };
 
-    expect(row.channel).toBe("online_form");
-    expect(row.entered_by_user_id).toBeNull();
-    expect(row.assessor1_user_id).toBe(officer.id);
-    expect(row.assessor1_assigned_at).not.toBeNull();
+    // The old rule would have handed this to the idle Officer. The new one hands it to nobody.
+    expect(filed.assessor1_user_id).toBeNull();
+    expect(filed.assessor1_user_id).not.toBe(idle.id);
+  });
+
+  it("still allocates a report number and stores the submission", async () => {
+    const res = await fileAtThePublicDoor();
+    const row = await onlyReport();
+
+    expect(res.statusCode).toBe(200);
+    expect(row.status).toBe("received");
+    expect(row.number).toMatch(/^AEMD\/\d{4}-\d{2}\/\d{3}$/);
+    expect(res.body).toContain(row.number);
+  });
+
+  it("does not call the removed auto-pick, and always inserts a null assignment", async () => {
+    const source = await import("node:fs/promises").then((fs) =>
+      fs.readFile(new URL("../../src/domain/reports.ts", import.meta.url), "utf8"),
+    );
+
+    // Asserted on the source: `pickFirstAssessor` and the advisory lock that protected its
+    // workload count are gone, not merely unused. A future re-introduction of either would fail
+    // this before it could reach a database.
+    expect(source).not.toContain("pickFirstAssessor");
+    expect(source).not.toContain("pg_advisory_xact_lock");
+    expect(source).toContain("assessor1UserId: null");
+    expect(source).toContain("assessor1AssignedAt: null");
   });
 });
 
@@ -364,6 +316,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the first assessment doorway", () => {
     const officer = await signedInAs("assessor", "Asha Mrema");
     await fileAtThePublicDoor();
     const row = await onlyReport();
+    await assignManually(row.id, officer.id);
 
     const res = await get(`/reports/${row.id}/assessment-1`, officer.cookie);
 
@@ -380,7 +333,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the first assessment doorway", () => {
     const holder = await signedInAs("assessor", "Asha Mrema");
     await fileAtThePublicDoor();
     const row = await onlyReport();
-    expect(row.assessor1_user_id).toBe(holder.id);
+    await assignManually(row.id, holder.id);
 
     const stranger = await signedInAs("assessor", "Baraka Nyoni");
     const manager = await signedInAs("manager", "Mgr");
@@ -400,16 +353,13 @@ describe.skipIf(!INTEGRATION_ENABLED)("the first assessment doorway", () => {
     expect((await get(`/reports/${row.id}`, manager.cookie)).statusCode).toBe(200);
   });
 
-  it("refuses an orphan to everybody", async () => {
+  it("refuses an orphan to everybody, including an active Officer", async () => {
     const officer = await signedInAs("assessor", "Asha Mrema");
-    await owner.db.execute(sql`
-      INSERT INTO reports (number, channel, severity, status, device_name, form_version, payload)
-      VALUES ('MD-AE/2026/7201', 'online_form', 'other', 'received', 'Orphan', 'F001', '{}'::jsonb)
-    `);
+    await fileAtThePublicDoor();
     const row = await onlyReport();
 
-    // Nobody was given it, so nobody may assess it. Handing out an orphan is a route that does not
-    // exist yet, and this page must not become it by first-come-first-served.
+    // Left exactly as filing leaves it — unassigned. Nobody was given it, so nobody may assess it.
+    expect(row.assessor1_user_id).toBeNull();
     expect((await get(`/reports/${row.id}/assessment-1`, officer.cookie)).statusCode).toBe(403);
   });
 
@@ -417,6 +367,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the first assessment doorway", () => {
     const officer = await signedInAs("assessor", "Asha Mrema");
     await fileAtThePublicDoor();
     const row = await onlyReport();
+    await assignManually(row.id, officer.id);
 
     const stranger = await signedInAs("assessor", "Baraka Nyoni");
     const manager = await signedInAs("manager", "Mgr");
@@ -432,6 +383,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the first assessment doorway", () => {
     const officer = await signedInAs("assessor", "Asha Mrema");
     await fileAtThePublicDoor();
     const row = await onlyReport();
+    await assignManually(row.id, officer.id);
 
     const body = (await get(`/reports/${row.id}/assessment-1`, officer.cookie)).body;
 
