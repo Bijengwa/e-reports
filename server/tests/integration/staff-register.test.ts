@@ -1,6 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 import { sql } from "drizzle-orm";
+import ExcelJS from "exceljs";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { hashPassword } from "../../src/auth/password.js";
@@ -8,6 +9,7 @@ import type { Config } from "../../src/config.js";
 import type { DatabaseHandle } from "../../src/db/client.js";
 import { F004_VERSION } from "../../src/domain/f004.js";
 import { FINAL_DOCUMENT_KIND } from "../../src/domain/final-document.js";
+import { COLUMNS } from "../../src/doors/staff/views/register.js";
 import { buildServer } from "../../src/server.js";
 import { INTEGRATION_ENABLED, openOwner, requireTestDatabase, truncateAll } from "./helpers.js";
 
@@ -234,5 +236,100 @@ describe.skipIf(!INTEGRATION_ENABLED)("staff Register data mapping", () => {
     expect(page.body).toContain("Provide feedback to users");
     expect(page.body).not.toContain(">Done<");
     expect(page.body).not.toContain(">Not Done<");
+  });
+});
+
+describe.skipIf(!INTEGRATION_ENABLED)("staff Register access and download", () => {
+  beforeEach(start);
+
+  it("lets a manager and an Officer open the Register and download it, and refuses an administrator", async () => {
+    await seedReport({ number: "AEMD/2026-27/201" });
+
+    for (const role of ["manager", "assessor"] as const) {
+      const { cookie } = await signedInAs(role);
+      const page = await get("/register", cookie);
+      expect(page.statusCode, role).toBe(200);
+      expect(page.body).toContain("Download Register");
+      expect(page.body).toContain('href="/register/download/pdf"');
+      expect(page.body).toContain('href="/register/download/xlsx"');
+
+      const pdf = await get("/register/download/pdf", cookie);
+      expect(pdf.statusCode, `${role} pdf`).toBe(200);
+      expect(String(pdf.headers["content-type"])).toContain("application/pdf");
+      expect(String(pdf.headers["content-disposition"])).toMatch(
+        /attachment; filename="AEMD-Register-\d{4}-\d{2}-\d{2}\.pdf"/,
+      );
+      expect(Buffer.from(pdf.rawPayload).subarray(0, 4).toString("latin1")).toBe("%PDF");
+      expect(pdf.rawPayload.byteLength).toBeGreaterThan(1000);
+
+      const xlsx = await get("/register/download/xlsx", cookie);
+      expect(xlsx.statusCode, `${role} xlsx`).toBe(200);
+      expect(String(xlsx.headers["content-type"])).toContain(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+      expect(String(xlsx.headers["content-disposition"])).toMatch(
+        /attachment; filename="AEMD-Register-\d{4}-\d{2}-\d{2}\.xlsx"/,
+      );
+      expect(xlsx.rawPayload.byteLength).toBeGreaterThan(1000);
+    }
+
+    const admin = await signedInAs("administrator");
+    expect((await get("/register", admin.cookie)).statusCode).toBe(403);
+    expect((await get("/register/download/pdf", admin.cookie)).statusCode).toBe(403);
+    expect((await get("/register/download/xlsx", admin.cookie)).statusCode).toBe(403);
+
+    const dashboard = await get("/dashboard", admin.cookie);
+    expect(dashboard.statusCode).toBe(200);
+    expect(dashboard.body).not.toContain('href="/register"');
+  });
+
+  it("exports the same Register fields the page shows", async () => {
+    const officer = await signedInAs("assessor", "Baraka Nyoni");
+    const reportId = await seedReport({
+      number: "AEMD/2026-27/202",
+      payload: {
+        manufacturing_country: "Kenya",
+        reporter_name: "A. Mwita",
+        phone: "+255700000000",
+      },
+    });
+    await seedSubmittedA1(reportId, officer.id, {
+      report_stage: "follow_up",
+      imdrf_component_l1: "Battery",
+      imdrf_component_code: "E1204",
+      imdrf_investigation_findings_l1: "Cell fault confirmed",
+      causality: "probable",
+      actions: ["monitoring"],
+    });
+
+    const { cookie } = await signedInAs("manager");
+    const page = await get("/register", cookie);
+    expect(page.body).toContain("AEMD/2026-27/202");
+    expect(page.body).toContain("Follow up");
+    expect(page.body).toContain("Battery");
+
+    const xlsx = await get("/register/download/xlsx", cookie);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(xlsx.rawPayload);
+    const sheet = workbook.getWorksheet("Register");
+    expect(sheet).toBeDefined();
+    if (sheet === undefined) return;
+
+    expect(sheet.columnCount).toBe(COLUMNS.length);
+    expect(sheet.getRow(1).getCell(2).value).toBe("TMDA Report Number");
+    expect(sheet.getRow(2).getCell(2).value).toBe("AEMD/2026-27/202");
+    expect(sheet.getRow(2).getCell(19).value).toBe("Follow up");
+    expect(sheet.getRow(2).getCell(20).value).toBe("Name: A. Mwita · Contact: +255700000000");
+    expect(sheet.getRow(2).getCell(22).value).toBe("Battery");
+    expect(sheet.getRow(2).getCell(25).value).toBe("E1204");
+    expect(sheet.getRow(2).getCell(39).value).toBe("Cell fault confirmed");
+    expect(sheet.getRow(2).getCell(48).value).toBe("Probable");
+    expect(sheet.getRow(2).getCell(50).value).toBe("Enhance monitoring");
+
+    const pdf = await get("/register/download/pdf", cookie);
+    expect(Buffer.from(pdf.rawPayload).subarray(0, 4).toString("latin1")).toBe("%PDF");
+    expect(Buffer.from(pdf.rawPayload).toString("latin1")).toContain(
+      "/MediaBox [0 0 1190.55 841.89]",
+    );
   });
 });

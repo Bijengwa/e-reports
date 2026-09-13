@@ -319,17 +319,19 @@ export function StaffShell({
               </a>
             )}
 
-            {/* The institutional register: read-only record of all adverse events/incidents,
-                automatically populated from the Orange Report → Assessment → Manager Decision
-                workflow. Accessible to all authenticated staff. */}
-            <a
-              href="/register"
-              class={active === "register" ? "on" : ""}
-              aria-current={active === "register" ? "page" : undefined}
-            >
-              <IconRegister />
-              <span class="rail-label">Register</span>
-            </a>
+            {/* The institutional register. Managers and Officers (assessors) may open it;
+                administrators may not. Presentation only — `requireRole` on the register scope
+                is what refuses the route. */}
+            {(isManager || isOfficer) && (
+              <a
+                href="/register"
+                class={active === "register" ? "on" : ""}
+                aria-current={active === "register" ? "page" : undefined}
+              >
+                <IconRegister />
+                <span class="rail-label">Register</span>
+              </a>
+            )}
 
             {/* The Officer's, because registering a report that arrived by email is the Officer's
                 work. Presentation only, as above: `requireRole` refuses the route whatever the

@@ -74,7 +74,7 @@ export type RegisterPageProps = {
  * Header strings mirror the TMDA Adverse Events/Incidents Register worksheet
  * (TMDA/DMD/MDV/R/002) column-for-column, with typos in the worksheet corrected.
  */
-const COLUMNS: ReadonlyArray<{
+export const COLUMNS: ReadonlyArray<{
   header: string;
   width: number;
   cell: (row: RegisterRow) => string | number;
@@ -310,6 +310,19 @@ export function RegisterPage({ rows, viewerRole, viewerName }: RegisterPageProps
               id="search-register"
               aria-label="Search the register"
             />
+            <details class="register-download">
+              <summary class="btn ghost">
+                Download Register <span aria-hidden="true">▾</span>
+              </summary>
+              <div class="register-download-menu" role="menu" aria-label="Download Register">
+                <a href="/register/download/pdf" role="menuitem">
+                  PDF
+                </a>
+                <a href="/register/download/xlsx" role="menuitem">
+                  Excel
+                </a>
+              </div>
+            </details>
           </div>
         </div>
 

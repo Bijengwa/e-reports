@@ -89,10 +89,14 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
       // the document is written by the approval and by nothing else.
       await active.register(finalDocumentRoutes);
 
-      // The Register: institutional read-only record of adverse events/incidents, automatically
-      // populated from the Orange Report → Assessment → Manager Decision workflow. Accessible
-      // to all authenticated staff roles. Read-only enforcement via UI and role-based access.
-      await active.register(registerRoutes);
+      // The Register: institutional read-only record of adverse events/incidents. Managers and
+      // Officers (the `assessor` role) may open it and download it. Administrators may not —
+      // their powers are over accounts, not the vigilance register. The rail hides the link;
+      // this scope is what refuses a direct URL.
+      await active.register(async (registerAccess) => {
+        requireRole(registerAccess, ["manager", "assessor"]);
+        await registerAccess.register(registerRoutes);
+      });
 
       await active.register(async (registration) => {
         // Narrower, and in the other direction from the scope below: registering a report that

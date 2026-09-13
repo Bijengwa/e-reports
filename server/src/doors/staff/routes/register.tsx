@@ -1,10 +1,12 @@
 import { sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
+import type { Database } from "../../../db/client.js";
 import {
   f004AnswersForRegister,
   formatReporterDetails,
   mapF004ToRegisterCells,
 } from "../../../domain/register.js";
+import { buildRegisterPdf, buildRegisterXlsx, registerExportFilename } from "../register-export.js";
 import { currentSession } from "../session-guard.js";
 import { RegisterPage, type RegisterRow } from "../views/register.js";
 
@@ -42,8 +44,8 @@ function cell(value: string | null | undefined): string {
   return value ?? "";
 }
 
-async function getRegisterData(app: FastifyInstance): Promise<ReadonlyArray<RegisterRow>> {
-  const rows = await app.db.execute(sql`
+async function loadRegisterRows(db: Database): Promise<ReadonlyArray<RegisterRow>> {
+  const rows = await db.execute(sql`
     SELECT
       r.id as report_id,
       r.number as tmda_report_number,
@@ -120,10 +122,30 @@ async function getRegisterData(app: FastifyInstance): Promise<ReadonlyArray<Regi
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
   app.get("/register", async (request, reply) => {
     const session = currentSession(request);
-    const rows = await getRegisterData(app);
+    const rows = await loadRegisterRows(app.db);
 
     return reply.html(
       <RegisterPage rows={rows} viewerRole={session.role} viewerName={session.fullName} />,
     );
+  });
+
+  app.get("/register/download/pdf", async (_request, reply) => {
+    const rows = await loadRegisterRows(app.db);
+    const body = await buildRegisterPdf(rows);
+    const filename = registerExportFilename("pdf");
+    return reply
+      .header("Content-Type", "application/pdf")
+      .header("Content-Disposition", `attachment; filename="${filename}"`)
+      .send(body);
+  });
+
+  app.get("/register/download/xlsx", async (_request, reply) => {
+    const rows = await loadRegisterRows(app.db);
+    const body = await buildRegisterXlsx(rows);
+    const filename = registerExportFilename("xlsx");
+    return reply
+      .header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+      .header("Content-Disposition", `attachment; filename="${filename}"`)
+      .send(body);
   });
 }
