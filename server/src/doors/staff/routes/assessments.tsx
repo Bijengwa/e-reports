@@ -18,6 +18,7 @@ type Row = {
   ordinal: number;
   started: boolean;
   submitted: boolean;
+  due_at: Date | null;
 };
 
 /**
@@ -51,6 +52,7 @@ function toRow(raw: unknown): AssignmentRow {
     severity: row.severity,
     ordinal: row.ordinal,
     state: stateOf(row),
+    dueAt: row.due_at === null ? null : new Date(row.due_at),
     // Whether the report page is still open to this Officer, decided by the same rule
     // `reportsRoutes` decides it by. Once the manager has approved and handed the work out, the
     // assessment workflow is over for an Officer and the page is refused them — so the number
@@ -85,7 +87,8 @@ export async function myAssessmentsRoutes(app: FastifyInstance): Promise<void> {
       SELECT r.id, r.number, r.received_at, r.device_name, r.severity, r.status::text AS status,
              1 AS ordinal,
              (coalesce(a.payload, '{}'::jsonb) IS DISTINCT FROM '{}'::jsonb) AS started,
-             (a.submitted_at IS NOT NULL) AS submitted
+             (a.submitted_at IS NOT NULL) AS submitted,
+             a.due_at
         FROM reports r
         LEFT JOIN assessments a ON a.report_id = r.id AND a.ordinal = 1
        WHERE r.assessor1_user_id = ${session.userId}
@@ -95,7 +98,8 @@ export async function myAssessmentsRoutes(app: FastifyInstance): Promise<void> {
       SELECT r.id, r.number, r.received_at, r.device_name, r.severity, r.status::text AS status,
              a.ordinal,
              (coalesce(a.payload, '{}'::jsonb) IS DISTINCT FROM '{}'::jsonb) AS started,
-             (a.submitted_at IS NOT NULL) AS submitted
+             (a.submitted_at IS NOT NULL) AS submitted,
+             a.due_at
         FROM assessments a
         JOIN reports r ON r.id = a.report_id
        WHERE a.assessor_id = ${session.userId} AND a.ordinal > 1

@@ -30,6 +30,13 @@ export type LayoutProps = {
    * must not be made to fetch a script that would find nothing to attach to.
    */
   f4Find?: boolean;
+  /**
+   * Load the live countdown enhancement.
+   *
+   * Opt-in for the same reason `f4Find` is: a page with no `[data-countdown]` element on it must
+   * not be made to fetch a script that would find nothing to attach to.
+   */
+  countdown?: boolean;
   children?: Children;
 };
 
@@ -47,6 +54,7 @@ export function Layout({
   passwordToggle,
   railScript,
   f4Find,
+  countdown,
   children,
 }: LayoutProps): JSX.Element {
   return (
@@ -70,6 +78,10 @@ export function Layout({
             reader needs to be told happened, so a browser that blocks this leaves the page
             exactly as readable as it was. Served from our own origin to satisfy the CSP. */}
         {f4Find && <script src="/assets/f4-find.js" defer></script>}
+        {/* Enhancement only: the server has already rendered the true remaining time as of the
+            response, so a browser that blocks this leaves a correct but static countdown rather
+            than a broken page. Served from our own origin to satisfy the CSP. */}
+        {countdown && <script src="/assets/countdown.js" defer></script>}
       </head>
       <body class={bodyClass ?? ""}>{children}</body>
     </html>

@@ -1228,6 +1228,39 @@ textarea[aria-invalid="true"] {
   color: var(--orange-d);
 }
 
+/* ---------- deadline countdown ---------- */
+/*
+ * A pill the same shape as `.tag`, but monospace: the digits change every second and a
+ * proportional font would make the whole label visibly shift width as it ticks.
+ */
+.countdown {
+  display: inline-block;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: var(--leaf-bg);
+  color: var(--leaf-d);
+}
+
+.countdown-near {
+  background: var(--orange-bg);
+  color: var(--orange-d);
+}
+
+.countdown-overdue {
+  background: var(--flag-bg);
+  color: var(--flag);
+}
+
+.countdown-completed,
+.countdown-none {
+  background: #ecefed;
+  color: var(--ink-3);
+}
+
 /* ---------- the one-time password ---------- */
 /*
  * Deliberately loud. This is the only time the credential is ever on screen, so the page has to

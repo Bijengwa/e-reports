@@ -1,3 +1,4 @@
+import { Countdown } from "./countdown.js";
 import {
   assessment1Href,
   day,
@@ -67,6 +68,7 @@ export type AssignmentRow = {
   /** 1 for the first assessment, 2, 3, 4 … for each secondary one. */
   ordinal: number;
   state: AssignmentState;
+  dueAt: Date | null;
   /**
    * Whether this Officer may still open the report page behind the number.
    *
@@ -135,6 +137,7 @@ function AssignmentRows({
             <th>Assessment</th>
             <th>Assessor</th>
             <th>Status</th>
+            <th>Deadline</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -167,6 +170,9 @@ function AssignmentRows({
                 <span class="tag muted" safe>
                   {STATE_LABELS[row.state]}
                 </span>
+              </td>
+              <td>
+                <Countdown dueAt={row.dueAt} completed={row.state === "submitted"} />
               </td>
               <td>
                 <a href={assignmentHref(row)} class="btn ghost btn-sm" safe>
@@ -251,8 +257,6 @@ export function MyAssessmentsPage({
   inProgress,
   submitted,
 }: MyAssessmentsPageProps): JSX.Element {
-  const total = notStarted.length + inProgress.length + submitted.length;
-
   return (
     <StaffShell
       title="My assessments — AE Reports"
@@ -260,14 +264,25 @@ export function MyAssessmentsPage({
       role={viewerRole}
       fullName={viewerName}
       active="assessments"
+      countdown
     >
-      <div class="staff-head">
-        <div class="sp">
-          <p class="hint">
-            {total} assessment{total === 1 ? "" : "s"} assigned to you
-          </p>
+      {/*
+       * "Assigned to you" means work sitting untouched, not work in any of the three states —
+       * an assessor already knows about the one they are mid-way through or already sent on, and
+       * counting those into this sentence made it read as a to-do count when 0 of them were
+       * actually waiting to be started. Absent entirely at zero, for the same reason: a bar
+       * announcing "0 assessments assigned to you" reads as a problem needing attention, and the
+       * Not started tab immediately below already says so plainly if it is empty.
+       */}
+      {notStarted.length > 0 && (
+        <div class="staff-head">
+          <div class="sp">
+            <p class="hint">
+              {notStarted.length} assessment{notStarted.length === 1 ? "" : "s"} assigned to you
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/*
        * Three tabs over one group at a time, not three lists stacked down the page.

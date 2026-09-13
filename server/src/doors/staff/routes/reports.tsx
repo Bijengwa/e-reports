@@ -125,6 +125,8 @@ export async function loadReport(
   assessor1UserId: string | null;
   legacyAssessor2UserId: string | null;
   assessor1Name: string | null;
+  /** Assessment 1's own deadline, whether or not it has been submitted yet. */
+  assessor1DueAt: Date | null;
   assessment1: Assessment1Read | null;
   secondaryAssessments: SecondaryAssignment[];
   decisions: DecisionEntry[];
@@ -138,6 +140,7 @@ export async function loadReport(
            asm.payload AS assessment1_payload,
            asm.conclusion AS assessment1_conclusion,
            asm.submitted_at AS assessment1_submitted_at,
+           asm.due_at AS assessment1_due_at,
            asm.manager_comment AS assessment1_comment,
            asm.manager_comment_at AS assessment1_comment_at,
            mc.full_name AS assessment1_comment_by
@@ -162,6 +165,7 @@ export async function loadReport(
     assessment1_payload: unknown;
     assessment1_conclusion: string | null;
     assessment1_submitted_at: Date | null;
+    assessment1_due_at: Date | null;
     assessment1_comment: string | null;
     assessment1_comment_at: Date | null;
     assessment1_comment_by: string | null;
@@ -192,7 +196,8 @@ export async function loadReport(
 
   // Every secondary assessment this report has ever had, ordinal 2 upward, draft or submitted.
   const secondaryRows = await app.db.execute(sql`
-    SELECT a.ordinal, a.assessor_id, u.full_name AS assessor_name, a.payload, a.submitted_at
+    SELECT a.ordinal, a.assessor_id, u.full_name AS assessor_name, a.payload, a.submitted_at,
+           a.due_at
       FROM assessments a
       JOIN users u ON u.id = a.assessor_id
      WHERE a.report_id = ${id} AND a.ordinal > 1
@@ -206,6 +211,7 @@ export async function loadReport(
       assessor_name: string;
       payload: unknown;
       submitted_at: Date | null;
+      due_at: Date | null;
     };
 
     return {
@@ -214,6 +220,7 @@ export async function loadReport(
       assessorName: r.assessor_name,
       submitted: r.submitted_at !== null,
       submittedOn: r.submitted_at === null ? null : day(r.submitted_at),
+      dueAt: r.due_at === null ? null : new Date(r.due_at),
       answers: normalizeSecondaryReview(r.payload) as SecondaryReviewPayload,
     };
   });
@@ -267,6 +274,7 @@ export async function loadReport(
     assessor1UserId: row.assessor1_user_id,
     legacyAssessor2UserId: row.assessor2_user_id,
     assessor1Name: row.assessor1_name,
+    assessor1DueAt: row.assessment1_due_at === null ? null : new Date(row.assessment1_due_at),
     assessment1,
     secondaryAssessments,
     decisions,
@@ -437,6 +445,8 @@ export async function renderReport(
             : null
         }
         assessor1Name={found.assessor1Name}
+        assessor1DueAt={found.assessor1DueAt}
+        assessor1Submitted={found.assessment1 !== null}
         assessment1Review={assessment1Review}
         secondaryAssessments={found.secondaryAssessments}
         firstAssessorPicker={firstAssessorPicker}

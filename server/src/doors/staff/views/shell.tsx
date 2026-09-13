@@ -50,6 +50,13 @@ export type StaffShellProps = {
    * made to fetch the script that would find nothing to attach to.
    */
   f4Find?: boolean;
+  /**
+   * Load the live countdown enhancement.
+   *
+   * Opt-in for the same reason `f4Find` is: a page with no `[data-countdown]` element on it must
+   * not be made to fetch a script that would find nothing to attach to.
+   */
+  countdown?: boolean;
   children?: Children;
 };
 
@@ -251,6 +258,7 @@ export function StaffShell({
   fullName,
   active,
   f4Find,
+  countdown,
   children,
 }: StaffShellProps): JSX.Element {
   const isAdministrator = role === "administrator";
@@ -259,7 +267,14 @@ export function StaffShell({
   const isManager = role === "manager";
 
   return (
-    <Layout title={title} locale="en" bodyClass="staff" railScript f4Find={f4Find}>
+    <Layout
+      title={title}
+      locale="en"
+      bodyClass="staff"
+      railScript
+      f4Find={f4Find}
+      countdown={countdown}
+    >
       <div class="shell">
         {/* `on-dark` is what recolours the mark for the rail: white folder, green cross. The
             paths are the same ones the sign-in card renders. */}

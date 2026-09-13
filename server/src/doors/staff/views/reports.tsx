@@ -2,6 +2,7 @@ import { DEADLINE_UNITS, DEFAULT_DEADLINE } from "../../../domain/assignment.js"
 import type { F004Answers, SecondaryReviewPayload } from "../../../domain/f004.js";
 import { STEP_FIELDS, STEPS } from "../../../domain/form-schema.js";
 import { type MessageKey, translatorFor } from "../../../i18n/index.js";
+import { Countdown } from "./countdown.js";
 import { F004Form, type PriorSecondaryReview, type SectionComment } from "./f004.js";
 import { CHANNEL_LABELS, OrangeReportIdentity, OrangeReportSurface } from "./orange-report.js";
 import { StaffShell } from "./shell.js";
@@ -491,6 +492,7 @@ export type SecondaryAssignment = {
   assessorName: string;
   submitted: boolean;
   submittedOn: string | null;
+  dueAt: Date | null;
   answers: SecondaryReviewPayload;
 };
 
@@ -537,6 +539,10 @@ export type ReportPageProps = {
   error?: string;
   /** Who holds the first assessment. Null until intake has named them. */
   assessor1Name?: string | null;
+  /** Assessment 1's own deadline, whether or not it has been submitted yet. */
+  assessor1DueAt?: Date | null;
+  /** Whether Assessment 1 has been submitted — the countdown stops the moment this is true. */
+  assessor1Submitted?: boolean;
   /**
    * The first assessment, read-only, for a manager reviewing what the first Officer submitted.
    *
@@ -580,10 +586,14 @@ export type ReportPageProps = {
  */
 function AssessmentHistory({
   assessor1Name,
+  assessor1DueAt,
+  assessor1Submitted,
   secondaryAssessments,
   mySecondaryOrdinal,
 }: {
   assessor1Name?: string | null;
+  assessor1DueAt?: Date | null;
+  assessor1Submitted?: boolean;
   secondaryAssessments: SecondaryAssignment[];
   mySecondaryOrdinal: number | null;
 }): JSX.Element {
@@ -592,8 +602,11 @@ function AssessmentHistory({
       <li>
         <span class="a-hist-no">A1</span>
         <span safe>{assessor1Name ?? "Not assigned"}</span>
-        {assessor1Name !== null && assessor1Name !== undefined && (
+        {assessor1Name !== null && assessor1Name !== undefined && assessor1Submitted === true && (
           <span class="a-hist-done">✓</span>
+        )}
+        {assessor1Name !== null && assessor1Name !== undefined && assessor1Submitted !== true && (
+          <Countdown dueAt={assessor1DueAt ?? null} completed={false} />
         )}
       </li>
       {secondaryAssessments.map((a) => (
@@ -602,10 +615,11 @@ function AssessmentHistory({
           <span safe>{a.assessorName}</span>
           {a.submitted ? (
             <span class="a-hist-done">✓</span>
-          ) : a.ordinal === mySecondaryOrdinal ? (
-            <span class="a-hist-current">→ Current</span>
           ) : (
-            <span class="hint">In progress</span>
+            <>
+              <Countdown dueAt={a.dueAt} completed={false} />
+              {a.ordinal === mySecondaryOrdinal && <span class="a-hist-current">→ Current</span>}
+            </>
           )}
         </li>
       ))}
@@ -659,6 +673,8 @@ export function ReportPage({
   canComment,
   error,
   assessor1Name,
+  assessor1DueAt,
+  assessor1Submitted,
   assessment1Review,
   secondaryAssessments,
   firstAssessorPicker,
@@ -692,6 +708,7 @@ export function ReportPage({
       role={viewerRole}
       fullName={viewerName}
       active="reports"
+      countdown
     >
       <div class="staff-head">
         <div class="sp">
@@ -701,6 +718,8 @@ export function ReportPage({
           <OrangeReportIdentity report={report} />
           <AssessmentHistory
             assessor1Name={assessor1Name}
+            assessor1DueAt={assessor1DueAt}
+            assessor1Submitted={assessor1Submitted}
             secondaryAssessments={secondaryAssessments}
             mySecondaryOrdinal={mySecondaryOrdinal}
           />
