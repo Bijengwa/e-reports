@@ -1,9 +1,12 @@
 /*
- * The IMDRF terminology browser: annex tree (expand-on-demand), search-with-debounce, and a term
- * detail panel. Every list here comes from the server already paged — nothing in this file ever
+ * The IMDRF terminology handbook: annex tree (expand-on-demand), search-with-debounce, and a term
+ * document pane. Every list here comes from the server already paged — nothing in this file ever
  * fetches "all terms" and filters client-side. Opt-in like the door's other scripts: a page with
  * no `[data-imdrf-browser]` container loads this file (it is only ever referenced from the one
  * page that has one) and does nothing.
+ *
+ * Indent is a `data-depth` attribute, never an inline style: the CSP `style-src 'self'` would
+ * drop a `padding-left` written here, which is how an earlier draft of this tree arrived flat.
  */
 (function () {
   "use strict";
@@ -22,6 +25,10 @@
     );
   }
 
+  function emptyHint(text) {
+    return '<p class="hint">' + escapeHtml(text) + "</p>";
+  }
+
   ready(function () {
     var root = document.querySelector("[data-imdrf-browser]");
     if (!root) return;
@@ -33,28 +40,30 @@
     var detailEl = root.querySelector("[data-imdrf-detail]");
     var annexButtons = root.querySelectorAll("[data-imdrf-annex]");
     var searchTimer = null;
+    var selectedId = null;
 
     function termRowHtml(row, depth) {
-      var indent = "padding-left:" + depth * 16 + "px";
-      var caret = row.hasChildren
-        ? '<span class="imdrf-caret" aria-hidden="true">›</span>'
-        : '<span class="imdrf-caret" aria-hidden="true"></span>';
+      var hasChildren = row.hasChildren === true;
       return (
-        '<div class="imdrf-row" style="' +
-        indent +
-        '" data-id="' +
+        '<div class="imdrf-row" data-id="' +
         escapeHtml(row.id) +
         '" data-has-children="' +
-        row.hasChildren +
-        '" data-expanded="false">' +
-        '<button type="button" class="imdrf-row-btn" data-role="toggle">' +
-        caret +
+        hasChildren +
+        '" data-expanded="false" data-depth="' +
+        String(depth) +
+        '">' +
+        '<button type="button" class="imdrf-toggle" data-role="toggle"' +
+        (hasChildren ? ' aria-expanded="false" aria-label="Expand"' : ' tabindex="-1"') +
+        ">" +
+        '<span class="imdrf-caret" aria-hidden="true"></span>' +
         "</button>" +
-        '<button type="button" class="imdrf-row-btn imdrf-row-label" data-role="detail">' +
+        '<button type="button" class="imdrf-term-btn" data-role="detail">' +
         "<code>" +
         escapeHtml(row.code) +
-        "</code> " +
+        "</code>" +
+        "<span>" +
         escapeHtml(row.term) +
+        "</span>" +
         "</button>" +
         '<div class="imdrf-children" data-role="children"></div>' +
         "</div>"
@@ -67,7 +76,17 @@
           .map(function (row) {
             return termRowHtml(row, depth);
           })
-          .join("") || '<p class="hint">No terms.</p>';
+          .join("") || emptyHint("No terms.");
+    }
+
+    function markSelected(termId) {
+      selectedId = termId;
+      root.querySelectorAll(".imdrf-term-btn.on").forEach(function (btn) {
+        btn.classList.remove("on");
+      });
+      if (!termId) return;
+      var match = root.querySelector('.imdrf-row[data-id="' + termId + '"] > .imdrf-term-btn');
+      if (match) match.classList.add("on");
     }
 
     function attachRowHandlers(container, depth) {
@@ -76,9 +95,13 @@
         var toggleBtn = rowEl.querySelector('[data-role="toggle"]');
         var labelBtn = rowEl.querySelector('[data-role="detail"]');
         var childrenEl = rowEl.querySelector('[data-role="children"]');
+        var termId = rowEl.getAttribute("data-id");
+
+        if (termId === selectedId) labelBtn.classList.add("on");
 
         labelBtn.addEventListener("click", function () {
-          loadDetail(rowEl.getAttribute("data-id"));
+          markSelected(termId);
+          loadDetail(termId);
         });
 
         if (rowEl.getAttribute("data-has-children") !== "true") return;
@@ -87,15 +110,16 @@
           var expanded = rowEl.getAttribute("data-expanded") === "true";
           if (expanded) {
             rowEl.setAttribute("data-expanded", "false");
+            toggleBtn.setAttribute("aria-expanded", "false");
+            toggleBtn.setAttribute("aria-label", "Expand");
             childrenEl.innerHTML = "";
-            toggleBtn.querySelector(".imdrf-caret").textContent = "›";
             return;
           }
           fetch(
             "/imdrf/releases/" +
               releaseId +
               "/terms?parentId=" +
-              encodeURIComponent(rowEl.getAttribute("data-id")),
+              encodeURIComponent(termId),
           )
             .then(function (r) {
               return r.json();
@@ -104,15 +128,24 @@
               renderRows(childrenEl, data.rows, depth + 1);
               attachRowHandlers(childrenEl, depth + 1);
               rowEl.setAttribute("data-expanded", "true");
-              toggleBtn.querySelector(".imdrf-caret").textContent = "⌄";
+              toggleBtn.setAttribute("aria-expanded", "true");
+              toggleBtn.setAttribute("aria-label", "Collapse");
             });
         });
       });
     }
 
+    function resetDetail() {
+      selectedId = null;
+      detailEl.innerHTML = emptyHint("Choose a term from the list to read its definition.");
+    }
+
     function loadAnnex(annex) {
-      treeEl.innerHTML = '<p class="hint">Loading…</p>';
-      detailEl.innerHTML = "";
+      treeEl.innerHTML = emptyHint("Loading…");
+      resultsEl.innerHTML = "";
+      resultsEl.hidden = true;
+      treeEl.hidden = false;
+      resetDetail();
       fetch("/imdrf/releases/" + releaseId + "/terms?annex=" + encodeURIComponent(annex))
         .then(function (r) {
           return r.json();
@@ -124,60 +157,73 @@
     }
 
     function loadDetail(termId) {
-      detailEl.innerHTML = '<p class="hint">Loading…</p>';
+      detailEl.innerHTML = emptyHint("Loading…");
       fetch("/imdrf/releases/" + releaseId + "/terms/" + encodeURIComponent(termId))
         .then(function (r) {
           return r.json();
         })
         .then(function (term) {
           if (!term) {
-            detailEl.innerHTML = '<p class="hint">Not found.</p>';
+            detailEl.innerHTML = emptyHint("Not found.");
             return;
           }
-          var isRetired = String(term.status || "").toLowerCase().indexOf("retired") !== -1;
-          var status = term.status
+          var statusText = String(term.status || "");
+          var lowered = statusText.toLowerCase();
+          var isQuiet =
+            lowered.indexOf("retired") !== -1 || lowered.indexOf("not selectable") !== -1;
+          var status = statusText
             ? '<span class="tag' +
-              (isRetired ? " muted" : "") +
+              (isQuiet ? " muted" : "") +
               '">' +
-              escapeHtml(term.status) +
+              escapeHtml(statusText) +
               "</span>"
             : "";
+          var crumb = String(term.codeHierarchy || "")
+            .split("|")
+            .filter(Boolean)
+            .join(" › ");
           var html =
-            '<div class="card card-b">' +
-            '<p class="eyebrow">' +
+            '<p class="eyebrow">Annex ' +
             escapeHtml(term.annex) +
             " · Level " +
-            term.level +
+            escapeHtml(term.level) +
             "</p>" +
-            "<h3><code>" +
+            '<h2 class="imdrf-entry-code"><code>' +
             escapeHtml(term.code) +
-            "</code></h3>" +
-            "<p>" +
+            "</code></h2>" +
+            '<p class="imdrf-entry-term">' +
             escapeHtml(term.term) +
             "</p>";
           if (status) html += "<p>" + status + "</p>";
-          html +=
-            '<p class="hint">Hierarchy: ' +
-            escapeHtml(String(term.codeHierarchy).split("|").join(" › ")) +
-            "</p>";
-          if (term.definition) html += "<p>" + escapeHtml(term.definition) + "</p>";
+          if (crumb && crumb !== String(term.code)) {
+            html += '<p class="imdrf-entry-crumb">' + escapeHtml(crumb) + "</p>";
+          }
+          if (term.definition) {
+            html += '<p class="imdrf-entry-def">' + escapeHtml(term.definition) + "</p>";
+          }
           if (term.statusDescription) {
             html += '<p class="hint">' + escapeHtml(term.statusDescription) + "</p>";
           }
+          var meta = "";
           if (term.nonImdrfCode) {
-            html += '<p class="hint">Non-IMDRF code: ' + escapeHtml(term.nonImdrfCode) + "</p>";
+            meta +=
+              "<div><dt>Non-IMDRF code</dt><dd>" +
+              escapeHtml(term.nonImdrfCode) +
+              "</dd></div>";
           }
           if (term.primaryCategory) {
-            html +=
-              '<p class="hint">Primary category: ' + escapeHtml(term.primaryCategory) + "</p>";
+            meta +=
+              "<div><dt>Primary category</dt><dd>" +
+              escapeHtml(term.primaryCategory) +
+              "</dd></div>";
           }
           if (term.secondaryCategory) {
-            html +=
-              '<p class="hint">Secondary category: ' +
+            meta +=
+              "<div><dt>Secondary category</dt><dd>" +
               escapeHtml(term.secondaryCategory) +
-              "</p>";
+              "</dd></div>";
           }
-          html += "</div>";
+          if (meta) html += '<dl class="imdrf-entry-meta">' + meta + "</dl>";
           detailEl.innerHTML = html;
         });
     }
@@ -188,6 +234,7 @@
           b.classList.remove("on");
         });
         btn.classList.add("on");
+        if (searchInput) searchInput.value = "";
         loadAnnex(btn.getAttribute("data-imdrf-annex"));
       });
     });
@@ -203,18 +250,22 @@
           return;
         }
         searchTimer = setTimeout(function () {
+          resultsEl.innerHTML = emptyHint("Searching…");
+          treeEl.hidden = true;
+          resultsEl.hidden = false;
           fetch("/imdrf/releases/" + releaseId + "/search?q=" + encodeURIComponent(query))
             .then(function (r) {
               return r.json();
             })
             .then(function (data) {
-              treeEl.hidden = true;
-              resultsEl.hidden = false;
               renderRows(resultsEl, data.rows, 0);
               attachRowHandlers(resultsEl, 0);
             });
         }, 300);
       });
     }
+
+    var firstAnnex = root.querySelector(".imdrf-annex.on, [data-imdrf-annex]");
+    if (firstAnnex) loadAnnex(firstAnnex.getAttribute("data-imdrf-annex"));
   });
 })();

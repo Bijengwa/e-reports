@@ -309,7 +309,7 @@ export function StaffShell({
               aria-current={active === "imdrf" ? "page" : undefined}
             >
               <IconImdrf />
-              <span class="rail-label">IMDRF Terminology</span>
+              <span class="rail-label">IMDRF</span>
             </a>
 
             {isManager && (
@@ -444,7 +444,7 @@ export function StaffShell({
                   aria-current={active === "imdrf-manage" ? "page" : undefined}
                 >
                   <IconImdrf />
-                  <span class="rail-label">Manage IMDRF Terminology</span>
+                  <span class="rail-label">Manage IMDRF</span>
                 </a>
               </>
             )}

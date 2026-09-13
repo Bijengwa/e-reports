@@ -407,4 +407,25 @@ describe.skipIf(!INTEGRATION_ENABLED)("the read-only IMDRF terminology sidebar",
     for (const row of second.rows) expect(firstCodes.has(row.code)).toBe(false);
     expect(first.rows.length + second.rows.length).toBe(60);
   });
+
+  it("renders a documentation reader with the same title bar as every other staff page, and no inline styles", async () => {
+    const releaseId = await seedRelease(2026);
+    await seedTerm(releaseId, {
+      annex: "A",
+      code: "A01",
+      term: "Root",
+      codeHierarchy: "A01",
+      level: 1,
+      sortOrder: 0,
+    });
+    const { cookie } = await signedInAs("assessor");
+
+    const page = await get("/imdrf", cookie);
+    expect(page.statusCode).toBe(200);
+    expect(page.body).toContain(">IMDRF terminology<");
+    expect(page.body).toContain("data-imdrf-browser");
+    expect(page.body).toContain("imdrf-reader");
+    expect(page.body).toContain("staff-head");
+    expect(page.body).not.toContain('style="');
+  });
 });

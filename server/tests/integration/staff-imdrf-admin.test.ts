@@ -393,4 +393,14 @@ describe.skipIf(!INTEGRATION_ENABLED)("importing an IMDRF release", () => {
     expect(await termCount()).toBe(0);
     expect((await get("/imdrf/manage", admin.cookie)).statusCode).toBe(200);
   });
+
+  it("renders the manage page with the same title bar as every other staff page, and no inline styles", async () => {
+    const admin = await signedInAs("administrator");
+    const page = await get("/imdrf/manage", admin.cookie);
+    expect(page.statusCode).toBe(200);
+    expect(page.body).toContain(">Manage IMDRF<");
+    expect(page.body).toContain("staff-head");
+    expect(page.body).toContain("imdrf-admin");
+    expect(page.body).not.toContain('style="');
+  });
 });
