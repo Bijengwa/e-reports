@@ -77,7 +77,11 @@ const STAGES = [
  * assessment" meant before they could find their own work. Named here so re-adding either one is
  * a failing test rather than a design decision nobody notices.
  */
-const FORBIDDEN_TABS = ["First assessment", "Assign next assessor", "Secondary assessment"] as const;
+const FORBIDDEN_TABS = [
+  "First assessment",
+  "Assign next assessor",
+  "Secondary assessment",
+] as const;
 
 /** The one status no state claims, and the one this page must keep out of every view of itself. */
 const UNBUCKETED_STATUS = "closed";

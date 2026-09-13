@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { listTerms, searchTerms } from "../../src/domain/imdrf/query-service.js";
 import type { DatabaseHandle } from "../../src/db/client.js";
+import { listTerms, searchTerms } from "../../src/domain/imdrf/query-service.js";
 import { INTEGRATION_ENABLED, openOwner, truncateAll } from "./helpers.js";
 
 let owner: DatabaseHandle;

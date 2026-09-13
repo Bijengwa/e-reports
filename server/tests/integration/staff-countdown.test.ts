@@ -116,7 +116,7 @@ async function seedFirstAssessment(over: {
     VALUES (${reportId}, ${over.assessorId}, 1, 'TMDA/DMD/MDV/F/004 Rev 05', '{}'::jsonb,
             ${over.managerId}, now(), 3, 'days'::deadline_unit,
             ${over.dueAt === null ? sql`NULL` : sql`${over.dueAt}::timestamptz`},
-            ${over.submitted ?? false ? sql`now()` : sql`NULL`})
+            ${(over.submitted ?? false) ? sql`now()` : sql`NULL`})
   `);
   return reportId;
 }

@@ -6,12 +6,12 @@
  */
 
 import ExcelJS from "exceljs";
-import { COLUMNS, type RegisterRow } from "./views/register.js";
+import { COLUMNS, type RegisterRow } from "./register/pages/register.js";
 
 /** `--green-d` from the staff palette — the dark institutional green the UI already uses. */
 const HEADER_FILL = "FF0C3B1E";
-/** `--green-bg` — pale enough to stripe without drowning the values. */
-const STRIPE_FILL = "FFE7F2EA";
+/** Pale enough to stripe without drowning the values. */
+const STRIPE_FILL = "FFEAF5EA";
 const WHITE_FILL = "FFFFFFFF";
 const BORDER = "FFD9E2DC";
 
@@ -96,3 +96,4 @@ export async function buildRegisterXlsx(rows: ReadonlyArray<RegisterRow>): Promi
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
 }
+

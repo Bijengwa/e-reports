@@ -1378,6 +1378,96 @@ textarea[aria-invalid="true"] {
 }
 
 /*
+ * The header squeeze this fixes: `.staff-head`'s title side (`.sp`) carries `min-width: 0` so it
+ * can shrink for the search box's fixed 280px beside it, but on a narrow phone shrinking is not
+ * enough room left over — the browser keeps both on one row rather than wrapping the whole bar,
+ * and a heading that long wraps one word per line inside what is left. Below the breakpoint the
+ * title, the metadata and the toolbar stack instead, each free to use the full width on its own
+ * line. Scoped to `.register-page` alone: no other page's `.staff-head` carries a toolbar this
+ * wide, and none should inherit a rule written for one that does.
+ */
+@media (max-width: 620px) {
+  .register-page .staff-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .register-page .register-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .register-search {
+    width: 100%;
+  }
+
+  .register-download {
+    justify-content: center;
+  }
+}
+
+/*
+ * A compact icon button, not a second visual language: same `.btn` green, sized and weighted the
+ * same as every other button on the page. The two SVGs share the slot the label wraps around —
+ * only one is ever visible, toggled by `.is-downloading` in `register.js` — so the button never
+ * changes width when it starts or stops spinning.
+ */
+.register-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.register-download-icon,
+.register-download-spinner {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.register-download-spinner {
+  display: none;
+  stroke-dasharray: 42;
+  stroke-dashoffset: 30;
+  animation: register-spin 0.8s linear infinite;
+}
+
+.register-download.is-downloading {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.register-download.is-downloading .register-download-icon {
+  display: none;
+}
+
+.register-download.is-downloading .register-download-spinner {
+  display: block;
+}
+
+.register-download.is-error {
+  background: var(--flag);
+  border-color: var(--flag);
+}
+
+@keyframes register-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .register-download-spinner {
+    animation: none;
+  }
+}
+
+/*
  * `.utable` holds every column to its own content width, which is right for a handful of columns
  * and wrong for fifty: a couple of long ones would swallow the row and the rest would starve.
  * `table-layout: fixed` plus an explicit width per `<col>` gives every column a deliberate size

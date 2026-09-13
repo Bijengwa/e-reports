@@ -37,6 +37,13 @@ export type LayoutProps = {
    * not be made to fetch a script that would find nothing to attach to.
    */
   countdown?: boolean;
+  /**
+   * Load the Register download button's enhancement.
+   *
+   * Opt-in for the same reason `countdown` is: a page with no `[data-download]` button on it must
+   * not be made to fetch a script that would find nothing to attach to.
+   */
+  registerDownload?: boolean;
   children?: Children;
 };
 
@@ -55,6 +62,7 @@ export function Layout({
   railScript,
   f4Find,
   countdown,
+  registerDownload,
   children,
 }: LayoutProps): JSX.Element {
   return (
@@ -82,6 +90,10 @@ export function Layout({
             response, so a browser that blocks this leaves a correct but static countdown rather
             than a broken page. Served from our own origin to satisfy the CSP. */}
         {countdown && <script src="/assets/countdown.js" defer></script>}
+        {/* Enhancement only: the plain `<a href>` this button degrades to already downloads the
+            file with this blocked, so a browser refusing the script leaves a working, merely
+            plainer, download in its place. Served from our own origin to satisfy the CSP. */}
+        {registerDownload && <script src="/assets/register.js" defer></script>}
       </head>
       <body class={bodyClass ?? ""}>{children}</body>
     </html>

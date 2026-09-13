@@ -5,7 +5,7 @@ import {
   SESSION_COOKIE_OPTIONS,
   type StaffSession,
 } from "../../auth/session.js";
-import { ForbiddenPage } from "./views/forbidden.js";
+import { ForbiddenPage } from "./shared/forbidden.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -126,3 +126,4 @@ export function currentSession(request: FastifyRequest): StaffSession {
 
   return request.staffSession;
 }
+

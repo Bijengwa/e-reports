@@ -81,8 +81,11 @@ the one opt-in client script this door already uses.
 **Interfaces:**
 - Produces: a `search_vector tsvector` column on `imdrf_terms` (generated, always
   populated), plus GIN indexes `imdrf_terms_search_vector_idx`,
-  `imdrf_terms_code_trgm_idx`, `imdrf_terms_term_trgm_idx`. Task 3 (`searchTerms`)
-  depends on `search_vector`, `similarity()`, and `word_similarity()` all being usable.
+  `imdrf_terms_code_trgm_idx`, `imdrf_terms_term_trgm_idx`,
+  `imdrf_terms_definition_trgm_idx`. Task 3 (`searchTerms`) depends on all four being
+  usable as index-backed *candidate-retrieval* predicates (`@@`, `%`, `<%`), not merely
+  as inputs to `ts_rank()`/`similarity()`/`word_similarity()` computed over a full scan
+  — a GIN index only helps a query that filters through the operator it indexes.
 
 - [ ] **Step 0: Verify the migration role can create extensions before assuming it**
 
@@ -119,8 +122,15 @@ ALTER TABLE "imdrf_terms" ADD COLUMN "search_vector" tsvector GENERATED ALWAYS A
 ) STORED;--> statement-breakpoint
 CREATE INDEX "imdrf_terms_search_vector_idx" ON "imdrf_terms" USING gin ("search_vector");--> statement-breakpoint
 CREATE INDEX "imdrf_terms_code_trgm_idx" ON "imdrf_terms" USING gin ("code" gin_trgm_ops);--> statement-breakpoint
-CREATE INDEX "imdrf_terms_term_trgm_idx" ON "imdrf_terms" USING gin ("term" gin_trgm_ops);
+CREATE INDEX "imdrf_terms_term_trgm_idx" ON "imdrf_terms" USING gin ("term" gin_trgm_ops);--> statement-breakpoint
+CREATE INDEX "imdrf_terms_definition_trgm_idx" ON "imdrf_terms" USING gin ("definition" gin_trgm_ops);
 ```
+
+Four indexes, not three: `search_vector` backs the `@@` full-text predicate;
+`code`/`term`/`definition` trigram indexes each back both the `%` (similarity) and
+`<%`/`%>` (word_similarity) operators — pg_trgm's GIN opclass supports all three,
+which is what lets `searchTerms` (Task 3) filter candidate rows through an index
+*before* ranking, rather than computing similarity for every row in the release.
 
 - [ ] **Step 2: Add the journal entry**
 
@@ -194,10 +204,12 @@ entries right after `index("imdrf_terms_release_level_idx").on(t.releaseId, t.le
     index("imdrf_terms_release_level_idx").on(t.releaseId, t.level),
     // GIN index over the generated tsvector, so a future `@@` full-text lookup has index support.
     index("imdrf_terms_search_vector_idx").using("gin", t.searchVector),
-    // Trigram GIN indexes: give the query planner index-backed statistics for `%`/similarity
-    // queries against `code`/`term`, the two columns searchTerms's fuzzy fallback reads directly.
+    // Trigram GIN indexes on all three fuzzy-search columns: `searchTerms` (Task 3) filters
+    // through the `%`/`<%` operators these back *before* ranking, so the index is actually used
+    // for candidate retrieval, not just consulted informally.
     index("imdrf_terms_code_trgm_idx").using("gin", sql`${t.code} gin_trgm_ops`),
     index("imdrf_terms_term_trgm_idx").using("gin", sql`${t.term} gin_trgm_ops`),
+    index("imdrf_terms_definition_trgm_idx").using("gin", sql`${t.definition} gin_trgm_ops`),
     check("imdrf_terms_annex_ck", sql`annex IN ('A','B','C','D','E','F','G')`),
 ```
 
@@ -780,6 +792,13 @@ export async function searchTerms(
     .filter((t) => t.length > 0);
   const tsqueryText = tsTokens.map((t) => `${t}:*`).join(" | ");
 
+  // Candidate retrieval happens through operators the migration's GIN indexes actually back —
+  // `@@` on search_vector, `%`/`<%` (similarity/word_similarity) on code/term/definition — so
+  // Postgres can use an index (bitmap-or) scan to find candidates instead of a sequential scan
+  // computing a similarity function for every row in the release. Ranking (the GREATEST(...)
+  // below) then runs only over that already-narrowed candidate set, not the whole table. This is
+  // the "indexed candidate retrieval, then rank" shape the spec requires — never widen this WHERE
+  // clause back to an unconditional per-row similarity() scan.
   const rows = await db.execute<TermQueryRow & { score: string }>(sql`
     WITH q AS (
       SELECT ${tsqueryText === "" ? sql`NULL::tsquery` : sql`to_tsquery('english', ${tsqueryText})`} AS tsq
@@ -806,6 +825,12 @@ export async function searchTerms(
         ) AS score
       FROM imdrf_terms t, q
       WHERE t.release_id = ${opts.releaseId}
+        AND (
+          (q.tsq IS NOT NULL AND t.search_vector @@ q.tsq)
+          OR t.code % ${trimmed}
+          OR t.term % ${trimmed}
+          ${isShortQuery ? sql`` : sql`OR t.definition %> ${trimmed}`}
+        )
     ) ranked
     WHERE ranked.score > ${scoreFloor}
       AND (
@@ -2559,6 +2584,53 @@ If any of these are poor, adjust `SEARCH_SCORE_FLOOR`/`SHORT_QUERY_SCORE_FLOOR`/
 `SHORT_QUERY_MAX_LENGTH` in `query-service.ts` and re-test — these constants were
 explicitly called out in the spec as needing real-data tuning, not as fixed final
 values.
+
+- [ ] **Step 4b: Prove the indexes are actually used, not just present**
+
+Creating a GIN index is not the same claim as "this query uses it" — verify it
+directly. Connect to the dev/test database with the real 2026 data loaded (`psql
+$DATABASE_URL` or the client of your choice) and run `EXPLAIN (ANALYZE, BUFFERS)` in
+front of `searchTerms`'s actual query body (copy it from `query-service.ts`,
+substituting a real `release_id` and a representative query like `'battery'`):
+
+```sql
+EXPLAIN (ANALYZE, BUFFERS)
+WITH q AS (
+  SELECT to_tsquery('english', 'battery:*') AS tsq
+)
+SELECT * FROM (
+  SELECT t.id, t.code, t.term,
+    round(GREATEST(
+      COALESCE(ts_rank(t.search_vector, q.tsq), 0),
+      similarity(t.code, 'battery'),
+      similarity(t.term, 'battery'),
+      word_similarity('battery', coalesce(t.definition, ''))
+    )::numeric, 6) AS score
+  FROM imdrf_terms t, q
+  WHERE t.release_id = '<a real release id>'
+    AND (
+      (q.tsq IS NOT NULL AND t.search_vector @@ q.tsq)
+      OR t.code % 'battery'
+      OR t.term % 'battery'
+      OR t.definition %> 'battery'
+    )
+) ranked
+WHERE ranked.score > 0.15
+ORDER BY ranked.score DESC, ranked.id ASC
+LIMIT 26;
+```
+
+Confirm the plan shows a **Bitmap Index Scan** (or plain **Index Scan**) against
+`imdrf_terms_search_vector_idx`, `imdrf_terms_code_trgm_idx`,
+`imdrf_terms_term_trgm_idx`, or `imdrf_terms_definition_trgm_idx` feeding a **BitmapOr**
+— not a **Seq Scan** over `imdrf_terms` as the query's first step. A sequential scan
+here means the candidate-retrieval predicate isn't actually index-backed for this data
+distribution (common causes: `pg_trgm.similarity_threshold`/
+`pg_trgm.word_similarity_threshold` GUCs set so permissively that the planner decides a
+seq scan is cheaper, or a release small enough that Postgres's own cost estimate
+prefers a seq scan regardless — check `EXPLAIN`'s row-count estimate against the
+release's actual ~2,133 rows to tell which). If it's a seq scan for the wrong reason,
+adjust the query or those GUCs and re-run this step until the plan shows index usage.
 
 - [ ] **Step 5: Verify mobile layout at real content volume**
 

@@ -275,6 +275,18 @@ describe.skipIf(!INTEGRATION_ENABLED)("staff Register access and download", () =
     expect(dashboard.body).not.toContain('href="/register"');
   });
 
+  it("sends an unauthenticated request to sign in rather than the register or its download", async () => {
+    await seedReport({ number: "AEMD/2026-27/203" });
+
+    const page = await get("/register", "");
+    expect(page.statusCode).toBe(302);
+    expect(page.headers.location).toBe("/");
+
+    const xlsx = await get("/register/download/xlsx", "");
+    expect(xlsx.statusCode).toBe(302);
+    expect(xlsx.headers.location).toBe("/");
+  });
+
   it("exports the same Register fields the page shows", async () => {
     const officer = await signedInAs("assessor", "Baraka Nyoni");
     const reportId = await seedReport({

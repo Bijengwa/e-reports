@@ -112,7 +112,7 @@ async function seedAssessment(over: {
     VALUES (${reportId}, ${over.assessorId}, ${over.ordinal ?? 1}, 'TMDA/DMD/MDV/F/004 Rev 05',
             '{}'::jsonb, ${over.assessorId}, now(), 3, 'days'::deadline_unit,
             now() + INTERVAL '1 day' * (CASE WHEN ${over.dueInPast ?? false} THEN -3 ELSE 3 END),
-            ${over.submitted ?? false ? sql`now()` : sql`NULL`})
+            ${(over.submitted ?? false) ? sql`now()` : sql`NULL`})
   `);
 }
 

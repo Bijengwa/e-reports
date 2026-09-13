@@ -1,27 +1,27 @@
 import rateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import { constrainToHost } from "../host-scope.js";
-import { activityRoutes } from "./routes/activity.js";
-import { assessmentRoutes } from "./routes/assessment.js";
-import { assessmentCommentRoutes } from "./routes/assessment-comments.js";
-import { assessmentReviewRoutes } from "./routes/assessment-review.js";
-import { myAssessmentsRoutes } from "./routes/assessments.js";
-import { changePasswordRoutes } from "./routes/change-password.js";
-import { dashboardRoutes } from "./routes/dashboard.js";
-import { decisionRoutes } from "./routes/decisions.js";
-import { finalDocumentRoutes } from "./routes/final-document.js";
-import { finalReportsRoutes } from "./routes/final-reports.js";
-import { firstAssessorRoutes } from "./routes/first-assessor.js";
-import { imdrfBrowserRoutes } from "./routes/imdrf.js";
-import { imdrfAdminRoutes } from "./routes/imdrf-admin.js";
-import { loginRoutes } from "./routes/login.js";
-import { logoutRoutes } from "./routes/logout.js";
-import { myWorkRoutes } from "./routes/my-work.js";
-import { newReportRoutes } from "./routes/new-report.js";
-import { registerRoutes } from "./routes/register.js";
-import { reportsRoutes } from "./routes/reports.js";
-import { usersRoutes } from "./routes/users.js";
-import { workloadRoutes } from "./routes/workload.js";
+import { activityRoutes } from "./activity/routes/activity.js";
+import { assessmentRoutes } from "./assessment/routes/assessment.js";
+import { assessmentCommentRoutes } from "./assessment/routes/assessment-comments.js";
+import { assessmentReviewRoutes } from "./assessment/routes/assessment-review.js";
+import { myAssessmentsRoutes } from "./assessment/routes/assessments.js";
+import { changePasswordRoutes } from "./auth/routes/change-password.js";
+import { dashboardRoutes } from "./dashboard/routes/dashboard.js";
+import { decisionRoutes } from "./decisions/routes/decisions.js";
+import { finalDocumentRoutes } from "./final-reports/routes/final-document.js";
+import { finalReportsRoutes } from "./final-reports/routes/final-reports.js";
+import { firstAssessorRoutes } from "./assessment/routes/first-assessor.js";
+import { imdrfBrowserRoutes } from "./imdrf/routes/imdrf.js";
+import { imdrfAdminRoutes } from "./imdrf/routes/admin.js";
+import { loginRoutes } from "./auth/routes/login.js";
+import { logoutRoutes } from "./auth/routes/logout.js";
+import { myWorkRoutes } from "./my-work/routes/my-work.js";
+import { newReportRoutes } from "./reports/routes/new-report.js";
+import { registerRoutes } from "./register/routes/register.js";
+import { reportsRoutes } from "./reports/routes/reports.js";
+import { usersRoutes } from "./users/routes/users.js";
+import { workloadRoutes } from "./workload/routes/workload.js";
 import { requirePasswordChanged, requireRole, requireSession } from "./session-guard.js";
 
 export type StaffDoorOptions = {
@@ -184,3 +184,6 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
     });
   });
 }
+
+
+

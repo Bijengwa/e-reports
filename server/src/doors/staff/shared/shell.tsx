@@ -1,0 +1,576 @@
+import type { Children } from "@kitajs/html";
+import { roleLabel } from "../../../domain/roles.js";
+import { BrandMark } from "../../../views/shared/brand-mark.js";
+import { Layout } from "../../../views/shared/layout.js";
+
+export type StaffShellProps = {
+  /** The document title, which the browser tab shows. */
+  title: string;
+  /**
+   * The page's name, shown in the title bar.
+   *
+   * The bar carries this and nothing else. Everything that might have gone beside it — counts,
+   * actions, filters — belongs in the page, because the bar's height is fixed and anything that
+   * can wrap would either be clipped or force it to grow.
+   */
+  pageTitle: string;
+  /**
+   * The reader's role, which decides what the rail offers.
+   *
+   * Optional because the 403 page renders through this shell, and the one branch that answers 403
+   * without a session has no role to give. A missing role is read as "not an administrator".
+   */
+  role?: string | undefined;
+  /**
+   * The signed-in person, shown at the right of the title bar.
+   *
+   * Optional for the same reason `role` is: the 403 page can be rendered on the one branch that
+   * has no session to name. Every page reached with one passes it, so the reader can see which
+   * account they are acting as without a sentence in the page saying so.
+   */
+  fullName?: string | undefined;
+  /** Which entry is the page being shown, so the rail can mark it. */
+  active?:
+    | "dashboard"
+    | "workload"
+    | "final-reports"
+    | "register"
+    | "assessments"
+    | "my-work"
+    | "reports"
+    | "new-report"
+    | "imdrf"
+    | "imdrf-manage"
+    | "users"
+    | "activity";
+  /**
+   * Load the F004 find-in-page enhancement.
+   *
+   * Opt-in for the same reason `passwordToggle` is: a page with no find box on it must not be
+   * made to fetch the script that would find nothing to attach to.
+   */
+  f4Find?: boolean;
+  /**
+   * Load the live countdown enhancement.
+   *
+   * Opt-in for the same reason `f4Find` is: a page with no `[data-countdown]` element on it must
+   * not be made to fetch a script that would find nothing to attach to.
+   */
+  countdown?: boolean;
+  /**
+   * Load the Register download button's enhancement.
+   *
+   * Opt-in for the same reason `countdown` is: a page with no `[data-download]` button on it must
+   * not be made to fetch a script that would find nothing to attach to.
+   */
+  registerDownload?: boolean;
+  children?: Children;
+};
+
+/** Stroke icons, sized and coloured by CSS so one rule covers the rail in both its states. */
+function IconDashboard(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <rect x="3" y="3" width="7.5" height="7.5" rx="1.5" />
+      <rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5" />
+      <rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5" />
+      <rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5" />
+    </svg>
+  );
+}
+
+/**
+ * The pipeline: work standing in columns, at different heights.
+ *
+ * Its own mark rather than a second copy of the dashboard's. The rail collapses to icons alone,
+ * and two entries sharing one glyph would leave a manager counting positions to tell their
+ * summary from their queue.
+ */
+/** An open book: the IMDRF terminology reference, distinct from every vigilance-record icon. */
+function IconImdrf(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M12 5.5c-1.8-1.2-4-1.7-6-1.5v13.5c2 -0.2 4.2 0.3 6 1.5" />
+      <path d="M12 5.5c1.8-1.2 4-1.7 6-1.5v13.5c-2 -0.2 -4.2 0.3 -6 1.5" />
+      <path d="M12 5.5v13.5" />
+    </svg>
+  );
+}
+
+function IconWorkload(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <rect x="3" y="9" width="4.5" height="12" rx="1.2" />
+      <rect x="9.75" y="4" width="4.5" height="17" rx="1.2" />
+      <rect x="16.5" y="13" width="4.5" height="8" rx="1.2" />
+    </svg>
+  );
+}
+
+function IconReports(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M6 3h8l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+      <path d="M14 3v5h5" />
+      <path d="M9 13h6" />
+      <path d="M9 17h4" />
+    </svg>
+  );
+}
+
+/** The register's sheet with a tick on it: a report whose assessment is finished and approved. */
+function IconFinalReports(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M6 3h8l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+      <path d="M14 3v5h5" />
+      <path d="M8 14l2 2 5-5" />
+    </svg>
+  );
+}
+
+/** The institutional register: a tabular view of all adverse events/incidents. */
+function IconRegister(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M4 4h16a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" />
+      <path d="M4 10h16" />
+      <path d="M4 14h16" />
+      <path d="M10 4v16" />
+      <path d="M14 4v16" />
+    </svg>
+  );
+}
+
+function IconAssessments(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M5 4h11l4 4v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" />
+      <path d="M15 4v5h5" />
+      <path d="M8 14l2.5 2.5L16 11" />
+    </svg>
+  );
+}
+
+/** A case: what the Officer has been handed to carry out, rather than to write. */
+function IconMyWork(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <rect x="3" y="7.5" width="18" height="12.5" rx="2" />
+      <path d="M9 7.5V6a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 6v1.5" />
+      <path d="M3 12.5h18" />
+    </svg>
+  );
+}
+
+function IconNewReport(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M6 3h8l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+      <path d="M14 3v5h5" />
+      <path d="M12 12v6" />
+      <path d="M9 15h6" />
+    </svg>
+  );
+}
+
+function IconUsers(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <circle cx="9" cy="8" r="3.4" />
+      <path d="M2.6 20a6.4 6.4 0 0 1 12.8 0" />
+      <path d="M16.2 5.2a3.4 3.4 0 0 1 0 5.8" />
+      <path d="M17.8 14.4A6.4 6.4 0 0 1 21.4 20" />
+    </svg>
+  );
+}
+
+function IconActivity(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M3 12h4l2.5-6 5 12 2.5-6h4" />
+    </svg>
+  );
+}
+
+function IconSignOut(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M15 4h3.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H15" />
+      <path d="M10 8l-4 4 4 4" />
+      <path d="M6 12h9" />
+    </svg>
+  );
+}
+
+function IconMenu(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M4 7h16" />
+      <path d="M4 12h16" />
+      <path d="M4 17h16" />
+    </svg>
+  );
+}
+
+/**
+ * Both directions are rendered and CSS shows one.
+ *
+ * The alternative is the script rewriting the button's contents on every toggle, which would put
+ * the arrow's meaning in two places — the markup and the handler — and let them disagree.
+ */
+function IconCollapse(): JSX.Element {
+  return (
+    <svg class="when-open" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M14 7l-5 5 5 5" />
+      <path d="M19 4v16" />
+    </svg>
+  );
+}
+
+function IconExpand(): JSX.Element {
+  return (
+    <svg class="when-collapsed" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M10 7l5 5-5 5" />
+      <path d="M5 4v16" />
+    </svg>
+  );
+}
+
+/**
+ * The frame around every page past the forced password change.
+ *
+ * Deliberately not `views/shared/`: that holds `Layout`, which is the one shell both doors share.
+ * This one is the staff door's alone, and the public door must never grow a link into it.
+ *
+ * The rail is a column beside the page, never a strip above it. It is `position: sticky` at full
+ * viewport height, so it stays put while the page scrolls, and its own nav scrolls inside it if
+ * the list ever outgrows the screen. Below 900px it becomes a drawer over the page rather than
+ * rearranging itself — a horizontal bar of links is not a smaller sidebar, it is a different
+ * thing that happens to fit.
+ *
+ * The rail is rendered for every role, but the administrator's two entries are rendered only for
+ * an administrator. That is presentation, not access control — `requireRole` refuses the routes
+ * whatever the rail shows — but a link that answers 403 when clicked is a worse page than no link,
+ * so the two agree.
+ *
+ * `/change-password` deliberately does not use this. It is reached before the gate these pages sit
+ * behind, and a rail whose every link bounced back to it would promise a portal that is not open
+ * yet.
+ */
+export function StaffShell({
+  title,
+  pageTitle,
+  role,
+  fullName,
+  active,
+  f4Find,
+  countdown,
+  registerDownload,
+  children,
+}: StaffShellProps): JSX.Element {
+  const isAdministrator = role === "administrator";
+  // The enum, not the caption. The rail is drawn from what the column stores.
+  const isOfficer = role === "assessor";
+  const isManager = role === "manager";
+
+  return (
+    <Layout
+      title={title}
+      locale="en"
+      bodyClass="staff"
+      railScript
+      f4Find={f4Find}
+      countdown={countdown}
+      registerDownload={registerDownload}
+    >
+      <div class="shell">
+        {/* `on-dark` is what recolours the mark for the rail: white folder, green cross. The
+            paths are the same ones the sign-in card renders. */}
+        <aside class="rail on-dark" id="rail">
+          <div class="brand">
+            <BrandMark />
+          </div>
+
+          <nav class="rail-nav" aria-label="Staff navigation">
+            {/* Everyone lands on the dashboard, the manager included. It used to redirect them
+                to `/workload` on the argument that the pipeline is what a manager works from —
+                which is true, and is why Workload sits directly under it — but it left the one
+                role accountable for the whole register with no summary of it at all. The two
+                answer different questions: the dashboard says how much of what there is, the
+                workload says which of it needs doing. Presentation only — `requireRole` decides
+                what actually opens. */}
+            <a
+              href="/dashboard"
+              class={active === "dashboard" ? "on" : ""}
+              aria-current={active === "dashboard" ? "page" : undefined}
+            >
+              <IconDashboard />
+              <span class="rail-label">Dashboard</span>
+            </a>
+
+            {/* Ungated, like Dashboard: the terminology browser is a reference tool every signed-in
+                role reads, not a vigilance record — `active.register(imdrfBrowserRoutes)` sits at
+                the same "every role" nesting level as `reportsRoutes`, not inside a role scope. */}
+            <a
+              href="/imdrf"
+              class={active === "imdrf" ? "on" : ""}
+              aria-current={active === "imdrf" ? "page" : undefined}
+            >
+              <IconImdrf />
+              <span class="rail-label">IMDRF</span>
+            </a>
+
+            {isManager && (
+              <a
+                href="/workload"
+                class={active === "workload" ? "on" : ""}
+                aria-current={active === "workload" ? "page" : undefined}
+              >
+                <IconWorkload />
+                <span class="rail-label">Workload</span>
+              </a>
+            )}
+
+            {/* The register — and not everyone's after all.
+
+                It used to be here for every role on the argument that everyone may read a report.
+                That was true of a slice where nobody could do anything with one; it is not true of
+                a workflow whose report page now carries every assessment, every manager decision
+                and the whole record of how a conclusion was reached. An Officer's own work is the
+                two lists below, and this entry is gone for them.
+
+                Presentation only, as ever — `reportsRoutes` refuses an Officer the register, and
+                refuses them any report they are not a party to, whatever the rail shows. The two
+                agree so that no link answers 403 when clicked. */}
+            {!isOfficer && (
+              <a
+                href="/reports"
+                class={active === "reports" ? "on" : ""}
+                aria-current={active === "reports" ? "page" : undefined}
+              >
+                <IconReports />
+                <span class="rail-label">Reports</span>
+              </a>
+            )}
+
+            {/* The index over every approved F004, and the manager's alone — they are the only
+                role that approves one. An Officer reaches the final document of their own
+                assigned work from My work, which is the one they have business with. */}
+            {isManager && (
+              <a
+                href="/final-reports"
+                class={active === "final-reports" ? "on" : ""}
+                aria-current={active === "final-reports" ? "page" : undefined}
+              >
+                <IconFinalReports />
+                <span class="rail-label">Final Reports</span>
+              </a>
+            )}
+
+            {/* The institutional register. Managers and Officers (assessors) may open it;
+                administrators may not. Presentation only — `requireRole` on the register scope
+                is what refuses the route. */}
+            {(isManager || isOfficer) && (
+              <a
+                href="/register"
+                class={active === "register" ? "on" : ""}
+                aria-current={active === "register" ? "page" : undefined}
+              >
+                <IconRegister />
+                <span class="rail-label">Register</span>
+              </a>
+            )}
+
+            {/* The Officer's, because registering a report that arrived by email is the Officer's
+                work. Presentation only, as above: `requireRole` refuses the route whatever the
+                rail shows, and the two agree so that no link answers 403 when clicked. */}
+            {/* An Officer's own work, which nobody else has: a manager and an administrator are
+                never assigned a report, so the page would be empty for them and is refused them. */}
+            {isOfficer && (
+              <a
+                href="/assessments"
+                class={active === "assessments" ? "on" : ""}
+                aria-current={active === "assessments" ? "page" : undefined}
+              >
+                <IconAssessments />
+                <span class="rail-label">My assessments</span>
+              </a>
+            )}
+
+            {/* The other half of an Officer’s own list: what the manager approved and handed
+                them to carry out. Its own entry rather than a tab on My assessments, because
+                assessing a report and acting on a decision about it are two different jobs
+                arriving at two different times. */}
+            {isOfficer && (
+              <a
+                href="/my-work"
+                class={active === "my-work" ? "on" : ""}
+                aria-current={active === "my-work" ? "page" : undefined}
+              >
+                <IconMyWork />
+                <span class="rail-label">My work</span>
+              </a>
+            )}
+
+            {isOfficer && (
+              <a
+                href="/reports/new"
+                class={active === "new-report" ? "on" : ""}
+                aria-current={active === "new-report" ? "page" : undefined}
+              >
+                <IconNewReport />
+                <span class="rail-label">New report</span>
+              </a>
+            )}
+
+            {isAdministrator && (
+              <>
+                <a
+                  href="/users"
+                  class={active === "users" ? "on" : ""}
+                  aria-current={active === "users" ? "page" : undefined}
+                >
+                  <IconUsers />
+                  <span class="rail-label">Staff accounts</span>
+                </a>
+                <a
+                  href="/activity"
+                  class={active === "activity" ? "on" : ""}
+                  aria-current={active === "activity" ? "page" : undefined}
+                >
+                  <IconActivity />
+                  <span class="rail-label">Activity</span>
+                </a>
+                {/* The write side of the terminology browser above — uploading, replacing a
+                    draft, and publishing a release. An administrator's own powers are over
+                    accounts and configuration, and this is exactly that: it manages what every
+                    other role reads at /imdrf, without itself being a reader of vigilance
+                    records. */}
+                <a
+                  href="/imdrf/manage"
+                  class={active === "imdrf-manage" ? "on" : ""}
+                  aria-current={active === "imdrf-manage" ? "page" : undefined}
+                >
+                  <IconImdrf />
+                  <span class="rail-label">Manage IMDRF</span>
+                </a>
+              </>
+            )}
+          </nav>
+
+          {/* A link, and the script turns it into the dialog below. The href is the point: with
+              scripting off it still goes somewhere that asks the question, so the control is never
+              dead. Either way the state change is a POST, so a Lax cookie is withheld from a
+              cross-site submission and another origin cannot sign the user out. */}
+          <div class="rail-foot">
+            <a href="/logout" class="rail-signout" data-signout>
+              <IconSignOut />
+              <span class="rail-label">Sign out</span>
+            </a>
+
+            {/* The rail's own control, on the rail. Collapsing is something you do to this
+                column, so it belongs here rather than in the title bar — the bar's one button
+                is the drawer's, and only exists at widths where the rail is off-canvas. */}
+            <button
+              type="button"
+              class="rail-collapse"
+              data-rail-collapse
+              aria-controls="rail"
+              aria-expanded="true"
+              aria-label="Collapse the sidebar"
+            >
+              <IconCollapse />
+              <IconExpand />
+              <span class="rail-label">Collapse</span>
+            </button>
+          </div>
+        </aside>
+
+        <div class="main">
+          <header class="top">
+            {/* Shown only once the rail is off-canvas. Rendered server-side rather than by the
+                script, so it is part of the page rather than something that appears late. */}
+            <button
+              type="button"
+              class="top-burger"
+              data-rail-open
+              aria-controls="rail"
+              aria-expanded="false"
+              aria-label="Open the sidebar"
+            >
+              <IconMenu />
+            </button>
+
+            <h1 safe>{pageTitle}</h1>
+
+            {fullName && (
+              <span class="top-user">
+                <span>
+                  <span class="top-name" safe>
+                    {fullName}
+                  </span>
+                  {role && (
+                    <span class="top-role" safe>
+                      {roleLabel(role)}
+                    </span>
+                  )}
+                </span>
+              </span>
+            )}
+          </header>
+
+          <main class="staff-main">{children}</main>
+        </div>
+
+        {/* Hidden until the drawer opens. `hidden` rather than a class, so it is inert to
+            assistive tech as well as invisible. */}
+        <div class="scrim" data-rail-scrim hidden></div>
+
+        {/*
+          Closed until the script opens it with showModal(), which is what buys the backdrop, the
+          focus trap and Escape-to-close without writing any of them. Rendered on every page rather
+          than fetched, so the question costs nothing when it is asked.
+
+          Cancel is `formmethod="dialog"`: inside the POST form, that button closes the dialog
+          instead of submitting it, so dismissing needs no script of its own.
+        */}
+        {/*
+          Closed until the script opens it with showModal(), which is what buys the backdrop, the
+          focus trap and Escape-to-close without writing any of them. Rendered on every page rather
+          than fetched, so the question costs nothing when it is asked.
+
+          Cancel is `formmethod="dialog"`: inside the POST form, that button closes the dialog
+          instead of submitting it, so dismissing needs no script of its own — which is also what
+          makes Escape safe, since the browser's own cancel closes without submitting.
+
+          The padding lives on the inner element, not on the dialog. That is what lets the script
+          treat "target is the dialog" as "the backdrop was clicked" without catching clicks that
+          merely landed on the box's own padding.
+        */}
+        {/* Signing out ends the session on the server, so the confirming button is styled as what
+            it is: destructive. Cancel stays neutral and stays first, so the quiet answer is the one
+            under the thumb and the red one has to be reached for. */}
+        <dialog class="modal" data-signout-dialog aria-labelledby="signout-title">
+          <div class="modal-body">
+            <h2 id="signout-title">Sign out</h2>
+            <p class="hint">
+              You will be signed out of AE Reports on this device and will need your password to
+              come back.
+            </p>
+
+            <form method="POST" action="/logout" class="bar modal-actions">
+              <button type="submit" formmethod="dialog" class="btn ghost">
+                Cancel
+              </button>
+              <button type="submit" class="btn danger">
+                Sign out
+              </button>
+            </form>
+          </div>
+        </dialog>
+      </div>
+    </Layout>
+  );
+}
+

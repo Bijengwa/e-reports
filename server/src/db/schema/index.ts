@@ -604,7 +604,9 @@ export const imdrfImportStaging = pgTable(
     workbookData: bytea("workbook_data").notNull(),
     /** Who started this import. Null if their account is later removed — the row itself still
      *  expires and cleans up on its own, so nothing here depends on the actor surviving. */
-    createdByUserId: uuid("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     /** Past this, the row is stale: `previewImdrfImport`/`confirmImdrfImport` sweep expired rows
      *  on every call, so no separate cron job is needed to keep the table from growing unbounded. */
