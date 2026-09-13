@@ -96,9 +96,15 @@ function act(url: string, cookie: string, body: Record<string, string> = {}) {
   });
 }
 
+const ALL_ANNEXES = ["A", "B", "C", "D", "E", "F", "G"] as const;
+
 /**
  * A minimal but structurally real IMDRF workbook: one sheet per annex given, header row detected
  * by content (not a fixed row number), three "Level N Term" columns so any of levels 1-3 works.
+ *
+ * Every annex not explicitly given gets one trivial padding row — validation now requires all
+ * seven to be present with at least one term each, and a test about (say) Annex A's hierarchy
+ * logic should not also have to think about the other six.
  */
 async function workbookBuffer(
   releaseYear: number,
@@ -110,7 +116,14 @@ async function workbookBuffer(
   >,
 ): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
-  for (const [annex, terms] of Object.entries(annexTerms)) {
+  const complete: typeof annexTerms = { ...annexTerms };
+  for (const annex of ALL_ANNEXES) {
+    if (!complete[annex]) {
+      complete[annex] = [{ code: `${annex}99`, term: `Padding ${annex}`, hierarchy: `${annex}99` }];
+    }
+  }
+
+  for (const [annex, terms] of Object.entries(complete)) {
     const ws = wb.addWorksheet(annex);
     ws.addRow([`Annex Name: Annex ${annex}`]);
     ws.addRow([`Release Number: ${releaseYear}`]);
@@ -213,7 +226,8 @@ describe.skipIf(!INTEGRATION_ENABLED)("importing an IMDRF release", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.body).toContain(">A<");
-    expect(res.body).toContain("<b>2</b>");
+    // 2 from Annex A (A_ROOT, A_CHILD) + 1 padding row each for the other six annexes.
+    expect(res.body).toContain("<b>8</b>");
     expect(tokenFrom(res.body)).toBeTruthy();
   });
 
@@ -234,7 +248,8 @@ describe.skipIf(!INTEGRATION_ENABLED)("importing an IMDRF release", () => {
     expect(release[0]).toMatchObject({ status: "draft" });
 
     const terms = await owner.db.execute(sql`
-      SELECT code, level, parent_term_id, sort_order FROM imdrf_terms ORDER BY sort_order
+      SELECT code, level, parent_term_id, sort_order FROM imdrf_terms
+       WHERE annex = 'A' ORDER BY sort_order
     `);
     expect(terms).toHaveLength(2);
     expect(terms[0]).toMatchObject({ code: "A01", level: 1, parent_term_id: null, sort_order: 0 });
@@ -266,11 +281,12 @@ describe.skipIf(!INTEGRATION_ENABLED)("importing an IMDRF release", () => {
       sql`SELECT release_year FROM imdrf_releases ORDER BY release_year`,
     );
     expect(releases.map((r) => (r as { release_year: number }).release_year)).toEqual([2026, 2027]);
-    expect(await termCount()).toBe(2);
+    // Each release: 1 term for the annex under test (A) + 1 padding row each for the other six.
+    expect(await termCount()).toBe(14);
 
     const y2026 = await owner.db.execute(sql`
       SELECT count(*) FROM imdrf_terms t JOIN imdrf_releases r ON r.id = t.release_id
-       WHERE r.release_year = 2026
+       WHERE r.release_year = 2026 AND t.annex = 'A'
     `);
     expect(Number((y2026[0] as { count: string }).count)).toBe(1);
   });
@@ -297,7 +313,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("importing an IMDRF release", () => {
     );
     expect(releases).toHaveLength(1);
 
-    const codes = await owner.db.execute(sql`SELECT code FROM imdrf_terms`);
+    const codes = await owner.db.execute(sql`SELECT code FROM imdrf_terms WHERE annex = 'A'`);
     expect(codes.map((r) => (r as { code: string }).code)).toEqual(["A99"]);
   });
 

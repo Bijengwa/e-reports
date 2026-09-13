@@ -153,4 +153,63 @@ describe("parseImdrfWorkbook", () => {
     expect(parsed.rows.map((r) => r.sourceOrder)).toEqual([0, 1, 2]);
     expect(parsed.rows.map((r) => r.code)).toEqual(["A01", "A0101", "A010101"]);
   });
+
+  it("records every discovered A-G sheet in annexesFound", async () => {
+    const buf = await bufferOf((wb) => {
+      addAnnexA(wb);
+      const ws = wb.addWorksheet("B");
+      for (let i = 0; i < 7; i++) ws.addRow([]);
+      ws.addRow([
+        "Level 1 Term",
+        "Code",
+        "Definition",
+        "Non-IMDRF Code",
+        "Status",
+        "Status Description",
+        "CodeHierarchy",
+      ]);
+      ws.addRow(["Only level", "B01", "def", null, null, null, "B01"]);
+    });
+    const parsed = await parseImdrfWorkbook(buf);
+    expect(parsed.annexesFound).toEqual(new Set(["A", "B"]));
+  });
+
+  it("records an annex as found even when its terminology sheet is entirely empty", async () => {
+    const buf = await bufferOf((wb) => {
+      const ws = wb.addWorksheet("G");
+      for (let i = 0; i < 7; i++) ws.addRow([]);
+      ws.addRow([
+        "Level 1 Term",
+        "Level 2 Term",
+        "Level 3 Term",
+        "Code",
+        "Definition",
+        "Non-IMDRF Code",
+        "Status",
+        "Status Description",
+        "CodeHierarchy",
+      ]);
+      // Header row only — no terminology rows follow.
+    });
+    const parsed = await parseImdrfWorkbook(buf);
+    expect(parsed.annexesFound).toEqual(new Set(["G"]));
+    expect(parsed.rows.filter((r) => r.annex === "G")).toHaveLength(0);
+  });
+
+  it("records an annex as found even when its header row cannot be located", async () => {
+    const buf = await bufferOf((wb) => {
+      wb.addWorksheet("F").addRow(["not a header row"]);
+    });
+    const parsed = await parseImdrfWorkbook(buf);
+    expect(parsed.annexesFound).toEqual(new Set(["F"]));
+  });
+
+  it("does not count an unrelated sheet as any annex", async () => {
+    const buf = await bufferOf((wb) => {
+      wb.addWorksheet("Cover Page").addRow(["Not terminology data"]);
+      wb.addWorksheet("Notes").addRow(["Also not terminology data"]);
+    });
+    const parsed = await parseImdrfWorkbook(buf);
+    expect(parsed.annexesFound.size).toBe(0);
+  });
 });

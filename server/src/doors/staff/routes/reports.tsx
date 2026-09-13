@@ -494,7 +494,7 @@ async function officerWorkloadOptions(
            : sql`AND u.id NOT IN (
                    SELECT assessor_id FROM assessments WHERE report_id = ${excludeAssessorsOnReportId}
                  )`
-       }
+}
      GROUP BY u.id, u.full_name
      ORDER BY u.full_name
   `);

@@ -44,17 +44,38 @@ function clampLimit(requested: number, max: number): number {
   return Math.min(Math.trunc(requested), max);
 }
 
-/** An opaque pagination cursor over `sort_order`. Malformed input degrades to "from the start". */
-export function encodeCursor(sortOrder: number): string {
-  return Buffer.from(String(sortOrder), "utf8").toString("base64url");
+export type Cursor = { sortOrder: number; id: string };
+
+/**
+ * An opaque pagination cursor over `(sort_order, id)`, not `sort_order` alone.
+ *
+ * `sort_order` is only unique within one annex (it is the workbook's own row order, reset per
+ * annex — see `parser.ts`), so a page boundary that landed exactly on a `sort_order` value shared
+ * by rows of two different annexes could skip or repeat rows depending on which of them Postgres
+ * happened to return last. `id` (the primary key, always unique) is the tiebreak that makes the
+ * ordering — and therefore the cursor — total rather than merely usually sufficient. A malformed
+ * or tampered cursor degrades to "from the start" rather than throwing.
+ */
+export function encodeCursor(cursor: Cursor): string {
+  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
 }
 
-export function decodeCursor(cursor: string | undefined): number | null {
-  if (!cursor) return null;
+export function decodeCursor(value: string | undefined): Cursor | null {
+  if (!value) return null;
   try {
-    const decoded = Buffer.from(cursor, "base64url").toString("utf8");
-    const value = Number(decoded);
-    return Number.isInteger(value) ? value : null;
+    const decoded = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as unknown;
+    if (
+      typeof decoded === "object" &&
+      decoded !== null &&
+      "sortOrder" in decoded &&
+      "id" in decoded &&
+      typeof (decoded as { sortOrder: unknown }).sortOrder === "number" &&
+      Number.isInteger((decoded as { sortOrder: unknown }).sortOrder) &&
+      typeof (decoded as { id: unknown }).id === "string"
+    ) {
+      return decoded as Cursor;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -173,6 +194,8 @@ export async function listTerms(
 
   const limit = clampLimit(opts.limit, MAX_LIST_LIMIT);
   const after = decodeCursor(opts.cursor);
+  const afterSortOrder = after?.sortOrder ?? null;
+  const afterId = after?.id ?? null;
 
   const rows = await db.execute<TermQueryRow>(
     opts.parentId === null
@@ -183,8 +206,12 @@ export async function listTerms(
            WHERE t.release_id = ${opts.releaseId}
              AND t.annex = ${opts.annex}
              AND t.parent_term_id IS NULL
-             AND (${after}::int IS NULL OR t.sort_order > ${after})
-           ORDER BY t.sort_order
+             AND (
+               ${afterSortOrder}::int IS NULL
+               OR t.sort_order > ${afterSortOrder}
+               OR (t.sort_order = ${afterSortOrder} AND t.id > ${afterId})
+             )
+           ORDER BY t.sort_order, t.id
            LIMIT ${limit + 1}
         `
       : sql`
@@ -193,8 +220,12 @@ export async function listTerms(
             FROM imdrf_terms t
            WHERE t.release_id = ${opts.releaseId}
              AND t.parent_term_id = ${opts.parentId}
-             AND (${after}::int IS NULL OR t.sort_order > ${after})
-           ORDER BY t.sort_order
+             AND (
+               ${afterSortOrder}::int IS NULL
+               OR t.sort_order > ${afterSortOrder}
+               OR (t.sort_order = ${afterSortOrder} AND t.id > ${afterId})
+             )
+           ORDER BY t.sort_order, t.id
            LIMIT ${limit + 1}
         `,
   );
@@ -204,7 +235,7 @@ export async function listTerms(
   const last = page[page.length - 1];
   return {
     rows: page.map(termRowOf),
-    nextCursor: hasMore && last ? encodeCursor(last.sort_order) : null,
+    nextCursor: hasMore && last ? encodeCursor({ sortOrder: last.sort_order, id: last.id }) : null,
   };
 }
 
@@ -222,6 +253,8 @@ export async function searchTerms(
 
   const limit = clampLimit(opts.limit, MAX_SEARCH_LIMIT);
   const after = decodeCursor(opts.cursor);
+  const afterSortOrder = after?.sortOrder ?? null;
+  const afterId = after?.id ?? null;
   const pattern = likePattern(trimmed);
 
   const rows = await db.execute<TermQueryRow>(sql`
@@ -232,8 +265,12 @@ export async function searchTerms(
        AND (t.code ILIKE ${pattern} ESCAPE '\\'
             OR t.term ILIKE ${pattern} ESCAPE '\\'
             OR t.definition ILIKE ${pattern} ESCAPE '\\')
-       AND (${after}::int IS NULL OR t.sort_order > ${after})
-     ORDER BY t.sort_order
+       AND (
+         ${afterSortOrder}::int IS NULL
+         OR t.sort_order > ${afterSortOrder}
+         OR (t.sort_order = ${afterSortOrder} AND t.id > ${afterId})
+       )
+     ORDER BY t.sort_order, t.id
      LIMIT ${limit + 1}
   `);
 
@@ -242,7 +279,7 @@ export async function searchTerms(
   const last = page[page.length - 1];
   return {
     rows: page.map(termRowOf),
-    nextCursor: hasMore && last ? encodeCursor(last.sort_order) : null,
+    nextCursor: hasMore && last ? encodeCursor({ sortOrder: last.sort_order, id: last.id }) : null,
   };
 }
 

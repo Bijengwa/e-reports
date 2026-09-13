@@ -2,16 +2,26 @@
  * Orchestrates the admin upload flow: parse, validate, hold for confirmation, then write.
  *
  * The three steps are deliberately separate calls rather than one function, because the workflow
- * itself has to be: an administrator sees a preview before anything touches the database, and only
- * a second, explicit action commits it. `previewImdrfImport` never writes. `confirmImdrfImport`
- * re-parses and re-validates the held buffer before it writes anything, rather than trusting that
- * nothing could have changed between the two calls — cheap insurance at a few thousand rows and a
- * few milliseconds, against ever writing something that was not itself just proven valid.
+ * itself has to be: an administrator sees a preview before anything touches the terminology
+ * tables, and only a second, explicit action commits it. `previewImdrfImport` never writes to
+ * `imdrf_releases`/`imdrf_terms`. `confirmImdrfImport` re-parses and re-validates the held
+ * workbook before it writes anything, rather than trusting that nothing could have changed since
+ * the preview — cheap insurance at a few thousand rows and a few milliseconds, against ever
+ * writing something that was not itself just proven valid.
+ *
+ * The hold between those two calls lives in `imdrf_import_staging` (Postgres), not in an
+ * in-memory map. This deployment can run more than one application instance behind a load
+ * balancer, and an in-memory map on one process is invisible to the others — the preview request
+ * and the confirm request are not guaranteed to land on the same one. The staging row is
+ * single-use: `confirmImdrfImport` locks it (`SELECT ... FOR UPDATE`) and deletes it inside the
+ * same transaction that reads it, so two simultaneous confirms of the same token cannot both
+ * proceed — the second finds nothing, because the first has already consumed it.
  */
 
-import { and, eq } from "drizzle-orm";
+import { createHash, randomBytes } from "node:crypto";
+import { and, eq, lt, sql } from "drizzle-orm";
 import type { Database } from "../../db/client.js";
-import { imdrfReleases, imdrfTerms } from "../../db/schema/index.js";
+import { imdrfImportStaging, imdrfReleases, imdrfTerms } from "../../db/schema/index.js";
 import { parseImdrfWorkbook } from "./parser.js";
 import type { AnnexSummary } from "./types.js";
 import { type ValidatedTerm, type ValidationIssue, validateParsedWorkbook } from "./validate.js";
@@ -39,48 +49,48 @@ export type PublishOutcome =
   | { status: "not_found" }
   | { status: "already_published" };
 
-type PendingImport = {
-  buffer: Buffer;
-  releaseYear: number;
-  documentCode: string | null;
-  title: string | null;
-  sourceFileName: string;
-  expiresAt: number;
-};
+const STAGING_TTL_MS = 15 * 60 * 1000;
 
-/**
- * A single-process, in-memory hold for an uploaded workbook between preview and confirm.
- *
- * Deliberately not a database table or a file on disk: the buffer only needs to survive the short
- * gap between one administrator's two clicks, on the one app instance this deployment runs (see
- * the "AE Reports locked architecture" note — one Fastify process, one Postgres). A restart during
- * that gap loses the token, and the administrator simply re-uploads; nothing about the release
- * itself is ever in a half-written state, because `confirmImdrfImport` re-validates from the held
- * buffer inside its own transaction rather than trusting anything the token merely remembers.
- */
-const PENDING_IMPORTS = new Map<string, PendingImport>();
-const PENDING_IMPORT_TTL_MS = 15 * 60 * 1000;
-
-function evictExpired(now: number): void {
-  for (const [token, pending] of PENDING_IMPORTS) {
-    if (pending.expiresAt <= now) PENDING_IMPORTS.delete(token);
-  }
+/** 256 bits from the CSPRNG — the same size and source `auth/session.ts` uses for a session token. */
+function generateToken(): string {
+  return randomBytes(32).toString("base64url");
 }
 
-export async function previewImdrfImport(input: {
-  buffer: Buffer;
-  releaseYear: number;
-  documentCode: string | null;
-  title: string | null;
-  sourceFileName: string;
-}): Promise<ImportPreview> {
-  const now = Date.now();
-  evictExpired(now);
+/**
+ * SHA-256, the same choice `hashSessionToken` makes and for the same reason: the token itself is
+ * already 256 bits of randomness with nothing to guess, so a slow password hash would only tax
+ * every legitimate confirm for no security benefit. What hashing buys is that a staging table dump
+ * holds no usable token — the raw value is never written anywhere, including here.
+ */
+function hashToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+/** Removes staging rows whose hold has expired. Called at the top of both entry points below,
+ *  so no separate cron job is needed to keep the table from growing without bound. */
+async function sweepExpiredStaging(db: Database): Promise<void> {
+  await db.delete(imdrfImportStaging).where(lt(imdrfImportStaging.expiresAt, sql`now()`));
+}
+
+export async function previewImdrfImport(
+  db: Database,
+  input: {
+    buffer: Buffer;
+    releaseYear: number;
+    documentCode: string | null;
+    title: string | null;
+    sourceFileName: string;
+    actorUserId: string | null;
+  },
+): Promise<ImportPreview> {
+  await sweepExpiredStaging(db);
 
   const parsed = await parseImdrfWorkbook(input.buffer);
   const result = validateParsedWorkbook(parsed, input.releaseYear);
 
   if (!result.ok) {
+    // Invalid: no staging row is written. "Failed validation performs zero database writes"
+    // holds here too, not only for the terminology tables.
     return {
       token: "",
       releaseYear: input.releaseYear,
@@ -94,14 +104,16 @@ export async function previewImdrfImport(input: {
     };
   }
 
-  const token = crypto.randomUUID();
-  PENDING_IMPORTS.set(token, {
-    buffer: input.buffer,
+  const token = generateToken();
+  await db.insert(imdrfImportStaging).values({
+    tokenHash: hashToken(token),
     releaseYear: input.releaseYear,
     documentCode: input.documentCode,
     title: input.title,
     sourceFileName: input.sourceFileName,
-    expiresAt: now + PENDING_IMPORT_TTL_MS,
+    workbookData: input.buffer,
+    createdByUserId: input.actorUserId,
+    expiresAt: new Date(Date.now() + STAGING_TTL_MS),
   });
 
   return {
@@ -146,27 +158,48 @@ function toRow(releaseId: string, term: ValidatedTerm) {
 }
 
 /**
- * Consumes a preview token exactly once: re-validates the held workbook and, only if it still
- * passes, writes it inside a single transaction. A `draft` release for that year is replaced
- * wholesale (its terms deleted, then reinserted, then its own metadata updated); a `published`
- * release is refused untouched; a year with no existing release gets a new `draft` row.
+ * Consumes a preview token exactly once: locks and deletes its staging row, re-validates the
+ * workbook it held, and — only if that still passes — writes the release/terms, all inside one
+ * transaction. A `draft` release for that year is replaced wholesale (its terms deleted, then
+ * reinserted, then its own metadata updated); a `published` release is refused untouched; a year
+ * with no existing release gets a new `draft` row.
+ *
+ * The token is consumed whatever the outcome below — including a revalidation failure — because a
+ * token is a bearer credential for one import attempt, not a retry coupon. The one exception is an
+ * unexpected error (not a validation failure) partway through the writes: that rolls the whole
+ * transaction back, staging row included, so an administrator who hit a transient failure can
+ * retry with the same token rather than losing their upload.
  */
 export async function confirmImdrfImport(db: Database, token: string): Promise<ImportOutcome> {
-  evictExpired(Date.now());
+  await sweepExpiredStaging(db);
 
-  const pending = PENDING_IMPORTS.get(token);
-  if (!pending) return { status: "invalid_token" };
-  PENDING_IMPORTS.delete(token); // Single-use, whatever the outcome below.
-
-  const parsed = await parseImdrfWorkbook(pending.buffer);
-  const result = validateParsedWorkbook(parsed, pending.releaseYear);
-  if (!result.ok) return { status: "validation_failed", issues: result.issues };
+  const tokenHash = hashToken(token);
 
   return db.transaction(async (tx) => {
+    const [staged] = await tx
+      .select()
+      .from(imdrfImportStaging)
+      .where(eq(imdrfImportStaging.tokenHash, tokenHash))
+      .for("update");
+
+    if (!staged) return { status: "invalid_token" as const };
+
+    // Consumed here, before anything else runs, so a concurrent confirm of the same token —
+    // blocked on the row lock above until this transaction ends — finds nothing once it does.
+    await tx.delete(imdrfImportStaging).where(eq(imdrfImportStaging.id, staged.id));
+
+    if (staged.expiresAt.getTime() <= Date.now()) {
+      return { status: "invalid_token" as const };
+    }
+
+    const parsed = await parseImdrfWorkbook(staged.workbookData);
+    const result = validateParsedWorkbook(parsed, staged.releaseYear);
+    if (!result.ok) return { status: "validation_failed" as const, issues: result.issues };
+
     const [existing] = await tx
       .select({ id: imdrfReleases.id, status: imdrfReleases.status })
       .from(imdrfReleases)
-      .where(eq(imdrfReleases.releaseYear, pending.releaseYear))
+      .where(eq(imdrfReleases.releaseYear, staged.releaseYear))
       .limit(1);
 
     if (existing && existing.status === "published") {
@@ -180,19 +213,19 @@ export async function confirmImdrfImport(db: Database, token: string): Promise<I
       await tx
         .update(imdrfReleases)
         .set({
-          documentCode: pending.documentCode,
-          title: pending.title,
-          sourceFileName: pending.sourceFileName,
+          documentCode: staged.documentCode,
+          title: staged.title,
+          sourceFileName: staged.sourceFileName,
         })
         .where(eq(imdrfReleases.id, releaseId));
     } else {
       const [inserted] = await tx
         .insert(imdrfReleases)
         .values({
-          releaseYear: pending.releaseYear,
-          documentCode: pending.documentCode,
-          title: pending.title,
-          sourceFileName: pending.sourceFileName,
+          releaseYear: staged.releaseYear,
+          documentCode: staged.documentCode,
+          title: staged.title,
+          sourceFileName: staged.sourceFileName,
           status: "draft",
         })
         .returning({ id: imdrfReleases.id });

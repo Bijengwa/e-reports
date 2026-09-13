@@ -49,6 +49,14 @@ export type ParsedWorkbook = {
   issues: ParseIssue[];
   /** Every "Release Number:" year found on any sheet, for the caller to cross-check. */
   releaseYearsFound: Set<number>;
+  /**
+   * Every annex whose sheet was discovered in the workbook — including one whose header row could
+   * not be found, or whose terminology sheet is entirely empty. A sheet counts as "found" as soon
+   * as its own name or "Annex Name:" cell identifies it as one of A-G; whether it could then be
+   * parsed is a separate question `issues` already answers. This is what lets the validator tell
+   * "Annex G is missing from the workbook" apart from "Annex G is present but broken".
+   */
+  annexesFound: Set<Annex>;
 };
 
 type ColumnMap = {
@@ -318,15 +326,21 @@ export async function parseImdrfWorkbook(buffer: Buffer): Promise<ParsedWorkbook
   const issues: ParseIssue[] = [];
   const rows: ParsedRow[] = [];
   const releaseYearsFound = new Set<number>();
+  const annexesFound = new Set<Annex>();
 
   for (const sheet of workbook.worksheets) {
     const annex = resolveSheetAnnex(sheet, issues);
     if (annex === null) continue; // Not a terminology sheet, or its own name/content disagree.
+
+    // Recorded as soon as the sheet is identified as this annex — before any attempt to parse its
+    // header or rows, so a sheet that is present but broken (or genuinely empty) still counts as
+    // "found". Whether it could be parsed is `issues`' question, not `annexesFound`'s.
+    annexesFound.add(annex);
 
     for (const year of findReleaseYears(sheet)) releaseYearsFound.add(year);
 
     rows.push(...parseSheet(sheet, annex, issues));
   }
 
-  return { rows, issues, releaseYearsFound };
+  return { rows, issues, releaseYearsFound, annexesFound };
 }

@@ -98,6 +98,33 @@ export function validateParsedWorkbook(
     }
   }
 
+  // All seven annexes are required, not merely whichever sheets happened to be present. A sheet
+  // that was found but is genuinely empty (a header row and no terminology below it) is called out
+  // separately from one that never existed at all — both leave the workbook incomplete, but an
+  // administrator fixing the problem needs to know which one it is.
+  const rowsByAnnex = new Set(parsed.rows.map((row) => row.annex));
+  for (const annex of ANNEXES) {
+    if (!parsed.annexesFound.has(annex)) {
+      issues.push({
+        severity: "error",
+        annex,
+        sheet: "(workbook)",
+        row: null,
+        field: "Annex",
+        message: `Annex ${annex} is missing from the workbook.`,
+      });
+    } else if (!rowsByAnnex.has(annex)) {
+      issues.push({
+        severity: "error",
+        annex,
+        sheet: "(workbook)",
+        row: null,
+        field: "Annex",
+        message: `Annex ${annex} is present in the workbook but has no terminology rows.`,
+      });
+    }
+  }
+
   // Structural pass: every row that can be a term at all gets an id here; a row that fails any
   // structural check is excluded from `candidates` (and therefore never becomes a parent target
   // or an inserted term), and its problem is recorded as an issue naming the exact sheet/row.

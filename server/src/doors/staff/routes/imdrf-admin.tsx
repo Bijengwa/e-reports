@@ -137,12 +137,13 @@ export async function imdrfAdminRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const session = currentSession(request);
-    const preview = await previewImdrfImport({
+    const preview = await previewImdrfImport(app.db, {
       buffer: fields.fileBuffer,
       releaseYear: parsedYear.data,
       documentCode: nonEmpty(fields.documentCode),
       title: nonEmpty(fields.title),
       sourceFileName: fields.fileName,
+      actorUserId: session.userId,
     });
 
     return reply.html(

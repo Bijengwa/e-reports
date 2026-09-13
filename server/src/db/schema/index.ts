@@ -5,6 +5,7 @@ import {
   bigserial,
   boolean,
   check,
+  customType,
   date,
   index,
   integer,
@@ -563,4 +564,51 @@ export const imdrfTerms = pgTable(
     index("imdrf_terms_release_level_idx").on(t.releaseId, t.level),
     check("imdrf_terms_annex_ck", sql`annex IN ('A','B','C','D','E','F','G')`),
   ],
+);
+
+/** Raw binary storage — the uploaded workbook's own bytes, held only while a staging row lives. */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
+
+/**
+ * The hold between an administrator's "preview" and "confirm" clicks — not terminology data, and
+ * deliberately not the tables above: this is one uploaded workbook's bytes and metadata, kept just
+ * long enough to be re-validated and imported, or to expire unused.
+ *
+ * A row here exists in-memory in earlier deployments; it moved to Postgres because that hold has
+ * to survive the request landing on a different application instance than the one that served the
+ * preview. Render load-balances across instances when scaled, and an in-memory map on one process
+ * is invisible to the others — a persistent disk would fix that only for a single instance and
+ * block horizontal scaling entirely, where the database this office already runs does not.
+ *
+ * `token_hash` is a SHA-256 of the actual token, the same discipline `sessions.token_hash` already
+ * keeps: the raw token is a bearer credential (whoever holds it may complete this import) and is
+ * never written anywhere, including here — only its hash is, so a database dump holds nothing
+ * usable. `created_by_user_id` is audit metadata, not a workflow coupling: it says who started an
+ * import, the same way `audit_log.actor_user_id` says who did anything else, and carries no
+ * foreign key from `reports`, `assessments`, F004 or the Register into IMDRF — see the comment on
+ * `imdrfReleases` above for why that boundary matters.
+ */
+export const imdrfImportStaging = pgTable(
+  "imdrf_import_staging",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tokenHash: text("token_hash").notNull().unique(),
+    releaseYear: smallint("release_year").notNull(),
+    documentCode: text("document_code"),
+    title: text("title"),
+    sourceFileName: text("source_file_name").notNull(),
+    workbookData: bytea("workbook_data").notNull(),
+    /** Who started this import. Null if their account is later removed — the row itself still
+     *  expires and cleans up on its own, so nothing here depends on the actor surviving. */
+    createdByUserId: uuid("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Past this, the row is stale: `previewImdrfImport`/`confirmImdrfImport` sweep expired rows
+     *  on every call, so no separate cron job is needed to keep the table from growing unbounded. */
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [index("imdrf_import_staging_expires_at_idx").on(t.expiresAt)],
 );
