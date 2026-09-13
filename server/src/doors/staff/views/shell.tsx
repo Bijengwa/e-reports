@@ -39,6 +39,8 @@ export type StaffShellProps = {
     | "my-work"
     | "reports"
     | "new-report"
+    | "imdrf"
+    | "imdrf-manage"
     | "users"
     | "activity";
   /**
@@ -70,6 +72,17 @@ function IconDashboard(): JSX.Element {
  * and two entries sharing one glyph would leave a manager counting positions to tell their
  * summary from their queue.
  */
+/** An open book: the IMDRF terminology reference, distinct from every vigilance-record icon. */
+function IconImdrf(): JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M12 5.5c-1.8-1.2-4-1.7-6-1.5v13.5c2 -0.2 4.2 0.3 6 1.5" />
+      <path d="M12 5.5c1.8-1.2 4-1.7 6-1.5v13.5c-2 -0.2 -4.2 0.3 -6 1.5" />
+      <path d="M12 5.5v13.5" />
+    </svg>
+  );
+}
+
 function IconWorkload(): JSX.Element {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -272,6 +285,18 @@ export function StaffShell({
               <span class="rail-label">Dashboard</span>
             </a>
 
+            {/* Ungated, like Dashboard: the terminology browser is a reference tool every signed-in
+                role reads, not a vigilance record — `active.register(imdrfBrowserRoutes)` sits at
+                the same "every role" nesting level as `reportsRoutes`, not inside a role scope. */}
+            <a
+              href="/imdrf"
+              class={active === "imdrf" ? "on" : ""}
+              aria-current={active === "imdrf" ? "page" : undefined}
+            >
+              <IconImdrf />
+              <span class="rail-label">IMDRF Terminology</span>
+            </a>
+
             {isManager && (
               <a
                 href="/workload"
@@ -392,6 +417,19 @@ export function StaffShell({
                 >
                   <IconActivity />
                   <span class="rail-label">Activity</span>
+                </a>
+                {/* The write side of the terminology browser above — uploading, replacing a
+                    draft, and publishing a release. An administrator's own powers are over
+                    accounts and configuration, and this is exactly that: it manages what every
+                    other role reads at /imdrf, without itself being a reader of vigilance
+                    records. */}
+                <a
+                  href="/imdrf/manage"
+                  class={active === "imdrf-manage" ? "on" : ""}
+                  aria-current={active === "imdrf-manage" ? "page" : undefined}
+                >
+                  <IconImdrf />
+                  <span class="rail-label">Manage IMDRF Terminology</span>
                 </a>
               </>
             )}

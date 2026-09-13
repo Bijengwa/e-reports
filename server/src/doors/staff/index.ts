@@ -12,6 +12,8 @@ import { decisionRoutes } from "./routes/decisions.js";
 import { finalDocumentRoutes } from "./routes/final-document.js";
 import { finalReportsRoutes } from "./routes/final-reports.js";
 import { firstAssessorRoutes } from "./routes/first-assessor.js";
+import { imdrfBrowserRoutes } from "./routes/imdrf.js";
+import { imdrfAdminRoutes } from "./routes/imdrf-admin.js";
 import { loginRoutes } from "./routes/login.js";
 import { logoutRoutes } from "./routes/logout.js";
 import { myWorkRoutes } from "./routes/my-work.js";
@@ -83,6 +85,12 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
       // Every signed-in role, so it sits here rather than in the administrator scope below. An
       // administrator's extra powers are over accounts, not over who may read a report.
       await active.register(reportsRoutes);
+
+      // The read-only IMDRF terminology browser. Every signed-in role, same as the register
+      // above's opposite — this is a reference vocabulary, not a vigilance record, so there is
+      // no role this door withholds it from. The write side (`imdrfAdminRoutes`, under
+      // `/imdrf/manage`) lives in the administrator scope below.
+      await active.register(imdrfBrowserRoutes);
 
       // The Final Document, beside the register and for the same readers. A manager approved it,
       // the Officer named on that approval is carrying it out, and an administrator can already
@@ -167,6 +175,11 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
 
         await administration.register(usersRoutes);
         await administration.register(activityRoutes);
+
+        // Uploading, previewing, importing and publishing IMDRF terminology releases. Beside the
+        // other administrator-only tools for the same reason they are here: managing what the
+        // rest of staff sees is an account-and-configuration power, not a vigilance-record one.
+        await administration.register(imdrfAdminRoutes);
       });
     });
   });

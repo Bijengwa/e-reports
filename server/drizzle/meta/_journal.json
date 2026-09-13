@@ -141,6 +141,13 @@
       "when": 1788445759000,
       "tag": "0019_imdrf_terminology_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1788532159000,
+      "tag": "0020_imdrf_terms_code_hierarchy_unique",
+      "breakpoints": true
     }
   ]
 }

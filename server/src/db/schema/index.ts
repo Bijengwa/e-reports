@@ -548,7 +548,14 @@ export const imdrfTerms = pgTable(
   (t) => [
     // The same code can recur in a later release (a 2027 workbook reusing "G02002" is expected,
     // not a collision) — uniqueness is scoped to the release, never global.
-    uniqueIndex("imdrf_terms_release_code_uq").on(t.releaseId, t.code),
+    //
+    // `code` alone is not unique within one release: IMDRF's own Annex E cross-lists roughly 200
+    // terms under more than one category branch, reusing the same code at each hierarchy position
+    // (e.g. E0104 "Cerebral Hyperperfusion Syndrome" appears at both E01|E0104, under Nervous
+    // System, and E05|E0104, under Vascular System — the same term, deliberately shown in two
+    // places). `code_hierarchy` is what is actually unique: two rows may share a code, but never
+    // both a code and the exact position in the tree that code was reused at.
+    uniqueIndex("imdrf_terms_release_code_hierarchy_uq").on(t.releaseId, t.code, t.codeHierarchy),
     // Serves both "list an annex's terms in source order" and the annex-count summary.
     index("imdrf_terms_release_annex_sort_idx").on(t.releaseId, t.annex, t.sortOrder),
     // Serves "get this term's children", the tree navigation's only query.

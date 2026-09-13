@@ -309,7 +309,11 @@ function findReleaseYears(sheet: ExcelJS.Worksheet): number[] {
 export async function parseImdrfWorkbook(buffer: Buffer): Promise<ParsedWorkbook> {
   const ExcelJSModule = await import("exceljs");
   const workbook = new ExcelJSModule.default.Workbook();
-  await workbook.xlsx.load(buffer);
+  // exceljs's bundled types predate the stricter `Buffer<ArrayBufferLike>` generic this repo's
+  // TypeScript/@types/node versions use; the value itself is a plain Buffer at runtime, so the
+  // mismatch is in the type declarations, not the data.
+  // biome-ignore lint/suspicious/noExplicitAny: bridging exceljs's pre-generic Buffer type.
+  await workbook.xlsx.load(buffer as any);
 
   const issues: ParseIssue[] = [];
   const rows: ParsedRow[] = [];
