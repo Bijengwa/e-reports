@@ -2,6 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Source of truth:** `docs/superpowers/plans/2026-09-13-imdrf-docs-search-redesign-requirements.md`
+> (authored directly by the user) is the authoritative requirements/acceptance-criteria
+> document for this feature. This file is the task-by-task execution of it — amended to
+> include an Overview landing mode (§9), `.imdrf-docs-*`/`.imdrf-term-*` CSS naming
+> (§35), stale-request-safe search (§29), tiered short-query scoring (§25), a
+> collapsible mobile nav menu (§32), a migration-privilege check (§38), and a
+> real-dataset verification task (§45). If anything here still contradicts that
+> document, the requirements document wins.
+
 **Goal:** Replace the IMDRF terminology door's two-pane tree/detail browser with a
 documentation-app-style layout (annex sidebar, breadcrumbs, deep-linkable term anchors),
 and replace its plain `ILIKE` search with a ranked, typo-tolerant hybrid of PostgreSQL
@@ -74,6 +83,23 @@ the one opt-in client script this door already uses.
   populated), plus GIN indexes `imdrf_terms_search_vector_idx`,
   `imdrf_terms_code_trgm_idx`, `imdrf_terms_term_trgm_idx`. Task 3 (`searchTerms`)
   depends on `search_vector`, `similarity()`, and `word_similarity()` all being usable.
+
+- [ ] **Step 0: Verify the migration role can create extensions before assuming it**
+
+`CREATE EXTENSION` needs a privileged role — do not assume this repo's migration role
+has it just because earlier migrations here only ran `CREATE TABLE`/`ALTER TABLE`.
+Check how migrations are actually run in this deployment: inspect
+`server/drizzle.config.ts` and whatever connection string/role `db:migrate` uses (see
+`.env`/`.env.example` for `DATABASE_URL` — is it a superuser/owner role, or a narrower
+one?), then either:
+- confirm that role already has `CREATE EXTENSION` rights (owning a database in
+  PostgreSQL, RDS, Supabase, Neon, etc. usually does), or
+- if it doesn't, `pg_trgm` must be enabled once, out-of-band, by whoever administers
+  the actual database (a platform superuser/admin console action) *before* this
+  migration runs — note that requirement to the user rather than silently failing
+  partway through a migration run.
+
+Do not proceed to Step 1 until this is confirmed one way or the other.
 
 - [ ] **Step 1: Write the migration SQL**
 
@@ -708,11 +734,20 @@ Delete the `likePattern` function and the existing `searchTerms` (currently line
 /**
  * A small, tunable floor below which a row's relevance score is not "found" at all — every
  * row has *some* nonzero trigram similarity to any string, so without a floor a search would
- * return the entire release, worst-match-first. 0.15 is a starting point; if real usage shows it
- * too strict (misses genuine typos) or too loose (returns noise), it is the one constant to
- * retune, not the query's structure.
+ * return the entire release, worst-match-first. These starting points must be re-validated
+ * against the actual imported 2026 release (Task 10) — they are not to be trusted as final just
+ * because they compile; if real usage against the real dataset shows either floor too strict
+ * (misses genuine typos) or too loose (returns noise), it is these two constants to retune, not
+ * the query's structure.
+ *
+ * Two floors, not one: a very short query (1-2 characters) has so few trigrams that almost
+ * anything clears a low floor, burying the handful of genuine prefix/code matches under noise —
+ * so short queries use a stricter floor and skip the fuzzy definition signal entirely (below),
+ * relying on prefix/code matching instead.
  */
 const SEARCH_SCORE_FLOOR = 0.15;
+const SHORT_QUERY_SCORE_FLOOR = 0.4;
+const SHORT_QUERY_MAX_LENGTH = 2;
 
 /** Strips everything but letters/digits from a token so it can be embedded directly into a
  *  hand-built `to_tsquery` string (as `token:*`) without risking tsquery operator-syntax
@@ -732,6 +767,8 @@ export async function searchTerms(
   const after = decodeSearchCursor(opts.cursor);
   const afterScore = after?.score ?? null;
   const afterId = after?.id ?? null;
+  const isShortQuery = trimmed.length <= SHORT_QUERY_MAX_LENGTH;
+  const scoreFloor = isShortQuery ? SHORT_QUERY_SCORE_FLOOR : SEARCH_SCORE_FLOOR;
 
   // Up to 8 tokens, each becomes a prefix match ("batt:*") OR'd together — OR (not AND) is what
   // lets a query that only supplies some of a multi-word term's words still find it; ts_rank
@@ -754,17 +791,23 @@ export async function searchTerms(
         t.non_imdrf_code, t.primary_category, t.secondary_category,
         round(
           GREATEST(
+            -- ts_rank over search_vector already weights term+code (weight A) above
+            -- definition+non_imdrf_code (weight B) via the migration's setweight() calls.
             COALESCE(ts_rank(t.search_vector, q.tsq), 0),
             similarity(t.code, ${trimmed}),
-            similarity(t.term, ${trimmed}),
-            word_similarity(${trimmed}, coalesce(t.definition, ''))
+            similarity(t.term, ${trimmed})
+            ${
+              isShortQuery
+                ? sql``
+                : sql`, word_similarity(${trimmed}, coalesce(t.definition, ''))`
+            }
           )::numeric,
           6
         ) AS score
       FROM imdrf_terms t, q
       WHERE t.release_id = ${opts.releaseId}
     ) ranked
-    WHERE ranked.score > ${SEARCH_SCORE_FLOOR}
+    WHERE ranked.score > ${scoreFloor}
       AND (
         ${afterScore}::numeric IS NULL
         OR ranked.score < ${afterScore}
@@ -1075,7 +1118,7 @@ git commit -m "feat(imdrf): drop parentId from the terms listing route"
 - Produces: the page shell Task 7's client script attaches to — `data-imdrf-browser`
   root, `data-release-id`, a `data-imdrf-annex` button per annex, a
   `data-imdrf-search` input, a `data-imdrf-content` container holding server-rendered
-  `<article id="term-<uuid>" class="imdrf-card" data-code="...">` blocks, and a
+  `<article id="term-<uuid>" class="imdrf-term" data-code="...">` blocks, and a
   `data-imdrf-sentinel` div for the client's `IntersectionObserver`.
 
 - [ ] **Step 1: Extend the failing integration test**
@@ -1158,11 +1201,14 @@ with:
 
     const summary = selected ? await annexSummary(app.db, selected.id) : [];
     const q = (query.q ?? "").trim();
-    const activeAnnex = isAnnex(query.annex ?? "") ? (query.annex as Annex) : "A";
+    // No `annex` param at all means "the overview page" (the documentation landing page — release
+    // info + the annex list as navigation), not "default to Annex A". Only an explicit, valid
+    // `?annex=X` selects a browse target.
+    const activeAnnex: Annex | null = isAnnex(query.annex ?? "") ? (query.annex as Annex) : null;
 
     let initialRows: TermRow[] = [];
     let initialNextCursor: string | null = null;
-    let mode: "browse" | "search" = "browse";
+    let mode: "overview" | "browse" | "search" = "overview";
 
     if (selected) {
       if (q !== "") {
@@ -1174,7 +1220,8 @@ with:
         });
         initialRows = page.rows;
         initialNextCursor = page.nextCursor;
-      } else {
+      } else if (activeAnnex !== null) {
+        mode = "browse";
         const page = await listTerms(app.db, {
           releaseId: selected.id,
           annex: activeAnnex,
@@ -1183,6 +1230,8 @@ with:
         initialRows = page.rows;
         initialNextCursor = page.nextCursor;
       }
+      // mode stays "overview" when neither q nor annex is present — no listTerms/searchTerms call
+      // at all, matching "opening /imdrf does not download thousands of terms" (spec §12, §45).
     }
 
     reply.html(
@@ -1251,8 +1300,8 @@ export type ImdrfBrowserPageProps = {
   summary: AnnexSummary[];
   viewerRole: string;
   viewerName: string;
-  mode: "browse" | "search";
-  activeAnnex: Annex;
+  mode: "overview" | "browse" | "search";
+  activeAnnex: Annex | null;
   query: string;
   initialRows: TermRow[];
   initialNextCursor: string | null;
@@ -1270,7 +1319,7 @@ function TermCard({ row }: { row: TermRow }): JSX.Element {
 
   return (
     <article
-      class="imdrf-card"
+      class="imdrf-term"
       id={`term-${row.id}`}
       data-imdrf-term
       data-code={row.code}
@@ -1279,8 +1328,8 @@ function TermCard({ row }: { row: TermRow }): JSX.Element {
       <p class="eyebrow">
         Annex {row.annex} · Level {row.level}
       </p>
-      <h3 class="imdrf-card-head">
-        <code safe>{row.code}</code>
+      <h3 class="imdrf-term-head">
+        <code safe class="imdrf-term-code">{row.code}</code>
         <span safe>{row.term}</span>
         {row.status && (
           <span class={isQuiet ? "tag muted" : "tag"} safe>
@@ -1289,12 +1338,12 @@ function TermCard({ row }: { row: TermRow }): JSX.Element {
         )}
       </h3>
       {crumb && crumb !== row.code && (
-        <p class="imdrf-card-crumb" safe>
+        <p class="imdrf-term-crumb" safe>
           {crumb}
         </p>
       )}
       {row.definition && (
-        <p class="imdrf-card-def" safe>
+        <p class="imdrf-term-definition" safe>
           {row.definition}
         </p>
       )}
@@ -1304,7 +1353,7 @@ function TermCard({ row }: { row: TermRow }): JSX.Element {
         </p>
       )}
       {hasMeta && (
-        <dl class="imdrf-card-meta">
+        <dl class="imdrf-term-meta">
           {row.nonImdrfCode && (
             <div>
               <dt>Non-IMDRF code</dt>
@@ -1343,7 +1392,11 @@ export function ImdrfBrowserPage({
 }: ImdrfBrowserPageProps): JSX.Element {
   const total = termTotal(summary);
   const breadcrumb =
-    mode === "search" ? `Search results for "${query}"` : `Annex ${activeAnnex} · ${ANNEX_TITLES[activeAnnex] ?? ""}`;
+    mode === "search"
+      ? `Search results for "${query}"`
+      : activeAnnex
+        ? `Annex ${activeAnnex} · ${ANNEX_TITLES[activeAnnex] ?? ""}`
+        : "";
 
   return (
     <StaffShell
@@ -1364,7 +1417,7 @@ export function ImdrfBrowserPage({
           class="imdrf-page"
           data-imdrf-browser
           data-release-id={selected.id}
-          data-initial-annex={activeAnnex}
+          data-initial-annex={activeAnnex ?? ""}
           data-initial-mode={mode}
           data-initial-cursor={initialNextCursor ?? ""}
         >
@@ -1419,13 +1472,26 @@ export function ImdrfBrowserPage({
             </nav>
           )}
 
-          <div class="imdrf-shell">
-            <aside class="imdrf-sidebar" aria-label="Annex">
+          <button
+            type="button"
+            class="imdrf-nav-toggle"
+            data-imdrf-nav-toggle
+            aria-expanded="false"
+            aria-controls="imdrf-docs-nav"
+          >
+            Annexes
+          </button>
+
+          <div class="imdrf-docs">
+            <aside class="imdrf-docs-nav" id="imdrf-docs-nav" aria-label="Annex">
+              <a href="/imdrf" class={mode === "overview" ? "imdrf-annex on" : "imdrf-annex"}>
+                <span class="imdrf-annex-name">Overview</span>
+              </a>
               {summary.map((row) => {
                 const on = mode === "browse" && row.annex === activeAnnex;
                 return (
-                  <button
-                    type="button"
+                  <a
+                    href={`/imdrf?release=${selected.id}&annex=${row.annex}`}
                     class={on ? "imdrf-annex on" : "imdrf-annex"}
                     data-imdrf-annex={row.annex}
                     aria-current={on ? "true" : undefined}
@@ -1435,25 +1501,53 @@ export function ImdrfBrowserPage({
                     </span>
                     <span class="imdrf-annex-name">{ANNEX_TITLES[row.annex] ?? ""}</span>
                     <span class="imdrf-annex-count">{row.count}</span>
-                  </button>
+                  </a>
                 );
               })}
             </aside>
 
-            <div class="imdrf-main">
-              <p class="imdrf-breadcrumb" data-imdrf-breadcrumb safe>
-                {breadcrumb}
-              </p>
-              <div class="imdrf-content" data-imdrf-content>
-                {initialRows.length === 0 ? (
-                  <p class="hint" data-imdrf-empty>
-                    {mode === "search" ? "No matching terms." : "No terms in this annex."}
+            <div class="imdrf-docs-main">
+              {mode === "overview" ? (
+                <div class="imdrf-overview" data-imdrf-overview>
+                  <p class="hint">
+                    A read-only, indexed handbook of published IMDRF adverse-event codes and
+                    definitions. Officers look terms up here while assessing a report — browse an
+                    annex from the list on the left, or search above.
                   </p>
-                ) : (
-                  initialRows.map((row) => <TermCard row={row} />)
-                )}
-              </div>
-              <div class="imdrf-sentinel" data-imdrf-sentinel></div>
+                  <nav class="imdrf-overview-annexes" aria-label="Annexes">
+                    {summary.map((row) => (
+                      <a class="imdrf-overview-annex" href={`/imdrf?release=${selected.id}&annex=${row.annex}`}>
+                        <span class="imdrf-annex-code" safe>
+                          {row.annex}
+                        </span>
+                        <span class="imdrf-annex-name">{ANNEX_TITLES[row.annex] ?? ""}</span>
+                        <span class="imdrf-annex-count">
+                          {row.count} term{row.count === 1 ? "" : "s"}
+                        </span>
+                      </a>
+                    ))}
+                  </nav>
+                </div>
+              ) : (
+                <>
+                  <p class="imdrf-docs-breadcrumb" data-imdrf-docs-breadcrumb safe>
+                    {breadcrumb}
+                  </p>
+                  <div
+                    class={mode === "search" ? "imdrf-content imdrf-search-results" : "imdrf-content"}
+                    data-imdrf-content
+                  >
+                    {initialRows.length === 0 ? (
+                      <p class="hint" data-imdrf-empty>
+                        {mode === "search" ? "No matching terms." : "No terms in this annex."}
+                      </p>
+                    ) : (
+                      initialRows.map((row) => <TermCard row={row} />)
+                    )}
+                  </div>
+                  <div class="imdrf-sentinel" data-imdrf-sentinel></div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -1541,7 +1635,7 @@ Replace the full contents of `server/public/imdrf-browser.js` with:
     var searchInput = root.querySelector("[data-imdrf-search]");
     var contentEl = root.querySelector("[data-imdrf-content]");
     var sentinelEl = root.querySelector("[data-imdrf-sentinel]");
-    var breadcrumbEl = root.querySelector("[data-imdrf-breadcrumb]");
+    var breadcrumbEl = root.querySelector("[data-imdrf-docs-breadcrumb]");
     var annexButtons = root.querySelectorAll("[data-imdrf-annex]");
 
     var mode = root.getAttribute("data-initial-mode") || "browse";
@@ -1569,7 +1663,7 @@ Replace the full contents of `server/public/imdrf-browser.js` with:
       var isQuiet = statusLower.indexOf("retired") !== -1 || statusLower.indexOf("not selectable") !== -1;
 
       var html =
-        '<article class="imdrf-card" id="term-' +
+        '<article class="imdrf-term" id="term-' +
         escapeHtml(row.id) +
         '" data-imdrf-term data-code="' +
         escapeHtml(row.code) +
@@ -1581,7 +1675,7 @@ Replace the full contents of `server/public/imdrf-browser.js` with:
         " · Level " +
         escapeHtml(row.level) +
         "</p>" +
-        '<h3 class="imdrf-card-head"><code>' +
+        '<h3 class="imdrf-term-head"><code class="imdrf-term-code">' +
         escapeHtml(row.code) +
         "</code><span>" +
         escapeHtml(row.term) +
@@ -1592,10 +1686,10 @@ Replace the full contents of `server/public/imdrf-browser.js` with:
       }
       html += "</h3>";
       if (crumb && crumb !== String(row.code)) {
-        html += '<p class="imdrf-card-crumb">' + escapeHtml(crumb) + "</p>";
+        html += '<p class="imdrf-term-crumb">' + escapeHtml(crumb) + "</p>";
       }
       if (row.definition) {
-        html += '<p class="imdrf-card-def">' + escapeHtml(row.definition) + "</p>";
+        html += '<p class="imdrf-term-definition">' + escapeHtml(row.definition) + "</p>";
       }
       if (row.statusDescription) {
         html += '<p class="hint">' + escapeHtml(row.statusDescription) + "</p>";
@@ -1611,7 +1705,7 @@ Replace the full contents of `server/public/imdrf-browser.js` with:
         meta +=
           "<div><dt>Secondary category</dt><dd>" + escapeHtml(row.secondaryCategory) + "</dd></div>";
       }
-      if (meta) html += '<dl class="imdrf-card-meta">' + meta + "</dl>";
+      if (meta) html += '<dl class="imdrf-term-meta">' + meta + "</dl>";
       html += "</article>";
       return html;
     }
@@ -1635,11 +1729,23 @@ Replace the full contents of `server/public/imdrf-browser.js` with:
 
     function resetContent() {
       contentEl.innerHTML = "";
+      contentEl.classList.toggle("imdrf-search-results", mode === "search");
     }
+
+    /**
+     * Every response that lands is checked against `requestToken` before it's allowed to touch
+     * the DOM. A fast typist firing "b", "ba", "bat" in quick succession can have those three
+     * requests resolve out of order (a slow "b" landing after a fast "bat"); without this check
+     * the stale "b" response would overwrite "bat"'s newer, narrower results. Incrementing the
+     * token on every new fetch and comparing it when a response arrives means only the most
+     * recently *started* request is ever allowed to render — older ones are silently dropped.
+     */
+    var requestToken = 0;
 
     function fetchNextPage() {
       if (loading || !nextCursor) return Promise.resolve();
       loading = true;
+      var myToken = ++requestToken;
       var url =
         mode === "search"
           ? "/imdrf/releases/" +
@@ -1660,67 +1766,94 @@ Replace the full contents of `server/public/imdrf-browser.js` with:
           return r.json();
         })
         .then(function (data) {
+          if (myToken !== requestToken) return; // a newer request has since started; drop this one
           appendRows(data.rows);
           nextCursor = data.nextCursor;
           loading = false;
         })
         .catch(function () {
-          loading = false;
+          if (myToken === requestToken) loading = false;
         });
     }
 
-    function loadAnnex(annex) {
+    function loadAnnex(annex, opts) {
       mode = "browse";
       activeAnnex = annex;
       nextCursor = null;
       resetContent();
       setBreadcrumb("Annex " + annex + " · " + (ANNEX_TITLES[annex] || ""));
       contentEl.scrollIntoView({ block: "start" });
+      if (!opts || opts.pushState !== false) {
+        history.pushState(
+          { imdrfAnnex: annex },
+          "",
+          "/imdrf?release=" + releaseId + "&annex=" + encodeURIComponent(annex),
+        );
+      }
 
       loading = true;
+      var myToken = ++requestToken;
       fetch("/imdrf/releases/" + releaseId + "/terms?annex=" + encodeURIComponent(annex))
         .then(function (r) {
           return r.json();
         })
         .then(function (data) {
+          if (myToken !== requestToken) return;
           appendRows(data.rows);
           nextCursor = data.nextCursor;
           loading = false;
         })
         .catch(function () {
-          loading = false;
+          if (myToken === requestToken) loading = false;
         });
     }
 
-    function runSearch(query) {
+    function runSearch(query, opts) {
       mode = "search";
       nextCursor = null;
       resetContent();
       setBreadcrumb('Search results for "' + query + '"');
+      if (!opts || opts.pushState !== false) {
+        history.pushState(
+          { imdrfQuery: query },
+          "",
+          "/imdrf?release=" + releaseId + "&q=" + encodeURIComponent(query),
+        );
+      }
 
       loading = true;
+      var myToken = ++requestToken;
       fetch("/imdrf/releases/" + releaseId + "/search?q=" + encodeURIComponent(query))
         .then(function (r) {
           return r.json();
         })
         .then(function (data) {
+          if (myToken !== requestToken) return; // a newer keystroke's search has since started
           appendRows(data.rows);
           nextCursor = data.nextCursor;
           loading = false;
         })
         .catch(function () {
-          loading = false;
+          if (myToken === requestToken) loading = false;
         });
     }
 
+    // Sidebar annex links are real `<a href>`s (so "Overview" → an annex → back works with plain
+    // navigation and no JS at all). When the browse/search content area is already on the page —
+    // i.e. we're not on the Overview landing page — intercept the click for a fast client-side
+    // switch instead of a full reload; on the Overview page (no `contentEl`) the click falls
+    // through to the browser's normal navigation.
     annexButtons.forEach(function (btn) {
-      btn.addEventListener("click", function () {
+      btn.addEventListener("click", function (event) {
+        if (!contentEl) return; // Overview page: let the link navigate normally
+        event.preventDefault();
         annexButtons.forEach(function (b) {
           b.classList.remove("on");
         });
         btn.classList.add("on");
         if (searchInput) searchInput.value = "";
         loadAnnex(btn.getAttribute("data-imdrf-annex"));
+        closeMobileNav();
       });
     });
 
@@ -1734,7 +1867,25 @@ Replace the full contents of `server/public/imdrf-browser.js` with:
         }
         searchTimer = setTimeout(function () {
           runSearch(query);
-        }, 300);
+        }, 250);
+      });
+    }
+
+    /* Mobile documentation menu: the sidebar (`.imdrf-docs-nav`) is hidden below 900px and
+     * replaced by a toggle button that reveals it as a collapsible menu — never a permanently
+     * visible desktop sidebar squeezed onto a phone screen. */
+    var navToggle = root.querySelector("[data-imdrf-nav-toggle]");
+    var navEl = root.querySelector(".imdrf-docs-nav");
+
+    function closeMobileNav() {
+      if (navEl) navEl.classList.remove("open");
+      if (navToggle) navToggle.setAttribute("aria-expanded", "false");
+    }
+
+    if (navToggle && navEl) {
+      navToggle.addEventListener("click", function () {
+        var open = navEl.classList.toggle("open");
+        navToggle.setAttribute("aria-expanded", open ? "true" : "false");
       });
     }
 
@@ -1769,6 +1920,22 @@ Replace the full contents of `server/public/imdrf-browser.js` with:
           /* deep link couldn't be resolved; the page is still usable without it */
         });
     }
+
+    // Back/Forward after a client-side annex switch or search: re-derive state from the URL
+    // rather than trusting `event.state`, since a user can also arrive here via a plain link.
+    window.addEventListener("popstate", function () {
+      if (!contentEl) return; // came from the Overview page originally; a full reload already happened
+      var params = new URLSearchParams(window.location.search);
+      var q = params.get("q");
+      var annex = params.get("annex");
+      if (q) {
+        if (searchInput) searchInput.value = q;
+        runSearch(q, { pushState: false });
+      } else if (annex) {
+        if (searchInput) searchInput.value = "";
+        loadAnnex(annex, { pushState: false });
+      }
+    });
 
     var params = new URLSearchParams(window.location.search);
     var deepLinkedTerm = params.get("term");
@@ -1816,9 +1983,9 @@ git commit -m "feat(imdrf): rewrite client script for docs-style browse/search/d
   3579 — the admin door's styles are untouched)
 
 **Interfaces:**
-- Produces: `.imdrf-search`, `.imdrf-shell`, `.imdrf-sidebar`, `.imdrf-annex(.on)`,
-  `.imdrf-annex-code/-name/-count`, `.imdrf-main`, `.imdrf-breadcrumb`,
-  `.imdrf-content`, `.imdrf-card`, `.imdrf-card-head/-crumb/-def/-meta`,
+- Produces: `.imdrf-search`, `.imdrf-docs`, `.imdrf-docs-nav`, `.imdrf-annex(.on)`,
+  `.imdrf-annex-code/-name/-count`, `.imdrf-docs-main`, `.imdrf-docs-breadcrumb`,
+  `.imdrf-content`, `.imdrf-term`, `.imdrf-term-head/-crumb/-def/-meta`,
   `.imdrf-sentinel` — the exact class names Task 6's view and Task 7's script emit.
 
 - [ ] **Step 1: Replace the CSS block**
@@ -1853,14 +2020,14 @@ terminology ---------- */` comment (currently line 3249) through the end of
   outline-offset: 1px;
 }
 
-.imdrf-shell {
+.imdrf-docs {
   display: grid;
   grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
   gap: 22px;
   align-items: start;
 }
 
-.imdrf-sidebar {
+.imdrf-docs-nav {
   position: sticky;
   top: 76px;
   display: flex;
@@ -1870,6 +2037,21 @@ terminology ---------- */` comment (currently line 3249) through the end of
   border: 1px solid var(--rule);
   border-radius: var(--r);
   background: var(--paper);
+}
+
+/* Mobile-only toggle for the annex list — hidden on desktop, where the sidebar is always
+ * visible. See the `@media (max-width: 900px)` block below for its shown state. */
+.imdrf-nav-toggle {
+  display: none;
+  margin-bottom: 12px;
+  padding: 8px 14px;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r);
+  background: var(--card);
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .imdrf-annex {
@@ -1931,11 +2113,59 @@ terminology ---------- */` comment (currently line 3249) through the end of
   opacity: 0.75;
 }
 
-.imdrf-main {
+/* The "Overview" nav entry has only a name span, not code/count — let it span the full row
+ * instead of collapsing into the 22px code column the 3-column grid otherwise reserves for it. */
+.imdrf-annex-name:only-child {
+  grid-column: 1 / -1;
+}
+
+/* Overview (landing) page: release description + the annex list as documentation nav cards —
+ * compact rows, not the huge-button/card/table layouts the spec explicitly rules out. */
+.imdrf-overview-annexes {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 16px;
+}
+
+.imdrf-overview-annex {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  color: inherit;
+  text-decoration: none;
+}
+
+.imdrf-overview-annex + .imdrf-overview-annex {
+  margin-top: 2px;
+}
+
+.imdrf-overview-annex:hover {
+  border-color: var(--green);
+  background: var(--green-bg);
+}
+
+.imdrf-overview-annex .imdrf-annex-code {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--green-d);
+}
+
+.imdrf-overview-annex .imdrf-annex-count {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.imdrf-docs-main {
   min-width: 0;
 }
 
-.imdrf-breadcrumb {
+.imdrf-docs-breadcrumb {
   position: sticky;
   top: 56px;
   z-index: 20;
@@ -1956,7 +2186,7 @@ terminology ---------- */` comment (currently line 3249) through the end of
   gap: 12px;
 }
 
-.imdrf-card {
+.imdrf-term {
   padding: 16px 20px;
   border: 1px solid var(--rule);
   border-radius: var(--r);
@@ -1964,13 +2194,13 @@ terminology ---------- */` comment (currently line 3249) through the end of
   scroll-margin-top: 96px;
 }
 
-.imdrf-card:target {
+.imdrf-term:target {
   border-color: var(--green);
   outline: 2px solid var(--green-bg);
   outline-offset: 2px;
 }
 
-.imdrf-card-head {
+.imdrf-term-head {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
@@ -1982,7 +2212,7 @@ terminology ---------- */` comment (currently line 3249) through the end of
   line-height: 1.35;
 }
 
-.imdrf-card-head code {
+.imdrf-term-code {
   font-family: var(--mono);
   font-size: 12.5px;
   color: var(--green-d);
@@ -1991,14 +2221,14 @@ terminology ---------- */` comment (currently line 3249) through the end of
   border-radius: 4px;
 }
 
-.imdrf-card-crumb {
+.imdrf-term-crumb {
   font-family: var(--mono);
   font-size: 12px;
   color: var(--ink-3);
   margin: 8px 0 0;
 }
 
-.imdrf-card-def {
+.imdrf-term-definition {
   font-size: 14.5px;
   line-height: 1.6;
   color: var(--ink);
@@ -2007,7 +2237,7 @@ terminology ---------- */` comment (currently line 3249) through the end of
   margin: 10px 0 0;
 }
 
-.imdrf-card-meta {
+.imdrf-term-meta {
   display: grid;
   gap: 10px;
   margin-top: 16px;
@@ -2016,7 +2246,7 @@ terminology ---------- */` comment (currently line 3249) through the end of
   max-width: 68ch;
 }
 
-.imdrf-card-meta dt {
+.imdrf-term-meta dt {
   font-size: 10px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -2024,7 +2254,7 @@ terminology ---------- */` comment (currently line 3249) through the end of
   font-weight: 500;
 }
 
-.imdrf-card-meta dd {
+.imdrf-term-meta dd {
   font-size: 13.5px;
   color: var(--ink-2);
 }
@@ -2034,21 +2264,32 @@ terminology ---------- */` comment (currently line 3249) through the end of
 }
 
 @media (max-width: 900px) {
-  .imdrf-shell {
+  /* Mobile is a real documentation menu, not a shrunken desktop sidebar: the annex list is
+   * collapsed behind a toggle button by default, and expands as a full-width dropdown menu when
+   * opened — never a permanently visible column squeezed next to the reading pane. */
+  .imdrf-nav-toggle {
+    display: block;
+  }
+
+  .imdrf-docs {
     grid-template-columns: 1fr;
   }
 
-  .imdrf-sidebar {
+  .imdrf-docs-nav {
+    display: none;
     position: static;
     max-height: none;
-    flex-direction: row;
-    flex-wrap: wrap;
+    flex-direction: column;
+    width: 100%;
+    margin-bottom: 16px;
+  }
+
+  .imdrf-docs-nav.open {
+    display: flex;
   }
 
   .imdrf-annex {
-    width: auto;
-    border-bottom: 0;
-    border-right: 1px solid var(--rule);
+    width: 100%;
   }
 }
 
@@ -2265,6 +2506,87 @@ Expected: no errors anywhere in `server/`.
 git add server/tests/integration/staff-imdrf-readonly.test.ts server/tests/integration/imdrf-query-pagination.test.ts
 git commit -m "test(imdrf): finish updating tests for flat listing and ranked search"
 ```
+
+---
+
+### Task 10: Verify against the real 2026 dataset, not just seeded mock rows
+
+**Files:** none modified — this task is verification only. If it surfaces a real
+problem (a bad ranking case, a slow query, a broken layout at real data volume), open
+a follow-up task rather than reopening earlier ones from inside this checklist.
+
+**Interfaces:** none — exercises the whole system built by Tasks 1–9 end-to-end.
+
+The integration tests in Tasks 1–9 all seed a handful of synthetic rows, which proves
+correctness but not real-world behavior — the actual 2026 release has thousands of
+terms across 7 annexes, per the spec's explicit requirement (§45) not to test only
+against one or two mock rows.
+
+- [ ] **Step 1: Import the real workbook into a published test release**
+
+Using the existing (untouched) admin import/staging flow — sign in as an
+administrator, go to the IMDRF admin door, upload
+`docs/TMDA files for reference/imdrf-tech-ae-terminologies-n43-ReleaseNumber2026-Annexes-revised 1 (1).XLSX`
+(the actual source file already in this repo), preview it, confirm the import, then
+publish the resulting release. This exercises the untouched import pipeline as a side
+effect and gives the reader real volume to test against — do not seed thousands of
+synthetic rows by hand instead.
+
+- [ ] **Step 2: Verify the overview page doesn't fetch term data**
+
+Open browser devtools' Network tab, navigate to `/imdrf` (no `annex`/`q` param).
+Confirm: no request to `.../terms` or `.../search` fires — the overview page is
+release/annex-summary metadata only, never term rows (spec §12, §45).
+
+- [ ] **Step 3: Verify annex browsing pages a large annex correctly**
+
+Open the largest annex (Annex E has ~1000+ rows in the real 2026 workbook). Confirm:
+the initial page is small (`TERMS_PAGE_LIMIT`, currently 50 — not the whole annex),
+scrolling to the bottom triggers exactly one more request per page reached (watch the
+Network tab for duplicate/overlapping requests while scrolling quickly), and no
+request ever asks for more than one page's worth of rows.
+
+- [ ] **Step 4: Verify search quality against the real dataset**
+
+Run each of these through the search box and confirm the results are sensible (the
+genuinely relevant term appears within the first few results, not buried or absent):
+`battery`, `batt`, `batery`, `battery device`, `device battery`, a real code from the
+imported data (e.g. `G02002` if present, or any code visible in Annex G), and a very
+short query like `a` or `ab` (confirm this does **not** return a huge, low-relevance
+result list — this is what `SHORT_QUERY_SCORE_FLOOR` from Task 3 exists to prevent).
+
+If any of these are poor, adjust `SEARCH_SCORE_FLOOR`/`SHORT_QUERY_SCORE_FLOOR`/
+`SHORT_QUERY_MAX_LENGTH` in `query-service.ts` and re-test — these constants were
+explicitly called out in the spec as needing real-data tuning, not as fixed final
+values.
+
+- [ ] **Step 5: Verify mobile layout at real content volume**
+
+Resize the browser to a phone-width viewport (or use devtools' device emulation) on
+both the overview page and a real annex page. Confirm: no horizontal overflow, the
+annex nav is collapsed behind the toggle button and opens/closes correctly, text is
+readable without zooming, and cards don't overflow their container.
+
+- [ ] **Step 6: Verify a deep link into the real dataset**
+
+Pick a term several pages deep into a large annex (not on the first page), construct
+its `/imdrf?release=<id>&annex=<annex>&term=<uuid>` URL, open it in a fresh tab.
+Confirm the term is fetched and scrolled into view even though it wasn't part of the
+server-rendered first page.
+
+- [ ] **Step 7: Record findings**
+
+If Steps 1–6 all pass cleanly, note that in this task's commit message. If any tuning
+was needed (Step 4's constants, page size, debounce timing), commit that change here
+with a message explaining what real-data behavior motivated it.
+
+```bash
+git add server/src/domain/imdrf/query-service.ts
+git commit -m "test(imdrf): tune search thresholds against the real 2026 dataset"
+```
+
+(Only commit if Step 4 actually required a constant change — otherwise this task adds
+no diff, and there is nothing to commit.)
 
 ---
 
