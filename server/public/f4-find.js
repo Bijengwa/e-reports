@@ -140,9 +140,16 @@
     var previous = document.querySelector("[data-f4-find-prev]");
     var next = document.querySelector("[data-f4-find-next]");
 
-    // Headings and labels, which is what someone hunting through a long form is reading. Not the
-    // section bars: the jump row above already reaches those by name.
-    var targets = document.querySelectorAll(".f4 .f4-blocktitle, .f4 .f4-label, .f4 .f4-imdrf-h");
+    // Headings and labels, which is what someone hunting through a long form is reading. The
+    // section bars are included too: the jump row above reaches them by number, but "risk" and
+    // "causality" are the bars' own titles (section 6 and section 4) and nothing else on the page
+    // repeats those words, so leaving section bars out made both words unfindable. The causality
+    // and risk cards' own headings (section 4.2 and section 6, e.g. "Critical Risk") are their own
+    // gap in the same way: they render as a bare <b> in .f4-card-h rather than as .f4-blocktitle or
+    // .f4-label, so they were never in this list either.
+    var targets = document.querySelectorAll(
+      ".f4 .f4-blocktitle, .f4 .f4-label, .f4 .f4-imdrf-h, .f4 .f4-bar, .f4 .f4-card-h b",
+    );
 
     var hits = [];
     var at = -1;
