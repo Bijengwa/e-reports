@@ -219,6 +219,14 @@ describe.skipIf(!INTEGRATION_ENABLED)("the deadline countdown", () => {
     const body = (await get(`/reports/${reportId}`, manager.cookie)).body;
 
     expect(body).toContain('class="countdown countdown-on-track"');
+    // The markup alone does not prove the countdown ticks in the browser — it only proves the
+    // server rendered the right initial state. `StaffShell`'s `countdown` flag is what makes
+    // `Layout` emit this script tag, which is what `countdown.js` needs to find and keep
+    // recomputing `[data-countdown]` elements every second after the page has loaded. Without
+    // this assertion, a regression that dropped the `countdown` flag from `ReportPage` (leaving
+    // the countdown looking right on load but static thereafter) would pass every other check in
+    // this suite.
+    expect(body).toContain('src="/assets/countdown.js"');
   });
 
   it("shows no countdown, only the checkmark, for a report with no deadline recorded", async () => {
