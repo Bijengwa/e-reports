@@ -24,13 +24,12 @@ import {
   type F004Answers,
   IMDRF_GROUPS,
   type ImdrfItem,
-  type Issue,
   imdrfItemForReviewKey,
+  type Issue,
   type SecondaryReviewPayload,
   value,
 } from "../f004.js";
 import { getReleaseCached, getTermCached, getTermLineageCached } from "./cached-query-service.js";
-import { getLatestPublishedRelease, type ReleaseSummary } from "./query-service.js";
 
 export type ResolvedImdrfTerm = { l1: string; l2: string; l3: string; code: string };
 
@@ -55,10 +54,7 @@ export async function resolveImdrfTerm(
   const label = item.title.replace(/\s*\(If applicable\)\s*$/, "");
   const term = await getTermCached(db, releaseId, termId);
   if (term === null) {
-    return {
-      ok: false,
-      message: `${label}: the selected term does not exist in the selected IMDRF release.`,
-    };
+    return { ok: false, message: `${label}: the selected term does not exist in the selected IMDRF release.` };
   }
 
   if (term.annex !== item.annexLetter) {
@@ -89,25 +85,6 @@ async function requirePublishedRelease(db: Database, releaseId: string): Promise
   if (releaseId === "") return false;
   const release = await getReleaseCached(db, releaseId);
   return release?.status === "published";
-}
-
-/**
- * The one release an assessment's IMDRF coding uses — never a choice the assessor makes.
- *
- * `existingReleaseId` is whatever this report's A1 has already stored (empty string for a report
- * with no draft yet). Once set, it is returned unchanged for the whole life of the report: a later
- * administrator publishing 2027 must never move a report already coded against 2026 onto it — see
- * "RELEASE CONSISTENCY". Only when nothing has been established yet does this resolve the current
- * `getLatestPublishedRelease()`, so a brand-new A1 always starts on the newest terminology without
- * anyone choosing it, and a report started before any release existed simply has none until one is
- * published.
- */
-export async function resolveAssessmentRelease(
-  db: Database,
-  existingReleaseId: string,
-): Promise<ReleaseSummary | null> {
-  if (existingReleaseId !== "") return getReleaseCached(db, existingReleaseId);
-  return getLatestPublishedRelease(db);
 }
 
 /** Every IMDRF item, keyed by its own field key ("component", "device_problem", …). */
@@ -189,45 +166,42 @@ async function resolveOneA1Item(
  * text `resolveImdrfTerm` derives from it, and any item with no term id has those four fields
  * cleared — a client cannot leave stale or hand-typed text behind by simply not posting a term id.
  *
- * The release itself is never read from the posted body — there is no control on the page for an
- * assessor to set it, and a hand-edited `imdrf_release_id` in the POST is simply overwritten here
- * with `resolveAssessmentRelease(db, existingReleaseId)`'s own answer: whatever this report's A1
- * already established, or the current latest published release for a report with none yet. This is
- * the one function that decides and stamps that value; nothing downstream may second-guess it.
- *
  * `strict` distinguishes a submission from a draft. A draft resolves best-effort and reports
  * nothing: an assessor mid-work may have an item half chosen, and a draft is allowed to be as
- * incomplete as the paper allows. A submission additionally requires a resolvable release and, for
- * every item that is "touched" at all, a term id that actually resolves. `validateForSubmit`
- * (`domain/f004.ts`) already requires *some* value for a non-optional item and requires the
- * level/coding pair to be complete or absent for a touched one; this is the one thing that pure,
- * DB-free function cannot check on its own, because only this module can ask the repository
- * whether a reference is real.
+ * incomplete as the paper allows. A submission additionally requires the release itself (published)
+ * and, for every item that is "touched" at all, a term id that actually resolves.
+ * `validateForSubmit` (`domain/f004.ts`) already requires *some* value for a non-optional item and
+ * requires the level/coding pair to be complete or absent for a touched one; this is the one thing
+ * that pure, DB-free function cannot check on its own, because only this module can ask the
+ * repository whether a reference is real.
  */
 export async function resolveA1Imdrf(
   db: Database,
   answers: F004Answers,
-  existingReleaseId: string,
   strict: boolean,
 ): Promise<Issue[]> {
   const issues: Issue[] = [];
-
-  const release = await resolveAssessmentRelease(db, existingReleaseId);
-  const releaseId = release?.id ?? "";
-  answers.imdrf_release_id = releaseId;
+  const releaseId = value(answers, "imdrf_release_id").trim();
 
   const anyItemTouched = IMDRF_GROUPS.some((group) =>
     group.items.some((item) => itemTouched(answers, item)),
   );
 
-  if (strict && anyItemTouched && release === null) {
+  if (strict && anyItemTouched && releaseId === "") {
     issues.push({
       field: "imdrf_release_id",
-      message: "No published IMDRF release is available yet. Contact an administrator.",
+      message: "Choose the published IMDRF release this assessment's terminology comes from.",
     });
   }
 
-  const releasePublished = release?.status === "published";
+  const releasePublished = releaseId !== "" ? await requirePublishedRelease(db, releaseId) : false;
+
+  if (strict && releaseId !== "" && !releasePublished) {
+    issues.push({
+      field: "imdrf_release_id",
+      message: "The selected IMDRF release is not published.",
+    });
+  }
 
   for (const group of IMDRF_GROUPS) {
     for (const item of group.items) {

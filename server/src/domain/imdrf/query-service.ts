@@ -32,13 +32,6 @@ export type TermRow = {
   term: string;
   level: number;
   hasChildren: boolean;
-  /**
-   * IMDRF's own selectability marker, verbatim (e.g. `"Not selectable"`), or `null`. Carried on
-   * list/search rows — not only on `TermDetail` — so a picker can tell a category apart from a
-   * final answer without a second round trip per row. See `docs/imdrf-terminology.md`, "Retired
-   * terms": this is preserved text, never reduced to a boolean.
-   */
-  status: string | null;
 };
 
 export type TermDetail = ValidatedTerm & { id: string; hasChildren: boolean };
@@ -125,28 +118,6 @@ export async function listPublishedReleases(db: Database): Promise<ReleaseSummar
   return rows.map(releaseOf);
 }
 
-/**
- * The one release F004 uses when an assessment does not already have one of its own — the newest
- * `release_year` among rows whose `status` is `'published'`, never merely the newest row of any
- * status. A draft release, however high its year, is invisible to this query: publishing is the
- * one action that ever makes a release eligible, exactly as it already is for the read-only
- * sidebar (`requirePublishedRelease` in `doors/staff/imdrf/routes/imdrf.tsx`).
- *
- * Not cached: unlike a specific release's own terms (immutable once published), *which* release is
- * "latest" changes the moment an administrator publishes a new one, and every assessor starting a
- * new assessment after that moment must see it — so this always reads the current table state.
- */
-export async function getLatestPublishedRelease(db: Database): Promise<ReleaseSummary | null> {
-  const rows = await db.execute<ReleaseRow>(sql`
-    SELECT id, release_year, document_code, title, source_file_name, status, created_at, published_at
-      FROM imdrf_releases
-     WHERE status = 'published'
-     ORDER BY release_year DESC
-     LIMIT 1
-  `);
-  return rows[0] ? releaseOf(rows[0]) : null;
-}
-
 /** Every release, drafts included. The caller is responsible for restricting this to admins. */
 export async function listAllReleases(db: Database): Promise<ReleaseSummary[]> {
   const rows = await db.execute<ReleaseRow>(sql`
@@ -194,7 +165,6 @@ type TermQueryRow = {
   level: number;
   sort_order: number;
   has_children: boolean;
-  status: string | null;
 };
 
 function termRowOf(row: TermQueryRow): TermRow {
@@ -208,7 +178,6 @@ function termRowOf(row: TermQueryRow): TermRow {
     term: row.term,
     level: row.level,
     hasChildren: row.has_children,
-    status: row.status,
   };
 }
 
@@ -234,7 +203,7 @@ export async function listTerms(
   const rows = await db.execute<TermQueryRow>(
     opts.parentId === null
       ? sql`
-          SELECT t.id, t.annex, t.code, t.term, t.level, t.sort_order, t.status,
+          SELECT t.id, t.annex, t.code, t.term, t.level, t.sort_order,
                  EXISTS (SELECT 1 FROM imdrf_terms c WHERE c.parent_term_id = t.id) AS has_children
             FROM imdrf_terms t
            WHERE t.release_id = ${opts.releaseId}
@@ -249,7 +218,7 @@ export async function listTerms(
            LIMIT ${limit + 1}
         `
       : sql`
-          SELECT t.id, t.annex, t.code, t.term, t.level, t.sort_order, t.status,
+          SELECT t.id, t.annex, t.code, t.term, t.level, t.sort_order,
                  EXISTS (SELECT 1 FROM imdrf_terms c WHERE c.parent_term_id = t.id) AS has_children
             FROM imdrf_terms t
            WHERE t.release_id = ${opts.releaseId}
@@ -324,7 +293,7 @@ export async function searchTerms(
 
   const rows = await db.execute<TermQueryRow & { rank: number }>(sql`
     WITH scored AS (
-      SELECT t.id, t.annex, t.code, t.term, t.level, t.sort_order, t.status,
+      SELECT t.id, t.annex, t.code, t.term, t.level, t.sort_order,
              EXISTS (SELECT 1 FROM imdrf_terms c WHERE c.parent_term_id = t.id) AS has_children,
              CASE
                WHEN lower(t.code) = lower(${trimmed}) THEN 0
@@ -340,7 +309,7 @@ export async function searchTerms(
               OR t.term ILIKE ${pattern} ESCAPE '\\'
               OR t.definition ILIKE ${pattern} ESCAPE '\\')
     )
-    SELECT id, annex, code, term, level, sort_order, status, has_children, rank
+    SELECT id, annex, code, term, level, sort_order, has_children, rank
       FROM scored
      WHERE (
        ${afterId}::uuid IS NULL

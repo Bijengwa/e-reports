@@ -68,15 +68,9 @@ export async function seedImdrfForF004(owner: Database): Promise<ImdrfFixture> {
  * `_l1`/`_code` display fields are intentionally not posted at all here — `resolveA1Imdrf`
  * overwrites them from the term id on save regardless of what (if anything) arrives for them, so a
  * fixture no longer needs to pretend to know their authoritative text.
- *
- * No `imdrf_release_id` field either: there is no control on the page for one any more, and the
- * route ignores whatever a client posts under that name — `resolveA1Imdrf` always resolves it
- * itself (the report's own established release, or the current latest published one). Every test
- * that calls `seedImdrfForF004` in its own `beforeEach` seeds exactly one release before any
- * assessment work happens, which is trivially "the latest published" one already.
  */
 export function imdrfAssessmentFields(fixture: ImdrfFixture): Record<string, string> {
-  const fields: Record<string, string> = {};
+  const fields: Record<string, string> = { imdrf_release_id: fixture.releaseId };
   for (const key of Object.keys(IMDRF_ITEM_ANNEX)) {
     fields[`imdrf_${key}_term_id`] = fixture.term[key] ?? "";
   }
