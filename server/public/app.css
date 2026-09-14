@@ -3361,32 +3361,27 @@ ul.f4-card-c li { margin-bottom: 3px; }
 
 /* ---------- IMDRF terminology ---------- */
 /*
- * A read-only handbook, not a second rail.
+ * A lookup tool, not a second rail and not a document browser.
  *
- * The title bar still carries only the page name (same 56px bar as every other staff page).
- * `.staff-head` introduces the published document; year switching, when there is more than one
- * release, reuses `.wl-tabs`. The reader itself is two panes: annex + term tree on the left, the
- * selected term as a document on the right. Indent in the tree is `data-depth`, never an inline
- * style — `style-src 'self'` would drop a `padding-left` written from the script.
+ * The page is four bands stacked: the document's own header (with the release chip pushed to the
+ * right, where a secondary fact belongs), the F004 scope bar, one search row, and then the
+ * reader, which takes every pixel that is left. The reader is two panes — term list left, term
+ * document right — and both scroll inside themselves so the page never grows a scrollbar of its
+ * own and the search box never leaves the screen.
+ *
+ * What was removed matters as much as what is here. The release tab bar is gone: it spent a full
+ * row restating one number. The annex list that used to sit above the tree is gone too — it was
+ * a second navigation stacked on a first inside a 320px column, and the annex is now implied by
+ * the scope the officer picked. The left column is one list again.
+ *
+ * Indent in the tree is `data-depth`, never an inline style — `style-src 'self'` would drop a
+ * `padding-left` written from the script.
  */
-.imdrf-search {
-  width: 280px;
-  max-width: 100%;
-  padding: 7px 11px;
-  border: 1px solid var(--rule-2);
-  border-radius: var(--r);
-  background: var(--card);
-}
-
-.imdrf-search:focus-visible {
-  outline: 2px solid var(--green);
-  outline-offset: 1px;
-}
 
 /*
- * The handbook fills the pane under the title bar, so the tree and the term document scroll
- * inside themselves rather than growing the page. `.main` is already a column; this is the
- * extra stretch so `.imdrf-reader` has a bounded height to scroll against.
+ * The handbook fills the pane under the title bar, so the two panes scroll inside themselves
+ * rather than growing the page. `.main` is already a column; this is the extra stretch so
+ * `.imdrf-reader` has a bounded height to scroll against.
  */
 .shell:has(.imdrf-page) {
   height: 100vh;
@@ -3413,13 +3408,303 @@ ul.f4-card-c li { margin-bottom: 3px; }
   min-height: 0;
 }
 
-.imdrf-page .staff-head {
+.imdrf-head {
+  flex: none;
+  align-items: center;
+  margin-bottom: 14px;
+  padding-bottom: 13px;
+}
+
+.imdrf-head .sp {
+  flex: 1;
+  min-width: 260px;
+}
+
+/* ---- release chip ---- */
+
+.imdrf-release-flat,
+.imdrf-release > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--paper);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.imdrf-release {
+  position: relative;
   flex: none;
 }
 
+.imdrf-release > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.imdrf-release > summary::-webkit-details-marker {
+  display: none;
+}
+
+.imdrf-release > summary:hover {
+  border-color: var(--rule-2);
+  color: var(--ink);
+}
+
+.imdrf-release > summary:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 1px;
+}
+
+.imdrf-release-caret {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-right: 1.5px solid currentcolor;
+  border-bottom: 1.5px solid currentcolor;
+  transform: rotate(45deg);
+  transform-origin: 60% 60%;
+}
+
+.imdrf-release[open] > summary {
+  background: var(--green-bg);
+  border-color: var(--green-bg);
+  color: var(--green-d);
+}
+
+.imdrf-release-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  min-width: 240px;
+  padding: 6px;
+  background: var(--card);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r);
+  box-shadow: 0 8px 24px rgb(16 25 19 / 12%);
+}
+
+.imdrf-release-menu-h {
+  padding: 4px 8px 6px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 500;
+}
+
+.imdrf-release-opt {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: var(--r);
+  text-decoration: none;
+  color: var(--ink-2);
+}
+
+.imdrf-release-opt:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.imdrf-release-opt.on {
+  background: var(--green-bg);
+  color: var(--green-d);
+}
+
+.imdrf-release-year {
+  font-weight: 600;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.imdrf-release-code {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.imdrf-release-opt.on .imdrf-release-code {
+  color: var(--green-d);
+  opacity: 0.8;
+}
+
+/* ---- the F004 scope bar ---- */
+/*
+ * Seven buttons, in the form's own order, wrapping onto a second line rather than scrolling
+ * sideways: an officer has to see all seven at once to pick between them, and a horizontal
+ * scroller hides the ones at the end from the reader who most needs to compare.
+ */
+.imdrf-scopes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+
+/* A `<legend>` rather than a `<p>` because these seven buttons are one choice, and a fieldset is
+   what says so to a screen reader. `float` is the one reliable way to take a legend out of its
+   box's own layout and let it sit in the flex row with the buttons. */
+.imdrf-scopes-legend {
+  float: left;
+  padding: 0 10px 0 0;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 500;
+  line-height: 30px;
+}
+
+.imdrf-scope {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 6px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink-2);
+  cursor: pointer;
+  text-align: left;
+}
+
+.imdrf-scope:hover {
+  border-color: var(--rule-2);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.imdrf-scope:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 1px;
+}
+
+.imdrf-scope.on {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+
+.imdrf-scope-no {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--green-d);
+}
+
+.imdrf-scope.on .imdrf-scope-no {
+  color: #fff;
+}
+
+.imdrf-scope-name {
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.imdrf-scope-annex {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink-3);
+}
+
+.imdrf-scope.on .imdrf-scope-annex {
+  background: rgb(255 255 255 / 22%);
+  color: #fff;
+}
+
+/* ---- the search row ---- */
+
+.imdrf-searchbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  flex: none;
+  margin-bottom: 12px;
+}
+
+.imdrf-searchwrap {
+  position: relative;
+  flex: 1;
+  min-width: 260px;
+  max-width: 460px;
+}
+
+.imdrf-searchicon {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  width: 11px;
+  height: 11px;
+  margin-top: -7px;
+  border: 1.6px solid var(--ink-3);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.imdrf-searchicon::after {
+  content: "";
+  position: absolute;
+  top: 9px;
+  left: 9px;
+  width: 5px;
+  height: 1.6px;
+  background: var(--ink-3);
+  transform: rotate(45deg);
+  transform-origin: left center;
+}
+
+.imdrf-search {
+  width: 100%;
+  padding: 9px 12px 9px 32px;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r);
+  background: var(--card);
+  font-size: 13.5px;
+}
+
+.imdrf-search::placeholder {
+  color: var(--ink-3);
+}
+
+.imdrf-search:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 1px;
+  border-color: var(--green);
+}
+
+/* The active scope restated as the question being answered — the one line that tells a reader
+   who has never coded a report what the box above is actually asking them for. */
+.imdrf-scope-hint {
+  font-size: 12.5px;
+  color: var(--ink-2);
+  min-width: 0;
+}
+
+/* ---- the reader ---- */
+
 .imdrf-reader {
   display: grid;
-  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
   flex: 1;
   min-height: 0;
   background: var(--card);
@@ -3438,71 +3723,16 @@ ul.f4-card-c li { margin-bottom: 3px; }
   background: var(--paper);
 }
 
-.imdrf-annexes {
-  display: flex;
-  flex-direction: column;
+.imdrf-toc-h {
   flex: none;
+  padding: 9px 14px;
   border-bottom: 1px solid var(--rule);
   background: var(--card);
-}
-
-.imdrf-annex {
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) auto;
-  align-items: baseline;
-  gap: 8px;
-  width: 100%;
-  padding: 6px 12px;
-  border: 0;
-  border-bottom: 1px solid var(--rule);
-  background: transparent;
-  color: var(--ink-2);
-  text-align: left;
-  cursor: pointer;
-}
-
-.imdrf-annex:last-child {
-  border-bottom: 0;
-}
-
-.imdrf-annex:hover {
-  background: #eef2ee;
-  color: var(--ink);
-}
-
-.imdrf-annex.on {
-  background: var(--green-bg);
-  color: var(--green-d);
-  font-weight: 600;
-}
-
-.imdrf-annex:focus-visible {
-  outline: 2px solid var(--green);
-  outline-offset: -2px;
-}
-
-.imdrf-annex-code {
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.imdrf-annex-name {
-  font-size: 12.5px;
-  font-weight: 500;
-  line-height: 1.3;
-}
-
-.imdrf-annex-count {
-  font-size: 11.5px;
-  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   color: var(--ink-3);
   font-weight: 500;
-}
-
-.imdrf-annex.on .imdrf-annex-count {
-  color: var(--green-d);
-  opacity: 0.75;
 }
 
 .imdrf-list {
@@ -3514,11 +3744,12 @@ ul.f4-card-c li { margin-bottom: 3px; }
 
 .imdrf-list > .hint {
   padding: 12px 14px;
+  text-wrap: pretty;
 }
 
 .imdrf-row {
   display: grid;
-  grid-template-columns: var(--imdrf-pad, 6px) 28px minmax(0, 1fr);
+  grid-template-columns: var(--imdrf-pad, 6px) 26px minmax(0, 1fr);
   align-items: start;
 }
 
@@ -3556,8 +3787,8 @@ ul.f4-card-c li { margin-bottom: 3px; }
 .imdrf-toggle {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 36px;
+  width: 26px;
+  height: 34px;
   padding: 0;
   color: var(--ink-3);
 }
@@ -3585,11 +3816,17 @@ ul.f4-card-c li { margin-bottom: 3px; }
   transform: rotate(45deg);
 }
 
+/*
+ * A term in the list is its code and its name on one line, code first and in a fixed column.
+ * The code is what gets typed into F004, so it is the part the eye scans down; the name is what
+ * confirms the pick, so it wraps rather than being truncated into ambiguity.
+ */
 .imdrf-term-btn {
-  display: flex;
-  align-items: baseline;
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr);
   gap: 8px;
-  min-height: 36px;
+  align-items: baseline;
+  min-height: 34px;
   padding: 7px 12px 7px 4px;
   border-radius: var(--r);
 }
@@ -3610,53 +3847,200 @@ ul.f4-card-c li { margin-bottom: 3px; }
 }
 
 .imdrf-term-btn code {
-  flex: none;
   font-family: var(--mono);
   font-size: 11.5px;
+  font-weight: 600;
   color: var(--green-d);
+  overflow-wrap: anywhere;
 }
 
 .imdrf-term-btn span {
   font-size: 13px;
   line-height: 1.35;
+  text-wrap: pretty;
 }
+
+.imdrf-more {
+  display: block;
+  width: calc(100% - 20px);
+  margin: 6px 10px 2px;
+  padding: 7px;
+  border: 1px dashed var(--rule-2);
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.imdrf-more:hover:not(:disabled) {
+  background: var(--card);
+  color: var(--ink);
+}
+
+.imdrf-more:disabled {
+  cursor: default;
+  color: var(--ink-3);
+}
+
+/* ---- the term document ---- */
 
 .imdrf-doc {
   min-width: 0;
-  padding: 28px 32px 40px;
+  padding: 26px 32px 40px;
   overflow: auto;
 }
 
-.imdrf-doc > .hint:only-child {
-  margin-top: 8px;
-}
-
-.imdrf-entry-code {
-  margin: 6px 0 4px;
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-}
-
-.imdrf-entry-code code {
-  font-family: var(--mono);
+.imdrf-warn {
+  margin-bottom: 14px;
+  padding: 9px 12px;
+  border: 1px solid var(--orange-line);
+  border-radius: var(--r);
+  background: var(--orange-bg);
+  color: var(--orange-d);
+  font-size: 12.5px;
+  font-weight: 500;
+  text-wrap: pretty;
 }
 
 .imdrf-entry-term {
-  font-size: 16px;
+  margin: 5px 0 0;
+  font-size: 21px;
   font-weight: 600;
-  letter-spacing: -0.01em;
-  line-height: 1.35;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
   text-wrap: pretty;
-  margin-bottom: 10px;
+  max-width: 34ch;
 }
 
 .imdrf-entry-crumb {
-  font-family: var(--mono);
+  margin: 8px 0 0;
   font-size: 12px;
   color: var(--ink-3);
-  margin: 8px 0 14px;
+  text-wrap: pretty;
+  max-width: 62ch;
+}
+
+/*
+ * The block the officer came for. It is a card rather than more prose because it is the one part
+ * of this pane that gets acted on — everything above it is how you know you are in the right
+ * place, and everything below it is why.
+ */
+.imdrf-f4 {
+  margin: 18px 0 22px;
+  padding: 14px 16px 15px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--green);
+  border-radius: var(--r);
+  background: var(--paper);
+  max-width: 62ch;
+}
+
+.imdrf-f4-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.imdrf-f4-h {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--green-d);
+  font-weight: 600;
+}
+
+.imdrf-copy {
+  flex: none;
+  padding: 5px 11px;
+  border: 1px solid var(--green);
+  border-radius: var(--r);
+  background: var(--card);
+  color: var(--green-d);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.imdrf-copy:hover {
+  background: var(--green);
+  color: #fff;
+}
+
+.imdrf-copy:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 1px;
+}
+
+.imdrf-copy.ok {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+
+.imdrf-f4-code-big {
+  margin: 6px 0 12px;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.imdrf-f4-code-big code {
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.imdrf-f4-levels {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+}
+
+.imdrf-f4-levels dt {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 500;
+}
+
+.imdrf-f4-levels dd {
+  margin-top: 1px;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+.imdrf-f4-code {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.imdrf-f4-note {
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--rule);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+
+.imdrf-def-h {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 500;
+  margin-bottom: 5px;
 }
 
 .imdrf-entry-def {
@@ -3688,6 +4072,136 @@ ul.f4-card-c li { margin-bottom: 3px; }
   font-size: 13.5px;
   color: var(--ink-2);
 }
+
+/* ---- the start panel ---- */
+/*
+ * What the right pane holds before a term is picked. This used to be one grey sentence in the
+ * largest region of the page; it is the instructions now, because the officer most likely to be
+ * looking at an empty pane is the one who does not yet know what to do with a full one.
+ */
+.imdrf-start {
+  max-width: 68ch;
+}
+
+.imdrf-start-h {
+  margin: 5px 0 8px;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  text-wrap: pretty;
+}
+
+.imdrf-start-lede {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+
+.imdrf-steps {
+  display: grid;
+  gap: 11px;
+  margin: 18px 0 24px;
+  padding: 0;
+  list-style: none;
+}
+
+.imdrf-steps li {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+
+.imdrf-step-n {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--green-bg);
+  color: var(--green-d);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.imdrf-start-h2 {
+  padding-top: 16px;
+  border-top: 1px solid var(--rule);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 500;
+}
+
+.imdrf-qlist {
+  display: grid;
+  gap: 2px;
+  margin-top: 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.imdrf-qbtn {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.imdrf-qbtn:hover {
+  background: var(--paper);
+}
+
+.imdrf-qbtn:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: -2px;
+}
+
+.imdrf-qno {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--green-d);
+  line-height: 1.45;
+}
+
+.imdrf-qtext {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.imdrf-qq {
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+.imdrf-qmeta {
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+/* ---- the admin side of the same subsystem ---- */
 
 .imdrf-admin {
   display: grid;
@@ -3730,16 +4244,27 @@ ul.f4-card-c li { margin-bottom: 3px; }
   max-height: min(420px, calc(100vh - 280px));
 }
 
+@media (max-width: 1100px) {
+  .imdrf-doc {
+    padding: 22px 22px 34px;
+  }
+}
+
 @media (max-width: 900px) {
   .imdrf-admin {
     grid-template-columns: 1fr;
   }
 
-  .imdrf-search {
-    width: 100%;
+  .imdrf-searchwrap {
+    max-width: 100%;
   }
 }
 
+/*
+ * Under 800px the two panes stop being two panes. Stacking them is the only honest layout at
+ * that width — a 260px list beside a definition would leave neither readable — so the list takes
+ * a bounded slice of the viewport and the document follows it down the page.
+ */
 @media (max-width: 800px) {
   .shell:has(.imdrf-page),
   .main:has(.imdrf-page) {
@@ -3776,23 +4301,13 @@ ul.f4-card-c li { margin-bottom: 3px; }
     overflow: hidden;
   }
 
-  .imdrf-annexes {
-    flex-direction: row;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .imdrf-annex {
-    flex: none;
-    width: auto;
-    min-width: 180px;
-    border-bottom: 0;
-    border-right: 1px solid var(--rule);
-  }
-
   .imdrf-doc {
     padding: 20px 16px 32px;
     min-height: 40vh;
   }
-}
 
+  .imdrf-release-menu {
+    right: auto;
+    left: 0;
+  }
+}

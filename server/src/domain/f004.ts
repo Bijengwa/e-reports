@@ -10,6 +10,8 @@
  * rewritten "clearer" causality definition would be a different standard.
  */
 
+import type { Annex } from "./imdrf/types.js";
+
 /** Stamped on every assessment row, so an old assessment stays readable when the form changes. */
 export const F004_VERSION = "TMDA/DMD/MDV/F/004 Rev 05";
 
@@ -430,6 +432,23 @@ export type ImdrfItem = {
   key: string;
   title: string;
   annex: string;
+  /**
+   * Which annex of IMDRF N43 this item's code must come from, as a bare letter.
+   *
+   * `annex` above is the sentence the paper prints beside the field; this is the same fact in a
+   * form a query can use. The terminology handbook scopes its search with it, so an officer
+   * looking up a code for 3.1.2 is never shown an Annex F code they cannot put there.
+   */
+  annexLetter: Annex;
+  /**
+   * The item restated as the question an officer is actually answering.
+   *
+   * The paper's own titles name the artefact ("Medical device problem"), which is the right label
+   * beside a field someone has already decided to fill. It is the wrong entry point for someone
+   * who has a report in front of them and does not yet know which of seven boxes their
+   * observation belongs in — that reader needs the question, not the category name.
+   */
+  question: string;
   /** How many preferred-terminology levels this annex carries. */
   levels: 1 | 2 | 3;
   /**
@@ -459,6 +478,8 @@ export const IMDRF_GROUPS: readonly ImdrfGroup[] = [
         key: "component",
         title: "Component of the medical device involved in the incident (If applicable)",
         annex: "IMDRF N43 Annex G — Medical Device Component",
+        annexLetter: "G",
+        question: "Which part of the device was involved?",
         levels: 3,
         optional: true,
       },
@@ -467,6 +488,8 @@ export const IMDRF_GROUPS: readonly ImdrfGroup[] = [
         key: "device_problem",
         title: "Medical device problem (If applicable)",
         annex: "IMDRF N43 Annex A — adverse incident terminologies and coding",
+        annexLetter: "A",
+        question: "What went wrong with the device?",
         levels: 3,
         optional: true,
       },
@@ -481,6 +504,8 @@ export const IMDRF_GROUPS: readonly ImdrfGroup[] = [
         key: "health_impact",
         title: "Health effects — health impact (If applicable)",
         annex: "IMDRF N43 Annex F — adverse event terminologies and coding",
+        annexLetter: "F",
+        question: "What was the consequence for the patient?",
         levels: 3,
         optional: true,
       },
@@ -490,6 +515,8 @@ export const IMDRF_GROUPS: readonly ImdrfGroup[] = [
         title:
           "Health effects — clinical signs and symptoms or conditions of the affected person (If applicable)",
         annex: "IMDRF N43 Annex E — terminologies and coding of conditions",
+        annexLetter: "E",
+        question: "What signs, symptoms or conditions were observed?",
         levels: 3,
         optional: true,
       },
@@ -504,6 +531,8 @@ export const IMDRF_GROUPS: readonly ImdrfGroup[] = [
         key: "investigation_type",
         title: "Cause investigation — type of investigation",
         annex: "IMDRF N43 Annex B",
+        annexLetter: "B",
+        question: "What kind of investigation was carried out?",
         levels: 1,
       },
       {
@@ -511,6 +540,8 @@ export const IMDRF_GROUPS: readonly ImdrfGroup[] = [
         key: "investigation_findings",
         title: "Cause investigation — investigation findings (If applicable)",
         annex: "IMDRF N43 Annex C",
+        annexLetter: "C",
+        question: "What did the investigation find?",
         levels: 3,
         optional: true,
       },
@@ -519,6 +550,8 @@ export const IMDRF_GROUPS: readonly ImdrfGroup[] = [
         key: "investigation_conclusion",
         title: "Cause investigation — investigation conclusion (If applicable)",
         annex: "IMDRF N43 Annex D",
+        annexLetter: "D",
+        question: "What did the investigation conclude was the cause?",
         levels: 2,
         optional: true,
       },
