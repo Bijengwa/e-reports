@@ -15,6 +15,7 @@
 
   var SEARCH_DEBOUNCE_MS = 250;
   var RESULTS_LIMIT = 20;
+  var MIN_QUERY_LENGTH = 2;
 
   function ready(fn) {
     if (document.readyState !== "loading") fn();
@@ -38,11 +39,9 @@
   }
 
   function currentReleaseId(root) {
-    var selectId = root.getAttribute("data-release-select");
-    if (selectId) {
-      var select = document.getElementById(selectId);
-      return select && select.value ? select.value : "";
-    }
+    // Always resolved server-side (`domain/imdrf/f004-integration.ts`'s `resolveAssessmentRelease`)
+    // and rendered onto the picker as a fixed attribute — there is no control on the page for an
+    // assessor to choose a release.
     return root.getAttribute("data-release-id") || "";
   }
 
@@ -75,6 +74,15 @@
     if (button) button.setAttribute("aria-expanded", "false");
   }
 
+  /** IMDRF's own marker for a term nobody may stop at — visible for hierarchy/context, never a
+   *  choice. Matches the same substring test `f004-integration.ts`'s `resolveImdrfTerm` enforces
+   *  server-side, so a row this script lets through is never one the save would still refuse. */
+  function isNotSelectable(status) {
+    return String(status || "")
+      .toLowerCase()
+      .indexOf("not selectable") !== -1;
+  }
+
   function renderResults(container, rows, onPick) {
     if (rows.length === 0) {
       container.innerHTML = '<p class="hint">No matching terms.</p>';
@@ -83,31 +91,39 @@
 
     container.innerHTML = rows
       .map(function (row) {
+        var notSelectable = isNotSelectable(row.status);
+        var pickable = row.hasChildren !== true && !notSelectable;
+        var note = row.hasChildren
+          ? '<em class="hint"> — has more specific terms; keep typing to reach one</em>'
+          : notSelectable
+            ? '<em class="hint"> — ' + escapeHtml(row.status) + ", not a final answer</em>"
+            : "";
+
         return (
           '<button type="button" class="imdrf-pick-row" data-id="' +
           escapeHtml(row.id) +
           '" data-has-children="' +
           (row.hasChildren === true) +
-          '"><code>' +
+          '"' +
+          (pickable ? "" : " disabled aria-disabled=\"true\"") +
+          "><code>" +
           escapeHtml(row.code) +
           "</code><span>" +
           escapeHtml(row.term) +
           "</span>" +
-          (row.hasChildren
-            ? '<em class="hint"> — has more specific terms; keep typing to reach one</em>'
-            : "") +
+          note +
           "</button>"
         );
       })
       .join("");
 
-    Array.prototype.slice.call(container.querySelectorAll(".imdrf-pick-row")).forEach(function (
-      btn,
-    ) {
-      btn.addEventListener("click", function () {
-        onPick(btn.getAttribute("data-id"));
+    Array.prototype.slice
+      .call(container.querySelectorAll(".imdrf-pick-row:not([disabled])"))
+      .forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          onPick(btn.getAttribute("data-id"));
+        });
       });
-    });
   }
 
   ready(function () {
@@ -131,8 +147,13 @@
             '<p class="hint">Choose the IMDRF release above first.</p>';
           return;
         }
-        if (query.trim() === "") {
-          resultsEl.innerHTML = '<p class="hint">Type a code or a term to search.</p>';
+        var trimmed = query.trim();
+        if (trimmed === "") {
+          resultsEl.innerHTML = '<p class="hint">Search IMDRF code or term.</p>';
+          return;
+        }
+        if (trimmed.length < MIN_QUERY_LENGTH) {
+          resultsEl.innerHTML = '<p class="hint">Type at least ' + MIN_QUERY_LENGTH + " characters.</p>";
           return;
         }
 
@@ -159,6 +180,13 @@
                   // Chosen anyway is refused server-side; here it is simply not offered as done.
                   resultsEl.innerHTML =
                     '<p class="hint">That is a category, not a specific term — search for something more specific within it.</p>';
+                  return;
+                }
+                if (isNotSelectable(term.status)) {
+                  resultsEl.innerHTML =
+                    '<p class="hint">' +
+                    escapeHtml(term.status) +
+                    " — not a final answer. Choose a different term.</p>";
                   return;
                 }
                 fillFrom(root, term);

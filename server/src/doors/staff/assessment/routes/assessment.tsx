@@ -16,12 +16,11 @@ import {
   validateSecondaryReviewForSubmit,
   value,
 } from "../../../../domain/f004.js";
-import { getReleaseCached } from "../../../../domain/imdrf/cached-query-service.js";
 import {
   resolveA1Imdrf,
+  resolveAssessmentRelease,
   resolveSecondaryImdrfReplacements,
 } from "../../../../domain/imdrf/f004-integration.js";
-import { listPublishedReleases } from "../../../../domain/imdrf/query-service.js";
 import { notifyAssessmentSubmitted } from "../../../../notifications/index.js";
 import { loadReport } from "../../reports/routes/reports.js";
 import { currentSession } from "../../session-guard.js";
@@ -32,17 +31,23 @@ import { SecondaryAssessmentPage } from "../pages/secondary-assessment.js";
 /** Same reason as the register's: a uuid column compared against arbitrary text raises 22P02. */
 const ReportId = z.uuid();
 
-/** "IMDRF/AE WG/N43 · 2026" for whichever release `answers.imdrf_release_id` names, or undefined
- *  once nothing has been established yet — `F004Form` falls back to its own copy for that case. */
-async function imdrfReleaseLabel(
+/**
+ * The release every IMDRF picker on this rendering is scoped to, and its passive display label —
+ * never a choice offered to the reader. `existingReleaseId` is whatever `answers.imdrf_release_id`
+ * already holds (empty for a report with no A1 draft yet); `resolveAssessmentRelease` is the same
+ * function `resolveA1Imdrf` uses to stamp the answers themselves, so a page render and the save it
+ * is about always agree on which release is "current" for this report.
+ */
+async function imdrfReleaseForDisplay(
   app: FastifyInstance,
-  answers: F004Answers,
-): Promise<string | undefined> {
-  const releaseId = value(answers, "imdrf_release_id").trim();
-  if (releaseId === "") return undefined;
-  const release = await getReleaseCached(app.db, releaseId);
-  if (release === null) return undefined;
-  return `${release.documentCode ?? "IMDRF"} · ${String(release.releaseYear)}`;
+  existingReleaseId: string,
+): Promise<{ releaseId: string; label: string | undefined }> {
+  const release = await resolveAssessmentRelease(app.db, existingReleaseId);
+  if (release === null) return { releaseId: "", label: undefined };
+  return {
+    releaseId: release.id,
+    label: `${release.documentCode ?? "IMDRF"} · ${String(release.releaseYear)}`,
+  };
 }
 
 function today(): string {
@@ -132,22 +137,26 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
     if (found.assessor1UserId !== session.userId) return forbid(reply, session.role);
 
     const draft = await loadDraft(app, found.report.id);
-    const imdrfReleases = await listPublishedReleases(app.db);
+    // Resolved server-side, always — the release this page's IMDRF pickers search against, and
+    // the same one `resolveA1Imdrf` will stamp into the payload on save. Stamped into `answers`
+    // itself rather than passed as a separate prop, so `F004Form`'s pickers read one source
+    // (`answers.imdrf_release_id`) whether the page arrived here from a GET or a POST re-render.
+    const imdrfRelease = await imdrfReleaseForDisplay(app, value(draft.answers, "imdrf_release_id"));
+    const answers: F004Answers = { ...draft.answers, imdrf_release_id: imdrfRelease.releaseId };
 
     return reply.html(
       <Assessment1Page
         report={found.report}
         viewerRole={session.role}
         viewerName={session.fullName}
-        answers={draft.answers}
+        answers={answers}
         device={prefillDeviceRows(found.report.payload, found.report)}
         event={prefillEventRows(found.report.payload)}
         assessedOn={draft.submittedOn ?? today()}
         submitted={draft.submitted}
         issues={[]}
         dueAt={found.assessor1DueAt}
-        imdrfReleases={imdrfReleases}
-        imdrfReleaseLabel={await imdrfReleaseLabel(app, draft.answers)}
+        imdrfReleaseLabel={imdrfRelease.label}
       />,
     );
   });
@@ -181,7 +190,12 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
     // to decide whether an item was answered at all, and the page no longer posts those two by
     // hand — only the term id. Resolving first is what lets a real selection still read as
     // "answered" to a check that predates this feature and does not know term ids exist.
-    const issues: Issue[] = await resolveA1Imdrf(app.db, answers, submitting);
+    const issues: Issue[] = await resolveA1Imdrf(
+      app.db,
+      answers,
+      value(existing.answers, "imdrf_release_id"),
+      submitting,
+    );
     if (submitting) issues.push(...validateForSubmit(answers));
 
     if (submitting && issues.length === 0) {
@@ -204,8 +218,11 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
             submitted={false}
             issues={shown}
             dueAt={found.assessor1DueAt}
-            imdrfReleases={await listPublishedReleases(app.db)}
-            imdrfReleaseLabel={await imdrfReleaseLabel(app, answers)}
+            // `answers.imdrf_release_id` is already resolved by `resolveA1Imdrf` above; only the
+            // display label needs a second lookup.
+            imdrfReleaseLabel={
+              (await imdrfReleaseForDisplay(app, value(answers, "imdrf_release_id"))).label
+            }
           />,
         );
 
@@ -353,7 +370,9 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
         submitted={mine?.submitted ?? false}
         issues={[]}
         dueAt={mine?.dueAt ?? null}
-        imdrfReleaseLabel={await imdrfReleaseLabel(app, first.answers)}
+        imdrfReleaseLabel={
+          (await imdrfReleaseForDisplay(app, value(first.answers, "imdrf_release_id"))).label
+        }
       />,
     );
   });
@@ -428,7 +447,9 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
           submitted={false}
           issues={issues}
           dueAt={mine?.dueAt ?? null}
-          imdrfReleaseLabel={await imdrfReleaseLabel(app, first.answers)}
+          imdrfReleaseLabel={
+            (await imdrfReleaseForDisplay(app, value(first.answers, "imdrf_release_id"))).label
+          }
         />,
       );
     }

@@ -1,5 +1,4 @@
 import type { Children } from "@kitajs/html";
-import type { ReleaseSummary } from "../../../../domain/imdrf/query-service.js";
 import {
   A2_DEGREE_LABELS,
   A2_DEGREES,
@@ -192,14 +191,12 @@ export type F004FormProps = {
   priorReviews?: readonly PriorSecondaryReview[];
   issues: readonly Issue[];
   /**
-   * Every published IMDRF release, newest first. Present only on A1's own live, unsubmitted page —
-   * the one place a release is actively being chosen (`writingA1` below). Everywhere else the
-   * release is already A1's own settled fact, read out of `answers.imdrf_release_id` and shown as
-   * text rather than a control a later reader could second-guess.
+   * The release every IMDRF picker on this form is scoped to — resolved server-side
+   * (`domain/imdrf/f004-integration.ts`), never a value the assessor chooses. There is no control
+   * anywhere on this form for it; every picker reads it straight off `answers.imdrf_release_id`,
+   * which the route stamps before rendering. This prop is purely the passive display label
+   * ("IMDRF/AE WG/N43 · 2026") shown beside "IMDRF release".
    */
-  imdrfReleases?: readonly ReleaseSummary[];
-  /** The established release's own label ("IMDRF/AE WG/N43 · 2026"), for every rendering that is
-   *  not A1's own live page — the manager's, a secondary assessor's, the concluded document's. */
   imdrfReleaseLabel?: string;
 };
 
@@ -1097,10 +1094,8 @@ function AssessedDeviceField({
  * are `readonly`, not `disabled`, so they still post — a `disabled` input is never submitted at
  * all, which would silently drop the resolved text on a browser with JavaScript turned off.
  *
- * `releaseSelect` names the id of a `<select name="imdrf_release_id">` elsewhere on the page whose
- * live value scopes the search (A1's own live page, where the release is still being chosen);
- * `releaseId` is a release already settled (every other reader) and is passed as a fixed value
- * instead. Exactly one of the two is meaningful for a given rendering.
+ * `releaseId` is always a release already resolved server-side (`resolveAssessmentRelease`) — there
+ * is no control anywhere on this form for an assessor to choose one, on A1's own page or any other.
  */
 function ImdrfPicker({
   idBase,
@@ -1110,7 +1105,6 @@ function ImdrfPicker({
   values,
   termId,
   annex,
-  releaseSelect,
   releaseId,
   locked,
 }: {
@@ -1121,7 +1115,6 @@ function ImdrfPicker({
   values: Record<string, string>;
   termId: string;
   annex: string;
-  releaseSelect?: string;
   releaseId?: string;
   locked: boolean;
 }): JSX.Element {
@@ -1130,7 +1123,6 @@ function ImdrfPicker({
       class="f4-grid"
       data-imdrf-picker
       data-annex={annex}
-      data-release-select={releaseSelect}
       data-release-id={releaseId}
       data-term-id-input={`#${idBase}-term-id`}
     >
@@ -1167,10 +1159,14 @@ function ImdrfPicker({
             Choose term…
           </button>
           <div class="imdrf-pick-panel" data-imdrf-pick-panel hidden>
+            <label for={`${idBase}-search`} class="vh">
+              Search IMDRF code or term
+            </label>
             <input
               type="search"
+              id={`${idBase}-search`}
               class="imdrf-pick-search"
-              placeholder="Search by code or term…"
+              placeholder="Search IMDRF code or term, e.g. G02, G02002, Battery"
               data-imdrf-pick-search
               autocomplete="off"
             />
@@ -1210,7 +1206,6 @@ export function F004Form({
   a2Review,
   priorReviews,
   issues,
-  imdrfReleases,
   imdrfReleaseLabel,
 }: F004FormProps): JSX.Element {
   // The concluded document rather than the working one. See `F004Presentation` for what it drops
@@ -1544,26 +1539,14 @@ export function F004Form({
 
             <div class="f4-block">
               <div class="f4-blocktitle">IMDRF release</div>
-              {writingA1 ? (
-                <div class="f4-field">
-                  <label for="imdrf_release_id">Published IMDRF release used for this coding</label>
-                  <select id="imdrf_release_id" name="imdrf_release_id" disabled={locked}>
-                    <option value="">Choose a release…</option>
-                    {(imdrfReleases ?? []).map((release) => (
-                      <option
-                        value={release.id}
-                        selected={value(answers, "imdrf_release_id") === release.id}
-                      >
-                        {`${release.documentCode ?? "IMDRF"} · ${String(release.releaseYear)}`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <p class="f4-note" safe>
-                  {imdrfReleaseLabel ?? "Not yet established."}
-                </p>
-              )}
+              {/* Never a control: which release this report's coding comes from is resolved
+                  server-side (`domain/imdrf/f004-integration.ts`'s `resolveAssessmentRelease`) —
+                  the newest published release for a brand-new assessment, and thereafter the same
+                  release this report has always used. Shown here so the assessor knows what they
+                  are searching, nothing more. */}
+              <p class="f4-note" safe>
+                {imdrfReleaseLabel ?? "No published IMDRF release is available yet."}
+              </p>
             </div>
 
             {IMDRF_GROUPS.map((group) => (
@@ -1597,8 +1580,7 @@ export function F004Form({
                         values={imdrfFieldValues(answers, `imdrf_${item.key}`)}
                         termId={value(answers, `imdrf_${item.key}_term_id`)}
                         annex={item.annexLetter}
-                        releaseSelect={writingA1 ? "imdrf_release_id" : undefined}
-                        releaseId={writingA1 ? undefined : value(answers, "imdrf_release_id")}
+                        releaseId={value(answers, "imdrf_release_id")}
                         locked={locked}
                       />
                       <A2InlineDecision
