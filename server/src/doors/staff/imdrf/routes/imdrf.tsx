@@ -15,6 +15,8 @@ import {
   annexSummary,
   getRelease,
   getTerm,
+  getTermByCode,
+  getTermLineage,
   listPublishedReleases,
   listTerms,
   searchTerms,
@@ -28,6 +30,10 @@ const TermId = z.uuid();
 
 const TERMS_PAGE_LIMIT = 50;
 const SEARCH_PAGE_LIMIT = 25;
+
+/** No IMDRF AE code comes close to this; the bound is here so a lookup cannot be used to hand
+ *  Postgres an arbitrarily long string to lower-case and compare against every row. */
+const MAX_CODE_LENGTH = 64;
 
 /**
  * The one check every route below makes before touching a release's terms: it must exist and be
@@ -119,13 +125,46 @@ export async function imdrfBrowserRoutes(app: FastifyInstance): Promise<void> {
     );
     if (!release) return reply.status(404).send({ error: "Release not found." });
 
-    const query = request.query as { q?: string; cursor?: string };
+    const query = request.query as { q?: string; cursor?: string; annex?: string };
+    // An unrecognised `annex` is dropped rather than rejected: the scope is a narrowing of a
+    // search, and the honest answer to "search annex Z" is every annex, not a 400 on a box the
+    // officer is still typing into.
+    const annex = query.annex !== undefined && isAnnex(query.annex) ? query.annex : undefined;
+
     return searchTerms(app.db, {
       releaseId: release.id,
       query: query.q ?? "",
       limit: SEARCH_PAGE_LIMIT,
       cursor: query.cursor,
+      annex,
     });
+  });
+
+  /*
+   * Resolve a typed code to the one term that carries it.
+   *
+   * The handbook's own search box does not need this — it already ranks an exact code first. It
+   * exists for F004 section 3, where the coding field is the only thing an officer fills and the
+   * three "preferred terminology level" boxes are filled from what comes back. That is a
+   * resolve, not a search: either the code names a published term, or the form has nothing to
+   * write, and a 404 here is the form's signal to say so rather than to guess.
+   */
+  app.get("/imdrf/releases/:releaseId/codes/:code", async (request, reply) => {
+    const release = await requirePublishedRelease(
+      app,
+      (request.params as { releaseId: string }).releaseId,
+    );
+    if (!release) return reply.status(404).send({ error: "Release not found." });
+
+    const code = (request.params as { code: string }).code;
+    if (code.length > MAX_CODE_LENGTH) {
+      return reply.status(404).send({ error: "Term not found." });
+    }
+
+    const term = await getTermByCode(app.db, release.id, code);
+    if (!term) return reply.status(404).send({ error: "Term not found." });
+
+    return { ...term, lineage: await getTermLineage(app.db, release.id, term.id) };
   });
 
   app.get("/imdrf/releases/:releaseId/terms/:id", async (request, reply) => {
@@ -141,6 +180,9 @@ export async function imdrfBrowserRoutes(app: FastifyInstance): Promise<void> {
     const term = await getTerm(app.db, release.id, termId.data);
     if (!term) return reply.status(404).send({ error: "Term not found." });
 
-    return term;
+    // The lineage rides along with the term rather than sitting behind its own route: every
+    // consumer of a term detail wants the level names (that is what F004 asks for), so a second
+    // round trip would only ever be made immediately after the first.
+    return { ...term, lineage: await getTermLineage(app.db, release.id, term.id) };
   });
 }

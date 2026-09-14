@@ -44,7 +44,7 @@ function clampLimit(requested: number, max: number): number {
   return Math.min(Math.trunc(requested), max);
 }
 
-export type Cursor = { sortOrder: number; id: string };
+export type Cursor = { sortOrder: number; id: string; rank?: number };
 
 /**
  * An opaque pagination cursor over `(sort_order, id)`, not `sort_order` alone.
@@ -71,7 +71,10 @@ export function decodeCursor(value: string | undefined): Cursor | null {
       "id" in decoded &&
       typeof (decoded as { sortOrder: unknown }).sortOrder === "number" &&
       Number.isInteger((decoded as { sortOrder: unknown }).sortOrder) &&
-      typeof (decoded as { id: unknown }).id === "string"
+      typeof (decoded as { id: unknown }).id === "string" &&
+      (!("rank" in decoded) ||
+        (typeof (decoded as { rank: unknown }).rank === "number" &&
+          Number.isInteger((decoded as { rank: unknown }).rank)))
     ) {
       return decoded as Cursor;
     }
@@ -244,33 +247,75 @@ function likePattern(query: string): string {
   return `%${query.replace(/[\\%_]/g, "\\$&")}%`;
 }
 
+/** Escapes LIKE metacharacters in a value used as a `prefix%` pattern. */
+function prefixPattern(query: string): string {
+  return `${query.replace(/[\\%_]/g, "\\$&")}%`;
+}
+
+/**
+ * Search a release's terms, best match first.
+ *
+ * Officers reach this box from two directions, and the ordering below is what lets one query
+ * serve both. Someone who already half-knows the code types `A05` and must get A05 itself at the
+ * top, not the eleventh row behind three definitions that happen to mention it; someone who knows
+ * only what they saw types "battery leak" and must get terms whose *name* says that before terms
+ * whose definition merely mentions it. So rows are scored — exact code, code prefix, term prefix,
+ * term contains, definition contains — and the workbook's own `sort_order` is only the tiebreak
+ * within one band rather than the whole ordering.
+ *
+ * `annex` narrows the search to the one annex an F004 field draws from. Nothing in F004 3.1.2
+ * may be answered with an Annex F code, so a scoped box is not a convenience filter: it is the
+ * shape of the question being asked.
+ *
+ * The cursor carries the rank band alongside `(sort_order, id)` for the same reason it carries
+ * `id` at all — the ordering is a three-part tuple now, so a cursor over two of its parts would
+ * skip or repeat rows at a band boundary.
+ */
 export async function searchTerms(
   db: Database,
-  opts: { releaseId: string; query: string; limit: number; cursor?: string },
+  opts: { releaseId: string; query: string; limit: number; cursor?: string; annex?: Annex },
 ): Promise<{ rows: TermRow[]; nextCursor: string | null }> {
   const trimmed = opts.query.trim();
   if (trimmed === "") return { rows: [], nextCursor: null };
 
   const limit = clampLimit(opts.limit, MAX_SEARCH_LIMIT);
-  const after = decodeCursor(opts.cursor);
+  const decoded = decodeCursor(opts.cursor);
+  // A cursor without a rank band cannot name a position in this ordering — a `listTerms` cursor
+  // handed to search, or a tampered one. Degrading to "from the start" beats silently skipping a
+  // band, which is what comparing against a NULL rank would do.
+  const after = typeof decoded?.rank === "number" ? decoded : null;
+  const afterRank = after?.rank ?? null;
   const afterSortOrder = after?.sortOrder ?? null;
   const afterId = after?.id ?? null;
   const pattern = likePattern(trimmed);
+  const prefix = prefixPattern(trimmed);
+  const annex = opts.annex ?? null;
 
-  const rows = await db.execute<TermQueryRow>(sql`
-    SELECT t.id, t.annex, t.code, t.term, t.level, t.sort_order,
-           EXISTS (SELECT 1 FROM imdrf_terms c WHERE c.parent_term_id = t.id) AS has_children
-      FROM imdrf_terms t
-     WHERE t.release_id = ${opts.releaseId}
-       AND (t.code ILIKE ${pattern} ESCAPE '\\'
-            OR t.term ILIKE ${pattern} ESCAPE '\\'
-            OR t.definition ILIKE ${pattern} ESCAPE '\\')
-       AND (
-         ${afterSortOrder}::int IS NULL
-         OR t.sort_order > ${afterSortOrder}
-         OR (t.sort_order = ${afterSortOrder} AND t.id > ${afterId})
-       )
-     ORDER BY t.sort_order, t.id
+  const rows = await db.execute<TermQueryRow & { rank: number }>(sql`
+    WITH scored AS (
+      SELECT t.id, t.annex, t.code, t.term, t.level, t.sort_order,
+             EXISTS (SELECT 1 FROM imdrf_terms c WHERE c.parent_term_id = t.id) AS has_children,
+             CASE
+               WHEN lower(t.code) = lower(${trimmed}) THEN 0
+               WHEN t.code ILIKE ${prefix} ESCAPE '\\' THEN 1
+               WHEN t.term ILIKE ${prefix} ESCAPE '\\' THEN 2
+               WHEN t.term ILIKE ${pattern} ESCAPE '\\' THEN 3
+               ELSE 4
+             END AS rank
+        FROM imdrf_terms t
+       WHERE t.release_id = ${opts.releaseId}
+         AND (${annex}::text IS NULL OR t.annex = ${annex})
+         AND (t.code ILIKE ${pattern} ESCAPE '\\'
+              OR t.term ILIKE ${pattern} ESCAPE '\\'
+              OR t.definition ILIKE ${pattern} ESCAPE '\\')
+    )
+    SELECT id, annex, code, term, level, sort_order, has_children, rank
+      FROM scored
+     WHERE (
+       ${afterId}::uuid IS NULL
+       OR (rank, sort_order, id) > (${afterRank}::int, ${afterSortOrder}::int, ${afterId}::uuid)
+     )
+     ORDER BY rank, sort_order, id
      LIMIT ${limit + 1}
   `);
 
@@ -279,7 +324,10 @@ export async function searchTerms(
   const last = page[page.length - 1];
   return {
     rows: page.map(termRowOf),
-    nextCursor: hasMore && last ? encodeCursor({ sortOrder: last.sort_order, id: last.id }) : null,
+    nextCursor:
+      hasMore && last
+        ? encodeCursor({ rank: last.rank, sortOrder: last.sort_order, id: last.id })
+        : null,
   };
 }
 
@@ -300,6 +348,71 @@ type TermDetailRow = {
   sort_order: number;
   has_children: boolean;
 };
+
+/**
+ * The one term in a release carrying exactly this code, or null.
+ *
+ * Case- and whitespace-insensitive on the way in, because the code an officer has in front of
+ * them was read off a PDF or a colleague's note, not copied from this database. It is still an
+ * exact match, not a prefix: a lookup that resolved `A05` to `A0501` because the officer stopped
+ * typing early would fill F004 with a code nobody chose. Browsing is forgiving; resolving is not.
+ */
+export async function getTermByCode(
+  db: Database,
+  releaseId: string,
+  code: string,
+): Promise<TermDetail | null> {
+  const rows = await db.execute<{ id: string }>(sql`
+    SELECT id FROM imdrf_terms
+     WHERE release_id = ${releaseId}
+       AND lower(btrim(code)) = lower(btrim(${code}))
+     LIMIT 1
+  `);
+  const row = rows[0];
+  return row ? getTerm(db, releaseId, row.id) : null;
+}
+
+/** One rung of a term's path from its annex root down to the term itself. */
+export type LineageStep = { id: string; level: number; code: string; term: string };
+
+/**
+ * A term's ancestors, root first, with the term itself last.
+ *
+ * This exists because of what F004 asks for. Section 3 does not want a code alone: each item has
+ * "preferred terminology level 1/2/3" beside the coding box, and those levels are not free text —
+ * they are the names of this term's ancestors. Deriving them here, from `parent_term_id`, is what
+ * lets the form fill them from a code instead of asking an officer to retype three names from a
+ * PDF and get one of them subtly wrong.
+ *
+ * Walked over `parent_term_id` rather than split out of `code_hierarchy`: the hierarchy string
+ * carries codes, and a code is not a name. The recursion is depth-bounded in practice (IMDRF
+ * AE terminology is three levels) but is written against the parent link, not a fixed depth.
+ */
+export async function getTermLineage(
+  db: Database,
+  releaseId: string,
+  termId: string,
+): Promise<LineageStep[]> {
+  const rows = await db.execute<{ id: string; level: number; code: string; term: string }>(sql`
+    WITH RECURSIVE up AS (
+      SELECT t.id, t.parent_term_id, t.level, t.code, t.term
+        FROM imdrf_terms t
+       WHERE t.release_id = ${releaseId} AND t.id = ${termId}
+      UNION ALL
+      SELECT p.id, p.parent_term_id, p.level, p.code, p.term
+        FROM imdrf_terms p
+        JOIN up ON up.parent_term_id = p.id
+       WHERE p.release_id = ${releaseId}
+    )
+    SELECT id, level, code, term FROM up ORDER BY level
+  `);
+  return rows.map((row) => ({
+    id: row.id,
+    level: row.level,
+    code: row.code,
+    term: row.term,
+  }));
+}
 
 export async function getTerm(
   db: Database,
