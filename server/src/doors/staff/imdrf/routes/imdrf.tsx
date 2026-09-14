@@ -144,6 +144,3 @@ export async function imdrfBrowserRoutes(app: FastifyInstance): Promise<void> {
     return term;
   });
 }
-
-
-

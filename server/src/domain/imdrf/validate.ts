@@ -137,7 +137,7 @@ export function validateParsedWorkbook(
   const hierarchySeenAt = new Map<string, number>();
 
   for (const row of parsed.rows) {
-    const where = { annex: row.annex, sheet: row.sheetName, row: row.rowNumber };
+    const where = { annex: row.annex, sheet: row.annex, row: row.rowNumber };
 
     if (!isAnnex(row.annex)) {
       issues.push({
@@ -162,15 +162,6 @@ export function validateParsedWorkbook(
         severity: "error",
         field: "CodeHierarchy",
         message: "CodeHierarchy is missing.",
-      });
-      continue;
-    }
-    if (row.filledLevelColumns !== 1) {
-      issues.push({
-        ...where,
-        severity: "error",
-        field: "Level N Term",
-        message: `Expected exactly one filled "Level N Term" column, found ${row.filledLevelColumns}.`,
       });
       continue;
     }
@@ -221,7 +212,7 @@ export function validateParsedWorkbook(
       if (parentId === undefined) {
         issues.push({
           annex: row.annex,
-          sheet: row.sheetName,
+          sheet: row.annex,
           row: row.rowNumber,
           severity: "error",
           field: "CodeHierarchy",

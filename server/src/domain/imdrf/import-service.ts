@@ -22,7 +22,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, eq, lt, sql } from "drizzle-orm";
 import type { Database } from "../../db/client.js";
 import { imdrfImportStaging, imdrfReleases, imdrfTerms } from "../../db/schema/index.js";
-import { parseImdrfWorkbook } from "./parser.js";
+import { parseImdrfPayload } from "./parser.js";
 import type { AnnexSummary } from "./types.js";
 import { type ValidatedTerm, type ValidationIssue, validateParsedWorkbook } from "./validate.js";
 
@@ -36,6 +36,10 @@ export type ImportPreview = {
   total: number;
   issues: ValidationIssue[];
   ok: boolean;
+  /** Deepest `level` among validated terms (1-based). 0 when validation failed. */
+  maxLevel: number;
+  /** A handful of validated terms for the "preview terms" view — never every record. */
+  sample: ValidatedTerm[];
 };
 
 export type ImportOutcome =
@@ -75,7 +79,8 @@ async function sweepExpiredStaging(db: Database): Promise<void> {
 export async function previewImdrfImport(
   db: Database,
   input: {
-    buffer: Buffer;
+    /** The raw JSON text the administrator pasted, exactly as provided — never re-serialized. */
+    payload: string;
     releaseYear: number;
     documentCode: string | null;
     title: string | null;
@@ -85,7 +90,7 @@ export async function previewImdrfImport(
 ): Promise<ImportPreview> {
   await sweepExpiredStaging(db);
 
-  const parsed = await parseImdrfWorkbook(input.buffer);
+  const parsed = parseImdrfPayload(input.payload);
   const result = validateParsedWorkbook(parsed, input.releaseYear);
 
   if (!result.ok) {
@@ -101,6 +106,8 @@ export async function previewImdrfImport(
       total: 0,
       issues: result.issues,
       ok: false,
+      maxLevel: 0,
+      sample: [],
     };
   }
 
@@ -111,7 +118,9 @@ export async function previewImdrfImport(
     documentCode: input.documentCode,
     title: input.title,
     sourceFileName: input.sourceFileName,
-    workbookData: input.buffer,
+    // Stored as UTF-8 bytes in the existing `bytea` column, which previously held the uploaded
+    // workbook's bytes — same column, now holding the pasted JSON text instead.
+    workbookData: Buffer.from(input.payload, "utf8"),
     createdByUserId: input.actorUserId,
     expiresAt: new Date(Date.now() + STAGING_TTL_MS),
   });
@@ -126,6 +135,8 @@ export async function previewImdrfImport(
     total: result.total,
     issues: result.issues,
     ok: true,
+    maxLevel: result.terms.reduce((max, term) => Math.max(max, term.level), 0),
+    sample: result.terms.slice(0, 10),
   };
 }
 
@@ -192,7 +203,7 @@ export async function confirmImdrfImport(db: Database, token: string): Promise<I
       return { status: "invalid_token" as const };
     }
 
-    const parsed = await parseImdrfWorkbook(staged.workbookData);
+    const parsed = parseImdrfPayload(staged.workbookData.toString("utf8"));
     const result = validateParsedWorkbook(parsed, staged.releaseYear);
     if (!result.ok) return { status: "validation_failed" as const, issues: result.issues };
 

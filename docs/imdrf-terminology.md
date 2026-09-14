@@ -1,9 +1,13 @@
 # IMDRF terminology subsystem
 
-An isolated repository of IMDRF adverse-event terminology, imported by an administrator from the
-yearly workbook IMDRF publishes, and browsed read-only by every signed-in staff role. Built in two
-phases: Phase 1 (release repository + admin import/publish) and Phase 2 (the read-only sidebar).
-Phase 3 — connecting this data into F004 Section 3 — has not been built.
+An isolated repository of IMDRF adverse-event terminology, imported by an administrator by pasting
+the yearly JSON payload IMDRF publishes, and browsed read-only by every signed-in staff role. Built
+in two phases: Phase 1 (release repository + admin paste/validate/import/publish) and Phase 2 (the
+read-only sidebar). Phase 3 — connecting this data into F004 Section 3 — has not been built.
+
+The import path is paste-only: an administrator pastes the official IMDRF JSON payload verbatim
+into a textarea on `/imdrf/manage`. There is no file upload and no CLI/script import path — the
+server is the sole source of truth for validation, exactly as it would be for any other input.
 
 ## Why it is separate
 
@@ -20,9 +24,9 @@ assessment to a specific term is Phase 3's job.
 so on — identified by `release_year` (a business key, unique, not the primary key: the primary key
 is a UUID like every other table in this schema). A release has a lifecycle of exactly two states:
 
-- **draft** — uploaded and validated, but not yet what read-only consumers see. An administrator
-  may replace a draft's terms as many times as needed (re-uploading corrects mistakes) without
-  creating a second row for that year.
+- **draft** — pasted, validated and imported, but not yet what read-only consumers see. An
+  administrator may replace a draft's terms as many times as needed (re-pasting corrects mistakes)
+  without creating a second row for that year.
 - **published** — immutable. Once published, a release can never be re-imported over; the only way
   to change published terminology is to publish a later year.
 
@@ -35,9 +39,9 @@ query.
 `imdrf_terms` holds one row per term, at whatever depth its own annex actually has. Three fields
 carry the hierarchy:
 
-- `code_hierarchy` — the source workbook's own trail, e.g. `A01|A0101|A010101`, kept verbatim.
+- `code_hierarchy` — the source payload's own trail, e.g. `A01|A0101|A010101`, kept verbatim.
 - `level` — `code_hierarchy.split("|").length`, computed once at import time. Never hardcoded to a
-  maximum: the real 2026 workbook has annexes at depth 1 (Annex B), depth 2 (Annex D), and depth 3
+  maximum: the real 2026 payload has annexes at depth 1 (Annex B), depth 2 (Annex D), and depth 3
   (A, C, E, F, G) side by side, in the same two tables.
 - `parent_term_id` — a self-referencing foreign key, resolved at import time by matching a row's
   hierarchy-minus-its-last-segment against another row's own `code_hierarchy`.
@@ -47,12 +51,11 @@ reader never infers the annex from the first character of a code.
 
 ### Variable hierarchy depth
 
-See `server/src/domain/imdrf/parser.ts` and `validate.ts`. The parser detects each sheet's header
-row by content (a cell reading exactly `"Level 1 Term"`), not by row number — the real workbook's
-metadata rows are not laid out identically across sheets — and maps columns by normalized header
-text, tolerating the workbook's own inconsistencies (`"Non-IMDRF Code"` vs `"Non-IMDRF Code/Term"`,
-1–3 "Level N Term" columns per sheet). `level` is always derived from `code_hierarchy`, never from
-which "Level N Term" column held the text.
+See `server/src/domain/imdrf/parser.ts` and `validate.ts`. The parser reads the pasted JSON's
+`annexes` object (keyed `A`–`G`, each an array of term records) and maps fields by name, tolerating
+both camelCase and snake_case variants (`nonImdrfCode`/`non_imdrf_code`, etc.). `level` is always
+derived from `code_hierarchy.split("|").length` at validation time, never from anything the payload
+itself claims about depth — a payload cannot lie about a term's level by mislabeling it.
 
 ### Why `code` alone is not unique
 
@@ -67,7 +70,7 @@ is scoped by `release_id`, same as before.
 
 ### Retired terms
 
-`status` and `status_description` are preserved verbatim from the workbook, including values like
+`status` and `status_description` are preserved verbatim from the payload, including values like
 `"Retired (2020)"`, and are never dropped, filtered, or converted to a boolean. A retired term
 remains fully queryable and browsable — it is part of the historical record a release exists to
 keep, not dead data.
@@ -76,41 +79,49 @@ keep, not dead data.
 
 `server/src/domain/imdrf/import-service.ts` is the only writer. The flow:
 
-1. **Preview** (`previewImdrfImport`) — parses and validates an uploaded buffer. Never writes. On
-   success, holds the buffer in an in-memory, single-process, 15-minute-TTL map keyed by an opaque
-   token (documented limitation: this deployment runs one Fastify process, so this is sufficient;
-   see the "AE Reports locked architecture" note).
-2. **Confirm** (`confirmImdrfImport`) — consumes the token once, **re-parses and re-validates the
-   held buffer from scratch** (never trusts that nothing changed since the preview), then does the
+1. **Validate/Preview** (`previewImdrfImport`) — parses and validates the pasted JSON text (bounded
+   by `MAX_PAYLOAD_BYTES`, checked before `JSON.parse` ever runs). Never writes. On success ("
+   VALIDATION PASSED" / "READY TO IMPORT"), holds the payload text in `imdrf_import_staging`
+   (Postgres, not an in-memory map — a preview and its confirm can land on two different
+   application instances once this deployment scales past one), keyed by a hashed, single-use,
+   15-minute-TTL token. On failure ("IMPORT BLOCKED"), nothing is staged or written, and every
+   issue found is reported at once.
+2. **Import** (`confirmImdrfImport`) — consumes the token once, **re-parses and re-validates the
+   held payload from scratch** (never trusts that nothing changed since validation), then does the
    entire write — release row insert/update, term delete-then-reinsert for a replaced draft, bulk
    term insert — inside one `db.transaction`. A failure anywhere rolls the whole thing back: a
-   malformed 2027 workbook can never leave 2026's rows touched, and can never leave 2027 half
+   malformed 2027 payload can never leave 2026's rows touched, and can never leave 2027 half
    written.
-3. **Publish** (`publishImdrfRelease`) — a single conditional `UPDATE ... WHERE status = 'draft'`.
+3. **Publish** (`publishImdrfRelease`) — a single conditional `UPDATE ... WHERE status = 'draft'`,
+   a deliberately separate, explicit action from import: importing a new release never makes it
+   live on its own, and the previously published release for another year is untouched either way.
 
 ## Validation rules
 
-`server/src/domain/imdrf/validate.ts`, run in full before any write: annex must be one of A–G,
-`code`/`term`/`code_hierarchy` must be present, exactly one "Level N Term" column must be filled
-per row, the hierarchy's last segment must equal the row's own code, every non-root row's parent
-hierarchy must resolve to another row in the same workbook, the release year the workbook declares
-must match the year being imported, and `(code, code_hierarchy)` must be unique within the
-workbook. Every failure is collected (not just the first) and reported with the exact sheet, row,
-field and message — an administrator sees every problem in one upload rather than one per retry.
-A single error anywhere means zero terms are computed for insertion at all.
+`server/src/domain/imdrf/validate.ts`, run in full before any write: the payload must be valid
+JSON shaped as `{ releaseYear, annexes: { A: [...], ..., G: [...] } }`; annex keys must be one of
+A–G; `code`/`term`/`code_hierarchy` must be present on every record; the hierarchy's last segment
+must equal the row's own code; every non-root row's parent hierarchy must resolve to another row in
+the same payload; the release year the payload declares must match the year being imported; and
+`(code, code_hierarchy)` must be unique within the payload (duplicate-code detection). Every
+failure is collected (not just the first) and reported with the exact annex, row, field and
+message — an administrator sees every problem in one paste rather than one per retry. A single
+error anywhere means zero terms are computed for insertion at all — "IMPORT BLOCKED" is all-or-
+nothing.
 
 ## Admin permissions
 
-Everything under `/imdrf/manage/*` (`server/src/doors/staff/routes/imdrf-admin.tsx`) sits in the
+Everything under `/imdrf/manage/*` (`server/src/doors/staff/imdrf/routes/admin.tsx`) sits in the
 staff door's existing `administrator`-only scope (`doors/staff/index.ts`), beside `usersRoutes` and
 `activityRoutes`. No new authentication or authorization system — the existing `requireRole` guard,
 which refuses a manager or assessor with 403 before any handler runs, is what enforces this.
 
 ## How a future release is added
 
-An administrator opens `/imdrf/manage`, uploads the new year's `.xlsx`, reviews the preview (which
-shows per-annex counts and every validation issue, if any), confirms the import, and publishes it
-when ready. No CLI, no script, no deployment step — the whole workflow is the admin frontend.
+An administrator opens `/imdrf/manage`, pastes the new year's JSON payload verbatim, clicks
+Validate, reviews the result (per-annex counts, hierarchy depth, a sample of terms, and every
+validation issue if any), imports, and publishes it when ready. No file upload, no CLI, no script,
+no deployment step — the whole workflow is the admin frontend.
 
 ## What Phase 2 (the sidebar) consumes
 
@@ -118,7 +129,7 @@ when ready. No CLI, no script, no deployment step — the whole workflow is the 
 view and the sidebar use. Every function takes a `releaseId` and never queries across releases.
 `listTerms`/`searchTerms` page results (a clamped server-side `limit` plus an opaque cursor over
 `sort_order`) rather than loading a release's few thousand terms into memory or into the browser.
-The sidebar itself (`server/src/doors/staff/routes/imdrf.tsx`, `views/imdrf.tsx`,
+The sidebar itself (`server/src/doors/staff/imdrf/routes/imdrf.tsx`, `imdrf/pages/imdrf.tsx`,
 `public/imdrf-browser.js`) sits in the staff door's `active` scope — every signed-in, password-set
 role, the same nesting level as the reports index — because it is a reference tool, not a
 vigilance record. `requirePublishedRelease` is the one function every read-only handler calls

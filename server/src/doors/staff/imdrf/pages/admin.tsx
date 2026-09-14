@@ -1,13 +1,15 @@
 /**
- * The IMDRF terminology admin area: release tabs, one release's detail, and the upload workflow.
+ * The IMDRF terminology admin area: release tabs, one release's detail, and the paste workflow.
  *
  * Kept to the three pages the workflow actually has — list/detail, preview, and the temp-password
- * page's sibling for nothing secret — rather than a CMS. Upload never writes; only a POST to
- * `/imdrf/import` on the preview page does, and only when the preview itself reported no errors.
+ * page's sibling for nothing secret — rather than a CMS. Validating never writes; only a POST to
+ * `/imdrf/manage/import` on the preview page does, and only when validation itself reported no
+ * errors ("VALIDATION PASSED" / "READY TO IMPORT"). A failed validation renders "IMPORT BLOCKED"
+ * with the itemized errors instead — nothing is ever partially imported.
  *
  * Layout matches the rest of the door: the title bar carries the page name alone, `.staff-head`
  * carries the count, year switching is the same tab bar Workload already uses, and the selected
- * release sits beside the upload form rather than stacked under a second copy of the rail. No
+ * release sits beside the paste form rather than stacked under a second copy of the rail. No
  * inline styles — `style-src 'self'` would drop them.
  */
 
@@ -162,13 +164,13 @@ export function ImdrfAdminPage({
         )}
 
         <div class="card card-b">
-          <h2>Upload new release</h2>
+          <h2>Paste new release</h2>
           <p class="hint">
-            Uploading a year that already has a <b>draft</b> release replaces that draft's terms.
-            Uploading a year that is already <b>published</b> is refused — publish a new year
+            Pasting a year that already has a <b>draft</b> release replaces that draft's terms.
+            Pasting a year that is already <b>published</b> is refused — publish a new year
             instead.
           </p>
-          <form method="POST" action="/imdrf/manage/upload" enctype="multipart/form-data">
+          <form method="POST" action="/imdrf/manage/validate">
             <div class="f">
               <label for="release_year">
                 Release year <i>*</i>
@@ -204,14 +206,27 @@ export function ImdrfAdminPage({
               />
             </div>
             <div class="f">
-              <label for="workbook">
-                Workbook (.xlsx) <i>*</i>
+              <label for="payload">
+                IMDRF JSON payload <i>*</i>
               </label>
-              <input type="file" id="workbook" name="workbook" accept=".xlsx" required />
+              <p class="hint">
+                Do not edit the JSON. Paste the official IMDRF payload exactly as provided.
+              </p>
+              <textarea
+                id="payload"
+                name="payload"
+                required
+                rows="16"
+                spellcheck="false"
+                class="code-paste"
+                placeholder={
+                  '{\n  "releaseYear": 2026,\n  "documentCode": "IMDRF/AE WG/N43",\n  "title": "IMDRF Adverse Event Terminology",\n  "annexes": { "A": [ ... ], "B": [ ... ], "...": [] }\n}'
+                }
+              />
             </div>
             <div class="bar">
               <button type="submit" class="btn">
-                Validate &amp; preview
+                Validate
               </button>
             </div>
           </form>
@@ -250,6 +265,12 @@ export function ImdrfImportPreviewPage({
 
         {preview.ok ? (
           <>
+            <div class="alert alert-ok">
+              <b>VALIDATION PASSED</b> — {preview.total} term{preview.total === 1 ? "" : "s"}{" "}
+              across {preview.summary.filter((row) => row.count > 0).length} annex
+              {preview.summary.filter((row) => row.count > 0).length === 1 ? "" : "es"}, hierarchy
+              depth {preview.maxLevel}. <b>READY TO IMPORT.</b>
+            </div>
             <div class="tscroll">
               <table class="utable">
                 <thead>
@@ -277,11 +298,39 @@ export function ImdrfImportPreviewPage({
               </table>
             </div>
 
+            <details>
+              <summary>Preview terms ({preview.sample.length} of {preview.total} shown)</summary>
+              <div class="tscroll">
+                <table class="utable">
+                  <thead>
+                    <tr>
+                      <th>Annex</th>
+                      <th>Code</th>
+                      <th>Term</th>
+                      <th>Level</th>
+                      <th>CodeHierarchy</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {preview.sample.map((term) => (
+                      <tr>
+                        <td safe>{term.annex}</td>
+                        <td safe>{term.code}</td>
+                        <td safe>{term.term}</td>
+                        <td>{term.level}</td>
+                        <td safe>{term.codeHierarchy}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+
             <form method="POST" action="/imdrf/manage/import">
               <input type="hidden" name="token" value={preview.token} />
               <div class="bar">
                 <button type="submit" class="btn">
-                  Confirm import
+                  Import release
                 </button>
                 <a href="/imdrf/manage" class="btn ghost">
                   Cancel
@@ -292,13 +341,21 @@ export function ImdrfImportPreviewPage({
         ) : (
           <>
             <div class="alert alert-error">
-              This workbook cannot be imported. Fix the issues below and upload again.
+              <b>
+                IMPORT BLOCKED — {preview.issues.filter((issue) => issue.severity === "error").length}{" "}
+                error
+                {preview.issues.filter((issue) => issue.severity === "error").length === 1
+                  ? ""
+                  : "s"}
+              </b>
+              . Fix the issues below in the source payload and paste it again — nothing was
+              imported.
             </div>
             <div class="tscroll">
               <table class="utable">
                 <thead>
                   <tr>
-                    <th>Sheet</th>
+                    <th>Annex</th>
                     <th>Row</th>
                     <th>Field</th>
                     <th>Problem</th>

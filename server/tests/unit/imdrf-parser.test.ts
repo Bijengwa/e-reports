@@ -1,215 +1,139 @@
-import ExcelJS from "exceljs";
 import { describe, expect, it } from "vitest";
-import { parseImdrfWorkbook } from "../../src/domain/imdrf/parser.js";
+import { MAX_PAYLOAD_BYTES, parseImdrfPayload } from "../../src/domain/imdrf/parser.js";
 
-async function bufferOf(build: (wb: ExcelJS.Workbook) => void): Promise<Buffer> {
-  const wb = new ExcelJS.Workbook();
-  build(wb);
-  return Buffer.from(await wb.xlsx.writeBuffer());
+function payloadOf(annexes: Record<string, unknown[]>, releaseYear = 2026): string {
+  return JSON.stringify({
+    releaseYear,
+    documentCode: "IMDRF/AE WG/N43",
+    title: "IMDRF Adverse Event Terminology",
+    annexes,
+  });
 }
 
-function addAnnexA(wb: ExcelJS.Workbook): void {
-  const ws = wb.addWorksheet("A");
-  ws.addRow(["Annex Name: Annex A"]);
-  ws.addRow(["Annex Title: Medical Device Problem"]);
-  ws.addRow(["Release Number: 2026"]);
-  ws.addRow([]);
-  ws.addRow([]);
-  ws.addRow([]);
-  ws.addRow([]);
-  ws.addRow([
-    "Level 1 Term",
-    "Level 2 Term",
-    "Level 3 Term",
-    "Code",
-    "Definition",
-    "Non-IMDRF Code",
-    "Status",
-    "Status Description",
-    "CodeHierarchy",
-  ]);
-  ws.addRow(["Root Term", null, null, "A01", "def", null, null, null, "A01"]);
-  ws.addRow([null, "Child Term", null, "A0101", "def2", null, null, null, "A01|A0101"]);
-  ws.addRow([
-    null,
-    null,
-    "Grandchild Term",
-    "A010101",
-    "def3",
-    null,
-    "Retired (2020)",
-    "no longer used",
-    "A01|A0101|A010101",
-  ]);
-  ws.addRow([]); // trailing blank row, must be skipped silently
-}
+const rootTerm = {
+  term: "Root Term",
+  code: "A01",
+  definition: "def",
+  codeHierarchy: "A01",
+};
+const childTerm = {
+  term: "Child Term",
+  code: "A0101",
+  definition: "def2",
+  codeHierarchy: "A01|A0101",
+};
+const grandchildTerm = {
+  term: "Grandchild Term",
+  code: "A010101",
+  definition: "def3",
+  status: "Retired (2020)",
+  statusDescription: "no longer used",
+  codeHierarchy: "A01|A0101|A010101",
+};
 
-describe("parseImdrfWorkbook", () => {
-  it("discovers annex sheets by content and detects the header row by name, not position", async () => {
-    const buf = await bufferOf(addAnnexA);
-    const parsed = await parseImdrfWorkbook(buf);
+describe("parseImdrfPayload", () => {
+  it("parses a well-formed payload into flat rows keyed by annex", () => {
+    const parsed = parseImdrfPayload(payloadOf({ A: [rootTerm, childTerm, grandchildTerm] }));
     expect(parsed.issues.filter((i) => i.severity === "error")).toEqual([]);
     expect(parsed.rows).toHaveLength(3);
-  });
-
-  it("maps columns by header meaning, tolerating header text variants", async () => {
-    const buf = await bufferOf((wb) => {
-      const ws = wb.addWorksheet("C");
-      for (let i = 0; i < 7; i++) ws.addRow([]);
-      ws.addRow([
-        "Level 1 Term",
-        "Level 2 Term",
-        "Level 3 Term",
-        "Code",
-        "Definition",
-        "Non-IMDRF Code/Term",
-        "Status",
-        "Status Description",
-        "CodeHierarchy",
-      ]);
-      ws.addRow(["Root", null, null, "C01", "def", "MedDRA:1:x", null, null, "C01"]);
-    });
-    const parsed = await parseImdrfWorkbook(buf);
-    expect(parsed.rows[0]?.nonImdrfCode).toBe("MedDRA:1:x");
-  });
-
-  it("supports annexes with only a Level 1 column (shallow hierarchy)", async () => {
-    const buf = await bufferOf((wb) => {
-      const ws = wb.addWorksheet("B");
-      for (let i = 0; i < 7; i++) ws.addRow([]);
-      ws.addRow([
-        "Level 1 Term",
-        "Code",
-        "Definition",
-        "Non-IMDRF Code",
-        "Status",
-        "Status Description",
-        "CodeHierarchy",
-      ]);
-      ws.addRow(["Only level", "B01", "def", null, null, null, "B01"]);
-    });
-    const parsed = await parseImdrfWorkbook(buf);
-    expect(parsed.rows).toHaveLength(1);
-    expect(parsed.rows[0]?.code).toBe("B01");
-  });
-
-  it("captures Primary/Secondary Category only where the sheet has those columns", async () => {
-    const buf = await bufferOf((wb) => {
-      const ws = wb.addWorksheet("E");
-      for (let i = 0; i < 7; i++) ws.addRow([]);
-      ws.addRow([
-        "Level 1 Term",
-        "Level 2 Term",
-        "Level 3 Term",
-        "Code",
-        "Definition",
-        "Non-IMDRF Code",
-        "Primary Category",
-        "Secondary Category",
-        "Status",
-        "Status Description",
-        "CodeHierarchy",
-      ]);
-      ws.addRow(["Nervous System", null, null, "E01", "def", null, null, null, null, null, "E01"]);
-    });
-    const parsed = await parseImdrfWorkbook(buf);
-    expect(parsed.rows[0]?.primaryCategory).toBeNull();
-  });
-
-  it("ignores sheets that are not one of A-G", async () => {
-    const buf = await bufferOf((wb) => {
-      wb.addWorksheet("Cover Page").addRow(["Not terminology data"]);
-      addAnnexA(wb);
-    });
-    const parsed = await parseImdrfWorkbook(buf);
     expect(parsed.rows.every((r) => r.annex === "A")).toBe(true);
   });
 
-  it("reports a precise sheet+row error for a missing header row instead of throwing", async () => {
-    const buf = await bufferOf((wb) => {
-      wb.addWorksheet("D").addRow(["not a header row"]);
-    });
-    const parsed = await parseImdrfWorkbook(buf);
-    expect(parsed.issues.some((i) => i.severity === "error" && i.sheet === "D")).toBe(true);
+  it("maps camelCase and snake_case field variants to the same output field", () => {
+    const parsed = parseImdrfPayload(
+      payloadOf({
+        C: [
+          {
+            term: "Root",
+            code: "C01",
+            codeHierarchy: "C01",
+            non_imdrf_code: "MedDRA:1:x",
+          },
+        ],
+      }),
+    );
+    expect(parsed.rows[0]?.nonImdrfCode).toBe("MedDRA:1:x");
   });
 
-  it("records the release year found on each sheet for cross-checking against the import target", async () => {
-    const buf = await bufferOf(addAnnexA);
-    const parsed = await parseImdrfWorkbook(buf);
+  it("captures Primary/Secondary Category when the record has them", () => {
+    const parsed = parseImdrfPayload(
+      payloadOf({
+        E: [
+          {
+            term: "Nervous System",
+            code: "E01",
+            codeHierarchy: "E01",
+            primaryCategory: "Nervous System",
+          },
+        ],
+      }),
+    );
+    expect(parsed.rows[0]?.primaryCategory).toBe("Nervous System");
+  });
+
+  it("rejects invalid JSON with a structural error instead of throwing", () => {
+    const parsed = parseImdrfPayload("{ not json");
+    expect(parsed.issues.some((i) => i.severity === "error")).toBe(true);
+    expect(parsed.rows).toEqual([]);
+  });
+
+  it("rejects a payload that is not a JSON object", () => {
+    const parsed = parseImdrfPayload("[1, 2, 3]");
+    expect(parsed.issues.some((i) => i.severity === "error")).toBe(true);
+  });
+
+  it("requires releaseYear to be a whole number", () => {
+    const parsed = parseImdrfPayload(JSON.stringify({ releaseYear: "2026", annexes: {} }));
+    expect(parsed.issues.some((i) => i.field === "releaseYear")).toBe(true);
+    expect(parsed.releaseYearsFound.size).toBe(0);
+  });
+
+  it("requires annexes to be an object", () => {
+    const parsed = parseImdrfPayload(JSON.stringify({ releaseYear: 2026, annexes: [] }));
+    expect(parsed.issues.some((i) => i.field === "annexes")).toBe(true);
+  });
+
+  it("rejects an annex key outside A-G", () => {
+    const parsed = parseImdrfPayload(payloadOf({ H: [rootTerm] }));
+    expect(parsed.issues.some((i) => i.field === "annexes")).toBe(true);
+  });
+
+  it("records the release year the payload declares, for cross-checking against the import target", () => {
+    const parsed = parseImdrfPayload(payloadOf({ A: [rootTerm] }, 2026));
     expect(parsed.releaseYearsFound).toEqual(new Set([2026]));
   });
 
-  it("converts empty optional cells to null rather than empty strings", async () => {
-    const buf = await bufferOf(addAnnexA);
-    const parsed = await parseImdrfWorkbook(buf);
+  it("converts empty/missing optional fields to null rather than empty strings", () => {
+    const parsed = parseImdrfPayload(payloadOf({ A: [rootTerm] }));
     const root = parsed.rows.find((r) => r.code === "A01");
     expect(root?.nonImdrfCode).toBeNull();
     expect(root?.status).toBeNull();
   });
 
-  it("preserves source row ordering via sourceOrder", async () => {
-    const buf = await bufferOf(addAnnexA);
-    const parsed = await parseImdrfWorkbook(buf);
+  it("preserves source row ordering via sourceOrder", () => {
+    const parsed = parseImdrfPayload(payloadOf({ A: [rootTerm, childTerm, grandchildTerm] }));
     expect(parsed.rows.map((r) => r.sourceOrder)).toEqual([0, 1, 2]);
     expect(parsed.rows.map((r) => r.code)).toEqual(["A01", "A0101", "A010101"]);
   });
 
-  it("records every discovered A-G sheet in annexesFound", async () => {
-    const buf = await bufferOf((wb) => {
-      addAnnexA(wb);
-      const ws = wb.addWorksheet("B");
-      for (let i = 0; i < 7; i++) ws.addRow([]);
-      ws.addRow([
-        "Level 1 Term",
-        "Code",
-        "Definition",
-        "Non-IMDRF Code",
-        "Status",
-        "Status Description",
-        "CodeHierarchy",
-      ]);
-      ws.addRow(["Only level", "B01", "def", null, null, null, "B01"]);
-    });
-    const parsed = await parseImdrfWorkbook(buf);
-    expect(parsed.annexesFound).toEqual(new Set(["A", "B"]));
-  });
-
-  it("records an annex as found even when its terminology sheet is entirely empty", async () => {
-    const buf = await bufferOf((wb) => {
-      const ws = wb.addWorksheet("G");
-      for (let i = 0; i < 7; i++) ws.addRow([]);
-      ws.addRow([
-        "Level 1 Term",
-        "Level 2 Term",
-        "Level 3 Term",
-        "Code",
-        "Definition",
-        "Non-IMDRF Code",
-        "Status",
-        "Status Description",
-        "CodeHierarchy",
-      ]);
-      // Header row only — no terminology rows follow.
-    });
-    const parsed = await parseImdrfWorkbook(buf);
-    expect(parsed.annexesFound).toEqual(new Set(["G"]));
+  it("records every annex key present in annexesFound, even one with an empty array", () => {
+    const parsed = parseImdrfPayload(payloadOf({ A: [rootTerm], G: [] }));
+    expect(parsed.annexesFound).toEqual(new Set(["A", "G"]));
     expect(parsed.rows.filter((r) => r.annex === "G")).toHaveLength(0);
   });
 
-  it("records an annex as found even when its header row cannot be located", async () => {
-    const buf = await bufferOf((wb) => {
-      wb.addWorksheet("F").addRow(["not a header row"]);
-    });
-    const parsed = await parseImdrfWorkbook(buf);
-    expect(parsed.annexesFound).toEqual(new Set(["F"]));
+  it("reports a malformed (non-object) record without discarding the rest of the annex", () => {
+    const parsed = parseImdrfPayload(payloadOf({ A: [rootTerm, "not a record", childTerm] }));
+    expect(parsed.issues.some((i) => i.severity === "error" && i.row === 2)).toBe(true);
+    expect(parsed.rows.map((r) => r.code)).toEqual(["A01", "A0101"]);
   });
 
-  it("does not count an unrelated sheet as any annex", async () => {
-    const buf = await bufferOf((wb) => {
-      wb.addWorksheet("Cover Page").addRow(["Not terminology data"]);
-      wb.addWorksheet("Notes").addRow(["Also not terminology data"]);
-    });
-    const parsed = await parseImdrfWorkbook(buf);
-    expect(parsed.annexesFound.size).toBe(0);
+  it("rejects a payload whose byte size exceeds MAX_PAYLOAD_BYTES before attempting JSON.parse", () => {
+    const huge = "x".repeat(MAX_PAYLOAD_BYTES + 1024);
+    const parsed = parseImdrfPayload(huge);
+    expect(parsed.issues.some((i) => i.severity === "error" && i.message.includes("MB"))).toBe(
+      true,
+    );
+    expect(parsed.rows).toEqual([]);
   });
 });

@@ -6,7 +6,6 @@ import { validateParsedWorkbook } from "../../src/domain/imdrf/validate.js";
 function row(partial: Partial<ParsedRow> & { code: string; codeHierarchy: string }): ParsedRow {
   return {
     annex: "A",
-    sheetName: "A",
     rowNumber: 1,
     sourceOrder: 0,
     term: `Term ${partial.code}`,
@@ -16,7 +15,6 @@ function row(partial: Partial<ParsedRow> & { code: string; codeHierarchy: string
     statusDescription: null,
     primaryCategory: null,
     secondaryCategory: null,
-    filledLevelColumns: 1,
     ...partial,
   };
 }
@@ -136,12 +134,6 @@ describe("validateParsedWorkbook", () => {
     const result = validateParsedWorkbook(workbookOf(completeWith(rows)), 2026);
     if (!result.ok) throw new Error("expected ok");
     expect(result.terms.find((t) => t.code === "A01")?.status).toBe("Retired (2020)");
-  });
-
-  it("rejects a row with zero or more than one filled level column", () => {
-    const rows = [row({ code: "A01", codeHierarchy: "A01", filledLevelColumns: 0, rowNumber: 9 })];
-    const result = validateParsedWorkbook(workbookOf(rows), 2026);
-    expect(result.ok).toBe(false);
   });
 
   it("preserves sourceOrder as sortOrder on the output", () => {

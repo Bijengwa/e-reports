@@ -1,7 +1,6 @@
 import os from "node:os";
 import path from "node:path";
 import { sql } from "drizzle-orm";
-import ExcelJS from "exceljs";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { hashPassword } from "../../src/auth/password.js";
@@ -98,24 +97,19 @@ function act(url: string, cookie: string, body: Record<string, string> = {}) {
 
 const ALL_ANNEXES = ["A", "B", "C", "D", "E", "F", "G"] as const;
 
+type TermRecord = { code: string; term: string; hierarchy: string; status?: string };
+
 /**
- * A minimal but structurally real IMDRF workbook: one sheet per annex given, header row detected
- * by content (not a fixed row number), three "Level N Term" columns so any of levels 1-3 works.
+ * A minimal but structurally real IMDRF JSON payload: `releaseYear`, and `annexes` keyed A-G.
  *
- * Every annex not explicitly given gets one trivial padding row — validation now requires all
+ * Every annex not explicitly given gets one trivial padding record — validation requires all
  * seven to be present with at least one term each, and a test about (say) Annex A's hierarchy
  * logic should not also have to think about the other six.
  */
-async function workbookBuffer(
+function payloadOf(
   releaseYear: number,
-  annexTerms: Partial<
-    Record<
-      "A" | "B" | "C" | "D" | "E" | "F" | "G",
-      Array<{ code: string; term: string; hierarchy: string }>
-    >
-  >,
-): Promise<Buffer> {
-  const wb = new ExcelJS.Workbook();
+  annexTerms: Partial<Record<(typeof ALL_ANNEXES)[number], TermRecord[]>>,
+): string {
   const complete: typeof annexTerms = { ...annexTerms };
   for (const annex of ALL_ANNEXES) {
     if (!complete[annex]) {
@@ -123,79 +117,29 @@ async function workbookBuffer(
     }
   }
 
+  const annexes: Record<string, unknown[]> = {};
   for (const [annex, terms] of Object.entries(complete)) {
-    const ws = wb.addWorksheet(annex);
-    ws.addRow([`Annex Name: Annex ${annex}`]);
-    ws.addRow([`Release Number: ${releaseYear}`]);
-    for (let i = 0; i < 5; i++) ws.addRow([]);
-    ws.addRow([
-      "Level 1 Term",
-      "Level 2 Term",
-      "Level 3 Term",
-      "Code",
-      "Definition",
-      "Non-IMDRF Code",
-      "Status",
-      "Status Description",
-      "CodeHierarchy",
-    ]);
-    for (const t of terms ?? []) {
-      const level = t.hierarchy.split("|").length;
-      const row: (string | null)[] = [
-        null,
-        null,
-        null,
-        t.code,
-        "def",
-        null,
-        null,
-        null,
-        t.hierarchy,
-      ];
-      row[level - 1] = t.term;
-      ws.addRow(row);
-    }
+    annexes[annex] = (terms ?? []).map((t) => ({
+      term: t.term,
+      code: t.code,
+      definition: "def",
+      codeHierarchy: t.hierarchy,
+      status: t.status ?? null,
+    }));
   }
-  return Buffer.from(await wb.xlsx.writeBuffer());
+
+  return JSON.stringify({
+    releaseYear,
+    documentCode: "IMDRF/AE WG/N43",
+    title: "IMDRF Adverse Event Terminology",
+    annexes,
+  });
 }
 
-function multipartBody(
-  fields: Record<string, string>,
-  fileField: string,
-  fileName: string,
-  fileBuffer: Buffer,
-): { body: Buffer; contentType: string } {
-  const boundary = `----testBoundary${Math.random().toString(16).slice(2)}`;
-  const parts: Buffer[] = [];
-  for (const [name, value] of Object.entries(fields)) {
-    parts.push(
-      Buffer.from(
-        `--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`,
-      ),
-    );
-  }
-  parts.push(
-    Buffer.from(
-      `--${boundary}\r\nContent-Disposition: form-data; name="${fileField}"; filename="${fileName}"\r\nContent-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n`,
-    ),
-  );
-  parts.push(fileBuffer);
-  parts.push(Buffer.from(`\r\n--${boundary}--\r\n`));
-  return { body: Buffer.concat(parts), contentType: `multipart/form-data; boundary=${boundary}` };
-}
-
-async function upload(cookie: string, releaseYear: number, fileBuffer: Buffer) {
-  const { body, contentType } = multipartBody(
-    { release_year: String(releaseYear) },
-    "workbook",
-    "imdrf.xlsx",
-    fileBuffer,
-  );
-  return app.inject({
-    method: "POST",
-    url: "/imdrf/manage/upload",
-    headers: { host: STAFF_HOST, cookie, "content-type": contentType },
-    payload: body,
+async function validate(cookie: string, releaseYear: number, payload: string) {
+  return act("/imdrf/manage/validate", cookie, {
+    release_year: String(releaseYear),
+    payload,
   });
 }
 
@@ -215,27 +159,79 @@ async function termCount(): Promise<number> {
 const A_ROOT = { code: "A01", term: "Root Problem", hierarchy: "A01" };
 const A_CHILD = { code: "A0101", term: "Child Problem", hierarchy: "A01|A0101" };
 
-describe.skipIf(!INTEGRATION_ENABLED)("importing an IMDRF release", () => {
+describe.skipIf(!INTEGRATION_ENABLED)("importing an IMDRF release from a pasted JSON payload", () => {
   beforeEach(start);
 
-  it("previews a valid workbook with correct per-annex counts and no errors", async () => {
+  it("validates a well-formed payload with correct per-annex counts and no errors", async () => {
     const admin = await signedInAs("administrator");
-    const wb = await workbookBuffer(2026, { A: [A_ROOT, A_CHILD] });
+    const payload = payloadOf(2026, { A: [A_ROOT, A_CHILD] });
 
-    const res = await upload(admin.cookie, 2026, wb);
+    const res = await validate(admin.cookie, 2026, payload);
 
     expect(res.statusCode).toBe(200);
+    expect(res.body).toContain("VALIDATION PASSED");
+    expect(res.body).toContain("READY TO IMPORT");
     expect(res.body).toContain(">A<");
     // 2 from Annex A (A_ROOT, A_CHILD) + 1 padding row each for the other six annexes.
     expect(res.body).toContain("<b>8</b>");
     expect(tokenFrom(res.body)).toBeTruthy();
   });
 
-  it("confirming the preview creates a draft release with correct level/parent/sortOrder", async () => {
+  it("blocks invalid JSON syntax without writing anything", async () => {
     const admin = await signedInAs("administrator");
-    const wb = await workbookBuffer(2026, { A: [A_ROOT, A_CHILD] });
+    const res = await validate(admin.cookie, 2026, "{ this is not json");
 
-    const preview = await upload(admin.cookie, 2026, wb);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain("IMPORT BLOCKED");
+    expect(tokenFrom(res.body)).toBeUndefined();
+    expect(await termCount()).toBe(0);
+  });
+
+  it("blocks a payload with duplicate CodeHierarchy values", async () => {
+    const admin = await signedInAs("administrator");
+    const payload = payloadOf(2026, {
+      A: [A_ROOT, { code: "A01", term: "Duplicate", hierarchy: "A01" }],
+    });
+
+    const res = await validate(admin.cookie, 2026, payload);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain("IMPORT BLOCKED");
+    expect(res.body).toContain("duplicate");
+    expect(tokenFrom(res.body)).toBeUndefined();
+  });
+
+  it("blocks a payload with a missing/invalid parent reference, writing zero rows", async () => {
+    const admin = await signedInAs("administrator");
+    const payload = payloadOf(2026, { A: [A_CHILD] }); // A0101 with no A01 root present
+
+    const res = await validate(admin.cookie, 2026, payload);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain("IMPORT BLOCKED");
+    expect(tokenFrom(res.body)).toBeUndefined();
+    expect(await termCount()).toBe(0);
+    expect(await owner.db.execute(sql`SELECT id FROM imdrf_releases`)).toHaveLength(0);
+  });
+
+  it("blocks a payload containing a malformed (non-object) record", async () => {
+    const admin = await signedInAs("administrator");
+    const raw = payloadOf(2026, { A: [A_ROOT] });
+    const parsed = JSON.parse(raw);
+    parsed.annexes.A.push("not a record");
+
+    const res = await validate(admin.cookie, 2026, JSON.stringify(parsed));
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain("IMPORT BLOCKED");
+    expect(tokenFrom(res.body)).toBeUndefined();
+  });
+
+  it("confirming a valid preview creates a draft release with correct level/parent/sortOrder", async () => {
+    const admin = await signedInAs("administrator");
+    const payload = payloadOf(2026, { A: [A_ROOT, A_CHILD] });
+
+    const preview = await validate(admin.cookie, 2026, payload);
     const token = tokenFrom(preview.body) as string;
     const confirm = await confirmImport(admin.cookie, token);
 
@@ -263,18 +259,22 @@ describe.skipIf(!INTEGRATION_ENABLED)("importing an IMDRF release", () => {
   it("lets two release years coexist without touching each other's terms", async () => {
     const admin = await signedInAs("administrator");
 
-    const wb2026 = await workbookBuffer(2026, { A: [A_ROOT] });
     await confirmImport(
       admin.cookie,
-      tokenFrom((await upload(admin.cookie, 2026, wb2026)).body) as string,
+      tokenFrom((await validate(admin.cookie, 2026, payloadOf(2026, { A: [A_ROOT] }))).body) as string,
     );
 
-    const wb2027 = await workbookBuffer(2027, {
-      A: [{ code: "A02", term: "Other", hierarchy: "A02" }],
-    });
     await confirmImport(
       admin.cookie,
-      tokenFrom((await upload(admin.cookie, 2027, wb2027)).body) as string,
+      tokenFrom(
+        (
+          await validate(
+            admin.cookie,
+            2027,
+            payloadOf(2027, { A: [{ code: "A02", term: "Other", hierarchy: "A02" }] }),
+          )
+        ).body,
+      ) as string,
     );
 
     const releases = await owner.db.execute(
@@ -294,18 +294,22 @@ describe.skipIf(!INTEGRATION_ENABLED)("importing an IMDRF release", () => {
   it("re-importing a still-draft release replaces its terms rather than duplicating the release row", async () => {
     const admin = await signedInAs("administrator");
 
-    const first = await workbookBuffer(2026, { A: [A_ROOT] });
     await confirmImport(
       admin.cookie,
-      tokenFrom((await upload(admin.cookie, 2026, first)).body) as string,
+      tokenFrom((await validate(admin.cookie, 2026, payloadOf(2026, { A: [A_ROOT] }))).body) as string,
     );
 
-    const second = await workbookBuffer(2026, {
-      A: [{ code: "A99", term: "Replaced", hierarchy: "A99" }],
-    });
     await confirmImport(
       admin.cookie,
-      tokenFrom((await upload(admin.cookie, 2026, second)).body) as string,
+      tokenFrom(
+        (
+          await validate(
+            admin.cookie,
+            2026,
+            payloadOf(2026, { A: [{ code: "A99", term: "Replaced", hierarchy: "A99" }] }),
+          )
+        ).body,
+      ) as string,
     );
 
     const releases = await owner.db.execute(
@@ -319,10 +323,9 @@ describe.skipIf(!INTEGRATION_ENABLED)("importing an IMDRF release", () => {
 
   it("publishing sets status/published_at, and refuses a second publish", async () => {
     const admin = await signedInAs("administrator");
-    const wb = await workbookBuffer(2026, { A: [A_ROOT] });
     const confirm = await confirmImport(
       admin.cookie,
-      tokenFrom((await upload(admin.cookie, 2026, wb)).body) as string,
+      tokenFrom((await validate(admin.cookie, 2026, payloadOf(2026, { A: [A_ROOT] }))).body) as string,
     );
     const releaseId = (confirm.headers.location as string).split("release=")[1];
 
@@ -339,22 +342,53 @@ describe.skipIf(!INTEGRATION_ENABLED)("importing an IMDRF release", () => {
     expect(again.statusCode).toBe(409);
   });
 
+  it("importing a new draft release does not automatically publish it or replace the currently live release", async () => {
+    const admin = await signedInAs("administrator");
+    const firstConfirm = await confirmImport(
+      admin.cookie,
+      tokenFrom((await validate(admin.cookie, 2026, payloadOf(2026, { A: [A_ROOT] }))).body) as string,
+    );
+    const firstId = (firstConfirm.headers.location as string).split("release=")[1];
+    await act(`/imdrf/manage/${firstId}/publish`, admin.cookie);
+
+    const secondConfirm = await confirmImport(
+      admin.cookie,
+      tokenFrom(
+        (
+          await validate(
+            admin.cookie,
+            2027,
+            payloadOf(2027, { A: [{ code: "A02", term: "Other", hierarchy: "A02" }] }),
+          )
+        ).body,
+      ) as string,
+    );
+    const secondId = (secondConfirm.headers.location as string).split("release=")[1];
+
+    const rows = await owner.db.execute(
+      sql`SELECT id, status FROM imdrf_releases WHERE id IN (${firstId}, ${secondId})`,
+    );
+    const byId = new Map(rows.map((r) => [(r as { id: string }).id, (r as { status: string }).status]));
+    expect(byId.get(firstId)).toBe("published");
+    expect(byId.get(secondId)).toBe("draft");
+  });
+
   it("refuses to import over an already-published release, leaving its rows unchanged", async () => {
     const admin = await signedInAs("administrator");
-    const wb = await workbookBuffer(2026, { A: [A_ROOT] });
     const confirm = await confirmImport(
       admin.cookie,
-      tokenFrom((await upload(admin.cookie, 2026, wb)).body) as string,
+      tokenFrom((await validate(admin.cookie, 2026, payloadOf(2026, { A: [A_ROOT] }))).body) as string,
     );
     const releaseId = (confirm.headers.location as string).split("release=")[1];
     await act(`/imdrf/manage/${releaseId}/publish`, admin.cookie);
 
     const before = await owner.db.execute(sql`SELECT code FROM imdrf_terms`);
 
-    const replacement = await workbookBuffer(2026, {
-      A: [{ code: "A99", term: "Should not land", hierarchy: "A99" }],
-    });
-    const preview = await upload(admin.cookie, 2026, replacement);
+    const preview = await validate(
+      admin.cookie,
+      2026,
+      payloadOf(2026, { A: [{ code: "A99", term: "Should not land", hierarchy: "A99" }] }),
+    );
     const token = tokenFrom(preview.body) as string;
     const confirmAgain = await confirmImport(admin.cookie, token);
 
@@ -364,27 +398,14 @@ describe.skipIf(!INTEGRATION_ENABLED)("importing an IMDRF release", () => {
     expect(after).toEqual(before);
   });
 
-  it("rejects a workbook with a missing parent, writing zero rows", async () => {
-    const admin = await signedInAs("administrator");
-    const wb = await workbookBuffer(2026, { A: [A_CHILD] }); // A0101 with no A01 root present
-
-    const res = await upload(admin.cookie, 2026, wb);
-
-    expect(res.statusCode).toBe(200);
-    expect(tokenFrom(res.body)).toBeUndefined();
-    expect(res.body).toContain("cannot be imported");
-    expect(await termCount()).toBe(0);
-    expect(await owner.db.execute(sql`SELECT id FROM imdrf_releases`)).toHaveLength(0);
-  });
-
   it("refuses a manager and an assessor every admin action", async () => {
     const admin = await signedInAs("administrator");
-    const wb = await workbookBuffer(2026, { A: [A_ROOT] });
+    const payload = payloadOf(2026, { A: [A_ROOT] });
 
     for (const role of ["manager", "assessor"] as const) {
       const { cookie } = await signedInAs(role);
       expect((await get("/imdrf/manage", cookie)).statusCode).toBe(403);
-      expect((await upload(cookie, 2026, wb)).statusCode).toBe(403);
+      expect((await validate(cookie, 2026, payload)).statusCode).toBe(403);
       expect((await act("/imdrf/manage/import", cookie, { token: "anything" })).statusCode).toBe(
         403,
       );
@@ -392,6 +413,11 @@ describe.skipIf(!INTEGRATION_ENABLED)("importing an IMDRF release", () => {
 
     expect(await termCount()).toBe(0);
     expect((await get("/imdrf/manage", admin.cookie)).statusCode).toBe(200);
+  });
+
+  it("rejects an unsigned-in request with a redirect rather than a 200", async () => {
+    const res = await get("/imdrf/manage", "");
+    expect(res.statusCode).toBe(302);
   });
 
   it("renders the manage page with the same title bar as every other staff page, and no inline styles", async () => {

@@ -603,6 +603,23 @@ textarea:focus-visible,
   color: var(--flag);
 }
 
+.alert-ok {
+  border-color: var(--green);
+  background: var(--green-bg);
+  color: var(--green-d);
+}
+
+/* Monospace paste box for the IMDRF admin JSON-paste workflow — keeps a large pasted payload
+   readable and visually distinct from ordinary short text fields. */
+.code-paste {
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  white-space: pre;
+  overflow-x: auto;
+  resize: vertical;
+}
+
 .login-form .field {
   margin-bottom: 14px;
 }
@@ -931,6 +948,12 @@ textarea[aria-invalid="true"] {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* The title bar's one optional badge — the F004 header's own `Countdown` today. `flex: none` so
+   it never shrinks or wraps; `h1`'s ellipsis gives way to it first, on the same fixed-height bar. */
+.top > .countdown {
+  flex: none;
 }
 
 /*
