@@ -29,8 +29,7 @@ const TargetId = z.uuid();
 const INVALID_YEAR = "Enter a release year between 2000 and 2100.";
 const NO_PAYLOAD = "Paste the IMDRF JSON payload before validating.";
 const PAYLOAD_TOO_LARGE = `The pasted payload exceeds the ${(MAX_PAYLOAD_BYTES / (1024 * 1024)).toFixed(0)} MB limit.`;
-const EXPIRED_TOKEN =
-  "That import link has expired or was already used. Paste the payload again.";
+const EXPIRED_TOKEN = "That import link has expired or was already used. Paste the payload again.";
 const ALREADY_PUBLISHED = "That release is already published and cannot be replaced.";
 const RELEASE_NOT_FOUND = "That release no longer exists.";
 

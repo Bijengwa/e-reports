@@ -132,14 +132,21 @@ export function parseImdrfPayload(payloadText: string): ParsedWorkbook {
 
   const releaseYearRaw = parsed.releaseYear;
   if (typeof releaseYearRaw !== "number" || !Number.isInteger(releaseYearRaw)) {
-    issues.push(structuralIssue('"releaseYear" is required and must be a whole number.', "releaseYear"));
+    issues.push(
+      structuralIssue('"releaseYear" is required and must be a whole number.', "releaseYear"),
+    );
   } else {
     releaseYearsFound.add(releaseYearRaw);
   }
 
   const annexesRaw = parsed.annexes;
   if (!isPlainObject(annexesRaw)) {
-    issues.push(structuralIssue('"annexes" is required and must be an object keyed by annex letter (A-G).', "annexes"));
+    issues.push(
+      structuralIssue(
+        '"annexes" is required and must be an object keyed by annex letter (A-G).',
+        "annexes",
+      ),
+    );
     return { rows, issues, releaseYearsFound, annexesFound };
   }
 
@@ -147,7 +154,10 @@ export function parseImdrfPayload(payloadText: string): ParsedWorkbook {
     const normalized = key.trim().toUpperCase();
     if (!isAnnex(normalized)) {
       issues.push(
-        structuralIssue(`"annexes" has an unrecognized key "${key}"; expected one of ${ANNEXES.join(", ")}.`, "annexes"),
+        structuralIssue(
+          `"annexes" has an unrecognized key "${key}"; expected one of ${ANNEXES.join(", ")}.`,
+          "annexes",
+        ),
       );
       continue;
     }
@@ -157,7 +167,10 @@ export function parseImdrfPayload(payloadText: string): ParsedWorkbook {
 
     if (!Array.isArray(list)) {
       issues.push(
-        structuralIssue(`"annexes.${key}" must be an array of terminology records.`, `annexes.${key}`),
+        structuralIssue(
+          `"annexes.${key}" must be an array of terminology records.`,
+          `annexes.${key}`,
+        ),
       );
       continue;
     }

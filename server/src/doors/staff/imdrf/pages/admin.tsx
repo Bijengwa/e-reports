@@ -167,8 +167,7 @@ export function ImdrfAdminPage({
           <h2>Paste new release</h2>
           <p class="hint">
             Pasting a year that already has a <b>draft</b> release replaces that draft's terms.
-            Pasting a year that is already <b>published</b> is refused — publish a new year
-            instead.
+            Pasting a year that is already <b>published</b> is refused — publish a new year instead.
           </p>
           <form method="POST" action="/imdrf/manage/validate">
             <div class="f">
@@ -266,8 +265,8 @@ export function ImdrfImportPreviewPage({
         {preview.ok ? (
           <>
             <div class="alert alert-ok">
-              <b>VALIDATION PASSED</b> — {preview.total} term{preview.total === 1 ? "" : "s"}{" "}
-              across {preview.summary.filter((row) => row.count > 0).length} annex
+              <b>VALIDATION PASSED</b> — {preview.total} term{preview.total === 1 ? "" : "s"} across{" "}
+              {preview.summary.filter((row) => row.count > 0).length} annex
               {preview.summary.filter((row) => row.count > 0).length === 1 ? "" : "es"}, hierarchy
               depth {preview.maxLevel}. <b>READY TO IMPORT.</b>
             </div>
@@ -299,7 +298,9 @@ export function ImdrfImportPreviewPage({
             </div>
 
             <details>
-              <summary>Preview terms ({preview.sample.length} of {preview.total} shown)</summary>
+              <summary>
+                Preview terms ({preview.sample.length} of {preview.total} shown)
+              </summary>
               <div class="tscroll">
                 <table class="utable">
                   <thead>
@@ -342,8 +343,8 @@ export function ImdrfImportPreviewPage({
           <>
             <div class="alert alert-error">
               <b>
-                IMPORT BLOCKED — {preview.issues.filter((issue) => issue.severity === "error").length}{" "}
-                error
+                IMPORT BLOCKED —{" "}
+                {preview.issues.filter((issue) => issue.severity === "error").length} error
                 {preview.issues.filter((issue) => issue.severity === "error").length === 1
                   ? ""
                   : "s"}
@@ -386,8 +387,3 @@ export function ImdrfImportPreviewPage({
     </StaffShell>
   );
 }
-
-
-
-
-

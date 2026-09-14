@@ -6,23 +6,23 @@ import { assessmentRoutes } from "./assessment/routes/assessment.js";
 import { assessmentCommentRoutes } from "./assessment/routes/assessment-comments.js";
 import { assessmentReviewRoutes } from "./assessment/routes/assessment-review.js";
 import { myAssessmentsRoutes } from "./assessment/routes/assessments.js";
+import { firstAssessorRoutes } from "./assessment/routes/first-assessor.js";
 import { changePasswordRoutes } from "./auth/routes/change-password.js";
+import { loginRoutes } from "./auth/routes/login.js";
+import { logoutRoutes } from "./auth/routes/logout.js";
 import { dashboardRoutes } from "./dashboard/routes/dashboard.js";
 import { decisionRoutes } from "./decisions/routes/decisions.js";
 import { finalDocumentRoutes } from "./final-reports/routes/final-document.js";
 import { finalReportsRoutes } from "./final-reports/routes/final-reports.js";
-import { firstAssessorRoutes } from "./assessment/routes/first-assessor.js";
-import { imdrfBrowserRoutes } from "./imdrf/routes/imdrf.js";
 import { imdrfAdminRoutes } from "./imdrf/routes/admin.js";
-import { loginRoutes } from "./auth/routes/login.js";
-import { logoutRoutes } from "./auth/routes/logout.js";
+import { imdrfBrowserRoutes } from "./imdrf/routes/imdrf.js";
 import { myWorkRoutes } from "./my-work/routes/my-work.js";
-import { newReportRoutes } from "./reports/routes/new-report.js";
 import { registerRoutes } from "./register/routes/register.js";
+import { newReportRoutes } from "./reports/routes/new-report.js";
 import { reportsRoutes } from "./reports/routes/reports.js";
+import { requirePasswordChanged, requireRole, requireSession } from "./session-guard.js";
 import { usersRoutes } from "./users/routes/users.js";
 import { workloadRoutes } from "./workload/routes/workload.js";
-import { requirePasswordChanged, requireRole, requireSession } from "./session-guard.js";
 
 export type StaffDoorOptions = {
   host: string;
@@ -184,6 +184,3 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
     });
   });
 }
-
-
-
