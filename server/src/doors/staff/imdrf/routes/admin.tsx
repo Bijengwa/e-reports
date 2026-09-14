@@ -73,7 +73,9 @@ function renderImportPage(
   const session = currentSession(request);
   reply
     .status(status)
-    .html(<ImdrfImportPage error={error} viewerRole={session.role} viewerName={session.fullName} />);
+    .html(
+      <ImdrfImportPage error={error} viewerRole={session.role} viewerName={session.fullName} />,
+    );
 }
 
 function nonEmpty(value: string | null | undefined): string | null {

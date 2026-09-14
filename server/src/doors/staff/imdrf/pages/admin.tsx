@@ -15,9 +15,14 @@
  */
 
 import type { ImportPreview } from "../../../../domain/imdrf/import-service.js";
-import type { ValidationIssue } from "../../../../domain/imdrf/validate.js";
 import type { ReleaseSummary } from "../../../../domain/imdrf/query-service.js";
-import { ANNEX_DESCRIPTIONS, ANNEXES, type Annex, type AnnexSummary } from "../../../../domain/imdrf/types.js";
+import {
+  ANNEX_DESCRIPTIONS,
+  ANNEXES,
+  type Annex,
+  type AnnexSummary,
+} from "../../../../domain/imdrf/types.js";
+import type { ValidationIssue } from "../../../../domain/imdrf/validate.js";
 import { StaffShell } from "../../shared/shell.js";
 
 const DEFAULT_DOCUMENT_CODE = "IMDRF/AE WG/N43";
@@ -179,7 +184,11 @@ export type ImdrfImportPageProps = {
   viewerName: string;
 };
 
-export function ImdrfImportPage({ error, viewerRole, viewerName }: ImdrfImportPageProps): JSX.Element {
+export function ImdrfImportPage({
+  error,
+  viewerRole,
+  viewerName,
+}: ImdrfImportPageProps): JSX.Element {
   return (
     <StaffShell
       title="Import IMDRF release — AE Reports"
@@ -240,7 +249,9 @@ export function ImdrfImportPage({ error, viewerRole, viewerName }: ImdrfImportPa
             <label for="payload">
               IMDRF JSON payload <i>*</i>
             </label>
-            <p class="hint">Paste the official IMDRF JSON exactly as provided. Do not edit the payload.</p>
+            <p class="hint">
+              Paste the official IMDRF JSON exactly as provided. Do not edit the payload.
+            </p>
             <textarea
               id="payload"
               name="payload"
@@ -277,7 +288,9 @@ export type ImdrfImportPreviewPageProps = {
   viewerName: string;
 };
 
-function issuesByAnnex(issues: ValidationIssue[]): { annex: Annex | null; issues: ValidationIssue[] }[] {
+function issuesByAnnex(
+  issues: ValidationIssue[],
+): { annex: Annex | null; issues: ValidationIssue[] }[] {
   const groups = new Map<Annex | null, ValidationIssue[]>();
   for (const issue of issues) {
     const key = issue.annex;
@@ -286,7 +299,8 @@ function issuesByAnnex(issues: ValidationIssue[]): { annex: Annex | null; issues
     groups.set(key, list);
   }
   const ordered: { annex: Annex | null; issues: ValidationIssue[] }[] = [];
-  if (groups.has(null)) ordered.push({ annex: null, issues: groups.get(null) as ValidationIssue[] });
+  if (groups.has(null))
+    ordered.push({ annex: null, issues: groups.get(null) as ValidationIssue[] });
   for (const annex of ANNEXES) {
     if (groups.has(annex)) ordered.push({ annex, issues: groups.get(annex) as ValidationIssue[] });
   }
@@ -414,7 +428,9 @@ export function ImdrfImportPreviewPage({
             return (
               <div class="card card-b">
                 <h2 safe>
-                  {group.annex ? `Annex ${group.annex} — ${ANNEX_DESCRIPTIONS[group.annex]}` : "Payload"}
+                  {group.annex
+                    ? `Annex ${group.annex} — ${ANNEX_DESCRIPTIONS[group.annex]}`
+                    : "Payload"}
                 </h2>
                 <p class="hint">
                   {errorCount} error{errorCount === 1 ? "" : "s"}

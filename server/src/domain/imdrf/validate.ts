@@ -78,7 +78,11 @@ export function validateParsedPayload(
 ): ValidationResult {
   const issues: ValidationIssue[] = [...parsed.issues];
 
-  if (!Number.isInteger(expectedReleaseYear) || expectedReleaseYear < MIN_YEAR || expectedReleaseYear > MAX_YEAR) {
+  if (
+    !Number.isInteger(expectedReleaseYear) ||
+    expectedReleaseYear < MIN_YEAR ||
+    expectedReleaseYear > MAX_YEAR
+  ) {
     issues.push({
       severity: "error",
       annex: null,
@@ -122,11 +126,21 @@ export function validateParsedPayload(
       continue;
     }
     if (row.code === null) {
-      issues.push({ ...where, severity: "error", field: "code", message: "Field \"code\" is missing." });
+      issues.push({
+        ...where,
+        severity: "error",
+        field: "code",
+        message: 'Field "code" is missing.',
+      });
       continue;
     }
     if (row.term === null) {
-      issues.push({ ...where, severity: "error", field: "term", message: "Field \"term\" is missing." });
+      issues.push({
+        ...where,
+        severity: "error",
+        field: "term",
+        message: 'Field "term" is missing.',
+      });
       continue;
     }
     if (row.codeHierarchy === null) {

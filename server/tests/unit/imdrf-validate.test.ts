@@ -78,7 +78,12 @@ describe("validateParsedPayload: code vs codeHierarchy uniqueness", () => {
   it("allows the same real code to recur at a different hierarchy position (Annex E cross-listing)", () => {
     // E0104 "Cerebral Hyperperfusion Syndrome" genuinely appears at both E01|E0104 and E05|E0104
     // in the real 2026 export — confirmed by grepping the source file (4 occurrences of E0104).
-    const records = [...singleAnnexE, singleAnnexE05Root, crossListedE0104UnderE01, crossListedE0104UnderE05];
+    const records = [
+      ...singleAnnexE,
+      singleAnnexE05Root,
+      crossListedE0104UnderE01,
+      crossListedE0104UnderE05,
+    ];
     const result = parseAndValidate(records);
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error("expected ok");
@@ -95,9 +100,9 @@ describe("validateParsedPayload: code vs codeHierarchy uniqueness", () => {
     const result = parseAndValidate(records);
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error("expected failure");
-    expect(result.issues.some((i) => i.field === "codehierarchy" && i.message.includes("duplicate"))).toBe(
-      true,
-    );
+    expect(
+      result.issues.some((i) => i.field === "codehierarchy" && i.message.includes("duplicate")),
+    ).toBe(true);
   });
 });
 

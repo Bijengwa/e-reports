@@ -211,7 +211,8 @@ export function parseImdrfPayload(payloadText: string): ParsedPayload {
   const isConsolidated = rows.some(
     (row) => row.code !== null && row.code.length === 1 && row.codeHierarchy === row.code,
   );
-  const shape: PayloadShape | null = annexesFound.size === 0 ? null : isConsolidated ? "consolidated" : "single-annex";
+  const shape: PayloadShape | null =
+    annexesFound.size === 0 ? null : isConsolidated ? "consolidated" : "single-annex";
 
   // A single-annex payload (no root markers found) is expected to hold exactly one annex. Real
   // IMDRF exports never mix annexes without the root markers, so any record whose own annex

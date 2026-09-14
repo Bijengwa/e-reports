@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { MAX_PAYLOAD_BYTES, describePayloadShape, parseImdrfPayload } from "../../src/domain/imdrf/parser.js";
+import {
+  describePayloadShape,
+  MAX_PAYLOAD_BYTES,
+  parseImdrfPayload,
+} from "../../src/domain/imdrf/parser.js";
 import {
   consolidatedAnnexA,
   consolidatedFragment,
@@ -83,7 +87,9 @@ describe("parseImdrfPayload", () => {
   it("rejects a payload whose byte size exceeds MAX_PAYLOAD_BYTES before attempting JSON.parse", () => {
     const huge = "x".repeat(MAX_PAYLOAD_BYTES + 1024);
     const parsed = parseImdrfPayload(huge);
-    expect(parsed.issues.some((i) => i.severity === "error" && i.message.includes("MB"))).toBe(true);
+    expect(parsed.issues.some((i) => i.severity === "error" && i.message.includes("MB"))).toBe(
+      true,
+    );
     expect(parsed.rows).toEqual([]);
   });
 

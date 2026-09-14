@@ -248,15 +248,22 @@ describe.skipIf(!INTEGRATION_ENABLED)(
       await confirmImport(
         admin.cookie,
         tokenFrom(
-          (await validate(admin.cookie, 2027, payloadOf([{ ...A_ROOT, code: "A02", codehierarchy: "A02" }])))
-            .body,
+          (
+            await validate(
+              admin.cookie,
+              2027,
+              payloadOf([{ ...A_ROOT, code: "A02", codehierarchy: "A02" }]),
+            )
+          ).body,
         ) as string,
       );
 
       const releases = await owner.db.execute(
         sql`SELECT release_year FROM imdrf_releases ORDER BY release_year`,
       );
-      expect(releases.map((r) => (r as { release_year: number }).release_year)).toEqual([2026, 2027]);
+      expect(releases.map((r) => (r as { release_year: number }).release_year)).toEqual([
+        2026, 2027,
+      ]);
       expect(await termCount()).toBe(2);
 
       const y2026 = await owner.db.execute(sql`
@@ -351,7 +358,9 @@ describe.skipIf(!INTEGRATION_ENABLED)(
         expect((await get("/imdrf/manage", cookie)).statusCode).toBe(403);
         expect((await get("/imdrf/manage/import", cookie)).statusCode).toBe(403);
         expect((await validate(cookie, 2026, payload)).statusCode).toBe(403);
-        expect((await act("/imdrf/manage/import", cookie, { token: "anything" })).statusCode).toBe(403);
+        expect((await act("/imdrf/manage/import", cookie, { token: "anything" })).statusCode).toBe(
+          403,
+        );
       }
 
       expect(await termCount()).toBe(0);

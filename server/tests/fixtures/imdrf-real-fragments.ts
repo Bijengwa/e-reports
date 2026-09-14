@@ -184,7 +184,8 @@ export const singleAnnexC = [
   {
     code: "C01",
     term: "Biological Problem Identified",
-    definition: "Problems relating to, caused by or affecting biological processes or living organisms.",
+    definition:
+      "Problems relating to, caused by or affecting biological processes or living organisms.",
     "non-IMDRF code": "",
     status: "",
     "status description": "",
@@ -335,7 +336,8 @@ export const singleAnnexF = [
       "A reduction in or complete loss of the desirable and beneficial effects resulting from a medical treatment.",
     "non-IMDRF code": "",
     status: "Modified (technical)",
-    "status description": "Definition modified for Release Number 2026. See no. 114 of Change Request Log",
+    "status description":
+      "Definition modified for Release Number 2026. See no. 114 of Change Request Log",
     codehierarchy: "F01|F0101",
   },
 ] as const;
