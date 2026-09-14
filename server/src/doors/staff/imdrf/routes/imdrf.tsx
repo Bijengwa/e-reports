@@ -12,11 +12,13 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
-  annexSummary,
-  getRelease,
-  getTerm,
+  annexSummaryCached,
+  getReleaseCached,
+  getTermCached,
+  getTermLineageCached,
+} from "../../../../domain/imdrf/cached-query-service.js";
+import {
   getTermByCode,
-  getTermLineage,
   listPublishedReleases,
   listTerms,
   searchTerms,
@@ -47,7 +49,7 @@ async function requirePublishedRelease(
   const parsed = ReleaseId.safeParse(releaseId);
   if (!parsed.success) return null;
 
-  const release = await getRelease(app.db, parsed.data);
+  const release = await getReleaseCached(app.db, parsed.data);
   if (release?.status !== "published") return null;
 
   return { id: release.id };
@@ -62,7 +64,7 @@ export async function imdrfBrowserRoutes(app: FastifyInstance): Promise<void> {
     const selected =
       releases.find((release) => release.id === query.release) ?? releases[0] ?? null;
 
-    const summary = selected ? await annexSummary(app.db, selected.id) : [];
+    const summary = selected ? await annexSummaryCached(app.db, selected.id) : [];
 
     reply.html(
       <ImdrfBrowserPage
@@ -82,7 +84,7 @@ export async function imdrfBrowserRoutes(app: FastifyInstance): Promise<void> {
     );
     if (!release) return reply.status(404).send({ error: "Release not found." });
 
-    return annexSummary(app.db, release.id);
+    return annexSummaryCached(app.db, release.id);
   });
 
   app.get("/imdrf/releases/:releaseId/terms", async (request, reply) => {
@@ -164,7 +166,7 @@ export async function imdrfBrowserRoutes(app: FastifyInstance): Promise<void> {
     const term = await getTermByCode(app.db, release.id, code);
     if (!term) return reply.status(404).send({ error: "Term not found." });
 
-    return { ...term, lineage: await getTermLineage(app.db, release.id, term.id) };
+    return { ...term, lineage: await getTermLineageCached(app.db, release.id, term.id) };
   });
 
   app.get("/imdrf/releases/:releaseId/terms/:id", async (request, reply) => {
@@ -177,12 +179,12 @@ export async function imdrfBrowserRoutes(app: FastifyInstance): Promise<void> {
     const termId = TermId.safeParse((request.params as { id: string }).id);
     if (!termId.success) return reply.status(404).send({ error: "Term not found." });
 
-    const term = await getTerm(app.db, release.id, termId.data);
+    const term = await getTermCached(app.db, release.id, termId.data);
     if (!term) return reply.status(404).send({ error: "Term not found." });
 
     // The lineage rides along with the term rather than sitting behind its own route: every
     // consumer of a term detail wants the level names (that is what F004 asks for), so a second
     // round trip would only ever be made immediately after the first.
-    return { ...term, lineage: await getTermLineage(app.db, release.id, term.id) };
+    return { ...term, lineage: await getTermLineageCached(app.db, release.id, term.id) };
   });
 }

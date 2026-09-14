@@ -14,6 +14,7 @@ import {
   requireTestDatabase,
   truncateAll,
 } from "./helpers.js";
+import { type ImdrfFixture, imdrfAssessmentFields, seedImdrfForF004 } from "./imdrf-fixture.js";
 
 /**
  * Naming the second assessor.
@@ -37,6 +38,7 @@ type Staff = { cookie: string; id: string; name: string };
 let owner: DatabaseHandle;
 let restricted: DatabaseHandle;
 let app: FastifyInstance;
+let imdrf: ImdrfFixture;
 
 /** The server under test connects as the restricted role, so a missing GRANT fails here. */
 function testConfig(): Config {
@@ -67,6 +69,7 @@ async function start(): Promise<void> {
   app ??= await buildServer(testConfig());
   await app.ready();
   await truncateAll(owner.db);
+  imdrf = await seedImdrfForF004(owner.db);
 }
 
 let seeded = 0;
@@ -163,20 +166,7 @@ function completeAssessment() {
     c2_6: "Required medical intervention and a 24-hour admission.",
     public_health: "no",
     c2_7: "One device at one facility; no wider exposure identified.",
-    imdrf_component_l1: "Battery",
-    imdrf_component_code: "E1204",
-    imdrf_device_problem_l1: "Battery depletion",
-    imdrf_device_problem_code: "A0501",
-    imdrf_health_impact_l1: "No clinical signs",
-    imdrf_health_impact_code: "E2301",
-    imdrf_clinical_signs_l1: "None observed",
-    imdrf_clinical_signs_code: "E0101",
-    imdrf_investigation_type_l1: "Manufacturer investigation",
-    imdrf_investigation_type_code: "A05",
-    imdrf_investigation_findings_l1: "Cell fault confirmed",
-    imdrf_investigation_findings_code: "A0702",
-    imdrf_investigation_conclusion_l1: "Device to be replaced",
-    imdrf_investigation_conclusion_code: "A0803",
+    ...imdrfAssessmentFields(imdrf),
     expectedness: "unexpected",
     c4_1: "Not described in the manufacturer's IFU or risk file.",
     causality: "probable",

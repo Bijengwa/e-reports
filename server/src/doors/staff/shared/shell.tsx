@@ -74,6 +74,13 @@ export type StaffShellProps = {
    * not be made to fetch a script that would find nothing to attach to.
    */
   registerDownload?: boolean;
+  /**
+   * Load the F004 IMDRF term-picker enhancement.
+   *
+   * Opt-in for the same reason `registerDownload` is: a page with no `[data-imdrf-picker]` on it
+   * must not be made to fetch a script that would find nothing to attach to.
+   */
+  imdrfPicker?: boolean;
   children?: Children;
 };
 
@@ -278,6 +285,7 @@ export function StaffShell({
   f4Find,
   countdown,
   registerDownload,
+  imdrfPicker,
   children,
 }: StaffShellProps): JSX.Element {
   const isAdministrator = role === "administrator";
@@ -294,6 +302,7 @@ export function StaffShell({
       f4Find={f4Find}
       countdown={countdown}
       registerDownload={registerDownload}
+      imdrfPicker={imdrfPicker}
     >
       <div class="shell">
         {/* `on-dark` is what recolours the mark for the rail: white folder, green cross. The

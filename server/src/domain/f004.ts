@@ -559,6 +559,21 @@ export const IMDRF_GROUPS: readonly ImdrfGroup[] = [
   },
 ];
 
+/**
+ * The IMDRF item behind one review key ("3.1.1" … "3.3.3") — the same items `IMDRF_GROUPS` holds,
+ * looked up by the number the paper (and `SECONDARY_REVIEW_ITEMS`) prints rather than by the
+ * item's own internal `key` ("component"). Exists for `domain/imdrf/f004-integration.ts`, which
+ * validates a secondary assessor's Disagree replacement and needs the item's annex/level back from
+ * the key a posted `a2_degree_3.1.1`/`a2_imdrf_term_3.1.1` names.
+ */
+const IMDRF_ITEM_BY_REVIEW_KEY: ReadonlyMap<string, ImdrfItem> = new Map(
+  IMDRF_GROUPS.flatMap((group) => group.items.map((item) => [`${group.no}.${item.letter}`, item])),
+);
+
+export function imdrfItemForReviewKey(key: string): ImdrfItem | undefined {
+  return IMDRF_ITEM_BY_REVIEW_KEY.get(key);
+}
+
 export const IMDRF_NOTE =
   "NB: These terms allow capturing of the problems encountered at device(s) level through observational language without yet describing possible reasons or causes for the problems or failures observed. The hierarchical structure allows more understanding of the problem occurred.";
 
@@ -1016,12 +1031,27 @@ export const F004_FIELDS: readonly string[] = [
   "c2_6",
   "public_health",
   "c2_7",
+  // The published IMDRF release this A1 is coded against — chosen once, on this ordinal, and read
+  // by every later ordinal of the same report as the release theirs must agree with. See
+  // `domain/imdrf/f004-integration.ts`, the only place that reads or enforces it.
+  "imdrf_release_id",
   ...IMDRF_GROUPS.flatMap((group) =>
     group.items.flatMap((item) => [
       `imdrf_${item.key}_l1`,
       `imdrf_${item.key}_l2`,
       `imdrf_${item.key}_l3`,
       `imdrf_${item.key}_code`,
+      // The unambiguous reference `imdrf_terms.id` this row's terminology actually came from.
+      //
+      // Additive, deliberately alongside the four fields above rather than replacing any of
+      // them: `_l1`/`_l2`/`_l3`/`_code` stay exactly what every existing consumer (Register
+      // mapping, PDF generation, the pinned `f004-a1-validation` suite) already reads, and this
+      // is what lets `f004-integration.ts` resolve them from the repository and overwrite them
+      // with the authoritative text on every save, so what those consumers read is never
+      // free-typed. `code` alone is not a stable identity within a release (the same code can
+      // recur under more than one hierarchy branch — see `docs/imdrf-terminology.md`), which is
+      // why this exists at all rather than trusting `_code` to resolve back to one term.
+      `imdrf_${item.key}_term_id`,
     ]),
   ),
   "expectedness",
@@ -1045,7 +1075,17 @@ export const F004_FIELDS: readonly string[] = [
  * signature, distinct from `assessments.assessor_id` only in that it is part of the document
  * itself rather than metadata about the row.
  */
-export const F004_SECONDARY_FIELDS: readonly string[] = ["signature_2"];
+export const F004_SECONDARY_FIELDS: readonly string[] = [
+  "signature_2",
+  // A Disagree replacement's own IMDRF term reference, one per IMDRF review item ("3.1.1" …
+  // "3.3.3"), additive beside `responses[key].value`'s existing `l1`/`l2`/`l3`/`code` shape rather
+  // than folded into it — that shape is pinned by `f004-a2-review.test.ts`
+  // (`fields?.map(f => f.key)).toEqual(["l1", "code"])` and similar), and adding a field there
+  // would change what every existing review renders and stores. `f004-integration.ts` reads this,
+  // resolves it against the repository, and overwrites `value.l1`/`l2`/`l3`/`code` with the
+  // authoritative text — the same relationship `imdrf_<key>_term_id` above has to A1's own fields.
+  ...IMDRF_GROUPS.flatMap((group) => group.items.map((item) => `a2_imdrf_term_${group.no}.${item.letter}`)),
+];
 
 /** Keep what the named set owns and drop the rest, so a payload is the document and nothing else. */
 function keep(fields: Record<string, string | string[]>, names: readonly string[]): F004Answers {

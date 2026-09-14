@@ -1,4 +1,5 @@
 import type { Children } from "@kitajs/html";
+import type { ReleaseSummary } from "../../../../domain/imdrf/query-service.js";
 import {
   A2_DEGREE_LABELS,
   A2_DEGREES,
@@ -19,6 +20,7 @@ import {
   type F004Answers,
   IMDRF_GROUPS,
   IMDRF_NOTE,
+  imdrfItemForReviewKey,
   type Issue,
   isA1Blank,
   list,
@@ -189,6 +191,16 @@ export type F004FormProps = {
    */
   priorReviews?: readonly PriorSecondaryReview[];
   issues: readonly Issue[];
+  /**
+   * Every published IMDRF release, newest first. Present only on A1's own live, unsubmitted page —
+   * the one place a release is actively being chosen (`writingA1` below). Everywhere else the
+   * release is already A1's own settled fact, read out of `answers.imdrf_release_id` and shown as
+   * text rather than a control a later reader could second-guess.
+   */
+  imdrfReleases?: readonly ReleaseSummary[];
+  /** The established release's own label ("IMDRF/AE WG/N43 · 2026"), for every rendering that is
+   *  not A1's own live page — the manager's, a secondary assessor's, the concluded document's. */
+  imdrfReleaseLabel?: string;
 };
 
 /** One earlier secondary assessor's finished work, as the per-item history reads it. */
@@ -623,10 +635,13 @@ function A2FillIn({
   item,
   response,
   locked,
+  releaseId,
 }: {
   item: A2ReviewItem;
   response?: SecondaryReviewResponse;
   locked: boolean;
+  /** A1's own established IMDRF release — see `ImdrfPicker`. Only meaningful for `"fields"`. */
+  releaseId?: string;
 }): JSX.Element {
   const stored = response?.value;
   const chosenValues = Array.isArray(stored) ? stored : typeof stored === "string" ? [stored] : [];
@@ -697,23 +712,27 @@ function A2FillIn({
         </textarea>
       )}
 
-      {item.valueKind === "fields" && (
-        <div class="a2-value-grid">
-          {(item.fields ?? []).map((field) => (
-            <div class="a2-value-cell">
-              <label for={`a2-value-${item.key}-${field.key}`} safe>
-                {field.label}
-              </label>
-              <input
-                id={`a2-value-${item.key}-${field.key}`}
-                name={`a2_value_${item.key}_${field.key}`}
-                value={storedFields[field.key] ?? ""}
-                disabled={locked}
-              />
-            </div>
-          ))}
-        </div>
-      )}
+      {item.valueKind === "fields" && (() => {
+        const imdrfItem = imdrfItemForReviewKey(item.key);
+        if (imdrfItem === undefined) return <></>;
+        const levelNames = (item.fields ?? [])
+          .filter((field) => field.key !== "code")
+          .map((field) => `a2_value_${item.key}_${field.key}`);
+
+        return (
+          <ImdrfPicker
+            idBase={`a2-supply-${item.key}`}
+            levelFieldNames={levelNames}
+            codeFieldName={`a2_value_${item.key}_code`}
+            termIdName={`a2_imdrf_term_${item.key}`}
+            values={storedFields}
+            termId={""}
+            annex={imdrfItem.annexLetter}
+            releaseId={releaseId}
+            locked={locked}
+          />
+        );
+      })()}
     </div>
   );
 }
@@ -864,7 +883,12 @@ function A2InlineDecision({
     return (
       <>
         {history}
-        <A2FillIn item={item} response={response} locked={locked} />
+        <A2FillIn
+          item={item}
+          response={response}
+          locked={locked}
+          releaseId={value(answers, "imdrf_release_id")}
+        />
       </>
     );
   }
@@ -931,23 +955,27 @@ function A2InlineDecision({
               </div>
             )}
 
-            {item.valueKind === "fields" && (
-              <div class="a2-value-grid">
-                {(item.fields ?? []).map((field) => (
-                  <div class="a2-value-cell">
-                    <label for={`a2-value-${item.key}-${field.key}`} safe>
-                      {field.label}
-                    </label>
-                    <input
-                      id={`a2-value-${item.key}-${field.key}`}
-                      name={`a2_value_${item.key}_${field.key}`}
-                      value={storedFields[field.key] ?? ""}
-                      disabled={locked}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
+            {item.valueKind === "fields" && (() => {
+              const imdrfItem = imdrfItemForReviewKey(item.key);
+              if (imdrfItem === undefined) return <></>;
+              const levelNames = (item.fields ?? [])
+                .filter((field) => field.key !== "code")
+                .map((field) => `a2_value_${item.key}_${field.key}`);
+
+              return (
+                <ImdrfPicker
+                  idBase={`a2-disagree-${item.key}`}
+                  levelFieldNames={levelNames}
+                  codeFieldName={`a2_value_${item.key}_code`}
+                  termIdName={`a2_imdrf_term_${item.key}`}
+                  values={storedFields}
+                  termId={""}
+                  annex={imdrfItem.annexLetter}
+                  releaseId={value(answers, "imdrf_release_id")}
+                  locked={locked}
+                />
+              );
+            })()}
           </div>
         )}
 
@@ -1057,6 +1085,112 @@ function AssessedDeviceField({
   );
 }
 
+/**
+ * The controlled-terminology replacement for a free-text level/coding grid: read-only display
+ * boxes, filled from whichever `imdrf_terms` row `termIdName` names, and a "Choose term…" control
+ * that reaches the repository through the same server-side search/hierarchy routes the read-only
+ * IMDRF handbook (`imdrf-browser.js`) already uses — never the whole release loaded into the page.
+ *
+ * `termIdName`'s value is what the route actually trusts (`domain/imdrf/f004-integration.ts`
+ * resolves it and overwrites the display boxes on every save); the boxes below are shown so the
+ * assessor can see what they chose, not because their contents are read back as the answer. They
+ * are `readonly`, not `disabled`, so they still post — a `disabled` input is never submitted at
+ * all, which would silently drop the resolved text on a browser with JavaScript turned off.
+ *
+ * `releaseSelect` names the id of a `<select name="imdrf_release_id">` elsewhere on the page whose
+ * live value scopes the search (A1's own live page, where the release is still being chosen);
+ * `releaseId` is a release already settled (every other reader) and is passed as a fixed value
+ * instead. Exactly one of the two is meaningful for a given rendering.
+ */
+function ImdrfPicker({
+  idBase,
+  levelFieldNames,
+  codeFieldName,
+  termIdName,
+  values,
+  termId,
+  annex,
+  releaseSelect,
+  releaseId,
+  locked,
+}: {
+  idBase: string;
+  levelFieldNames: readonly string[];
+  codeFieldName: string;
+  termIdName: string;
+  values: Record<string, string>;
+  termId: string;
+  annex: string;
+  releaseSelect?: string;
+  releaseId?: string;
+  locked: boolean;
+}): JSX.Element {
+  return (
+    <div
+      class="f4-grid"
+      data-imdrf-picker
+      data-annex={annex}
+      data-release-select={releaseSelect}
+      data-release-id={releaseId}
+      data-term-id-input={`#${idBase}-term-id`}
+    >
+      {levelFieldNames.map((name, index) => (
+        <div class="f4-field">
+          <label for={`${idBase}-l${String(index + 1)}`}>
+            Preferred terminology level {String(index + 1)}
+          </label>
+          <input
+            id={`${idBase}-l${String(index + 1)}`}
+            name={name}
+            value={values[`l${String(index + 1)}`] ?? ""}
+            readonly
+            disabled={locked}
+            data-imdrf-level={String(index + 1)}
+          />
+        </div>
+      ))}
+      <div class="f4-field">
+        <label for={`${idBase}-code`}>Coding</label>
+        <input
+          id={`${idBase}-code`}
+          name={codeFieldName}
+          value={values.code ?? ""}
+          readonly
+          disabled={locked}
+          data-imdrf-code
+        />
+      </div>
+      <input type="hidden" id={`${idBase}-term-id`} name={termIdName} value={termId} />
+      {!locked && (
+        <div class="f4-field f4-imdrf-pick">
+          <button type="button" class="btn btn-sm" data-imdrf-pick-open>
+            Choose term…
+          </button>
+          <div class="imdrf-pick-panel" data-imdrf-pick-panel hidden>
+            <input
+              type="search"
+              class="imdrf-pick-search"
+              placeholder="Search by code or term…"
+              data-imdrf-pick-search
+              autocomplete="off"
+            />
+            <div class="imdrf-pick-results" data-imdrf-pick-results></div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** `{l1, l2, l3, code}` read off `answers`/a review value for one IMDRF item's own field prefix. */
+function imdrfFieldValues(source: F004Answers | Record<string, string>, prefix: string): Record<string, string> {
+  const read = (key: string): string => {
+    const raw = (source as Record<string, unknown>)[key];
+    return typeof raw === "string" ? raw : "";
+  };
+  return { l1: read(`${prefix}_l1`), l2: read(`${prefix}_l2`), l3: read(`${prefix}_l3`), code: read(`${prefix}_code`) };
+}
+
 export function F004Form({
   reportId,
   answers,
@@ -1076,6 +1210,8 @@ export function F004Form({
   a2Review,
   priorReviews,
   issues,
+  imdrfReleases,
+  imdrfReleaseLabel,
 }: F004FormProps): JSX.Element {
   // The concluded document rather than the working one. See `F004Presentation` for what it drops
   // and, more to the point, for what it deliberately does not: every answer on the paper.
@@ -1405,6 +1541,31 @@ export function F004Form({
               comments={sectionComments?.["3"]}
               action={commentAction?.("3")}
             />
+
+            <div class="f4-block">
+              <div class="f4-blocktitle">IMDRF release</div>
+              {writingA1 ? (
+                <div class="f4-field">
+                  <label for="imdrf_release_id">Published IMDRF release used for this coding</label>
+                  <select id="imdrf_release_id" name="imdrf_release_id" disabled={locked}>
+                    <option value="">Choose a release…</option>
+                    {(imdrfReleases ?? []).map((release) => (
+                      <option
+                        value={release.id}
+                        selected={value(answers, "imdrf_release_id") === release.id}
+                      >
+                        {`${release.documentCode ?? "IMDRF"} · ${String(release.releaseYear)}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <p class="f4-note" safe>
+                  {imdrfReleaseLabel ?? "Not yet established."}
+                </p>
+              )}
+            </div>
+
             {IMDRF_GROUPS.map((group) => (
               <div class="f4-block">
                 <div class="f4-blocktitle">
@@ -1414,51 +1575,43 @@ export function F004Form({
                   <span safe>{group.title}</span>
                 </div>
 
-                {group.items.map((item) => (
-                  <div class="f4-imdrf-item">
-                    <div class="f4-imdrf-h">
-                      <span class="f4-letter" safe>{`${group.no}.${item.letter}`}</span>{" "}
-                      <span safe>{item.title}</span>
-                    </div>
-                    <p class="f4-note" safe>
-                      {item.annex}
-                    </p>
-                    <div class="f4-grid">
-                      {[1, 2, 3]
-                        .filter((level) => level <= item.levels)
-                        .map((level) => (
-                          <div class="f4-field">
-                            <label for={`imdrf_${item.key}_l${level}`}>
-                              Preferred terminology level {String(level)}
-                            </label>
-                            <input
-                              id={`imdrf_${item.key}_l${level}`}
-                              name={`imdrf_${item.key}_l${level}`}
-                              value={value(answers, `imdrf_${item.key}_l${level}`)}
-                              disabled={locked}
-                            />
-                          </div>
-                        ))}
-                      <div class="f4-field">
-                        <label for={`imdrf_${item.key}_code`}>Coding</label>
-                        <input
-                          id={`imdrf_${item.key}_code`}
-                          name={`imdrf_${item.key}_code`}
-                          value={value(answers, `imdrf_${item.key}_code`)}
-                          disabled={locked}
-                        />
+                {group.items.map((item) => {
+                  const levelNames = [1, 2, 3]
+                    .filter((level) => level <= item.levels)
+                    .map((level) => `imdrf_${item.key}_l${level}`);
+
+                  return (
+                    <div class="f4-imdrf-item">
+                      <div class="f4-imdrf-h">
+                        <span class="f4-letter" safe>{`${group.no}.${item.letter}`}</span>{" "}
+                        <span safe>{item.title}</span>
                       </div>
+                      <p class="f4-note" safe>
+                        {item.annex}
+                      </p>
+                      <ImdrfPicker
+                        idBase={`imdrf-${item.key}`}
+                        levelFieldNames={levelNames}
+                        codeFieldName={`imdrf_${item.key}_code`}
+                        termIdName={`imdrf_${item.key}_term_id`}
+                        values={imdrfFieldValues(answers, `imdrf_${item.key}`)}
+                        termId={value(answers, `imdrf_${item.key}_term_id`)}
+                        annex={item.annexLetter}
+                        releaseSelect={writingA1 ? "imdrf_release_id" : undefined}
+                        releaseId={writingA1 ? undefined : value(answers, "imdrf_release_id")}
+                        locked={locked}
+                      />
+                      <A2InlineDecision
+                        itemKey={`${group.no}.${item.letter}`}
+                        answers={answers}
+                        review={a2Review?.review}
+                        locked={a2Review?.submitted ?? true}
+                        priorReviews={priorReviews}
+                        notes={resolvedNotes}
+                      />
                     </div>
-                    <A2InlineDecision
-                      itemKey={`${group.no}.${item.letter}`}
-                      answers={answers}
-                      review={a2Review?.review}
-                      locked={a2Review?.submitted ?? true}
-                      priorReviews={priorReviews}
-                      notes={resolvedNotes}
-                    />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ))}
             <p class="f4-note" safe>

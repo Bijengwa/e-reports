@@ -1,4 +1,5 @@
 import type { F004Answers, Issue } from "../../../../domain/f004.js";
+import type { ReleaseSummary } from "../../../../domain/imdrf/query-service.js";
 import { F004Form } from "../../reports/components/f004.js";
 import {
   OrangeReportIdentity,
@@ -23,6 +24,12 @@ export type Assessment1PageProps = {
    *  from (`loadReport`'s `assessor1DueAt`, `workload.tsx`'s `currentDueAt`), never a date read
    *  off the F004 itself. Null means no deadline was set. */
   dueAt: Date | null;
+  /** Every published IMDRF release, newest first — what the release selector in Section 3 offers.
+   *  See `domain/imdrf/f004-integration.ts` for why A1 alone chooses it and every later ordinal
+   *  must agree with the choice. */
+  imdrfReleases: readonly ReleaseSummary[];
+  /** The established release's own label, once submitted — see `F004FormProps`. */
+  imdrfReleaseLabel?: string;
 };
 
 /**
@@ -54,6 +61,8 @@ export function Assessment1Page({
   submitted,
   issues,
   dueAt,
+  imdrfReleases,
+  imdrfReleaseLabel,
 }: Assessment1PageProps): JSX.Element {
   return (
     <StaffShell
@@ -69,6 +78,7 @@ export function Assessment1Page({
       active="assessments"
       f4Find
       countdown
+      imdrfPicker
     >
       <div class="staff-head">
         <div class="sp">
@@ -112,6 +122,8 @@ export function Assessment1Page({
           // fill in. The official F004 keeps 7.2; the page that shows it is the one that owns it.
           omitSecond
           issues={issues}
+          imdrfReleases={imdrfReleases}
+          imdrfReleaseLabel={imdrfReleaseLabel}
         />
 
         {/* Both siblings of the checkbox, which is what lets CSS alone open them. The scrim says

@@ -230,12 +230,14 @@ export function WorkloadPage({
   const heading = shown?.heading ?? "All reports";
 
   return (
+
     <StaffShell
       title="Workload — AE Reports"
       pageTitle="Workload"
       role={viewerRole}
       fullName={viewerName}
       active="workload"
+      countdown
     >
       {/*
        * Links, not buttons, and a filter only — never an action. Filtering is a different view of

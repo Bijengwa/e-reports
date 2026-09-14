@@ -44,6 +44,13 @@ export type LayoutProps = {
    * not be made to fetch a script that would find nothing to attach to.
    */
   registerDownload?: boolean;
+  /**
+   * Load the F004 IMDRF term-picker enhancement.
+   *
+   * Opt-in for the same reason `countdown` is: a page with no `[data-imdrf-picker]` element on it
+   * must not be made to fetch a script that would find nothing to attach to.
+   */
+  imdrfPicker?: boolean;
   children?: Children;
 };
 
@@ -63,6 +70,7 @@ export function Layout({
   f4Find,
   countdown,
   registerDownload,
+  imdrfPicker,
   children,
 }: LayoutProps): JSX.Element {
   return (
@@ -94,6 +102,11 @@ export function Layout({
             file with this blocked, so a browser refusing the script leaves a working, merely
             plainer, download in its place. Served from our own origin to satisfy the CSP. */}
         {registerDownload && <script src="/assets/register.js" defer></script>}
+        {/* Enhancement only: the hidden term-id input and the read-only display boxes it fills
+            are both rendered server-side already, so a browser refusing this leaves the picker
+            button doing nothing rather than a broken form — the assessor is told to try again
+            without JavaScript blocked, and nothing already chosen is lost. */}
+        {imdrfPicker && <script src="/assets/f004-imdrf-picker.js" defer></script>}
       </head>
       <body class={bodyClass ?? ""}>{children}</body>
     </html>

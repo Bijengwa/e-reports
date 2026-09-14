@@ -37,6 +37,8 @@ export type SecondaryAssessmentPageProps = {
   review: SecondaryReviewPayload;
   submitted: boolean;
   issues: readonly Issue[];
+  /** A1's own established IMDRF release, formatted for display — see `F004FormProps`. */
+  imdrfReleaseLabel?: string;
   /** This assignment's own deadline, the same `assessments.due_at` field `assessor1DueAt` reads
    *  for the first assessment — read off `resolveMine`'s own `mine.dueAt`, never recomputed. */
   dueAt: Date | null;
@@ -60,6 +62,7 @@ export function SecondaryAssessmentPage({
   submitted,
   issues,
   dueAt,
+  imdrfReleaseLabel,
 }: SecondaryAssessmentPageProps): JSX.Element {
   return (
     <StaffShell
@@ -71,6 +74,7 @@ export function SecondaryAssessmentPage({
       active="assessments"
       f4Find
       countdown
+      imdrfPicker
     >
       <div class="staff-head">
         <div class="sp">
@@ -156,6 +160,7 @@ export function SecondaryAssessmentPage({
               assessedOn: today(),
             }}
             priorReviews={priorReviews}
+            imdrfReleaseLabel={imdrfReleaseLabel}
           />
         </div>
 

@@ -16,6 +16,12 @@ import {
   validateSecondaryReviewForSubmit,
   value,
 } from "../../../../domain/f004.js";
+import { getReleaseCached } from "../../../../domain/imdrf/cached-query-service.js";
+import {
+  resolveA1Imdrf,
+  resolveSecondaryImdrfReplacements,
+} from "../../../../domain/imdrf/f004-integration.js";
+import { listPublishedReleases } from "../../../../domain/imdrf/query-service.js";
 import { notifyAssessmentSubmitted } from "../../../../notifications/index.js";
 import { loadReport } from "../../reports/routes/reports.js";
 import { currentSession } from "../../session-guard.js";
@@ -25,6 +31,19 @@ import { SecondaryAssessmentPage } from "../pages/secondary-assessment.js";
 
 /** Same reason as the register's: a uuid column compared against arbitrary text raises 22P02. */
 const ReportId = z.uuid();
+
+/** "IMDRF/AE WG/N43 · 2026" for whichever release `answers.imdrf_release_id` names, or undefined
+ *  once nothing has been established yet — `F004Form` falls back to its own copy for that case. */
+async function imdrfReleaseLabel(
+  app: FastifyInstance,
+  answers: F004Answers,
+): Promise<string | undefined> {
+  const releaseId = value(answers, "imdrf_release_id").trim();
+  if (releaseId === "") return undefined;
+  const release = await getReleaseCached(app.db, releaseId);
+  if (release === null) return undefined;
+  return `${release.documentCode ?? "IMDRF"} · ${String(release.releaseYear)}`;
+}
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -113,6 +132,7 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
     if (found.assessor1UserId !== session.userId) return forbid(reply, session.role);
 
     const draft = await loadDraft(app, found.report.id);
+    const imdrfReleases = await listPublishedReleases(app.db);
 
     return reply.html(
       <Assessment1Page
@@ -126,6 +146,8 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
         submitted={draft.submitted}
         issues={[]}
         dueAt={found.assessor1DueAt}
+        imdrfReleases={imdrfReleases}
+        imdrfReleaseLabel={await imdrfReleaseLabel(app, draft.answers)}
       />,
     );
   });
@@ -148,14 +170,26 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
     const answers = collect(posted);
     const submitting = value(posted, "intent") === "submit";
 
-    const issues: Issue[] = submitting ? validateForSubmit(answers) : [];
+    // Resolves every IMDRF item's `_term_id` against the repository and overwrites the display
+    // fields with the authoritative text either way — a draft save gets this too, so the officer
+    // sees the real term name before ever reaching submit. On a submission this also refuses a
+    // reference that does not resolve, belongs to the wrong Annex, or names an unpublished/foreign
+    // release, and refuses free text posted with no term id behind it. See
+    // `domain/imdrf/f004-integration.ts`.
+    //
+    // Run before `validateForSubmit`, deliberately: that function reads `imdrf_<key>_l1`/`_code`
+    // to decide whether an item was answered at all, and the page no longer posts those two by
+    // hand — only the term id. Resolving first is what lets a real selection still read as
+    // "answered" to a check that predates this feature and does not know term ids exist.
+    const issues: Issue[] = await resolveA1Imdrf(app.db, answers, submitting);
+    if (submitting) issues.push(...validateForSubmit(answers));
 
     if (submitting && issues.length === 0) {
       const passwordIssue = await verifySigningPassword(app, session.userId, posted);
       if (passwordIssue !== null) issues.push(passwordIssue);
     }
 
-    const page = (status: 200 | 422, shown: readonly Issue[]) =>
+    const page = async (status: 200 | 422, shown: readonly Issue[]) =>
       reply
         .status(status)
         .html(
@@ -170,6 +204,8 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
             submitted={false}
             issues={shown}
             dueAt={found.assessor1DueAt}
+            imdrfReleases={await listPublishedReleases(app.db)}
+            imdrfReleaseLabel={await imdrfReleaseLabel(app, answers)}
           />,
         );
 
@@ -317,6 +353,7 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
         submitted={mine?.submitted ?? false}
         issues={[]}
         dueAt={mine?.dueAt ?? null}
+        imdrfReleaseLabel={await imdrfReleaseLabel(app, first.answers)}
       />,
     );
   });
@@ -333,11 +370,24 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
     const answers = collectSecondaryReview(posted, first.answers);
     const submitting = value(posted, "intent") === "submit";
 
+    // A Disagree on one of the seven IMDRF rows must replace A1's term with another real one from
+    // the same published release — never free text, never a different release. Resolved and
+    // validated here rather than trusted from the page, exactly as `resolveA1Imdrf` does for A1's
+    // own answers, and against the release A1 itself established, never one this assessor chooses.
+    //
+    // Run before `validateSecondaryReviewForSubmit`, deliberately: that function reads a Disagree
+    // response's own `value.l1`/`.code` to decide whether a replacement was given at all, and the
+    // page no longer posts those two by hand for an IMDRF item — only the term id. Resolving first
+    // fills them in, so a real replacement still reads as one to a check that predates term ids.
+    const issues: Issue[] = await resolveSecondaryImdrfReplacements(
+      app.db,
+      value(first.answers, "imdrf_release_id").trim(),
+      answers,
+      submitting,
+    );
     // Every reviewable item, Section 7's own actions and conclusion included — the same
     // agree/disagree/clarify position on each that sections 1-6 already ask for.
-    const issues: Issue[] = submitting
-      ? validateSecondaryReviewForSubmit(answers, first.answers)
-      : [];
+    if (submitting) issues.push(...validateSecondaryReviewForSubmit(answers, first.answers));
 
     if (submitting && issues.length === 0) {
       const passwordIssue = await verifySigningPassword(app, session.userId, posted);
@@ -378,6 +428,7 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
           submitted={false}
           issues={issues}
           dueAt={mine?.dueAt ?? null}
+          imdrfReleaseLabel={await imdrfReleaseLabel(app, first.answers)}
         />,
       );
     }
