@@ -160,7 +160,11 @@ function AssignmentRows({
                 )}
               </td>
               <td>{day(row.receivedAt)}</td>
-              <td safe>{row.deviceName}</td>
+              <td>
+                <span class="cap" safe>
+                  {row.deviceName}
+                </span>
+              </td>
               <td>
                 <span class={`tag ${severityTone(row.severity) === "caution" ? "warn" : ""}`} safe>
                   {SEVERITY_LABELS[row.severity] ?? row.severity}
@@ -366,5 +370,3 @@ export function MyAssessmentsPage({
     </StaffShell>
   );
 }
-
-

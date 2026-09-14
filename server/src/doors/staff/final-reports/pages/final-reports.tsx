@@ -107,7 +107,11 @@ export function FinalReportsPage({
                     <span class="hint block" safe>{`Received ${receivedDay(row.receivedAt)}`}</span>
                   </td>
 
-                  <td safe>{row.deviceName}</td>
+                  <td>
+                    <span class="cap" safe>
+                      {row.deviceName}
+                    </span>
+                  </td>
 
                   <td>
                     <span class={`tag ${severityTone(row.severity)}`} safe>
@@ -154,5 +158,3 @@ export function FinalReportsPage({
     </StaffShell>
   );
 }
-
-

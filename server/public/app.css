@@ -1343,34 +1343,101 @@ textarea[aria-invalid="true"] {
   white-space: nowrap;
 }
 
+/*
+ * A cell whose value a reporter typed, held to a readable width.
+ *
+ * Every column in a `.utable` is content-sized and `nowrap`, which is right for a number, a date or
+ * a role and wrong for a free-text device name or facility: one 400-character value makes one
+ * column wider than the screen and pushes every other column out of reach, so the density of the
+ * whole list is decided by the worst value in it. This bounds those columns and marks the clip with
+ * an ellipsis. Nothing is truncated in the document — the value is whole in the markup, and the
+ * row's number already opens the report that shows it in full, which is where a reader goes for the
+ * rest of it.
+ *
+ * Applied to those cells only, not to `.utable td` at large: a number, a status or a date must
+ * never be clipped.
+ */
+.utable .cap {
+  display: inline-block;
+  max-width: 34ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+
 @media (max-width: 620px) {
   /* Less chrome to clear on a phone, so the box may be taller before it starts scrolling. */
   .tscroll {
     max-height: calc(100vh - 150px);
   }
+
+  .utable .cap {
+    max-width: 22ch;
+  }
 }
 
 /* ---------- register ---------- */
 /*
- * The register is `.tscroll` again — same box, same reason: a table this wide must scroll inside
- * itself rather than push the page sideways. Only the offset changes, because the header above it
- * is taller than a plain `.staff-head` line.
+ * The register is a workspace, not a table on a page: the sheet's viewport takes the width beside
+ * the rail and the height under the toolbar, and both scrollbars belong to that viewport.
  *
- * The ordinary staff column is 1100px, which leaves most of the workspace empty next to a
- * fifty-column sheet. On this page the main pane takes 90% of the workspace beside the rail.
+ * This replaces two rules that fought the layout instead of describing it — a `max-width: 90%`,
+ * which left a tenth of the desk empty next to a 56-column sheet, and a `max-height:
+ * calc(100vh - 232px)`, which guessed at the height of everything above the table and left the
+ * rest of the screen blank whenever the guess was low. The chain below is the same one the IMDRF
+ * reader already uses, so the staff portal has one way of building a full-height workspace rather
+ * than two: bound the shell to the viewport, let every ancestor give up its height (`min-height:
+ * 0`), and let the scroll box take what is left with `flex: 1`.
+ *
+ * Only the register's own ancestors are touched, `:has()`-scoped, so no other staff page inherits
+ * a viewport-bounded shell.
  */
+.shell:has(.register-page) {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.main:has(.register-page) {
+  min-height: 0;
+  overflow: hidden;
+}
+
 .staff-main:has(.register-page) {
-  max-width: 90%;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  /* Without this a flex item refuses to shrink below its content, and a 56-column table's content
+     is very tall — which is how the scroll box ends up pushing the page instead of scrolling. */
+  min-height: 0;
+  min-width: 0;
+  max-width: none;
+  padding-bottom: 22px;
 }
 
+.register-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* The title, the count and the toolbar keep their own height; the sheet gets the rest. */
+.register-page .staff-head {
+  flex: none;
+}
+
+/*
+ * The sheet's viewport. `flex: 1` is what makes it grow into the space under the toolbar, so there
+ * is no unexplained gap below the table on a tall screen; `min-height: 0` is what lets it be
+ * shorter than the table inside it, which is what makes it scroll at all. `overflow: auto` on both
+ * axes is deliberate — see the note on `.tscroll`: a box that scrolls on one axis has no `visible`
+ * left on the other, and the sticky header needs this box to be its scroll container.
+ */
 .register-scroll {
-  max-height: calc(100vh - 232px);
-}
-
-@media (max-width: 620px) {
-  .register-scroll {
-    max-height: calc(100vh - 210px);
-  }
+  flex: 1;
+  min-height: 0;
+  max-height: none;
 }
 
 .register-title {
@@ -1380,15 +1447,23 @@ textarea[aria-invalid="true"] {
   letter-spacing: -0.01em;
 }
 
+/* Wraps rather than overflows: the search box and the download button are the two things on this
+   bar, and at a width where they no longer sit side by side the honest answer is a second line. */
 .register-toolbar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
+  min-width: 0;
 }
 
 .register-search {
-  width: 280px;
-  max-width: 100%;
+  /* Grows into the bar and shrinks with it, rather than holding a desktop 280px on a phone and
+     pushing the page sideways. */
+  flex: 1 1 220px;
+  width: auto;
+  min-width: 0;
+  max-width: 320px;
   padding: 7px 11px;
   border: 1px solid var(--rule-2);
   border-radius: var(--r);
@@ -1421,11 +1496,46 @@ textarea[aria-invalid="true"] {
   }
 
   .register-search {
+    flex: none;
     width: 100%;
+    max-width: none;
   }
 
   .register-download {
     justify-content: center;
+  }
+}
+
+/*
+ * Below 900px the rail is a drawer over the page, the title area is two or three lines tall, and a
+ * viewport-bounded shell would leave the sheet a few rows high under it. So the page scrolls the
+ * ordinary way again and the sheet's viewport takes a fixed slice of the screen instead — still
+ * tall enough to read a run of records, still the box that owns both scrollbars, so the page itself
+ * never acquires a horizontal scrollbar from the 56 columns. The same concession the IMDRF reader
+ * makes at its own breakpoint.
+ */
+@media (max-width: 900px) {
+  .shell:has(.register-page),
+  .main:has(.register-page) {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .staff-main:has(.register-page) {
+    display: block;
+    flex: none;
+    padding-bottom: 44px;
+  }
+
+  .register-page {
+    display: block;
+    flex: none;
+  }
+
+  .register-scroll {
+    flex: none;
+    max-height: 70vh;
   }
 }
 
@@ -1531,7 +1641,10 @@ textarea[aria-invalid="true"] {
   letter-spacing: 0.05em;
   color: var(--ink-3);
   white-space: normal;
-  word-break: break-word;
+  /* Break inside a word only when the word alone cannot fit. The legacy `break-word` value behaves
+     like `overflow-wrap: anywhere` here and split headings mid-word ("MANUFACTURIN / G DATE"). */
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 
 .register-table thead tr:first-child th:first-child {
@@ -1548,7 +1661,10 @@ textarea[aria-invalid="true"] {
   border-right: 1px solid var(--rule);
   vertical-align: top;
   white-space: normal;
-  word-break: break-word;
+  /* Values wrap between words; a token with no spaces in it (a batch number, a code) still breaks
+     rather than widening its column. `.rg-text` clamps the result to a preview. */
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 
 .register-table th:last-child,
@@ -1572,6 +1688,92 @@ textarea[aria-invalid="true"] {
    as a rendering fault. */
 .register-table .rg-empty {
   color: var(--ink-3);
+}
+
+/* ---- a cell is a preview, the record is whole ----
+ *
+ * Row height is controlled here and nowhere else, and nothing is cut from the document to do it:
+ * every value is rendered in full and clipped to a few lines by the box below. That is what lets
+ * the search on the page, the Excel export and a screen reader all see the whole value while a
+ * three-paragraph incident narrative still occupies one register row rather than half a screen.
+ *
+ * The clamp is the only mechanism — there is deliberately no `max-height` on the row and no
+ * server-side truncation of the value.
+ */
+.register-table .rg-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  /* Prose breaks between words; a batch number or a code hierarchy with no spaces in it still has
+     to break somewhere rather than widen its column. */
+  overflow-wrap: anywhere;
+}
+
+/* One more line for the free-form columns — `narrative: true` in the COLUMNS array. Kept in step
+   with `NARRATIVE_PREVIEW_LINES` in the register view, which decides which cells get the control
+   below. */
+.register-table .rg-narrative {
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+}
+
+/*
+ * The control that opens the rest, on the cells whose value does not fit — a real `<button>`, so it
+ * is in the tab order, works from the keyboard, and needs no hover, which a phone cannot give. It
+ * is styled as the cell it replaces rather than as a button: a register of buttons would read as a
+ * form.
+ */
+.register-table .rg-open {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Says "there is more of this", so a clipped value never reads as the whole value. Quiet enough
+   that fifty of them down a column do not become the loudest thing on the sheet. */
+.register-table .rg-more {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--green);
+}
+
+.register-table .rg-open:hover .rg-more,
+.register-table .rg-open:focus-visible .rg-more {
+  text-decoration: underline;
+}
+
+.register-table .rg-open:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
+/* Wider than the shell's confirmation dialog, because what it holds is a paragraph rather than a
+   question, and the value scrolls inside it rather than growing the dialog past the screen. */
+.rg-modal {
+  max-width: 560px;
+}
+
+.rg-modal .rg-modal-value {
+  margin-top: 10px;
+  max-height: 52vh;
+  overflow: auto;
+  font-size: 13.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /*

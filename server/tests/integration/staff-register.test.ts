@@ -9,7 +9,7 @@ import type { Config } from "../../src/config.js";
 import type { DatabaseHandle } from "../../src/db/client.js";
 import { F004_VERSION } from "../../src/domain/f004.js";
 import { FINAL_DOCUMENT_KIND } from "../../src/domain/final-document.js";
-import { COLUMNS } from "../../src/doors/staff/views/register.js";
+import { COLUMNS } from "../../src/doors/staff/register/pages/register.js";
 import { buildServer } from "../../src/server.js";
 import { INTEGRATION_ENABLED, openOwner, requireTestDatabase, truncateAll } from "./helpers.js";
 

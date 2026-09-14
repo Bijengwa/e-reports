@@ -1,5 +1,8 @@
 /*
- * The Register download button's progressive enhancement.
+ * The Register page's two progressive enhancements: the download button's loading state, and the
+ * dialog that shows the whole of a cell whose value is clipped to a preview.
+ *
+ * The download half:
  *
  * The button is a real `<a href="/register/download/xlsx">` first — with this blocked or failing
  * to load, it still downloads the file exactly as it always did. What this adds is a loading
@@ -15,7 +18,54 @@
     else document.addEventListener("DOMContentLoaded", fn);
   }
 
+  /*
+   * A previewed cell, opened.
+   *
+   * The value is not held in an attribute and not fetched: the cell already contains it in full —
+   * the clipping is CSS — so the dialog is filled from the cell's own text. One dialog for the
+   * page and one listener on the table, whatever the row count.
+   *
+   * showModal() is what gives the backdrop, the focus trap and Escape-to-close, and returning
+   * focus to the cell on close is the browser's own behaviour for a dialog opened this way. With
+   * this script blocked the cell is still a preview of a value the page holds in full, and the
+   * reader still has the Excel export — nothing is unreachable.
+   */
+  function cellDialog() {
+    var dialog = document.querySelector("[data-rg-dialog]");
+    var table = document.querySelector(".register-table");
+    if (!dialog || !table || typeof dialog.showModal !== "function") return;
+
+    var labelBox = dialog.querySelector("[data-rg-dialog-label]");
+    var rowBox = dialog.querySelector("[data-rg-dialog-row]");
+    var valueBox = dialog.querySelector("[data-rg-dialog-value]");
+
+    table.addEventListener("click", function (event) {
+      var target = event.target;
+      var button = target && target.closest ? target.closest("[data-rg-open]") : null;
+      if (!button) return;
+
+      var text = button.querySelector(".rg-text");
+      var row = button.closest("tr");
+
+      if (labelBox) labelBox.textContent = button.getAttribute("data-rg-label") || "Register value";
+      if (rowBox) rowBox.textContent = (row && row.getAttribute("data-rg-row")) || "";
+      // textContent both ways: a register value is data, never markup.
+      if (valueBox) valueBox.textContent = text ? text.textContent : "";
+
+      dialog.showModal();
+    });
+
+    /* A click on the backdrop closes, which is the same test the sign-out dialog uses: the padding
+       lives on .modal-body, so a click whose target is the dialog itself can only be the
+       backdrop. */
+    dialog.addEventListener("click", function (event) {
+      if (event.target === dialog) dialog.close();
+    });
+  }
+
   ready(function () {
+    cellDialog();
+
     var link = document.querySelector("[data-download]");
     if (!link) return;
 

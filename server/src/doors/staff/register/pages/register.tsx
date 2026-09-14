@@ -70,15 +70,25 @@ export type RegisterPageProps = {
  *
  * A single source of truth for the header row, the `<colgroup>` and each body row, so the three
  * can never drift out of sync — the failure mode the previous version had no guard against.
+ * `register-export.ts` reads the same array, so the sheet and the page can never disagree either.
  *
  * Header strings mirror the TMDA Adverse Events/Incidents Register worksheet
  * (TMDA/DMD/MDV/R/002) column-for-column, with typos in the worksheet corrected.
+ *
+ * `narrative: true` marks the columns whose values are free-form prose written by a reporter or an
+ * assessor rather than a date, a code or a picked term. It buys them a deliberately wider column
+ * and one more line of preview — it is not what decides whether a value is previewed at all; see
+ * `cellOverflows`, which asks the value itself.
  */
-export const COLUMNS: ReadonlyArray<{
+export type RegisterColumn = {
   header: string;
   width: number;
+  /** Free-form prose, as opposed to a date, a code, a name or a picked IMDRF term. */
+  narrative?: true;
   cell: (row: RegisterRow) => string | number;
-}> = [
+};
+
+export const COLUMNS: ReadonlyArray<RegisterColumn> = [
   { header: "S/N", width: 56, cell: (r) => r.sn },
   { header: "TMDA Report Number", width: 150, cell: (r) => r.tmda_report_number },
   { header: "Date Received", width: 110, cell: (r) => r.date_received },
@@ -91,7 +101,8 @@ export const COLUMNS: ReadonlyArray<{
   { header: "Expiry Date", width: 105, cell: (r) => r.expiry_date },
   {
     header: "Name and Physical Address of Manufacturer",
-    width: 220,
+    width: 240,
+    narrative: true,
     cell: (r) => r.manufacturer_name_address,
   },
   { header: "Manufacturing Country", width: 120, cell: (r) => r.manufacturing_country },
@@ -100,9 +111,13 @@ export const COLUMNS: ReadonlyArray<{
     width: 160,
     cell: (r) => r.supplier_name,
   },
+  // The one field that is always a paragraph. 320px is as wide as a single column may be without
+  // starting to dominate a 56-column sheet, and the preview below is what keeps the row compact —
+  // widening it further was the wrong lever and is why this note is here.
   {
     header: "Adverse Event(s)/Incident(s) Description",
-    width: 220,
+    width: 320,
+    narrative: true,
     cell: (r) => r.event_description,
   },
   {
@@ -114,13 +129,15 @@ export const COLUMNS: ReadonlyArray<{
   {
     header: "Place/Location of Event(s)/Incident(s)",
     width: 180,
+    narrative: true,
     cell: (r) => r.event_location,
   },
   { header: "Region", width: 100, cell: (r) => r.region },
   { header: "Type of Report", width: 100, cell: (r) => r.type_of_report },
   {
     header: "Reporter Details (Name / Contact Information)",
-    width: 220,
+    width: 240,
+    narrative: true,
     cell: (r) => r.reporter_details,
   },
   { header: "Event Seriousness (Yes/No)", width: 120, cell: (r) => r.event_seriousness },
@@ -268,13 +285,58 @@ export const COLUMNS: ReadonlyArray<{
     width: 150,
     cell: (r) => r.risk_assessment,
   },
-  { header: "Regulatory Action(s) Taken", width: 210, cell: (r) => r.regulatory_action },
+  {
+    header: "Regulatory Action(s) Taken",
+    width: 260,
+    narrative: true,
+    cell: (r) => r.regulatory_action,
+  },
   { header: "1st Assessor Name", width: 140, cell: (r) => r.assessor_1_name },
   { header: "Date of Assessment", width: 120, cell: (r) => r.date_assessment_1 },
   { header: "2nd Assessor Name", width: 140, cell: (r) => r.assessor_2_name },
   { header: "Date of Assessment", width: 120, cell: (r) => r.date_assessment_2 },
-  { header: "Acknowledgement / Feedback", width: 190, cell: (r) => r.acknowledgement_feedback },
+  {
+    header: "Acknowledgement / Feedback",
+    width: 240,
+    narrative: true,
+    cell: (r) => r.acknowledgement_feedback,
+  },
 ];
+
+/**
+ * How many lines of a value the register shows before it becomes a preview.
+ *
+ * Three for an ordinary column, four for a narrative one. Both are enforced in CSS (`.rg-text`,
+ * `.rg-narrative`) — the numbers are repeated here only to decide which cells get the control that
+ * opens the rest, and the two must stay in step.
+ */
+const PREVIEW_LINES = 3;
+const NARRATIVE_PREVIEW_LINES = 4;
+
+/** `padding: 8px 10px` on `.register-table td`, so 20px of a column is never text. */
+const CELL_PADDING_PX = 20;
+/**
+ * Average glyph advance at the table's 12.5px system font, measured against the longest headers
+ * on the sheet. Deliberately a little narrow: erring towards "this will not fit" offers the reader
+ * the full value on a cell that would have just fitted, which is a smaller fault than clipping a
+ * regulatory value with no way to see the rest.
+ */
+const AVG_CHAR_PX = 6.2;
+
+/**
+ * Whether a value is longer than the lines its own column can show.
+ *
+ * This — not the field name — is what decides that a cell is rendered as a preview. A register is
+ * mostly dates, codes and picked terms that always fit, and giving every one of them a control
+ * that opens a dialog on the same text already on screen would be noise. Asking the value means a
+ * genuinely long device name gets the same treatment as a genuinely long narrative, and a short
+ * narrative gets none.
+ */
+export function cellOverflows(col: RegisterColumn, text: string): boolean {
+  const lines = col.narrative ? NARRATIVE_PREVIEW_LINES : PREVIEW_LINES;
+  const charsPerLine = Math.max(6, Math.floor((col.width - CELL_PADDING_PX) / AVG_CHAR_PX));
+  return text.length > charsPerLine * lines;
+}
 
 /** Only S/N stays put while every later column — TMDA report number, date received, and the rest — scrolls. See `.rg-c1` in the stylesheet. */
 const STICKY_COUNT = 1;
@@ -376,13 +438,50 @@ export function RegisterPage({ rows, viewerRole, viewerName }: RegisterPageProps
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr>
+                  // The row's own identity, for the dialog a preview opens: a value shown out of
+                  // the table needs to say which record it belongs to.
+                  <tr data-rg-row={row.tmda_report_number || `S/N ${row.sn}`}>
                     {COLUMNS.map((col, i) => {
                       const value = col.cell(row);
                       const isEmpty = value === "" || value === null || value === undefined;
+                      const text = isEmpty ? "" : String(value);
+                      const textClass = col.narrative ? "rg-text rg-narrative" : "rg-text";
+
+                      if (isEmpty) {
+                        return (
+                          <td class={stickyClass(i)}>
+                            <span class="rg-empty">—</span>
+                          </td>
+                        );
+                      }
+
+                      /*
+                       * The whole value is in the document either way — clipped by CSS, never cut
+                       * here. That is what keeps the search below, the Excel export and assistive
+                       * technology reading the record rather than the preview of it.
+                       */
                       return (
                         <td class={stickyClass(i)}>
-                          {isEmpty ? <span class="rg-empty">—</span> : <span safe>{value}</span>}
+                          {cellOverflows(col, text) ? (
+                            <button
+                              type="button"
+                              class="rg-open"
+                              data-rg-open
+                              data-rg-label={col.header}
+                              aria-haspopup="dialog"
+                            >
+                              <span class={textClass} safe>
+                                {text}
+                              </span>
+                              <span class="rg-more" aria-hidden="true">
+                                Show all
+                              </span>
+                            </button>
+                          ) : (
+                            <span class={textClass} safe>
+                              {text}
+                            </span>
+                          )}
                         </td>
                       );
                     })}
@@ -392,15 +491,61 @@ export function RegisterPage({ rows, viewerRole, viewerName }: RegisterPageProps
             </table>
           </div>
         )}
+
+        {/*
+          Where a previewed cell shows the rest of itself.
+
+          The page's one dialog, reusing the shell's `.modal` conventions rather than a second
+          modal system: `showModal()` is what buys the backdrop, the focus trap and Escape, and
+          `method="dialog"` is what makes Close need no script. Rendered once and filled by
+          `register.js` from the cell that was clicked, so a register of five hundred rows carries
+          one dialog rather than one per long value.
+        */}
+        <dialog class="modal rg-modal" data-rg-dialog aria-labelledby="rg-modal-title">
+          <div class="modal-body">
+            <p class="eyebrow" data-rg-dialog-row></p>
+            {/* The column's name replaces this the moment a cell is opened; the wording only
+                stands in for the fraction of a second before then, and gives the heading the
+                content a screen reader is entitled to find. */}
+            <h2 id="rg-modal-title" data-rg-dialog-label>
+              Register value
+            </h2>
+            <p class="rg-modal-value" data-rg-dialog-value></p>
+
+            <form method="dialog" class="bar modal-actions">
+              <button type="submit" class="btn ghost">
+                Close
+              </button>
+            </form>
+          </div>
+        </dialog>
       </div>
 
       <script>{`
         const search = document.getElementById('search-register');
         if (search) {
+          /*
+           * textContent, not innerText: a cell whose value is clipped to a few lines is still in
+           * the document in full, and searching what is rendered rather than what is stored would
+           * quietly stop finding words inside a long narrative — the one place a register search
+           * matters most.
+           */
+          const rows = Array.from(document.querySelectorAll('.register-table tbody tr')).map(
+            function (row) {
+              // The values only. A preview cell also carries a 'Show all' affordance, and a
+              // register where typing 'show' matched every long row would be a search of the
+              // furniture rather than of the record.
+              const text = Array.from(row.querySelectorAll('.rg-text'))
+                .map(function (cell) { return cell.textContent || ''; })
+                .join(' ')
+                .toLowerCase();
+              return { row: row, text: text };
+            }
+          );
           search.addEventListener('input', function () {
-            const q = this.value.toLowerCase();
-            document.querySelectorAll('.register-table tbody tr').forEach(function (row) {
-              row.hidden = q.length > 0 && !row.innerText.toLowerCase().includes(q);
+            const q = this.value.trim().toLowerCase();
+            rows.forEach(function (entry) {
+              entry.row.hidden = q.length > 0 && !entry.text.includes(q);
             });
           });
         }
@@ -408,4 +553,3 @@ export function RegisterPage({ rows, viewerRole, viewerName }: RegisterPageProps
     </StaffShell>
   );
 }
-

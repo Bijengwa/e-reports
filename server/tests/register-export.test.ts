@@ -1,7 +1,11 @@
 import ExcelJS from "exceljs";
 import { describe, expect, it } from "vitest";
+import {
+  COLUMNS,
+  cellOverflows,
+  type RegisterRow,
+} from "../src/doors/staff/register/pages/register.js";
 import { buildRegisterXlsx, registerExportFilename } from "../src/doors/staff/register-export.js";
-import { COLUMNS, type RegisterRow } from "../src/doors/staff/views/register.js";
 
 function sampleRow(overrides: Partial<RegisterRow> = {}): RegisterRow {
   return {
@@ -131,5 +135,44 @@ describe("register Excel workbook", () => {
     expect(firstFill).not.toBe(secondFill);
     expect(sheet.getRow(2).getCell(2).value).toBe("AEMD/2026-27/001");
     expect(sheet.getRow(3).getCell(2).value).toBe("AEMD/2026-27/002");
+  });
+});
+
+/**
+ * The page shows a preview of a long value; the sheet shows the value.
+ *
+ * The two read the same COLUMNS array, so the only way they could diverge is if a UI-side shortening
+ * ever leaked into the mapping. This is the test that would catch it.
+ */
+describe("register Excel keeps the whole value", () => {
+  it("exports a long narrative in full even though the page previews it", async () => {
+    const narrative =
+      "During use, the monitor unexpectedly stopped displaying the patient's SpO2 value and " +
+      "generated repeated alarm notifications despite the sensor being correctly positioned on the " +
+      "patient's finger. The device was replaced and the patient monitored manually until a spare " +
+      "unit arrived from the biomedical engineering department, which retained the failed unit for " +
+      "investigation and notified the supplier the same afternoon.";
+    const feedback = `Acknowledged to the reporter on 14/09/2026. ${"Follow-up correspondence. ".repeat(8)}`;
+
+    const description = COLUMNS.findIndex((col) =>
+      col.header.startsWith("Adverse Event(s)/Incident(s) Description"),
+    );
+    const acknowledgement = COLUMNS.findIndex((col) => col.header.startsWith("Acknowledgement"));
+
+    // The premise: the page does shorten these two on screen.
+    expect(cellOverflows(COLUMNS[description], narrative)).toBe(true);
+    expect(cellOverflows(COLUMNS[acknowledgement], feedback)).toBe(true);
+
+    const buffer = await buildRegisterXlsx([
+      sampleRow({ event_description: narrative, acknowledgement_feedback: feedback }),
+    ]);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer);
+    const sheet = workbook.getWorksheet("Register");
+    expect(sheet).toBeDefined();
+    if (sheet === undefined) return;
+
+    expect(sheet.getRow(2).getCell(description + 1).value).toBe(narrative);
+    expect(sheet.getRow(2).getCell(acknowledgement + 1).value).toBe(feedback);
   });
 });

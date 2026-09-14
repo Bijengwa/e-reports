@@ -230,7 +230,6 @@ export function WorkloadPage({
   const heading = shown?.heading ?? "All reports";
 
   return (
-
     <StaffShell
       title="Workload — AE Reports"
       pageTitle="Workload"
@@ -322,7 +321,11 @@ export function WorkloadPage({
                     </a>
                   </td>
                   <td>{day(row.receivedAt)}</td>
-                  <td safe>{row.deviceName}</td>
+                  <td>
+                    <span class="cap" safe>
+                      {row.deviceName}
+                    </span>
+                  </td>
                   <td>
                     <span
                       class={`tag ${severityTone(row.severity) === "caution" ? "warn" : ""}`}
@@ -379,5 +382,3 @@ export function WorkloadPage({
     </StaffShell>
   );
 }
-
-

@@ -1,4 +1,7 @@
-import { OrangeReportIdentity, OrangeReportSurface } from "../../reports/components/orange-report.js";
+import {
+  OrangeReportIdentity,
+  OrangeReportSurface,
+} from "../../reports/components/orange-report.js";
 import {
   day,
   type ReportDetail,
@@ -107,7 +110,11 @@ export function MyWorkPage({ viewerRole, viewerName, rows }: MyWorkPageProps): J
                     </a>
                   </td>
                   <td>{day(row.receivedAt)}</td>
-                  <td safe>{row.deviceName}</td>
+                  <td>
+                    <span class="cap" safe>
+                      {row.deviceName}
+                    </span>
+                  </td>
                   <td>
                     <span
                       class={`tag ${severityTone(row.severity) === "caution" ? "warn" : ""}`}
@@ -242,5 +249,3 @@ export function MyWorkItemPage({
     </StaffShell>
   );
 }
-
-

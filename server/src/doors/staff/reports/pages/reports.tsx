@@ -3,9 +3,13 @@ import type { F004Answers, SecondaryReviewPayload } from "../../../../domain/f00
 import { STEP_FIELDS, STEPS } from "../../../../domain/form-schema.js";
 import { type MessageKey, translatorFor } from "../../../../i18n/index.js";
 import { Countdown } from "../../assessment/components/countdown.js";
-import { F004Form, type PriorSecondaryReview, type SectionComment } from "../components/f004.js";
-import { CHANNEL_LABELS, OrangeReportIdentity, OrangeReportSurface } from "../components/orange-report.js";
 import { StaffShell } from "../../shared/shell.js";
+import { F004Form, type PriorSecondaryReview, type SectionComment } from "../components/f004.js";
+import {
+  CHANNEL_LABELS,
+  OrangeReportIdentity,
+  OrangeReportSurface,
+} from "../components/orange-report.js";
 
 /**
  * Captions for the enums a report carries.
@@ -142,7 +146,11 @@ export function ReceivedRows({ reports }: { reports: ReceivedRow[] }): JSX.Eleme
                 )}
               </td>
               <td>{day(report.receivedAt)}</td>
-              <td safe>{report.deviceName}</td>
+              <td>
+                <span class="cap" safe>
+                  {report.deviceName}
+                </span>
+              </td>
               <td>
                 <span class={`tag ${severityTone(report.severity) === "caution" ? "warn" : ""}`}>
                   {caption(SEVERITY_LABELS, report.severity)}
@@ -234,7 +242,11 @@ export function ReportsPage({
                     </a>
                   </td>
                   <td>{day(report.receivedAt)}</td>
-                  <td safe>{report.deviceName}</td>
+                  <td>
+                    <span class="cap" safe>
+                      {report.deviceName}
+                    </span>
+                  </td>
                   <td>
                     <span
                       class={`tag ${severityTone(report.severity) === "caution" ? "warn" : ""}`}
@@ -244,7 +256,11 @@ export function ReportsPage({
                   </td>
                   <td safe>{caption(STATUS_LABELS, report.status)}</td>
                   <td safe>{caption(CHANNEL_LABELS, report.channel)}</td>
-                  <td safe>{report.facility ?? "—"}</td>
+                  <td>
+                    <span class="cap" safe>
+                      {report.facility ?? "—"}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -1012,5 +1028,3 @@ export function ReportPage({
     </StaffShell>
   );
 }
-
-
