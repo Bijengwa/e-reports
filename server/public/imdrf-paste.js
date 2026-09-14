@@ -10,19 +10,34 @@
 (function () {
   "use strict";
 
-  document.querySelectorAll("[data-paste-only]").forEach(function (el) {
-    el.addEventListener("keydown", function (event) {
-      event.preventDefault();
-    });
-    el.addEventListener("beforeinput", function (event) {
-      if (event.inputType !== "insertFromPaste") {
-        event.preventDefault();
-      }
-    });
-    el.addEventListener("cut", function (event) {
-      event.preventDefault();
-    });
+document.querySelectorAll("[data-paste-only]").forEach(function (el) {
+  el.addEventListener("keydown", function (event) {
+    // Allow Ctrl+V / Cmd+V so the official JSON can be pasted.
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      event.key.toLowerCase() === "v"
+    ) {
+      return;
+    }
+
+    // Block all other keyboard editing.
+    event.preventDefault();
   });
+
+  el.addEventListener("beforeinput", function (event) {
+    // Allow actual paste input.
+    if (event.inputType === "insertFromPaste") {
+      return;
+    }
+
+    // Block typing, deletion, replacement, etc.
+    event.preventDefault();
+  });
+
+  el.addEventListener("cut", function (event) {
+    event.preventDefault();
+  });
+});
 
   document.querySelectorAll("[data-paste-clear]").forEach(function (button) {
     button.addEventListener("click", function () {
