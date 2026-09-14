@@ -1,8 +1,12 @@
 import type { F004Answers, Issue } from "../../../../domain/f004.js";
 import { F004Form } from "../../reports/components/f004.js";
-import { OrangeReportIdentity, OrangeReportSurface } from "../../reports/components/orange-report.js";
+import {
+  OrangeReportIdentity,
+  OrangeReportSurface,
+} from "../../reports/components/orange-report.js";
 import { type ReportDetail, ReportDocument } from "../../reports/pages/reports.js";
 import { StaffShell } from "../../shared/shell.js";
+import { Countdown } from "../components/countdown.js";
 
 export type Assessment1PageProps = {
   report: ReportDetail;
@@ -15,6 +19,10 @@ export type Assessment1PageProps = {
   assessedOn: string;
   submitted: boolean;
   issues: readonly Issue[];
+  /** This assignment's own deadline — the same `assessments.due_at` every other queue reads it
+   *  from (`loadReport`'s `assessor1DueAt`, `workload.tsx`'s `currentDueAt`), never a date read
+   *  off the F004 itself. Null means no deadline was set. */
+  dueAt: Date | null;
 };
 
 /**
@@ -45,6 +53,7 @@ export function Assessment1Page({
   assessedOn,
   submitted,
   issues,
+  dueAt,
 }: Assessment1PageProps): JSX.Element {
   return (
     <StaffShell
@@ -52,10 +61,14 @@ export function Assessment1Page({
       // Short, because the title bar is one line on a phone. The document says what it is in its
       // own masthead, which is where a reader looks for a form's identity anyway.
       pageTitle="Assessment 1 — F004"
+      // Right beside "Assessment 1 — F004": how much time is left on it, reusing the exact
+      // `Countdown` every other queue draws the same fact with — never a second deadline display.
+      titleExtra={<Countdown dueAt={dueAt} completed={submitted} />}
       role={viewerRole}
       fullName={viewerName}
       active="assessments"
       f4Find
+      countdown
     >
       <div class="staff-head">
         <div class="sp">
@@ -123,5 +136,3 @@ export function Assessment1Page({
     </StaffShell>
   );
 }
-
-

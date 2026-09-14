@@ -17,11 +17,11 @@ import {
   value,
 } from "../../../../domain/f004.js";
 import { notifyAssessmentSubmitted } from "../../../../notifications/index.js";
-import { currentSession } from "../../session-guard.js";
-import { Assessment1Page } from "../pages/assessment.js";
-import { ForbiddenPage } from "../../shared/forbidden.js";
-import { SecondaryAssessmentPage } from "../pages/secondary-assessment.js";
 import { loadReport } from "../../reports/routes/reports.js";
+import { currentSession } from "../../session-guard.js";
+import { ForbiddenPage } from "../../shared/forbidden.js";
+import { Assessment1Page } from "../pages/assessment.js";
+import { SecondaryAssessmentPage } from "../pages/secondary-assessment.js";
 
 /** Same reason as the register's: a uuid column compared against arbitrary text raises 22P02. */
 const ReportId = z.uuid();
@@ -125,6 +125,7 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
         assessedOn={draft.submittedOn ?? today()}
         submitted={draft.submitted}
         issues={[]}
+        dueAt={found.assessor1DueAt}
       />,
     );
   });
@@ -168,6 +169,7 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
             assessedOn={today()}
             submitted={false}
             issues={shown}
+            dueAt={found.assessor1DueAt}
           />,
         );
 
@@ -314,6 +316,7 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
         review={normalizeSecondaryReview(mine?.answers)}
         submitted={mine?.submitted ?? false}
         issues={[]}
+        dueAt={mine?.dueAt ?? null}
       />,
     );
   });
@@ -374,6 +377,7 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
           review={answers}
           submitted={false}
           issues={issues}
+          dueAt={mine?.dueAt ?? null}
         />,
       );
     }
@@ -451,10 +455,3 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
     );
   });
 }
-
-
-
-
-
-
-

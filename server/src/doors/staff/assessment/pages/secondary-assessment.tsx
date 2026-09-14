@@ -1,13 +1,17 @@
 import type { F004Answers, Issue, SecondaryReviewPayload } from "../../../../domain/f004.js";
 import { F004Form, type PriorSecondaryReview } from "../../reports/components/f004.js";
 import {
+  OrangeReportIdentity,
+  OrangeReportSurface,
+} from "../../reports/components/orange-report.js";
+import {
   ManagerReviewBlock,
   type ManagerReviewNote,
   type ReportDetail,
   ReportDocument,
 } from "../../reports/pages/reports.js";
-import { OrangeReportIdentity, OrangeReportSurface } from "../../reports/components/orange-report.js";
 import { StaffShell } from "../../shared/shell.js";
+import { Countdown } from "../components/countdown.js";
 
 /** What a secondary assessor reads before annotating: A1's submitted F004. */
 export type FirstAssessmentRead = {
@@ -33,6 +37,9 @@ export type SecondaryAssessmentPageProps = {
   review: SecondaryReviewPayload;
   submitted: boolean;
   issues: readonly Issue[];
+  /** This assignment's own deadline, the same `assessments.due_at` field `assessor1DueAt` reads
+   *  for the first assessment — read off `resolveMine`'s own `mine.dueAt`, never recomputed. */
+  dueAt: Date | null;
 };
 
 /** Today, for the date printed beside this assessor's own signature in 7.2. */
@@ -52,15 +59,18 @@ export function SecondaryAssessmentPage({
   review,
   submitted,
   issues,
+  dueAt,
 }: SecondaryAssessmentPageProps): JSX.Element {
   return (
     <StaffShell
       title={`Secondary assessment — ${report.number}`}
       pageTitle={`Secondary assessment (A${ordinal})`}
+      titleExtra={<Countdown dueAt={dueAt} completed={submitted} />}
       role={viewerRole}
       fullName={viewerName}
       active="assessments"
       f4Find
+      countdown
     >
       <div class="staff-head">
         <div class="sp">
@@ -168,5 +178,3 @@ export function SecondaryAssessmentPage({
     </StaffShell>
   );
 }
-
-

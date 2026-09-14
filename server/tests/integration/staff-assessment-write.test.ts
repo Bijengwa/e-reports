@@ -620,3 +620,84 @@ describe.skipIf(!INTEGRATION_ENABLED)("what the Officer sees afterwards", () => 
     expect(posts).toEqual([`action="/reports/${report.id}/assessment-1"`]);
   });
 });
+
+/**
+ * The header's own countdown.
+ *
+ * Assigning a report leaves no `assessments` row until the Officer's first save (see `assigned`
+ * above), so these seed one directly — the same shape `assign-first-assessor` itself writes — to
+ * put a `due_at` on ordinal 1 before the page is ever opened.
+ */
+describe.skipIf(!INTEGRATION_ENABLED)("the F004 header's countdown", () => {
+  beforeEach(start);
+
+  async function assignedWithDueAt(dueAt: string): Promise<{ officer: Staff; report: Report }> {
+    const { officer, report } = await assigned();
+    await owner.db.execute(sql`
+      INSERT INTO assessments (report_id, assessor_id, ordinal, form_version, payload, due_at)
+      VALUES (${report.id}, ${officer.id}, 1, 'F004', '{}'::jsonb, ${dueAt})
+    `);
+    return { officer, report };
+  }
+
+  it("shows the header's countdown beside the page's own title, on time", async () => {
+    const { officer, report } = await assignedWithDueAt("2099-01-01T00:00:00Z");
+
+    const body = (await get(`/reports/${report.id}/assessment-1`, officer.cookie)).body;
+
+    // Reuses the shared `Countdown` component — the same class the workload table and the
+    // Officer's own queue draw a deadline with — not a second implementation.
+    expect(body).toContain('class="countdown countdown-on-track"');
+    // Beside "Assessment 1 — F004" in the title bar, not buried somewhere else in the page.
+    expect(body.indexOf("Assessment 1 — F004")).toBeLessThan(body.indexOf('class="countdown'));
+  });
+
+  it("reads an overdue assignment through the same Countdown, not a duplicate", async () => {
+    const { officer, report } = await assignedWithDueAt("2020-01-01T00:00:00Z");
+
+    const body = (await get(`/reports/${report.id}/assessment-1`, officer.cookie)).body;
+
+    expect(body).toContain('class="countdown countdown-overdue"');
+    expect(body).toContain("OVERDUE");
+  });
+
+  it("shows Completed, not a live countdown, once the assessment is submitted", async () => {
+    const { officer, report } = await assignedWithDueAt("2099-01-01T00:00:00Z");
+
+    await post(`/reports/${report.id}/assessment-1`, officer.cookie, completeAssessment());
+
+    // Submitting redirects to the report page; the Officer has no more reason to reopen the F004,
+    // but the GET route must still answer correctly if they do.
+    const body = (await get(`/reports/${report.id}/assessment-1`, officer.cookie)).body;
+
+    expect(body).toContain('class="countdown countdown-completed"');
+    expect(body).toContain("Completed");
+    expect(body).not.toContain('class="countdown countdown-on-track"');
+    expect(body).not.toContain('class="countdown countdown-overdue"');
+  });
+
+  it("reads 'No deadline' rather than a countdown when none was ever set", async () => {
+    const { officer, report } = await assigned();
+
+    const body = (await get(`/reports/${report.id}/assessment-1`, officer.cookie)).body;
+
+    expect(body).toContain('class="countdown countdown-none"');
+    expect(body).toContain("No deadline");
+  });
+
+  it("carries the same countdown on the secondary assessment's own header", async () => {
+    const manager = await signedInAs("manager", "Grace Mollel");
+    const { officer: first, report } = await assignedWithDueAt("2099-01-01T00:00:00Z");
+    await post(`/reports/${report.id}/assessment-1`, first.cookie, completeAssessment());
+
+    const second = await signedInAs("assessor", "Baraka Nyoni");
+    await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
+      assessor_id: second.id,
+    });
+
+    const body = (await get(`/reports/${report.id}/secondary-assessment`, second.cookie)).body;
+
+    expect(body).toContain('class="countdown countdown-on-track"');
+    expect(body.indexOf("Secondary assessment")).toBeLessThan(body.indexOf('class="countdown'));
+  });
+});

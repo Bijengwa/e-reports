@@ -15,6 +15,16 @@ export type StaffShellProps = {
    */
   pageTitle: string;
   /**
+   * A small, fixed-width badge shown beside `pageTitle` in the title bar — the F004 assessment
+   * header's own `Countdown`, and nothing else today.
+   *
+   * The bar's height is fixed (see `.top` in app.css) on the argument that nothing beside the
+   * title may wrap or grow it. A `Countdown` pill is one line, `white-space: nowrap`, and never
+   * grows with content the way a count or an action label could — which is why it, alone, gets a
+   * slot here rather than joining the page body's own header the way every other addition does.
+   */
+  titleExtra?: JSX.Element;
+  /**
    * The reader's role, which decides what the rail offers.
    *
    * Optional because the 403 page renders through this shell, and the one branch that answers 403
@@ -261,6 +271,7 @@ function IconExpand(): JSX.Element {
 export function StaffShell({
   title,
   pageTitle,
+  titleExtra,
   role,
   fullName,
   active,
@@ -504,6 +515,8 @@ export function StaffShell({
 
             <h1 safe>{pageTitle}</h1>
 
+            {titleExtra}
+
             {fullName && (
               <span class="top-user">
                 <span>
@@ -573,4 +586,3 @@ export function StaffShell({
     </Layout>
   );
 }
-
