@@ -16,3 +16,16 @@ export type ReleaseStatus = "draft" | "published";
 
 /** One (annex, count) pair, as the admin preview and the sidebar's annex list both need it. */
 export type AnnexSummary = { annex: Annex; count: number };
+
+/** IMDRF's own fixed annex titles. Presentation copy, not stored — an annex's description does
+ *  not vary release to release, so this lives once in the domain layer rather than being
+ *  hardcoded in every view that needs it. */
+export const ANNEX_DESCRIPTIONS: Record<Annex, string> = {
+  A: "Medical Device Problem",
+  B: "Type of Investigation",
+  C: "Investigation Findings",
+  D: "Investigation Conclusion",
+  E: "Clinical Signs, Symptoms or Conditions",
+  F: "Health Impact",
+  G: "Medical Device Component",
+};

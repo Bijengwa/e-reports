@@ -2,45 +2,58 @@
  * Turns a pasted IMDRF JSON payload into rows, without trusting its shape.
  *
  * This module owns exactly one job: parse the JSON text an administrator pasted, confirm it has
- * the expected top-level release/annex structure, and map each terminology record to a flat row
- * by field name. Nothing here judges whether the *data* is sound — a code that duplicates another
- * annex's, a hierarchy whose parent is missing, a level that does not match its own segment count
- * — that is `validate.ts`'s job, over the flat rows this module hands it. Splitting the two means
- * a payload with a broken shape (invalid JSON, missing `annexes`, an annex that isn't an array)
- * fails here with a structural error, and a payload with a sound shape but bad data fails there
- * with a data error.
+ * the shape IMDRF's own exports actually use, and map each terminology record to a flat row by
+ * field name. Nothing here judges whether the *data* is sound — a hierarchy whose parent is
+ * missing, a duplicate tree position, a record that belongs to the wrong annex — that is
+ * `validate.ts`'s job, over the flat rows this module hands it.
  *
- * Expected payload shape (the "official IMDRF payload" administrators paste verbatim):
+ * The real IMDRF export (verified against the official 2026 JSON, all 8 published payload
+ * variants — the consolidated Annexes A-G file and each of the 7 single-annex files) is a bare
+ * top-level JSON ARRAY, never an object with a `releaseYear`/`annexes` wrapper. Each element
+ * looks like:
  * ```json
  * {
- *   "releaseYear": 2026,
- *   "documentCode": "IMDRF/AE WG/N43",
- *   "title": "IMDRF Adverse Event Terminology",
- *   "annexes": {
- *     "A": [
- *       {
- *         "term": "...", "code": "...", "codeHierarchy": "A01|A0101",
- *         "definition": "...", "nonImdrfCode": "...", "status": "...",
- *         "statusDescription": "...", "primaryCategory": "...", "secondaryCategory": "..."
- *       }
- *     ],
- *     "B": [ ... ], "C": [ ... ], "D": [ ... ], "E": [ ... ], "F": [ ... ], "G": [ ... ]
- *   }
+ *   "code": "A0101",
+ *   "term": "Patient-Device Incompatibility",
+ *   "definition": "...",
+ *   "non-IMDRF code": "MedDRA:10092649:...",
+ *   "status": "",
+ *   "status description": "",
+ *   "primary category": "",
+ *   "secondary category": "",
+ *   "codehierarchy": "A|A01|A0101"
  * }
  * ```
- * Only `term`, `code` and `codeHierarchy` are required per record; every other field is optional
- * and stored verbatim (or `null`) exactly as `validate.ts` already expects from the old workbook
- * parser, so the rest of the pipeline (validate → import-service → schema) is unchanged.
+ * Field names use spaces, and casing is inconsistent between the consolidated export
+ * (`"non-IMDRF code"`) and the single-annex exports (`"non-imdrf code"`) — this module matches
+ * field names case-insensitively rather than trusting one spelling.
+ *
+ * `codehierarchy` is pipe-separated, and its segments are the progressive chain of codes from the
+ * annex root down to the record; the last segment always equals the record's own `code`. Two
+ * distinct shapes appear in the real exports:
+ *  - The **consolidated** file includes a bare annex-root record for each annex (`code: "A"`,
+ *    `codehierarchy: "A"`), and every other record's hierarchy begins with that same bare letter
+ *    (e.g. `"A|A01|A0101"`).
+ *  - Each **single-annex** file omits that root record entirely — its hierarchies start directly
+ *    at the first real code (e.g. `"A01|A0101"`, `"G01"`), never with a bare letter segment.
+ * A payload is therefore classified as "consolidated" if any record's `codehierarchy` is exactly
+ * a bare annex letter (A-G) equal to its own `code`, and as "single-annex" otherwise. This is a
+ * fact discoverable in the data itself, not a wrapper field — there is no metadata field in any
+ * of the 8 real payloads that states which shape it is.
+ *
+ * Every record's own annex is derived from the first character of its `code` (A-G), which is
+ * true of both shapes: `"A"` and `"A0101"` both start with `A`, `"G07003"` starts with `G`.
  */
 
 import { ANNEXES, type Annex, isAnnex } from "./types.js";
 
 export type ParsedRow = {
-  annex: Annex;
-  /** 1-based position of this record within its annex's array, for error messages. */
-  rowNumber: number;
-  /** 0-based order among the rows emitted for this annex, independent of gaps. */
-  sourceOrder: number;
+  /** 1-based position of this record within the top-level array — used in every error message
+   *  and in the preview's "index/row" column. */
+  index: number;
+  /** Derived from the first character of `code`. `null` when `code` is missing/invalid, in which
+   *  case `validate.ts` reports the row as unresolvable rather than this module guessing. */
+  annex: Annex | null;
   term: string | null;
   code: string | null;
   definition: string | null;
@@ -55,26 +68,28 @@ export type ParsedRow = {
 export type ParseIssue = {
   severity: "error" | "warning";
   annex: Annex | null;
-  /** Kept as "sheet" for compatibility with the validator/admin views built for the old workbook
-   *  parser; for a JSON payload this is always "(payload)" or an annex letter. */
-  sheet: string;
-  row: number | null;
+  /** 1-based position of the offending record in the top-level array, or `null` for a
+   *  payload-level problem (not-JSON, not-an-array, empty array). */
+  index: number | null;
   field: string | null;
   message: string;
 };
 
-export type ParsedWorkbook = {
+/** How the parser classified the payload, from the data itself — see the module comment. `null`
+ *  when the payload is empty or too malformed to classify. */
+export type PayloadShape = "consolidated" | "single-annex";
+
+export type ParsedPayload = {
   rows: ParsedRow[];
   issues: ParseIssue[];
-  /** The release year the payload itself declares, for the caller to cross-check. */
-  releaseYearsFound: Set<number>;
-  /** Every annex key present in `annexes`, whether or not its array held any valid records. */
+  /** Every annex any row resolved to, regardless of whether that row later fails validation. */
   annexesFound: Set<Annex>;
+  shape: PayloadShape | null;
 };
 
 /** Hard ceiling on the pasted payload's byte size, enforced before `JSON.parse` ever runs — a
  *  malicious or accidental multi-hundred-MB paste is rejected on size alone, never parsed. */
-export const MAX_PAYLOAD_BYTES = 15 * 1024 * 1024; // 15 MB — generous for ~2,100 terms/release.
+export const MAX_PAYLOAD_BYTES = 15 * 1024 * 1024; // 15 MB — generous for ~2,100 terms/annex.
 
 function textOrNull(value: unknown): string | null {
   if (value === null || value === undefined) return null;
@@ -87,30 +102,46 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function structuralIssue(message: string, field: string | null = null): ParseIssue {
-  return { severity: "error", annex: null, sheet: "(payload)", row: null, field, message };
+/** Case-insensitive field lookup: IMDRF's own exports spell `"non-IMDRF code"` in the
+ *  consolidated file and `"non-imdrf code"` in the single-annex files. Every key is folded to a
+ *  trimmed lowercase form once per record rather than trying every known spelling per field. */
+function lowerKeyed(record: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    out[key.trim().toLowerCase()] = value;
+  }
+  return out;
+}
+
+function annexOf(code: string | null): Annex | null {
+  if (code === null || code.length === 0) return null;
+  const letter = code.charAt(0).toUpperCase();
+  return isAnnex(letter) ? letter : null;
+}
+
+function payloadIssue(message: string, field: string | null = null): ParseIssue {
+  return { severity: "error", annex: null, index: null, field, message };
 }
 
 /**
  * Parses a pasted JSON payload. Never throws for malformed content — every structural problem
  * becomes an `error`-severity `ParseIssue` instead, and parsing stops as soon as the shape is too
- * broken to say anything more specific (e.g. the payload isn't even an object). A `bytesLength`
- * over `MAX_PAYLOAD_BYTES` is rejected before `JSON.parse` is attempted at all.
+ * broken to say anything more specific (not valid JSON, not a top-level array, an empty array). A
+ * `bytesLength` over `MAX_PAYLOAD_BYTES` is rejected before `JSON.parse` is attempted at all.
  */
-export function parseImdrfPayload(payloadText: string): ParsedWorkbook {
+export function parseImdrfPayload(payloadText: string): ParsedPayload {
   const issues: ParseIssue[] = [];
   const rows: ParsedRow[] = [];
-  const releaseYearsFound = new Set<number>();
   const annexesFound = new Set<Annex>();
 
   const byteLength = Buffer.byteLength(payloadText, "utf8");
   if (byteLength > MAX_PAYLOAD_BYTES) {
     issues.push(
-      structuralIssue(
+      payloadIssue(
         `The pasted payload is ${(byteLength / (1024 * 1024)).toFixed(1)} MB, which exceeds the ${(MAX_PAYLOAD_BYTES / (1024 * 1024)).toFixed(0)} MB limit.`,
       ),
     );
-    return { rows, issues, releaseYearsFound, annexesFound };
+    return { rows, issues, annexesFound, shape: null };
   }
 
   let parsed: unknown;
@@ -118,94 +149,103 @@ export function parseImdrfPayload(payloadText: string): ParsedWorkbook {
     parsed = JSON.parse(payloadText);
   } catch (error) {
     issues.push(
-      structuralIssue(
+      payloadIssue(
         `The pasted text is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
       ),
     );
-    return { rows, issues, releaseYearsFound, annexesFound };
+    return { rows, issues, annexesFound, shape: null };
   }
 
-  if (!isPlainObject(parsed)) {
-    issues.push(structuralIssue("The payload must be a JSON object, not an array or scalar."));
-    return { rows, issues, releaseYearsFound, annexesFound };
-  }
-
-  const releaseYearRaw = parsed.releaseYear;
-  if (typeof releaseYearRaw !== "number" || !Number.isInteger(releaseYearRaw)) {
+  if (!Array.isArray(parsed)) {
     issues.push(
-      structuralIssue('"releaseYear" is required and must be a whole number.', "releaseYear"),
-    );
-  } else {
-    releaseYearsFound.add(releaseYearRaw);
-  }
-
-  const annexesRaw = parsed.annexes;
-  if (!isPlainObject(annexesRaw)) {
-    issues.push(
-      structuralIssue(
-        '"annexes" is required and must be an object keyed by annex letter (A-G).',
-        "annexes",
+      payloadIssue(
+        "The payload must be a JSON array of terminology records — the official IMDRF export is a " +
+          "bare array, not an object with a wrapper key.",
       ),
     );
-    return { rows, issues, releaseYearsFound, annexesFound };
+    return { rows, issues, annexesFound, shape: null };
   }
 
-  for (const key of Object.keys(annexesRaw)) {
-    const normalized = key.trim().toUpperCase();
-    if (!isAnnex(normalized)) {
-      issues.push(
-        structuralIssue(
-          `"annexes" has an unrecognized key "${key}"; expected one of ${ANNEXES.join(", ")}.`,
-          "annexes",
-        ),
-      );
-      continue;
-    }
+  if (parsed.length === 0) {
+    issues.push(payloadIssue("The payload is an empty array; it contains no terminology records."));
+    return { rows, issues, annexesFound, shape: null };
+  }
 
-    const list = annexesRaw[key];
-    annexesFound.add(normalized);
-
-    if (!Array.isArray(list)) {
-      issues.push(
-        structuralIssue(
-          `"annexes.${key}" must be an array of terminology records.`,
-          `annexes.${key}`,
-        ),
-      );
-      continue;
-    }
-
-    let sourceOrder = 0;
-    list.forEach((record, index) => {
-      const rowNumber = index + 1;
-      if (!isPlainObject(record)) {
-        issues.push({
-          severity: "error",
-          annex: normalized,
-          sheet: normalized,
-          row: rowNumber,
-          field: null,
-          message: `Record ${rowNumber} in annex ${normalized} is not a JSON object.`,
-        });
-        return;
-      }
-
-      rows.push({
-        annex: normalized,
-        rowNumber,
-        sourceOrder: sourceOrder++,
-        term: textOrNull(record.term),
-        code: textOrNull(record.code),
-        definition: textOrNull(record.definition),
-        nonImdrfCode: textOrNull(record.nonImdrfCode ?? record.non_imdrf_code),
-        status: textOrNull(record.status),
-        statusDescription: textOrNull(record.statusDescription ?? record.status_description),
-        primaryCategory: textOrNull(record.primaryCategory ?? record.primary_category),
-        secondaryCategory: textOrNull(record.secondaryCategory ?? record.secondary_category),
-        codeHierarchy: textOrNull(record.codeHierarchy ?? record.code_hierarchy),
+  parsed.forEach((record, arrayIndex) => {
+    const index = arrayIndex + 1;
+    if (!isPlainObject(record)) {
+      issues.push({
+        severity: "error",
+        annex: null,
+        index,
+        field: null,
+        message: `Record at index ${index} is not a JSON object.`,
       });
+      return;
+    }
+
+    const f = lowerKeyed(record);
+    const code = textOrNull(f["code"]);
+    const codeHierarchy = textOrNull(f["codehierarchy"]);
+    const annex = annexOf(code);
+    if (annex) annexesFound.add(annex);
+
+    rows.push({
+      index,
+      annex,
+      code,
+      term: textOrNull(f["term"]),
+      definition: textOrNull(f["definition"]),
+      nonImdrfCode: textOrNull(f["non-imdrf code"]),
+      status: textOrNull(f["status"]),
+      statusDescription: textOrNull(f["status description"]),
+      primaryCategory: textOrNull(f["primary category"]),
+      secondaryCategory: textOrNull(f["secondary category"]),
+      codeHierarchy,
     });
+  });
+
+  // Classify the payload's shape from the data itself (see module comment): a "consolidated"
+  // payload carries at least one bare annex-root record whose codehierarchy is just its own
+  // single-letter code.
+  const isConsolidated = rows.some(
+    (row) => row.code !== null && row.code.length === 1 && row.codeHierarchy === row.code,
+  );
+  const shape: PayloadShape | null = annexesFound.size === 0 ? null : isConsolidated ? "consolidated" : "single-annex";
+
+  // A single-annex payload (no root markers found) is expected to hold exactly one annex. Real
+  // IMDRF exports never mix annexes without the root markers, so any record whose own annex
+  // differs from the first resolvable row's annex is flagged rather than silently accepted or
+  // silently dropped.
+  if (shape === "single-annex") {
+    const expected = rows.find((row) => row.annex !== null)?.annex ?? null;
+    if (expected) {
+      for (const row of rows) {
+        if (row.annex !== null && row.annex !== expected) {
+          issues.push({
+            severity: "error",
+            annex: row.annex,
+            index: row.index,
+            field: "codehierarchy",
+            message: `Record at index ${row.index} belongs to Annex ${row.annex}, but this payload was detected as a single-annex Annex ${expected} payload (from its first record). A single-annex payload must not mix annexes.`,
+          });
+        }
+      }
+    }
   }
 
-  return { rows, issues, releaseYearsFound, annexesFound };
+  return { rows, issues, annexesFound, shape };
+}
+
+/** Human-readable label for a parsed payload's detected shape, for the preview UI. */
+export function describePayloadShape(shape: PayloadShape | null, annexesFound: Set<Annex>): string {
+  if (shape === "consolidated") {
+    const letters = ANNEXES.filter((a) => annexesFound.has(a));
+    return `Consolidated Annexes ${letters.length > 0 ? letters.join("-") : "A-G"}`;
+  }
+  if (shape === "single-annex") {
+    const [only] = annexesFound;
+    return only ? `Annex ${only}` : "Single annex";
+  }
+  return "Unrecognized payload";
 }

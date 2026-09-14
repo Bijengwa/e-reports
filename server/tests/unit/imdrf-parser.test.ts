@@ -1,74 +1,56 @@
 import { describe, expect, it } from "vitest";
-import { MAX_PAYLOAD_BYTES, parseImdrfPayload } from "../../src/domain/imdrf/parser.js";
-
-function payloadOf(annexes: Record<string, unknown[]>, releaseYear = 2026): string {
-  return JSON.stringify({
-    releaseYear,
-    documentCode: "IMDRF/AE WG/N43",
-    title: "IMDRF Adverse Event Terminology",
-    annexes,
-  });
-}
-
-const rootTerm = {
-  term: "Root Term",
-  code: "A01",
-  definition: "def",
-  codeHierarchy: "A01",
-};
-const childTerm = {
-  term: "Child Term",
-  code: "A0101",
-  definition: "def2",
-  codeHierarchy: "A01|A0101",
-};
-const grandchildTerm = {
-  term: "Grandchild Term",
-  code: "A010101",
-  definition: "def3",
-  status: "Retired (2020)",
-  statusDescription: "no longer used",
-  codeHierarchy: "A01|A0101|A010101",
-};
+import { MAX_PAYLOAD_BYTES, describePayloadShape, parseImdrfPayload } from "../../src/domain/imdrf/parser.js";
+import {
+  consolidatedAnnexA,
+  consolidatedFragment,
+  singleAnnexA,
+  singleAnnexC,
+  singleAnnexE,
+} from "../fixtures/imdrf-real-fragments.js";
 
 describe("parseImdrfPayload", () => {
-  it("parses a well-formed payload into flat rows keyed by annex", () => {
-    const parsed = parseImdrfPayload(payloadOf({ A: [rootTerm, childTerm, grandchildTerm] }));
+  it("parses the real consolidated Annexes A-G export as a bare top-level array", () => {
+    const parsed = parseImdrfPayload(JSON.stringify(consolidatedFragment));
     expect(parsed.issues.filter((i) => i.severity === "error")).toEqual([]);
-    expect(parsed.rows).toHaveLength(3);
-    expect(parsed.rows.every((r) => r.annex === "A")).toBe(true);
+    expect(parsed.rows).toHaveLength(consolidatedFragment.length);
+    expect(parsed.shape).toBe("consolidated");
+    expect(parsed.annexesFound).toEqual(new Set(["A", "B", "G"]));
   });
 
-  it("maps camelCase and snake_case field variants to the same output field", () => {
-    const parsed = parseImdrfPayload(
-      payloadOf({
-        C: [
-          {
-            term: "Root",
-            code: "C01",
-            codeHierarchy: "C01",
-            non_imdrf_code: "MedDRA:1:x",
-          },
-        ],
-      }),
-    );
-    expect(parsed.rows[0]?.nonImdrfCode).toBe("MedDRA:1:x");
+  it("derives each row's annex from the first character of its own code, for every real shape", () => {
+    const parsed = parseImdrfPayload(JSON.stringify(consolidatedAnnexA));
+    expect(parsed.rows.map((r) => r.annex)).toEqual(["A", "A", "A", "A"]);
+    // the bare annex-root record itself ("A", codehierarchy "A") is included, not skipped
+    const root = parsed.rows.find((r) => r.code === "A");
+    expect(root?.codeHierarchy).toBe("A");
   });
 
-  it("captures Primary/Secondary Category when the record has them", () => {
-    const parsed = parseImdrfPayload(
-      payloadOf({
-        E: [
-          {
-            term: "Nervous System",
-            code: "E01",
-            codeHierarchy: "E01",
-            primaryCategory: "Nervous System",
-          },
-        ],
-      }),
+  it("parses a real single-annex export (no root marker record) as shape single-annex", () => {
+    const parsed = parseImdrfPayload(JSON.stringify(singleAnnexA));
+    expect(parsed.issues.filter((i) => i.severity === "error")).toEqual([]);
+    expect(parsed.shape).toBe("single-annex");
+    expect(parsed.annexesFound).toEqual(new Set(["A"]));
+    // real single-annex hierarchies start at the first real code, never a bare letter
+    expect(parsed.rows.every((r) => r.codeHierarchy !== "A")).toBe(true);
+  });
+
+  it("matches non-IMDRF code / status description fields case-insensitively across the two real spellings", () => {
+    const consolidated = parseImdrfPayload(JSON.stringify(consolidatedAnnexA));
+    expect(consolidated.rows.find((r) => r.code === "A01")?.nonImdrfCode).toBe(
+      "MedDRA:10092649:Patient-device interaction issue",
     );
-    expect(parsed.rows[0]?.primaryCategory).toBe("Nervous System");
+    const singleAnnex = parseImdrfPayload(JSON.stringify(singleAnnexE));
+    // singleAnnexE spells the field "non-imdrf code" (lowercase) — same output field.
+    expect(singleAnnex.rows.find((r) => r.code === "E0101")?.nonImdrfCode).toBe(
+      "MedDRA:10049848:Balance disorder",
+    );
+  });
+
+  it("captures primary/secondary category when the real record has them (Annex E only)", () => {
+    const parsed = parseImdrfPayload(JSON.stringify(singleAnnexE));
+    const brainInjury = parsed.rows.find((r) => r.code === "E0102");
+    expect(brainInjury?.primaryCategory).toBe("Nervous System");
+    expect(brainInjury?.secondaryCategory).toBe("Injury");
   });
 
   it("rejects invalid JSON with a structural error instead of throwing", () => {
@@ -77,63 +59,64 @@ describe("parseImdrfPayload", () => {
     expect(parsed.rows).toEqual([]);
   });
 
-  it("rejects a payload that is not a JSON object", () => {
-    const parsed = parseImdrfPayload("[1, 2, 3]");
+  it("rejects a payload that is a JSON object rather than a bare array (the old invented wrapper shape)", () => {
+    const parsed = parseImdrfPayload(
+      JSON.stringify({ releaseYear: 2026, annexes: { A: consolidatedAnnexA } }),
+    );
     expect(parsed.issues.some((i) => i.severity === "error")).toBe(true);
+    expect(parsed.rows).toEqual([]);
   });
 
-  it("requires releaseYear to be a whole number", () => {
-    const parsed = parseImdrfPayload(JSON.stringify({ releaseYear: "2026", annexes: {} }));
-    expect(parsed.issues.some((i) => i.field === "releaseYear")).toBe(true);
-    expect(parsed.releaseYearsFound.size).toBe(0);
+  it("rejects an empty array", () => {
+    const parsed = parseImdrfPayload("[]");
+    expect(parsed.issues.some((i) => i.severity === "error")).toBe(true);
+    expect(parsed.rows).toEqual([]);
   });
 
-  it("requires annexes to be an object", () => {
-    const parsed = parseImdrfPayload(JSON.stringify({ releaseYear: 2026, annexes: [] }));
-    expect(parsed.issues.some((i) => i.field === "annexes")).toBe(true);
-  });
-
-  it("rejects an annex key outside A-G", () => {
-    const parsed = parseImdrfPayload(payloadOf({ H: [rootTerm] }));
-    expect(parsed.issues.some((i) => i.field === "annexes")).toBe(true);
-  });
-
-  it("records the release year the payload declares, for cross-checking against the import target", () => {
-    const parsed = parseImdrfPayload(payloadOf({ A: [rootTerm] }, 2026));
-    expect(parsed.releaseYearsFound).toEqual(new Set([2026]));
-  });
-
-  it("converts empty/missing optional fields to null rather than empty strings", () => {
-    const parsed = parseImdrfPayload(payloadOf({ A: [rootTerm] }));
-    const root = parsed.rows.find((r) => r.code === "A01");
-    expect(root?.nonImdrfCode).toBeNull();
-    expect(root?.status).toBeNull();
-  });
-
-  it("preserves source row ordering via sourceOrder", () => {
-    const parsed = parseImdrfPayload(payloadOf({ A: [rootTerm, childTerm, grandchildTerm] }));
-    expect(parsed.rows.map((r) => r.sourceOrder)).toEqual([0, 1, 2]);
-    expect(parsed.rows.map((r) => r.code)).toEqual(["A01", "A0101", "A010101"]);
-  });
-
-  it("records every annex key present in annexesFound, even one with an empty array", () => {
-    const parsed = parseImdrfPayload(payloadOf({ A: [rootTerm], G: [] }));
-    expect(parsed.annexesFound).toEqual(new Set(["A", "G"]));
-    expect(parsed.rows.filter((r) => r.annex === "G")).toHaveLength(0);
-  });
-
-  it("reports a malformed (non-object) record without discarding the rest of the annex", () => {
-    const parsed = parseImdrfPayload(payloadOf({ A: [rootTerm, "not a record", childTerm] }));
-    expect(parsed.issues.some((i) => i.severity === "error" && i.row === 2)).toBe(true);
-    expect(parsed.rows.map((r) => r.code)).toEqual(["A01", "A0101"]);
+  it("reports a malformed (non-object) record by index without discarding the rest of the array", () => {
+    const withJunk = [consolidatedAnnexA[0], "not a record", consolidatedAnnexA[1]];
+    const parsed = parseImdrfPayload(JSON.stringify(withJunk));
+    expect(parsed.issues.some((i) => i.severity === "error" && i.index === 2)).toBe(true);
+    expect(parsed.rows.map((r) => r.code)).toEqual(["A", "A01"]);
   });
 
   it("rejects a payload whose byte size exceeds MAX_PAYLOAD_BYTES before attempting JSON.parse", () => {
     const huge = "x".repeat(MAX_PAYLOAD_BYTES + 1024);
     const parsed = parseImdrfPayload(huge);
-    expect(parsed.issues.some((i) => i.severity === "error" && i.message.includes("MB"))).toBe(
-      true,
-    );
+    expect(parsed.issues.some((i) => i.severity === "error" && i.message.includes("MB"))).toBe(true);
     expect(parsed.rows).toEqual([]);
+  });
+
+  it("rejects a single-annex payload that silently contains a record from a different annex", () => {
+    // Real Annex C records plus one real Annex A record spliced in — the kind of mistake an
+    // administrator pasting the wrong file section could make.
+    const mixed = [...singleAnnexC, singleAnnexA[0]];
+    const parsed = parseImdrfPayload(JSON.stringify(mixed));
+    expect(parsed.shape).toBe("single-annex");
+    const mismatch = parsed.issues.find((i) => i.severity === "error" && i.annex === "A");
+    expect(mismatch).toBeDefined();
+    expect(mismatch?.message).toContain("Annex A");
+    expect(mismatch?.message).toContain("Annex C");
+  });
+
+  it("does not flag a mismatch for the real consolidated export, which legitimately spans several annexes", () => {
+    const parsed = parseImdrfPayload(JSON.stringify(consolidatedFragment));
+    expect(parsed.issues.filter((i) => i.severity === "error")).toEqual([]);
+  });
+});
+
+describe("describePayloadShape", () => {
+  it("describes a consolidated payload by the annexes actually found", () => {
+    expect(describePayloadShape("consolidated", new Set(["A", "B", "G"]))).toBe(
+      "Consolidated Annexes A-B-G",
+    );
+  });
+
+  it("describes a single-annex payload by its one annex letter", () => {
+    expect(describePayloadShape("single-annex", new Set(["C"]))).toBe("Annex C");
+  });
+
+  it("describes an unrecognized payload", () => {
+    expect(describePayloadShape(null, new Set())).toBe("Unrecognized payload");
   });
 });

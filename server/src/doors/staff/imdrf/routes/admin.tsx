@@ -1,5 +1,6 @@
 /**
- * IMDRF terminology admin: list/detail, paste → validate → preview → import, and publish.
+ * IMDRF terminology admin: a release library, a dedicated import page, paste → validate → preview
+ * → import, and publish.
  *
  * Registered in the staff door's administrator-only scope (`doors/staff/index.ts`); nothing here
  * re-checks the role, the same discipline `usersRoutes` already follows — the guard on that scope
@@ -21,7 +22,7 @@ import {
 import { MAX_PAYLOAD_BYTES } from "../../../../domain/imdrf/parser.js";
 import { annexSummary, listAllReleases } from "../../../../domain/imdrf/query-service.js";
 import { currentSession } from "../../session-guard.js";
-import { ImdrfAdminPage, ImdrfImportPreviewPage } from "../pages/admin.js";
+import { ImdrfImportPage, ImdrfImportPreviewPage, ImdrfLibraryPage } from "../pages/admin.js";
 
 const ReleaseYear = z.coerce.number().int().min(2000).max(2100);
 const TargetId = z.uuid();
@@ -33,7 +34,7 @@ const EXPIRED_TOKEN = "That import link has expired or was already used. Paste t
 const ALREADY_PUBLISHED = "That release is already published and cannot be replaced.";
 const RELEASE_NOT_FOUND = "That release no longer exists.";
 
-async function renderImdrfAdmin(
+async function renderLibrary(
   app: FastifyInstance,
   request: FastifyRequest,
   reply: FastifyReply,
@@ -52,7 +53,7 @@ async function renderImdrfAdmin(
   reply
     .status(status)
     .html(
-      <ImdrfAdminPage
+      <ImdrfLibraryPage
         releases={releases}
         selected={selected}
         summary={summary}
@@ -61,6 +62,18 @@ async function renderImdrfAdmin(
         viewerName={session.fullName}
       />,
     );
+}
+
+function renderImportPage(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  status: number,
+  error?: string,
+): void {
+  const session = currentSession(request);
+  reply
+    .status(status)
+    .html(<ImdrfImportPage error={error} viewerRole={session.role} viewerName={session.fullName} />);
 }
 
 function nonEmpty(value: string | null | undefined): string | null {
@@ -83,7 +96,9 @@ const UploadBody = z.object({
  * /imdrf` — the path split is what keeps "browse" and "administer" from colliding at the router.
  */
 export async function imdrfAdminRoutes(app: FastifyInstance): Promise<void> {
-  app.get("/imdrf/manage", async (request, reply) => renderImdrfAdmin(app, request, reply, 200));
+  app.get("/imdrf/manage", async (request, reply) => renderLibrary(app, request, reply, 200));
+
+  app.get("/imdrf/manage/import", async (request, reply) => renderImportPage(request, reply, 200));
 
   app.post(
     "/imdrf/manage/validate",
@@ -94,21 +109,15 @@ export async function imdrfAdminRoutes(app: FastifyInstance): Promise<void> {
     { bodyLimit: MAX_PAYLOAD_BYTES + 64 * 1024 },
     async (request, reply) => {
       const body = UploadBody.safeParse(request.body);
-      if (!body.success) {
-        return renderImdrfAdmin(app, request, reply, 422, { error: NO_PAYLOAD });
-      }
+      if (!body.success) return renderImportPage(request, reply, 422, NO_PAYLOAD);
 
       const parsedYear = ReleaseYear.safeParse(body.data.release_year);
-      if (!parsedYear.success) {
-        return renderImdrfAdmin(app, request, reply, 422, { error: INVALID_YEAR });
-      }
+      if (!parsedYear.success) return renderImportPage(request, reply, 422, INVALID_YEAR);
 
       const payload = body.data.payload;
-      if (nonEmpty(payload) === null) {
-        return renderImdrfAdmin(app, request, reply, 422, { error: NO_PAYLOAD });
-      }
+      if (nonEmpty(payload) === null) return renderImportPage(request, reply, 422, NO_PAYLOAD);
       if (Buffer.byteLength(payload, "utf8") > MAX_PAYLOAD_BYTES) {
-        return renderImdrfAdmin(app, request, reply, 413, { error: PAYLOAD_TOO_LARGE });
+        return renderImportPage(request, reply, 413, PAYLOAD_TOO_LARGE);
       }
 
       const session = currentSession(request);
@@ -133,7 +142,7 @@ export async function imdrfAdminRoutes(app: FastifyInstance): Promise<void> {
 
   app.post("/imdrf/manage/import", async (request, reply) => {
     const body = z.object({ token: z.string().min(1) }).safeParse(request.body);
-    if (!body.success) return renderImdrfAdmin(app, request, reply, 422, { error: EXPIRED_TOKEN });
+    if (!body.success) return renderImportPage(request, reply, 422, EXPIRED_TOKEN);
 
     const outcome = await confirmImdrfImport(app.db, body.data.token);
 
@@ -141,22 +150,25 @@ export async function imdrfAdminRoutes(app: FastifyInstance): Promise<void> {
       return reply.redirect(`/imdrf/manage?release=${outcome.releaseId}`, 303);
     }
     if (outcome.status === "invalid_token") {
-      return renderImdrfAdmin(app, request, reply, 410, { error: EXPIRED_TOKEN });
+      return renderImportPage(request, reply, 410, EXPIRED_TOKEN);
     }
     if (outcome.status === "already_published") {
-      return renderImdrfAdmin(app, request, reply, 409, { error: ALREADY_PUBLISHED });
+      return renderImportPage(request, reply, 409, ALREADY_PUBLISHED);
     }
     // validation_failed: re-validating the held payload on confirm found a new problem — rare
     // (the payload cannot have changed between preview and confirm) but never silently ignored.
-    return renderImdrfAdmin(app, request, reply, 422, {
-      error: `The payload failed validation on confirm (${outcome.issues.length} issue${outcome.issues.length === 1 ? "" : "s"}). Paste it again.`,
-    });
+    return renderImportPage(
+      request,
+      reply,
+      422,
+      `The payload failed validation on confirm (${outcome.issues.length} issue${outcome.issues.length === 1 ? "" : "s"}). Paste it again.`,
+    );
   });
 
   app.post("/imdrf/manage/:releaseId/publish", async (request, reply) => {
     const target = TargetId.safeParse((request.params as { releaseId: string }).releaseId);
     if (!target.success) {
-      return renderImdrfAdmin(app, request, reply, 404, { error: RELEASE_NOT_FOUND });
+      return renderLibrary(app, request, reply, 404, { error: RELEASE_NOT_FOUND });
     }
 
     const outcome = await publishImdrfRelease(app.db, target.data);
@@ -165,9 +177,9 @@ export async function imdrfAdminRoutes(app: FastifyInstance): Promise<void> {
       return reply.redirect(`/imdrf/manage?release=${target.data}`, 303);
     }
     if (outcome.status === "not_found") {
-      return renderImdrfAdmin(app, request, reply, 404, { error: RELEASE_NOT_FOUND });
+      return renderLibrary(app, request, reply, 404, { error: RELEASE_NOT_FOUND });
     }
-    return renderImdrfAdmin(app, request, reply, 409, {
+    return renderLibrary(app, request, reply, 409, {
       selectedId: target.data,
       error: ALREADY_PUBLISHED,
     });

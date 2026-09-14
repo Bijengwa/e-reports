@@ -6,8 +6,46 @@ in two phases: Phase 1 (release repository + admin paste/validate/import/publish
 read-only sidebar). Phase 3 — connecting this data into F004 Section 3 — has not been built.
 
 The import path is paste-only: an administrator pastes the official IMDRF JSON payload verbatim
-into a textarea on `/imdrf/manage`. There is no file upload and no CLI/script import path — the
-server is the sole source of truth for validation, exactly as it would be for any other input.
+into a textarea on `/imdrf/manage/import`, a dedicated page reached from the release library at
+`/imdrf/manage`. There is no file upload and no CLI/script import path — the server is the sole
+source of truth for validation, exactly as it would be for any other input.
+
+### Payload shape
+
+The real IMDRF export is a **bare top-level JSON array** of terminology records — never an object
+with a `releaseYear`/`annexes` wrapper. Each record looks like:
+
+```json
+{
+  "code": "A0101",
+  "term": "Patient-Device Incompatibility",
+  "definition": "...",
+  "non-IMDRF code": "MedDRA:10092649:...",
+  "status": "",
+  "status description": "",
+  "primary category": "",
+  "secondary category": "",
+  "codehierarchy": "A|A01|A0101"
+}
+```
+
+IMDRF actually publishes 8 such payloads per release: one **consolidated** array spanning all
+seven annexes, and 7 **single-annex** arrays (one per annex, A–G). The two shapes differ in one
+telling way: the consolidated array includes a bare annex-root record for each annex (`code: "A"`,
+`codehierarchy: "A"`), and every other record's hierarchy begins with that same bare letter (e.g.
+`"A|A01|A0101"`); a single-annex array omits that root record entirely, so its hierarchies start
+directly at the first real code (e.g. `"A01|A0101"`, `"G01"`). `parser.ts` classifies a payload as
+"consolidated" or "single-annex" from this fact in the data itself — there is no metadata field in
+any real export that states which shape it is. Release-level metadata (`documentCode`, `title`,
+the release year) is never carried in the payload; it is supplied by the import form and stored on
+`imdrf_releases`, independent of the array.
+
+Field names use spaces, and casing is inconsistent between the real exports themselves — the
+consolidated file spells `"non-IMDRF code"`, the single-annex files spell `"non-imdrf code"` — so
+`parser.ts` matches field names case-insensitively rather than trusting one spelling.
+
+An administrator's document code and title default to `IMDRF/AE WG/N43` and
+`IMDRF Adverse Event Terminology` on the import form, editable per release.
 
 ## Why it is separate
 
@@ -52,10 +90,12 @@ reader never infers the annex from the first character of a code.
 ### Variable hierarchy depth
 
 See `server/src/domain/imdrf/parser.ts` and `validate.ts`. The parser reads the pasted JSON's
-`annexes` object (keyed `A`–`G`, each an array of term records) and maps fields by name, tolerating
-both camelCase and snake_case variants (`nonImdrfCode`/`non_imdrf_code`, etc.). `level` is always
-derived from `code_hierarchy.split("|").length` at validation time, never from anything the payload
-itself claims about depth — a payload cannot lie about a term's level by mislabeling it.
+bare top-level array and maps fields by name, case-insensitively (`"non-IMDRF code"` /
+`"non-imdrf code"`, etc. — see "Payload shape" above). Each record's annex is derived from the
+first character of its own `code` (A–G), true of both the consolidated and single-annex shapes.
+`level` is always derived from `code_hierarchy.split("|").length` at validation time, never from
+anything the payload itself claims about depth — a payload cannot lie about a term's level by
+mislabeling it.
 
 ### Why `code` alone is not unique
 
@@ -99,15 +139,16 @@ keep, not dead data.
 ## Validation rules
 
 `server/src/domain/imdrf/validate.ts`, run in full before any write: the payload must be valid
-JSON shaped as `{ releaseYear, annexes: { A: [...], ..., G: [...] } }`; annex keys must be one of
-A–G; `code`/`term`/`code_hierarchy` must be present on every record; the hierarchy's last segment
-must equal the row's own code; every non-root row's parent hierarchy must resolve to another row in
-the same payload; the release year the payload declares must match the year being imported; and
-`(code, code_hierarchy)` must be unique within the payload (duplicate-code detection). Every
-failure is collected (not just the first) and reported with the exact annex, row, field and
-message — an administrator sees every problem in one paste rather than one per retry. A single
-error anywhere means zero terms are computed for insertion at all — "IMPORT BLOCKED" is all-or-
-nothing.
+JSON; the top-level value must be an array of terminology records (never an object, never empty);
+every record's `code` must resolve to a known annex (A–G); `code`/`term`/`codehierarchy` must be
+present; the hierarchy's last segment must equal the record's own code; every non-root record's
+parent hierarchy must resolve to another record in the same payload; a single-annex payload (no
+annex-root marker records present) must not silently mix annexes; the release year supplied by the
+import form must itself be a sane year; and `codehierarchy` (not `code` alone — see "Why `code`
+alone is not unique" above) must be unique within the payload. Every failure is collected (not just
+the first) and reported with the exact annex, index, field and message — an administrator sees
+every problem in one paste rather than one per retry. A single error anywhere means zero terms are
+computed for insertion at all — "IMPORT BLOCKED" is all-or-nothing.
 
 ## Admin permissions
 
@@ -118,10 +159,12 @@ which refuses a manager or assessor with 403 before any handler runs, is what en
 
 ## How a future release is added
 
-An administrator opens `/imdrf/manage`, pastes the new year's JSON payload verbatim, clicks
-Validate, reviews the result (per-annex counts, hierarchy depth, a sample of terms, and every
-validation issue if any), imports, and publishes it when ready. No file upload, no CLI, no script,
-no deployment step — the whole workflow is the admin frontend.
+An administrator opens `/imdrf/manage` (the release library) and clicks "+ Import New Release" to
+reach `/imdrf/manage/import`, pastes the new year's JSON payload verbatim (one of IMDRF's 8 real
+export files — consolidated or single-annex, both accepted with no reformatting), clicks Validate,
+reviews the full-width preview (detected payload shape, per-annex counts, hierarchy depth, a sample
+of terms, and every validation issue if any), imports, and publishes it when ready. No file upload,
+no CLI, no script, no deployment step — the whole workflow is the admin frontend.
 
 ## What Phase 2 (the sidebar) consumes
 

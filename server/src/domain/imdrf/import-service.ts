@@ -22,9 +22,9 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, eq, lt, sql } from "drizzle-orm";
 import type { Database } from "../../db/client.js";
 import { imdrfImportStaging, imdrfReleases, imdrfTerms } from "../../db/schema/index.js";
-import { parseImdrfPayload } from "./parser.js";
+import { describePayloadShape, parseImdrfPayload } from "./parser.js";
 import type { AnnexSummary } from "./types.js";
-import { type ValidatedTerm, type ValidationIssue, validateParsedWorkbook } from "./validate.js";
+import { type ValidatedTerm, type ValidationIssue, validateParsedPayload } from "./validate.js";
 
 export type ImportPreview = {
   token: string;
@@ -32,6 +32,9 @@ export type ImportPreview = {
   documentCode: string | null;
   title: string | null;
   sourceFileName: string;
+  /** Human-readable description of the payload's detected shape, e.g. "Consolidated Annexes A-G"
+   *  or "Annex B" — derived from the data itself, never from a wrapper field. */
+  payloadSource: string;
   summary: AnnexSummary[];
   total: number;
   issues: ValidationIssue[];
@@ -91,7 +94,8 @@ export async function previewImdrfImport(
   await sweepExpiredStaging(db);
 
   const parsed = parseImdrfPayload(input.payload);
-  const result = validateParsedWorkbook(parsed, input.releaseYear);
+  const result = validateParsedPayload(parsed, input.releaseYear);
+  const payloadSource = describePayloadShape(parsed.shape, parsed.annexesFound);
 
   if (!result.ok) {
     // Invalid: no staging row is written. "Failed validation performs zero database writes"
@@ -102,6 +106,7 @@ export async function previewImdrfImport(
       documentCode: input.documentCode,
       title: input.title,
       sourceFileName: input.sourceFileName,
+      payloadSource,
       summary: [],
       total: 0,
       issues: result.issues,
@@ -131,6 +136,7 @@ export async function previewImdrfImport(
     documentCode: input.documentCode,
     title: input.title,
     sourceFileName: input.sourceFileName,
+    payloadSource,
     summary: result.summary,
     total: result.total,
     issues: result.issues,
@@ -204,7 +210,7 @@ export async function confirmImdrfImport(db: Database, token: string): Promise<I
     }
 
     const parsed = parseImdrfPayload(staged.workbookData.toString("utf8"));
-    const result = validateParsedWorkbook(parsed, staged.releaseYear);
+    const result = validateParsedPayload(parsed, staged.releaseYear);
     if (!result.ok) return { status: "validation_failed" as const, issues: result.issues };
 
     const [existing] = await tx
