@@ -32,6 +32,9 @@ const TermId = z.uuid();
 
 const TERMS_PAGE_LIMIT = 50;
 const SEARCH_PAGE_LIMIT = 25;
+/** See the search route's own comment: below this, a query is too broad to be useful and too
+ *  broad to be cheap. */
+const MIN_SEARCH_QUERY_LENGTH = 2;
 
 /** No IMDRF AE code comes close to this; the bound is here so a lookup cannot be used to hand
  *  Postgres an arbitrarily long string to lower-case and compare against every row. */
@@ -133,9 +136,18 @@ export async function imdrfBrowserRoutes(app: FastifyInstance): Promise<void> {
     // officer is still typing into.
     const annex = query.annex !== undefined && isAnnex(query.annex) ? query.annex : undefined;
 
+    // Below this, a query matches so broadly (every code and term containing one letter) that it
+    // amounts to dumping a large slice of the annex a keystroke at a time — the client already
+    // enforces the same floor (`f004-imdrf-picker.js`), and this is the same rule applied
+    // server-side for every caller of this route, not only that one page.
+    const trimmedQuery = (query.q ?? "").trim();
+    if (trimmedQuery.length < MIN_SEARCH_QUERY_LENGTH) {
+      return { rows: [], nextCursor: null };
+    }
+
     return searchTerms(app.db, {
       releaseId: release.id,
-      query: query.q ?? "",
+      query: trimmedQuery,
       limit: SEARCH_PAGE_LIMIT,
       cursor: query.cursor,
       annex,

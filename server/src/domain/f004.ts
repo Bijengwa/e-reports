@@ -1084,7 +1084,9 @@ export const F004_SECONDARY_FIELDS: readonly string[] = [
   // would change what every existing review renders and stores. `f004-integration.ts` reads this,
   // resolves it against the repository, and overwrites `value.l1`/`l2`/`l3`/`code` with the
   // authoritative text — the same relationship `imdrf_<key>_term_id` above has to A1's own fields.
-  ...IMDRF_GROUPS.flatMap((group) => group.items.map((item) => `a2_imdrf_term_${group.no}.${item.letter}`)),
+  ...IMDRF_GROUPS.flatMap((group) =>
+    group.items.map((item) => `a2_imdrf_term_${group.no}.${item.letter}`),
+  ),
 ];
 
 /** Keep what the named set owns and drop the rest, so a payload is the document and nothing else. */

@@ -43,10 +43,7 @@ export async function getReleaseCached(
   return release;
 }
 
-export async function annexSummaryCached(
-  db: Database,
-  releaseId: string,
-): Promise<AnnexSummary[]> {
+export async function annexSummaryCached(db: Database, releaseId: string): Promise<AnnexSummary[]> {
   const key = `imdrf:${releaseId}:annex-summary`;
   const hit = getCached<AnnexSummary[]>(key);
   if (hit !== undefined) return hit;

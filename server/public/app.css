@@ -2595,6 +2595,103 @@ textarea[aria-invalid="true"] {
 .f4-imdrf-h { font-weight: 600; color: var(--f4-ink); font-size: 12.5px; margin-bottom: 3px; }
 .f4-letter { color: var(--f4-accent-ink); font-weight: 700; }
 
+.imdrf-release-note { margin-bottom: 10px; }
+.imdrf-release-missing { color: var(--flag); }
+
+/*
+ * The controlled IMDRF term picker — `<details class="imdrf-pick">`. Closed, it is a single
+ * compact row (the chosen term, or a prompt); open, it grows a search box and a result list
+ * beneath it. Never a card of its own: it sits directly in the item's own block, the same way the
+ * old Level 1/2/3/Coding fields used to.
+ */
+.imdrf-pick {
+  border: 1px solid var(--f4-field-border);
+  border-radius: var(--r);
+  background: var(--f4-field-bg);
+  margin-top: 4px;
+}
+.imdrf-pick-locked { padding: 8px 12px; }
+.imdrf-pick-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 13px;
+}
+.imdrf-pick-summary::-webkit-details-marker { display: none; }
+.imdrf-pick-summary:hover { background: var(--f4-tint-2); }
+.imdrf-pick-summary:focus-visible { outline: 2px solid var(--orange); outline-offset: -2px; }
+.imdrf-pick-summary-main { min-width: 0; flex: 1; }
+.imdrf-pick-placeholder { color: var(--f4-ink-3); }
+.imdrf-pick-action {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--f4-accent-ink);
+  white-space: nowrap;
+}
+
+/* The chosen term itself, read the same way whether the picker is open, closed, or locked. */
+.imdrf-pick-chosen { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.imdrf-pick-code {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--f4-accent-ink);
+  background: var(--f4-tint);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.imdrf-pick-term { font-weight: 600; color: var(--f4-ink); }
+.imdrf-pick-hierarchy { color: var(--f4-ink-3); font-size: 12px; }
+.imdrf-pick-hierarchy::before { content: "— "; }
+.imdrf-pick-empty { color: var(--f4-ink-3); font-size: 13px; margin: 0; }
+
+.imdrf-pick-body { border-top: 1px solid var(--f4-line); padding: 10px 12px 12px; }
+.imdrf-pick-label { display: block; font-size: 11.5px; font-weight: 500; color: var(--f4-accent-ink); margin-bottom: 4px; }
+.imdrf-pick-search { width: 100%; font-size: 13px; padding: 7px 10px; }
+
+.imdrf-pick-hint { color: var(--f4-ink-3); font-size: 12.5px; margin: 8px 2px; }
+
+/* Results: a plain, compact list rather than a wall of cards — depth is a CSS variable set per
+   row from the term's own `level`, so a deeper term reads visibly nested under its ancestors
+   without the server needing to send a tree shape. */
+.imdrf-pick-list { list-style: none; margin: 8px 0 0; padding: 0; max-height: 260px; overflow-y: auto; }
+.imdrf-pick-result {
+  --imdrf-depth: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px;
+  padding-left: calc(8px + var(--imdrf-depth) * 14px);
+  border-radius: 6px;
+  font-size: 12.5px;
+}
+.imdrf-pick-result + .imdrf-pick-result { margin-top: 1px; }
+.imdrf-pick-result:hover { background: var(--f4-tint-2); }
+.imdrf-pick-result-main { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.imdrf-pick-result-main code {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--f4-accent-ink);
+  flex: none;
+}
+.imdrf-pick-result-term { color: var(--f4-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.imdrf-pick-result-category { color: var(--f4-ink-3); }
+.imdrf-pick-result-category .imdrf-pick-result-term { font-style: italic; }
+.imdrf-pick-result-note { flex: none; font-size: 11px; color: var(--f4-ink-3); white-space: nowrap; }
+.imdrf-pick-result .btn-sm { flex: none; }
+
+@media (max-width: 640px) {
+  .imdrf-pick-summary { flex-wrap: wrap; }
+  .imdrf-pick-result { flex-wrap: wrap; align-items: flex-start; }
+  .imdrf-pick-result-note { white-space: normal; }
+}
+
 .f4-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; }
 .f4-card {
   border: 1px solid var(--f4-pill-border); border-radius: var(--r); padding: 12px 14px; cursor: pointer;

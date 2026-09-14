@@ -4,9 +4,16 @@
  *
  * Enhancement only, on the same footing as `imdrf-browser.js`: everything this fills in is also
  * enforced server-side (`domain/imdrf/f004-integration.ts`) when the form is saved, so a browser
- * that blocks this script leaves a working "Choose term…" button that does nothing rather than a
- * form that can be corrupted by disabling JavaScript. Search is always server-side and always
- * paged — nothing here ever fetches "every term of an annex" into the page.
+ * that blocks this script leaves a disclosure ("Change"/"Select") that opens onto an inert search
+ * box, never a form that can be corrupted by disabling JavaScript — there is nothing here for the
+ * assessor to type free text into either way. Search is always server-side and always paged;
+ * nothing here ever fetches "every term of an annex" into the page.
+ *
+ * The markup this attaches to is `<details data-imdrf-picker>` (`reports/components/f004.tsx`'s
+ * `ImdrfPicker`): a `<summary>` showing either the chosen term or "Choose an IMDRF term…", and a
+ * body holding the search box and results. Opening/closing the disclosure is the browser's own
+ * native behaviour; this script only fills in what happens inside it and updates the summary once
+ * a term is picked.
  *
  * Opt-in like the door's other scripts: a page with no `[data-imdrf-picker]` does nothing.
  */
@@ -15,14 +22,16 @@
 
   var SEARCH_DEBOUNCE_MS = 250;
   var RESULTS_LIMIT = 20;
+  // Below this, a single keystroke would dump a large slice of an annex — see the module comment.
+  var MIN_QUERY_LENGTH = 2;
 
   function ready(fn) {
     if (document.readyState !== "loading") fn();
     else document.addEventListener("DOMContentLoaded", fn);
   }
 
-  function escapeHtml(value) {
-    return String(value === null || value === undefined ? "" : value).replace(
+  function escapeHtml(text) {
+    return String(text === null || text === undefined ? "" : text).replace(
       /[&<>"']/g,
       function (ch) {
         return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch];
@@ -37,16 +46,69 @@
     });
   }
 
-  function currentReleaseId(root) {
-    var selectId = root.getAttribute("data-release-select");
-    if (selectId) {
-      var select = document.getElementById(selectId);
-      return select && select.value ? select.value : "";
-    }
-    return root.getAttribute("data-release-id") || "";
+  function isNotSelectable(row) {
+    return typeof row.status === "string" && row.status.toLowerCase().indexOf("not selectable") !== -1;
   }
 
-  function fillFrom(root, term) {
+  /** A category the assessor cannot stop at: has children of its own, or IMDRF itself marks it
+   *  "Not selectable" — the same two conditions `f004-integration.ts` enforces server-side. */
+  function isCategory(row) {
+    return row.hasChildren === true || isNotSelectable(row);
+  }
+
+  function hint(text) {
+    return '<p class="imdrf-pick-hint">' + escapeHtml(text) + "</p>";
+  }
+
+  function renderResults(container, rows, onPick) {
+    if (rows.length === 0) {
+      container.innerHTML = hint("No matching terms.");
+      return;
+    }
+
+    container.innerHTML =
+      '<ul class="imdrf-pick-list">' +
+      rows
+        .map(function (row) {
+          var category = isCategory(row);
+          var indent = Math.max(0, (row.level || 1) - 1);
+          var rowClass = "imdrf-pick-result" + (category ? " imdrf-pick-result-category" : "");
+
+          return (
+            '<li class="' +
+            rowClass +
+            '" style="--imdrf-depth: ' +
+            String(indent) +
+            '">' +
+            '<span class="imdrf-pick-result-main">' +
+            "<code>" +
+            escapeHtml(row.code) +
+            "</code>" +
+            '<span class="imdrf-pick-result-term">' +
+            escapeHtml(row.term) +
+            "</span>" +
+            "</span>" +
+            (category
+              ? '<span class="imdrf-pick-result-note">Not selectable — choose a more specific term</span>'
+              : '<button type="button" class="btn btn-sm" data-imdrf-select="' +
+                escapeHtml(row.id) +
+                '">Select</button>') +
+            "</li>"
+          );
+        })
+        .join("") +
+      "</ul>";
+
+    Array.prototype.slice.call(container.querySelectorAll("[data-imdrf-select]")).forEach(function (
+      btn,
+    ) {
+      btn.addEventListener("click", function () {
+        onPick(btn.getAttribute("data-imdrf-select"));
+      });
+    });
+  }
+
+  function fillHiddenFields(root, term) {
     var levelInputs = Array.prototype.slice.call(root.querySelectorAll("[data-imdrf-level]"));
     var lineage = Array.isArray(term.lineage) ? term.lineage : [];
     var annex = root.getAttribute("data-annex") || "";
@@ -68,76 +130,60 @@
     var termIdSelector = root.getAttribute("data-term-id-input");
     var termIdInput = termIdSelector ? root.querySelector(termIdSelector) : null;
     if (termIdInput) termIdInput.value = term.id;
+
+    return named;
   }
 
-  function closePanel(panel, button) {
-    panel.hidden = true;
-    if (button) button.setAttribute("aria-expanded", "false");
-  }
-
-  function renderResults(container, rows, onPick) {
-    if (rows.length === 0) {
-      container.innerHTML = '<p class="hint">No matching terms.</p>';
-      return;
-    }
-
-    container.innerHTML = rows
-      .map(function (row) {
-        return (
-          '<button type="button" class="imdrf-pick-row" data-id="' +
-          escapeHtml(row.id) +
-          '" data-has-children="' +
-          (row.hasChildren === true) +
-          '"><code>' +
-          escapeHtml(row.code) +
-          "</code><span>" +
-          escapeHtml(row.term) +
-          "</span>" +
-          (row.hasChildren
-            ? '<em class="hint"> — has more specific terms; keep typing to reach one</em>'
-            : "") +
-          "</button>"
-        );
-      })
-      .join("");
-
-    Array.prototype.slice.call(container.querySelectorAll(".imdrf-pick-row")).forEach(function (
-      btn,
-    ) {
-      btn.addEventListener("click", function () {
-        onPick(btn.getAttribute("data-id"));
-      });
+  function chosenSummaryHtml(term, ancestry) {
+    var names = ancestry.map(function (step) {
+      return step.term;
     });
+    return (
+      '<span class="imdrf-pick-chosen">' +
+      '<span class="imdrf-pick-code">' +
+      escapeHtml(term.code) +
+      "</span>" +
+      '<span class="imdrf-pick-term">' +
+      escapeHtml(term.term) +
+      "</span>" +
+      (names.length
+        ? '<span class="imdrf-pick-hierarchy">' + escapeHtml(names.join(" › ")) + "</span>"
+        : "") +
+      "</span>"
+    );
   }
 
   ready(function () {
     var roots = Array.prototype.slice.call(document.querySelectorAll("[data-imdrf-picker]"));
 
     roots.forEach(function (root) {
-      var openButton = root.querySelector("[data-imdrf-pick-open]");
-      var panel = root.querySelector("[data-imdrf-pick-panel]");
-      if (!openButton || !panel) return;
+      var searchInput = root.querySelector("[data-imdrf-pick-search]");
+      var resultsEl = root.querySelector("[data-imdrf-pick-results]");
+      var summaryMain = root.querySelector("[data-imdrf-pick-summary-main]");
+      var actionEl = root.querySelector("[data-imdrf-pick-action]");
+      if (!searchInput || !resultsEl) return;
 
-      var searchInput = panel.querySelector("[data-imdrf-pick-search]");
-      var resultsEl = panel.querySelector("[data-imdrf-pick-results]");
+      var releaseId = root.getAttribute("data-release-id") || "";
+      var annex = root.getAttribute("data-annex") || "";
       var searchTimer = null;
       var searchSeq = 0;
 
       function runSearch(query) {
-        var releaseId = currentReleaseId(root);
-        var annex = root.getAttribute("data-annex") || "";
+        var trimmed = query.trim();
+
         if (!releaseId) {
-          resultsEl.innerHTML =
-            '<p class="hint">Choose the IMDRF release above first.</p>';
+          resultsEl.innerHTML = hint("No published IMDRF release is available yet.");
           return;
         }
-        if (query.trim() === "") {
-          resultsEl.innerHTML = '<p class="hint">Type a code or a term to search.</p>';
+        if (trimmed.length < MIN_QUERY_LENGTH) {
+          resultsEl.innerHTML = hint(
+            "Type at least " + String(MIN_QUERY_LENGTH) + " characters to search.",
+          );
           return;
         }
 
         var seq = ++searchSeq;
-        resultsEl.innerHTML = '<p class="hint">Searching…</p>';
+        resultsEl.innerHTML = hint("Searching…");
 
         getJson(
           "/imdrf/releases/" +
@@ -145,53 +191,57 @@
             "/search?annex=" +
             encodeURIComponent(annex) +
             "&q=" +
-            encodeURIComponent(query) +
+            encodeURIComponent(trimmed) +
             "&limit=" +
             String(RESULTS_LIMIT),
         )
           .then(function (data) {
             if (seq !== searchSeq) return; // a faster keystroke already replaced this
             renderResults(resultsEl, data.rows || [], function (termId) {
-              getJson(
-                "/imdrf/releases/" + encodeURIComponent(releaseId) + "/terms/" + termId,
-              ).then(function (term) {
-                if (term.hasChildren) {
-                  // Chosen anyway is refused server-side; here it is simply not offered as done.
-                  resultsEl.innerHTML =
-                    '<p class="hint">That is a category, not a specific term — search for something more specific within it.</p>';
-                  return;
-                }
-                fillFrom(root, term);
-                closePanel(panel, openButton);
-              });
+              getJson("/imdrf/releases/" + encodeURIComponent(releaseId) + "/terms/" + termId)
+                .then(function (term) {
+                  if (isCategory(term)) {
+                    // Refused server-side regardless; here it is simply not offered as done.
+                    resultsEl.innerHTML = hint(
+                      "That is a category, not a specific term — search for something more specific.",
+                    );
+                    return;
+                  }
+                  var ancestry = fillHiddenFields(root, term);
+                  if (summaryMain) summaryMain.innerHTML = chosenSummaryHtml(term, ancestry);
+                  if (actionEl) actionEl.textContent = "Change";
+                  root.open = false;
+                })
+                .catch(function () {
+                  resultsEl.innerHTML = hint("Could not load that term. Try again.");
+                });
             });
           })
           .catch(function () {
             if (seq !== searchSeq) return;
-            resultsEl.innerHTML = '<p class="hint">Could not search. Try again.</p>';
+            resultsEl.innerHTML = hint("Could not search. Try again.");
           });
       }
 
-      openButton.addEventListener("click", function () {
-        var opening = panel.hidden;
-        panel.hidden = !opening;
-        openButton.setAttribute("aria-expanded", opening ? "true" : "false");
-        if (opening && searchInput) {
-          searchInput.value = "";
-          resultsEl.innerHTML = '<p class="hint">Type a code or a term to search.</p>';
-          searchInput.focus();
-        }
+      searchInput.addEventListener("input", function () {
+        window.clearTimeout(searchTimer);
+        var query = searchInput.value;
+        searchTimer = window.setTimeout(function () {
+          runSearch(query);
+        }, SEARCH_DEBOUNCE_MS);
       });
 
-      if (searchInput) {
-        searchInput.addEventListener("input", function () {
-          window.clearTimeout(searchTimer);
-          var query = searchInput.value;
-          searchTimer = window.setTimeout(function () {
-            runSearch(query);
-          }, SEARCH_DEBOUNCE_MS);
-        });
-      }
+      // Re-opening the disclosure (native `<details>` toggle) is the moment to focus the search
+      // box and show the minimum-length hint again, rather than whatever was left over from the
+      // previous search.
+      root.addEventListener("toggle", function () {
+        if (!root.open) return;
+        searchInput.value = "";
+        resultsEl.innerHTML = hint(
+          "Type at least " + String(MIN_QUERY_LENGTH) + " characters to search.",
+        );
+        searchInput.focus();
+      });
     });
   });
 })();

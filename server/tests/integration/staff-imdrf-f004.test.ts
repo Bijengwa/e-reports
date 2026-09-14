@@ -258,33 +258,100 @@ describe.skipIf(!INTEGRATION_ENABLED)("A1's IMDRF term selection", () => {
     expect(res.body).toContain("category heading");
   });
 
-  it("refuses an unpublished release", async () => {
+  it("ignores a draft release, however new, and uses the latest published one", async () => {
     const { officer, report } = await assigned();
-    const draftRows = await owner.db.execute(sql`
+    // A higher year, but a draft — never eligible, whatever its year.
+    await owner.db.execute(sql`
       INSERT INTO imdrf_releases (release_year, source_file_name, status)
-      VALUES (2027, 'draft.json', 'draft'::imdrf_release_status)
-      RETURNING id
+      VALUES (9001, 'draft.json', 'draft'::imdrf_release_status)
     `);
-    const draftId = (draftRows[0] as { id: string }).id;
 
-    const res = await post(
-      `/reports/${report.id}/assessment-1`,
-      officer.cookie,
-      baseAssessment({ imdrf_release_id: draftId }),
-    );
+    const res = await post(`/reports/${report.id}/assessment-1`, officer.cookie, baseAssessment());
+    expect(res.statusCode).toBe(302);
 
-    expect(res.statusCode).toBe(422);
-    expect(res.body).toContain("not published");
+    const payload = await payloadOf(report.id, 1);
+    expect(payload.imdrf_release_id).toBe(imdrf.releaseId);
   });
 
-  it("refuses a term id that belongs to a different release", async () => {
+  it("does not select an older published release over a newer one for a brand-new assessment", async () => {
     const { officer, report } = await assigned();
-    const otherRelease = await seedImdrfForF004(owner.db);
+    const newer = await seedImdrfForF004(owner.db); // a higher release_year than `imdrf`'s
+
+    const res = await post(`/reports/${report.id}/assessment-1`, officer.cookie, baseAssessment());
+    expect(res.statusCode).toBe(422); // `imdrf`'s own term ids no longer belong to the latest release
+    expect(res.body).toContain("does not exist in the selected IMDRF release");
+
+    // Using the newer release's own terms succeeds, and that is the release recorded.
+    const retried = await post(
+      `/reports/${report.id}/assessment-1`,
+      officer.cookie,
+      baseAssessment(imdrfAssessmentFields(newer)),
+    );
+    expect(retried.statusCode).toBe(302);
+    expect((await payloadOf(report.id, 1)).imdrf_release_id).toBe(newer.releaseId);
+  });
+
+  it("keeps an existing assessment on its original release even after a newer one is published", async () => {
+    const { officer, report } = await assigned();
+
+    const draft = await post(
+      `/reports/${report.id}/assessment-1`,
+      officer.cookie,
+      baseAssessment({ intent: "save" }),
+    );
+    expect(draft.statusCode).toBe(302);
+    expect((await payloadOf(report.id, 1)).imdrf_release_id).toBe(imdrf.releaseId);
+
+    // A new, later release goes live after work on this report already started.
+    await seedImdrfForF004(owner.db);
+
+    const submitted = await post(
+      `/reports/${report.id}/assessment-1`,
+      officer.cookie,
+      baseAssessment(),
+    );
+    expect(submitted.statusCode).toBe(302);
+    // Still the release this report started on — never silently moved onto the new one.
+    expect((await payloadOf(report.id, 1)).imdrf_release_id).toBe(imdrf.releaseId);
+  });
+
+  it("ignores a hand-edited imdrf_release_id — the assessor cannot choose or change it", async () => {
+    const { officer, report } = await assigned();
+    const other = await seedImdrfForF004(owner.db);
 
     const res = await post(
       `/reports/${report.id}/assessment-1`,
       officer.cookie,
-      baseAssessment({ imdrf_component_term_id: otherRelease.term.component }),
+      // A hand-crafted body naming a release id directly, with `imdrf`'s own (older) term ids.
+      baseAssessment({ imdrf_release_id: other.releaseId }),
+    );
+
+    // Resolves to the latest published release (`other`), never the one named in the POST — so
+    // `imdrf`'s own component term id, which belongs to the older release, no longer resolves.
+    expect(res.statusCode).toBe(422);
+    expect(res.body).toContain("does not exist in the selected IMDRF release");
+  });
+
+  it("refuses a term id that belongs to a different (draft) release", async () => {
+    const { officer, report } = await assigned();
+    const foreignRows = await owner.db.execute(sql`
+      INSERT INTO imdrf_releases (release_year, source_file_name, status)
+      VALUES (9101, 'other.json', 'draft'::imdrf_release_status)
+      RETURNING id
+    `);
+    const foreignReleaseId = (foreignRows[0] as { id: string }).id;
+    const foreignTerm = await owner.db.execute(sql`
+      INSERT INTO imdrf_terms (release_id, annex, code, term, code_hierarchy, level, sort_order)
+      VALUES (${foreignReleaseId}, 'G', 'G99', 'Foreign term', 'G99', 1, 0)
+      RETURNING id
+    `);
+
+    const res = await post(
+      `/reports/${report.id}/assessment-1`,
+      officer.cookie,
+      baseAssessment({
+        imdrf_component_term_id: (foreignTerm[0] as { id: string }).id,
+      }),
     );
 
     expect(res.statusCode).toBe(422);
@@ -349,6 +416,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("a secondary assessor's IMDRF Disagree rep
   function agreeExcept(overrides: Record<string, string>): Record<string, string> {
     const keys = [
       "1.3",
+      "1.10",
       "1.11",
       "1.19",
       "2.5",
