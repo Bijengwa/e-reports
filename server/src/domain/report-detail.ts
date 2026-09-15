@@ -104,12 +104,12 @@ export type ReportDetail = ReportRow & {
 
 /** Where an Officer opens the first assessment of a report that is theirs. */
 export function assessment1Href(reportId: string): string {
-  return `/register/${reportId}/assessment-1`;
+  return `/reports/${reportId}/assessment-1`;
 }
 
 /** Where an Officer opens their own secondary assessment of a report, whatever ordinal it is. */
 export function secondaryAssessmentHref(reportId: string): string {
-  return `/register/${reportId}/secondary-assessment`;
+  return `/reports/${reportId}/secondary-assessment`;
 }
 
 /**
