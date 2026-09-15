@@ -27,6 +27,7 @@ beforeEach(async () => {
 function submission() {
   const result = validateSubmission({
     device_name: "Infusion Pump X",
+    report_type: "incident",
     incident_date: "2026-08-01",
     incident_narrative: "Pump stopped mid-infusion.",
     event_type: ["Hospitalization"],

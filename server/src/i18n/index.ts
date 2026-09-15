@@ -69,14 +69,28 @@ const messages = {
     sw: "Majibu yako bado yapo kwenye ukurasa huu, lakini kumbukumbu za TMDA hazikufikika, hivyo ripoti hii HAIJAWASILISHWA. Tafadhali jaribu tena baada ya muda mfupi.",
   },
 
+  // ---- Report type -------------------------------------------------------------
+  "f.report_type": {
+    en: "What are you reporting?",
+    sw: "Unaripoti nini?",
+  },
+  "o.report_type.incident": {
+    en: "Incident / device problem — something went wrong with the device itself",
+    sw: "Tukio / tatizo la kifaa — kuna kilichokwenda vibaya kwenye kifaa chenyewe",
+  },
+  "o.report_type.adverse_event": {
+    en: "Adverse event — a patient or user was harmed",
+    sw: "Tukio baya — mgonjwa au mtumiaji alipata madhara",
+  },
+
   // ---- Step 1: device --------------------------------------------------------
   "f.device_name": {
     en: "Full name of the medical device or in vitro diagnostic",
     sw: "Jina kamili la kifaa tiba au kitendanishi cha uchunguzi",
   },
   "f.device_name.ph": {
-    en: "Exactly as written on the label",
-    sw: "Kama kilivyoandikwa kwenye lebo",
+    en: "Generated automatically from Brand name and Common name below",
+    sw: "Inatengenezwa kiotomatiki kutoka Jina la biashara na Jina linalojulikana hapa chini",
   },
   "f.brand_name": { en: "Brand name", sw: "Jina la biashara" },
   "f.common_name": { en: "Common name", sw: "Jina linalojulikana" },

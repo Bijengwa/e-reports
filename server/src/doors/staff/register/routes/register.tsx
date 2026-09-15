@@ -15,6 +15,7 @@ type RegisterQueryRow = {
   tmda_report_number: string | null;
   date_received: string | null;
   device_brand_name: string | null;
+  device_common_name: string | null;
   device_name: string | null;
   size: string | null;
   batch_lot_serial_number: string | null;
@@ -51,6 +52,7 @@ async function loadRegisterRows(db: Database): Promise<ReadonlyArray<RegisterRow
       r.number as tmda_report_number,
       TO_CHAR(r.received_at, 'YYYY-MM-DD') as date_received,
       (r.payload->>'brand_name')::text as device_brand_name,
+      (r.payload->>'common_name')::text as device_common_name,
       r.device_name,
       (r.payload->>'size')::text as size,
       COALESCE((r.payload->>'batch_number'), (r.payload->>'serial_number'), '')::text as batch_lot_serial_number,
@@ -94,7 +96,7 @@ async function loadRegisterRows(db: Database): Promise<ReadonlyArray<RegisterRow
       tmda_report_number: cell(row.tmda_report_number),
       date_received: cell(row.date_received),
       device_brand_name: cell(row.device_brand_name),
-      device_common_name: cell(row.device_name),
+      device_common_name: cell(row.device_common_name),
       size: cell(row.size),
       batch_lot_serial_number: cell(row.batch_lot_serial_number),
       device_type: cell(row.device_type),
@@ -139,6 +141,3 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       .send(body);
   });
 }
-
-
-

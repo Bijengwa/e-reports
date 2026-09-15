@@ -103,12 +103,11 @@ function completeForm(overrides: Record<string, string> = {}): Record<string, st
   return {
     step: "5",
     action: "submit",
-    device_name: "Infusion Pump X",
+    report_type: "incident",
+    brand_name: "Infusion Pump X",
     incident_date: "2026-08-01",
     incident_type: "Malfunction",
     incident_narrative: "Pump stopped mid-infusion.",
-    event_type: "Hospitalization",
-    event_narrative: "Patient kept overnight for observation.",
     measures_taken: "Taken out of service.",
     informed_supplier: "No",
     reporter_name: "A. Mwita",
@@ -154,12 +153,15 @@ type Row = {
   status: string;
   channel: string;
   entered_by_user_id: string | null;
+  device_name: string;
+  payload: Record<string, unknown>;
 };
 
 /** The one report the test filed, insisted upon rather than assumed. */
 async function onlyReport(): Promise<Row> {
   const rows = await owner.db.execute(sql`
-    SELECT id, number, status::text AS status, channel::text AS channel, entered_by_user_id
+    SELECT id, number, status::text AS status, channel::text AS channel, entered_by_user_id,
+           device_name, payload
       FROM reports
   `);
 
@@ -234,7 +236,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("filing one", () => {
 
     // Complete on the step being submitted, missing a field on the first. Submitting re-checks
     // every step, which is what stops a hand-written POST filing half a report.
-    const res = await file(officer.cookie, completeForm({ device_name: "" }));
+    const res = await file(officer.cookie, completeForm({ report_type: "" }));
 
     expect(res.statusCode).toBe(422);
     expect(await reportCount()).toBe(0);
@@ -255,6 +257,21 @@ describe.skipIf(!INTEGRATION_ENABLED)("filing one", () => {
     expect(row.status).toBe("received");
     expect(row.channel).toBe("email");
     expect(row.entered_by_user_id).toBe(officer.id);
+  });
+
+  it("derives the device full name and persists the report type through to the row", async () => {
+    const officer = await signedInAs("assessor");
+
+    await file(
+      officer.cookie,
+      completeForm({ brand_name: "B. Braun Perfusor", common_name: "Infusion Pump" }),
+    );
+    const row = await onlyReport();
+
+    expect(row.device_name).toBe("B. Braun Perfusor — Infusion Pump");
+    expect(row.payload.report_type).toBe("incident");
+    expect(row.payload.brand_name).toBe("B. Braun Perfusor");
+    expect(row.payload.common_name).toBe("Infusion Pump");
   });
 
   it("names the Officer who typed it on the report", async () => {

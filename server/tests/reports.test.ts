@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { firstIncompleteStep, pruneDependents, validateStep } from "../src/domain/form-schema.js";
+import {
+  deriveDeviceFullName,
+  firstIncompleteStep,
+  pruneDependents,
+  validateStep,
+} from "../src/domain/form-schema.js";
 import { normalizePhone } from "../src/domain/phone.js";
 import {
   type Answers,
@@ -13,6 +18,7 @@ import {
 function complete(overrides: Answers = {}): Answers {
   return {
     device_name: "Infusion Pump X",
+    report_type: "incident",
     incident_date: "2026-08-01",
     incident_narrative: "Pump stopped mid-infusion.",
     event_type: ["Hospitalization"],
@@ -65,11 +71,86 @@ describe("submission validation", () => {
     expect(result.ok === false && result.errors).toContain("Name or initials is required");
   });
 
-  it("requires at least one type of event", () => {
-    const result = validateSubmission(complete({ event_type: [] }));
+  it("requires at least one type of event, but only for an adverse event report", () => {
+    const result = validateSubmission(complete({ report_type: "adverse_event", event_type: [] }));
 
     expect(result.ok).toBe(false);
     expect(result.ok === false && result.errors).toContain("Type of event is required");
+  });
+});
+
+describe("report type", () => {
+  it("requires incident details for an incident report, not event details", () => {
+    const result = validateSubmission(
+      complete({ report_type: "incident", event_type: [], event_narrative: "" }),
+    );
+
+    expect(result.ok).toBe(true);
+  });
+
+  it("requires event details for an adverse event report, not incident details", () => {
+    const result = validateSubmission(
+      complete({
+        report_type: "adverse_event",
+        incident_date: "",
+        incident_narrative: "",
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+  });
+
+  it("still refuses an incident report missing its own incident details", () => {
+    const result = validateSubmission(complete({ report_type: "incident", incident_date: "" }));
+
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.errors).toContain("Onset date of incident is required");
+  });
+
+  it("still refuses an adverse event report missing its own event details", () => {
+    const result = validateSubmission(
+      complete({ report_type: "adverse_event", event_narrative: "" }),
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.errors).toContain("Event narrative is required");
+  });
+
+  it("names the field instead of leaking an enum error", () => {
+    const result = validateSubmission(complete({ report_type: undefined as never }));
+
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.errors).toContain("Report type is required");
+  });
+
+  it("is persisted on the stored submission", () => {
+    const result = validateSubmission(complete({ report_type: "adverse_event" }));
+
+    expect(result.ok && result.submission.report_type).toBe("adverse_event");
+  });
+});
+
+describe("derived device full name", () => {
+  it("joins brand and common name", () => {
+    expect(deriveDeviceFullName("B. Braun Perfusor", "Infusion Pump")).toBe(
+      "B. Braun Perfusor — Infusion Pump",
+    );
+  });
+
+  it("falls back to whichever half is present", () => {
+    expect(deriveDeviceFullName("B. Braun Perfusor", "")).toBe("B. Braun Perfusor");
+    expect(deriveDeviceFullName("", "Infusion Pump")).toBe("Infusion Pump");
+  });
+
+  it("is empty rather than a stray separator when neither is given", () => {
+    expect(deriveDeviceFullName("", "")).toBe("");
+    expect(deriveDeviceFullName("  ", "  ")).toBe("");
+  });
+
+  it("trims whitespace from each half", () => {
+    expect(deriveDeviceFullName("  B. Braun Perfusor  ", "  Infusion Pump  ")).toBe(
+      "B. Braun Perfusor — Infusion Pump",
+    );
   });
 });
 

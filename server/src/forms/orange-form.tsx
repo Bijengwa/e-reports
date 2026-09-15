@@ -1,9 +1,12 @@
 import type { Children } from "@kitajs/html";
 import {
+  ADVERSE_EVENT_DEPENDENCY,
   type Answers,
   DEPENDENCIES,
   type Dependency,
+  dependencyMet,
   FIRST_STEP,
+  INCIDENT_DEPENDENCY,
   type Issue,
   LAST_STEP,
   list,
@@ -115,9 +118,11 @@ function TextField(
     placeholderKey?: MessageKey;
     min?: string;
     fallback?: string;
+    /** Shown but not typeable: its value comes from other fields, not from this one. */
+    readOnly?: boolean;
   },
 ): JSX.Element {
-  const { t, answers, issues, name, labelKey, required, type = "text" } = props;
+  const { t, answers, issues, name, labelKey, required, type = "text", readOnly } = props;
   const invalid = issueFor(issues, name) !== undefined;
 
   return (
@@ -129,7 +134,11 @@ function TextField(
         type={type}
         id={name}
         name={name}
-        required={required}
+        // A read-only field cannot be edited to satisfy `required`, so the browser must never be
+        // told to block submission on it — the server enforces it against the fields it is built
+        // from instead (see `deriveDeviceFullName`).
+        required={readOnly ? undefined : required}
+        readonly={readOnly}
         min={props.min}
         aria-invalid={invalid ? "true" : undefined}
         aria-describedby={invalid ? `${name}-error` : undefined}
@@ -420,6 +429,20 @@ export function OrangeForm(props: OrangeFormProps): JSX.Element {
             <div class="card-b">
               {currentStep === 1 && (
                 <div>
+                  <Choices
+                    t={t}
+                    answers={answers}
+                    issues={issues}
+                    name="report_type"
+                    labelKey="f.report_type"
+                    type="radio"
+                    required
+                    options={[
+                      { value: "incident", labelKey: "o.report_type.incident" },
+                      { value: "adverse_event", labelKey: "o.report_type.adverse_event" },
+                    ]}
+                  />
+
                   <TextField
                     t={t}
                     answers={answers}
@@ -427,7 +450,7 @@ export function OrangeForm(props: OrangeFormProps): JSX.Element {
                     name="device_name"
                     labelKey="f.device_name"
                     placeholderKey="f.device_name.ph"
-                    required
+                    readOnly
                   />
 
                   <div class="grid2">
@@ -561,62 +584,64 @@ export function OrangeForm(props: OrangeFormProps): JSX.Element {
                     {t("lead.incident")}
                   </p>
 
-                  <div class="grid2">
-                    <TextField
+                  <Dependent dep={INCIDENT_DEPENDENCY} answers={answers}>
+                    <div class="grid2">
+                      <TextField
+                        t={t}
+                        answers={answers}
+                        issues={issues}
+                        name="incident_date"
+                        labelKey="f.incident_date"
+                        type="date"
+                        required={dependencyMet(answers, INCIDENT_DEPENDENCY)}
+                      />
+                      <TextField
+                        t={t}
+                        answers={answers}
+                        issues={issues}
+                        name="devices_involved"
+                        labelKey="f.devices_involved"
+                        type="number"
+                        min="1"
+                        fallback="1"
+                      />
+                    </div>
+
+                    <Choices
                       t={t}
                       answers={answers}
                       issues={issues}
-                      name="incident_date"
-                      labelKey="f.incident_date"
-                      type="date"
-                      required
+                      name="incident_type"
+                      labelKey="f.incident_type"
+                      type="checkbox"
+                      required={dependencyMet(answers, INCIDENT_DEPENDENCY)}
+                      options={[
+                        { value: "Inadequate design", labelKey: "o.incident.design" },
+                        { value: "Inaccurate labeling", labelKey: "o.incident.labeling" },
+                        { value: "Malfunction", labelKey: "o.incident.malfunction" },
+                        { value: "Deterioration", labelKey: "o.incident.deterioration" },
+                        { value: "Other", labelKey: "o.other" },
+                      ]}
                     />
-                    <TextField
+                    <OtherBox
                       t={t}
                       answers={answers}
                       issues={issues}
-                      name="devices_involved"
-                      labelKey="f.devices_involved"
-                      type="number"
-                      min="1"
-                      fallback="1"
+                      name="incident_type_other"
+                      labelKey="f.incident_type_other"
                     />
-                  </div>
 
-                  <Choices
-                    t={t}
-                    answers={answers}
-                    issues={issues}
-                    name="incident_type"
-                    labelKey="f.incident_type"
-                    type="checkbox"
-                    required
-                    options={[
-                      { value: "Inadequate design", labelKey: "o.incident.design" },
-                      { value: "Inaccurate labeling", labelKey: "o.incident.labeling" },
-                      { value: "Malfunction", labelKey: "o.incident.malfunction" },
-                      { value: "Deterioration", labelKey: "o.incident.deterioration" },
-                      { value: "Other", labelKey: "o.other" },
-                    ]}
-                  />
-                  <OtherBox
-                    t={t}
-                    answers={answers}
-                    issues={issues}
-                    name="incident_type_other"
-                    labelKey="f.incident_type_other"
-                  />
-
-                  <TextArea
-                    t={t}
-                    answers={answers}
-                    issues={issues}
-                    name="incident_narrative"
-                    labelKey="f.incident_narrative"
-                    placeholderKey="f.incident_narrative.ph"
-                    rows="tall"
-                    required
-                  />
+                    <TextArea
+                      t={t}
+                      answers={answers}
+                      issues={issues}
+                      name="incident_narrative"
+                      labelKey="f.incident_narrative"
+                      placeholderKey="f.incident_narrative.ph"
+                      rows="tall"
+                      required={dependencyMet(answers, INCIDENT_DEPENDENCY)}
+                    />
+                  </Dependent>
                 </div>
               )}
 
@@ -626,61 +651,63 @@ export function OrangeForm(props: OrangeFormProps): JSX.Element {
                     {t("lead.event")}
                   </p>
 
-                  <div class="grid2">
-                    <TextField
+                  <Dependent dep={ADVERSE_EVENT_DEPENDENCY} answers={answers}>
+                    <div class="grid2">
+                      <TextField
+                        t={t}
+                        answers={answers}
+                        issues={issues}
+                        name="event_date"
+                        labelKey="f.event_date"
+                        type="date"
+                      />
+                      <TextField
+                        t={t}
+                        answers={answers}
+                        issues={issues}
+                        name="users_involved"
+                        labelKey="f.users_involved"
+                        type="number"
+                        min="0"
+                        fallback="1"
+                      />
+                    </div>
+
+                    <Choices
                       t={t}
                       answers={answers}
                       issues={issues}
-                      name="event_date"
-                      labelKey="f.event_date"
-                      type="date"
+                      name="event_type"
+                      labelKey="f.event_type"
+                      type="checkbox"
+                      required={dependencyMet(answers, ADVERSE_EVENT_DEPENDENCY)}
+                      options={[
+                        { value: "Death", labelKey: "o.event.death" },
+                        { value: "Life threatening", labelKey: "o.event.lifeThreatening" },
+                        { value: "Malfunction", labelKey: "o.event.malfunction" },
+                        { value: "Persistent disability", labelKey: "o.event.disability" },
+                        { value: "Hospitalization", labelKey: "o.event.hospitalization" },
+                        { value: "Other", labelKey: "o.other" },
+                      ]}
                     />
-                    <TextField
+                    <OtherBox
                       t={t}
                       answers={answers}
                       issues={issues}
-                      name="users_involved"
-                      labelKey="f.users_involved"
-                      type="number"
-                      min="0"
-                      fallback="1"
+                      name="event_type_other"
+                      labelKey="f.event_type_other"
                     />
-                  </div>
 
-                  <Choices
-                    t={t}
-                    answers={answers}
-                    issues={issues}
-                    name="event_type"
-                    labelKey="f.event_type"
-                    type="checkbox"
-                    required
-                    options={[
-                      { value: "Death", labelKey: "o.event.death" },
-                      { value: "Life threatening", labelKey: "o.event.lifeThreatening" },
-                      { value: "Malfunction", labelKey: "o.event.malfunction" },
-                      { value: "Persistent disability", labelKey: "o.event.disability" },
-                      { value: "Hospitalization", labelKey: "o.event.hospitalization" },
-                      { value: "Other", labelKey: "o.other" },
-                    ]}
-                  />
-                  <OtherBox
-                    t={t}
-                    answers={answers}
-                    issues={issues}
-                    name="event_type_other"
-                    labelKey="f.event_type_other"
-                  />
-
-                  <TextArea
-                    t={t}
-                    answers={answers}
-                    issues={issues}
-                    name="event_narrative"
-                    labelKey="f.event_narrative"
-                    rows="tall"
-                    required
-                  />
+                    <TextArea
+                      t={t}
+                      answers={answers}
+                      issues={issues}
+                      name="event_narrative"
+                      labelKey="f.event_narrative"
+                      rows="tall"
+                      required={dependencyMet(answers, ADVERSE_EVENT_DEPENDENCY)}
+                    />
+                  </Dependent>
                 </div>
               )}
 

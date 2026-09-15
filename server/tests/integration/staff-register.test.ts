@@ -237,6 +237,20 @@ describe.skipIf(!INTEGRATION_ENABLED)("staff Register data mapping", () => {
     expect(page.body).not.toContain(">Done<");
     expect(page.body).not.toContain(">Not Done<");
   });
+
+  it("shows the actual common name, not the combined full name, in its own column", async () => {
+    // brand_name and common_name are kept apart on the form; the Register must keep them apart
+    // too, rather than printing the derived full name under the common-name heading.
+    await seedReport({
+      number: "AEMD/2026-27/104",
+      payload: { brand_name: "B. Braun Perfusor", common_name: "Infusion Pump" },
+    });
+
+    const page = await get("/register", (await signedInAs("manager")).cookie);
+
+    expect(page.body).toContain("B. Braun Perfusor");
+    expect(page.body).toContain("Infusion Pump");
+  });
 });
 
 describe.skipIf(!INTEGRATION_ENABLED)("staff Register access and download", () => {

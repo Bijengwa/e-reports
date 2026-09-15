@@ -47,19 +47,40 @@ const asList = z.preprocess(
   z.array(z.string().trim().min(1)),
 );
 
+/** A field normalised the same way as `required`, but left blank rather than rejected when empty. */
+const optionalText = z.preprocess(
+  (value) => (Array.isArray(value) ? value.join(", ") : (value ?? "")),
+  z.string().trim(),
+);
+
+/** The two kinds of situation the orange form can carry. */
+export const REPORT_TYPES = ["incident", "adverse_event"] as const;
+export type ReportType = (typeof REPORT_TYPES)[number];
+
+const reportType = z.preprocess(
+  (value) => (Array.isArray(value) ? value[0] : value),
+  z.enum(REPORT_TYPES, { error: "Report type is required" }),
+);
+
 /**
  * What the form must contain before it can become a report.
  *
  * These mirror the fields marked with a red asterisk. The browser enforces them too, but browser
  * validation is a convenience for the reporter, not a guarantee to us — anything can post here.
+ *
+ * Incident details and event details are each required only for the report type that asks for
+ * them — see the `superRefine` below, which is the one place both this schema and the wizard's own
+ * step rules (`domain/form-schema.ts`) have to agree, since a hand-written POST reaches this schema
+ * without ever going through a step.
  */
 export const SubmissionSchema = z
   .object({
     device_name: required("Device name"),
-    incident_date: required("Onset date of incident"),
-    incident_narrative: required("Incident narrative"),
-    event_type: asList.refine((types) => types.length > 0, "Type of event is required"),
-    event_narrative: required("Event narrative"),
+    report_type: reportType,
+    incident_date: optionalText,
+    incident_narrative: optionalText,
+    event_type: asList,
+    event_narrative: optionalText,
     measures_taken: required("Measures taken"),
     reporter_name: required("Name or initials"),
     facility_address: required("Physical address"),
@@ -88,7 +109,42 @@ export const SubmissionSchema = z
     report_date: required("Date of report"),
     device_location: required("Current location of the device"),
   })
-  .passthrough();
+  .passthrough()
+  .superRefine((data, ctx) => {
+    if (data.report_type === "incident") {
+      if (data.incident_date.trim() === "") {
+        ctx.addIssue({
+          code: "custom",
+          path: ["incident_date"],
+          message: "Onset date of incident is required",
+        });
+      }
+      if (data.incident_narrative.trim() === "") {
+        ctx.addIssue({
+          code: "custom",
+          path: ["incident_narrative"],
+          message: "Incident narrative is required",
+        });
+      }
+    }
+
+    if (data.report_type === "adverse_event") {
+      if (data.event_type.length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["event_type"],
+          message: "Type of event is required",
+        });
+      }
+      if (data.event_narrative.trim() === "") {
+        ctx.addIssue({
+          code: "custom",
+          path: ["event_narrative"],
+          message: "Event narrative is required",
+        });
+      }
+    }
+  });
 
 export type Submission = z.infer<typeof SubmissionSchema>;
 

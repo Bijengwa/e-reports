@@ -44,6 +44,15 @@ describe("door isolation", () => {
     expect(res.body).toContain('name="device_name"');
   });
 
+  it("has no Office Improvement field on the orange form", async () => {
+    // Not part of this document: the Orange Report captures the device problem and its outcome,
+    // not what the office plans to do differently, and must never grow a field for it.
+    const res = await app.inject({ url: "/", headers: { host: config.PUBLIC_HOST } });
+
+    expect(res.body.toLowerCase()).not.toContain("office improvement");
+    expect(res.body).not.toContain('name="office_improvement"');
+  });
+
   it("serves staff sign-in on the staff host", async () => {
     const res = await app.inject({ url: "/", headers: { host: config.STAFF_HOST } });
 
@@ -115,17 +124,16 @@ describe("orange form wizard", () => {
     return /<li class="on"><button[^>]*><span class="num">(\d)/.exec(html)?.[1];
   }
 
-  /** Enough of step 1 to get past it. */
-  const step1 = { device_name: "Infusion Pump X" };
+  /** Enough of step 1 to get past it. Brand alone, so the derived full name matches it exactly. */
+  const step1 = { report_type: "incident", brand_name: "Infusion Pump X" };
   const completeSubmission = {
     step: "5",
     action: "submit",
-    device_name: "Infusion Pump X",
+    report_type: "incident",
+    brand_name: "Infusion Pump X",
     incident_date: "2026-08-01",
     incident_type: "Malfunction",
     incident_narrative: "Pump stopped mid-infusion.",
-    event_type: "Hospitalization",
-    event_narrative: "Patient kept overnight for observation.",
     measures_taken: "Taken out of service.",
     informed_supplier: "No",
     reporter_name: "A. Mwita",
@@ -137,15 +145,26 @@ describe("orange form wizard", () => {
   } as const;
 
   it("moves forward a step on Continue", async () => {
-    const res = await post({ step: "1", action: "next", device_name: "Infusion Pump X" });
+    const res = await post({
+      step: "1",
+      action: "next",
+      report_type: "incident",
+      brand_name: "Infusion Pump X",
+    });
 
     expect(currentStep(res.body)).toBe("2");
     expect(res.body).toContain('name="incident_narrative"');
   });
 
   it("carries answers from other steps as hidden inputs", async () => {
-    const res = await post({ step: "1", action: "next", device_name: "Infusion Pump X" });
+    const res = await post({
+      step: "1",
+      action: "next",
+      report_type: "incident",
+      brand_name: "Infusion Pump X",
+    });
 
+    // Derived from brand_name, and carried like any other step-1 answer.
     expect(res.body).toContain('type="hidden" name="device_name" value="Infusion Pump X"');
   });
 
@@ -153,14 +172,15 @@ describe("orange form wizard", () => {
     const res = await post({
       step: "2",
       action: "back",
-      device_name: "Infusion Pump X",
+      brand_name: "Infusion Pump X",
       source: "Hospital",
       incident_date: "2026-08-01",
     });
 
     expect(currentStep(res.body)).toBe("1");
-    // Step 1 is on screen, so its answers come back as real values, not hidden inputs.
-    expect(res.body).toContain('name="device_name" required value="Infusion Pump X"');
+    // Step 1 is on screen, so its answers come back as real values, not hidden inputs. The full
+    // name is read-only rather than required: the reporter cannot fix it by typing into it.
+    expect(res.body).toContain('name="device_name" readonly value="Infusion Pump X"');
     expect(res.body).toContain('value="Hospital" checked');
     // The step-2 answer is not on screen but must survive the round trip.
     expect(res.body).toContain('name="incident_date" value="2026-08-01"');
@@ -304,20 +324,73 @@ describe("orange form wizard", () => {
   });
 
   it("escapes reporter input on the way back out", async () => {
+    // The full name is no longer typed directly, so the injection has to arrive through one of
+    // the fields it is derived from.
     const res = await post({
       step: "1",
       action: "next",
-      device_name: '" autofocus onfocus="alert(1)',
+      brand_name: '" autofocus onfocus="alert(1)',
     });
 
     expect(res.body).not.toContain('value="" autofocus onfocus="');
     expect(res.body).toContain("&#34;");
   });
 
-  it("keeps the existing not-filed message when final storage fails", async () => {
-    const transaction = vi.spyOn(app.db, "transaction").mockRejectedValueOnce(
-      new Error("Failed query: INSERT INTO reports"),
+  it("derives the full name from brand and common name, ignoring whatever is posted for it", async () => {
+    const res = await post({
+      step: "1",
+      action: "next",
+      device_name: "a name nobody typed into brand or common",
+      brand_name: "B. Braun Perfusor",
+      common_name: "Infusion Pump",
+    });
+
+    expect(res.body).toContain(
+      'name="device_name" readonly value="B. Braun Perfusor — Infusion Pump"',
     );
+    expect(res.body).not.toContain("a name nobody typed into brand or common");
+  });
+
+  it("derives the full name from whichever of brand or common name is given", async () => {
+    const brandOnly = await post({ step: "1", action: "next", brand_name: "Revital" });
+    expect(brandOnly.body).toContain('name="device_name" readonly value="Revital"');
+
+    const commonOnly = await post({ step: "1", action: "next", common_name: "Infusion set" });
+    expect(commonOnly.body).toContain('name="device_name" readonly value="Infusion set"');
+  });
+
+  it("does not require event details on step 3 for an incident report", async () => {
+    const res = await post({ step: "3", action: "next", report_type: "incident" });
+
+    expect(res.statusCode).toBe(200);
+    expect(currentStep(res.body)).toBe("4");
+  });
+
+  it("does not require incident details on step 2 for an adverse event report", async () => {
+    const res = await post({ step: "2", action: "next", report_type: "adverse_event" });
+
+    expect(res.statusCode).toBe(200);
+    expect(currentStep(res.body)).toBe("3");
+  });
+
+  it("still requires event details on step 3 for an adverse event report", async () => {
+    const res = await post({ step: "3", action: "next", report_type: "adverse_event" });
+
+    expect(res.statusCode).toBe(422);
+    expect(currentStep(res.body)).toBe("3");
+  });
+
+  it("still requires incident details on step 2 for an incident report", async () => {
+    const res = await post({ step: "2", action: "next", report_type: "incident" });
+
+    expect(res.statusCode).toBe(422);
+    expect(currentStep(res.body)).toBe("2");
+  });
+
+  it("keeps the existing not-filed message when final storage fails", async () => {
+    const transaction = vi
+      .spyOn(app.db, "transaction")
+      .mockRejectedValueOnce(new Error("Failed query: INSERT INTO reports"));
 
     const res = await post({
       ...completeSubmission,
@@ -373,11 +446,13 @@ describe("staff sign-in", () => {
   });
 
   it("hides database failures behind a generic sign-in message", async () => {
-    const execute = vi.spyOn(app.db, "execute").mockRejectedValueOnce(
-      new Error(
-        "Failed query: SELECT id, password_hash, must_change_password FROM users params: a@tmda.go.tz\n    at /srv/app/server.ts:99:1",
-      ),
-    );
+    const execute = vi
+      .spyOn(app.db, "execute")
+      .mockRejectedValueOnce(
+        new Error(
+          "Failed query: SELECT id, password_hash, must_change_password FROM users params: a@tmda.go.tz\n    at /srv/app/server.ts:99:1",
+        ),
+      );
 
     const res = await signIn({ email: "a@tmda.go.tz", password: "correct horse battery staple" });
 
@@ -399,7 +474,9 @@ describe("global request error handling", () => {
     const testApp = await buildServer(config);
 
     testApp.get("/boom", async () => {
-      throw new Error("SELECT * FROM users\nparams: staff@tmda.go.tz\n    at /srv/app/server.ts:101:2");
+      throw new Error(
+        "SELECT * FROM users\nparams: staff@tmda.go.tz\n    at /srv/app/server.ts:101:2",
+      );
     });
 
     await testApp.ready();

@@ -1,12 +1,14 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
   type Answers,
+  deriveDeviceFullName,
   firstIncompleteStep,
   type Issue,
   parseStep,
   type Step,
   shiftStep,
   validateStep,
+  value,
 } from "../domain/form-schema.js";
 import { type Submission, validateSubmission } from "../domain/reports.js";
 import { isAllowedMimeType, MAX_ATTACHMENTS, type StoredObject } from "../storage/index.js";
@@ -116,10 +118,18 @@ export async function parseForm(
 export function collectAnswers(fields: Record<string, string | string[]>): Answers {
   const answers: Answers = {};
 
-  for (const [name, value] of Object.entries(fields)) {
+  for (const [name, raw] of Object.entries(fields)) {
     if (CONTROL_FIELDS.has(name)) continue;
-    answers[name] = value;
+    answers[name] = raw;
   }
+
+  // The full name is derived from brand and common name, never typed: whatever a client posted
+  // for it is discarded here so a hand-written POST cannot make the record disagree with the two
+  // fields it is supposed to be built from.
+  answers.device_name = deriveDeviceFullName(
+    value(answers, "brand_name"),
+    value(answers, "common_name"),
+  );
 
   return answers;
 }

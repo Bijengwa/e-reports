@@ -60,13 +60,42 @@
     }
   }
 
+  /**
+   * Previews the full name the server will derive, so the reporter is not left staring at a blank
+   * read-only box while they type. Purely cosmetic: `domain/form-schema.ts#deriveDeviceFullName`
+   * is what actually decides the stored value, and does so again on every submit regardless of
+   * what this script wrote here.
+   */
+  function applyDeviceName(form) {
+    var deviceName = form.querySelector("#device_name");
+    var brand = form.querySelector("#brand_name");
+    var common = form.querySelector("#common_name");
+    if (!deviceName || !brand || !common) return;
+
+    var parts = [];
+    if (brand.value.trim() !== "") parts.push(brand.value.trim());
+    if (common.value.trim() !== "") parts.push(common.value.trim());
+    deviceName.value = parts.join(" — ");
+  }
+
   function start() {
     var form = document.querySelector("form[data-orange-form]");
     if (!form) return;
 
     apply(form);
+    applyDeviceName(form);
+
     form.addEventListener("change", function () {
       apply(form);
+    });
+
+    // `input` rather than `change`, so the preview updates as the reporter types rather than only
+    // once the field loses focus.
+    form.addEventListener("input", function (event) {
+      var target = event.target;
+      if (target && (target.id === "brand_name" || target.id === "common_name")) {
+        applyDeviceName(form);
+      }
     });
   }
 

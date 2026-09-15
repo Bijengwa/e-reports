@@ -28,6 +28,7 @@ export type Answers = Record<string, string | string[]>;
  */
 export const STEP_FIELDS: Record<Step, readonly string[]> = {
   1: [
+    "report_type",
     "device_name",
     "brand_name",
     "common_name",
@@ -77,6 +78,19 @@ export type Dependency = {
   on: string;
   /** The values of the controlling field that switch this field on. */
   values: readonly string[];
+  /**
+   * Whether `pruneDependents` should erase the answer once this dependency stops holding.
+   *
+   * Defaults to true, which is right for a stray explanation left behind by a since-changed
+   * checkbox. It is wrong for a whole section's worth of narrative gated on `report_type`: the
+   * fields it gates (`incident_type`, `event_type`, ...) are themselves the `on` field for other
+   * dependencies (`incident_type_other`), and `pruneDependents` mutates its answers as it goes, so
+   * erasing `incident_type` before its own dependents are checked would cascade into erasing them
+   * too, even when nothing about their own condition changed. Report-type gating is enforced by
+   * `validateStep` and `SubmissionSchema` instead, which is where it belongs — it decides what is
+   * mandatory, not what survives on the page.
+   */
+  prune?: boolean;
 };
 
 export type Rule = {
@@ -96,8 +110,26 @@ export type Rule = {
  * field: a blank "Have you informed the supplier?" leaves `informed_date` undefined rather than
  * optional, which is not a state a vigilance record should be able to reach.
  */
+/** The two kinds of situation the orange form can carry, as the reporter names one. */
+export const REPORT_TYPES = ["incident", "adverse_event"] as const;
+export type ReportType = (typeof REPORT_TYPES)[number];
+
+/** Whichever report type selects "Incident details" as applicable. */
+export const INCIDENT_DEPENDENCY: Dependency = {
+  on: "report_type",
+  values: ["incident"],
+  prune: false,
+};
+/** Whichever report type selects "Event details" as applicable. */
+export const ADVERSE_EVENT_DEPENDENCY: Dependency = {
+  on: "report_type",
+  values: ["adverse_event"],
+  prune: false,
+};
+
 export const RULES: Record<Step, readonly Rule[]> = {
   1: [
+    { field: "report_type", labelKey: "f.report_type", kind: "text" },
     { field: "device_name", labelKey: "f.device_name", kind: "text" },
     {
       field: "duration_other",
@@ -107,25 +139,50 @@ export const RULES: Record<Step, readonly Rule[]> = {
     },
   ],
   2: [
-    { field: "incident_date", labelKey: "f.incident_date", kind: "text" },
-    { field: "incident_type", labelKey: "f.incident_type", kind: "list" },
+    {
+      field: "incident_date",
+      labelKey: "f.incident_date",
+      kind: "text",
+      requiredWhen: INCIDENT_DEPENDENCY,
+    },
+    {
+      field: "incident_type",
+      labelKey: "f.incident_type",
+      kind: "list",
+      requiredWhen: INCIDENT_DEPENDENCY,
+    },
     {
       field: "incident_type_other",
       labelKey: "f.incident_type_other",
       kind: "text",
       requiredWhen: { on: "incident_type", values: ["Other"] },
     },
-    { field: "incident_narrative", labelKey: "f.incident_narrative", kind: "text" },
+    {
+      field: "incident_narrative",
+      labelKey: "f.incident_narrative",
+      kind: "text",
+      requiredWhen: INCIDENT_DEPENDENCY,
+    },
   ],
   3: [
-    { field: "event_type", labelKey: "f.event_type", kind: "list" },
+    {
+      field: "event_type",
+      labelKey: "f.event_type",
+      kind: "list",
+      requiredWhen: ADVERSE_EVENT_DEPENDENCY,
+    },
     {
       field: "event_type_other",
       labelKey: "f.event_type_other",
       kind: "text",
       requiredWhen: { on: "event_type", values: ["Other"] },
     },
-    { field: "event_narrative", labelKey: "f.event_narrative", kind: "text" },
+    {
+      field: "event_narrative",
+      labelKey: "f.event_narrative",
+      kind: "text",
+      requiredWhen: ADVERSE_EVENT_DEPENDENCY,
+    },
   ],
   4: [
     {
@@ -193,6 +250,19 @@ export function dependencyMet(answers: Answers, dep: Dependency): boolean {
   return dep.values.some((wanted) => current.includes(wanted));
 }
 
+/**
+ * The device's full name, as the paper form prints it — built from what a reporter actually
+ * types, never typed directly.
+ *
+ * Brand and common name are collected separately because they are separate facts; the full name
+ * is what you get from reading both together, so it is computed here instead of being a third
+ * thing the reporter could make disagree with the other two. Either half missing still yields a
+ * usable name rather than a stray separator with nothing on one side of it.
+ */
+export function deriveDeviceFullName(brand: string, common: string): string {
+  return [brand.trim(), common.trim()].filter((part) => part !== "").join(" — ");
+}
+
 // ---- Validation --------------------------------------------------------------
 
 export type Issue = {
@@ -251,6 +321,7 @@ export function pruneDependents(answers: Answers): Answers {
   const pruned: Answers = { ...answers };
 
   for (const [field, dep] of Object.entries(DEPENDENCIES)) {
+    if (dep.prune === false) continue;
     if (!dependencyMet(pruned, dep)) delete pruned[field];
   }
 
