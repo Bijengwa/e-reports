@@ -1011,9 +1011,18 @@ function A2InlineDecision({
 }
 
 /**
- * One of the four section-1 rows the orange form never answers — `ASSESSED_DEVICE_KEYS` — drawn
- * as a finding rather than a fact: a choice or a line of text, required of A1, and reviewable by
- * A2 exactly as 2.5 onward is. `row.no` is the row's own number, which is also its A2 item key.
+ * One of the four section-1 rows the orange form never answers — `ASSESSED_DEVICE_KEYS`.
+ *
+ * Drawn as a row of section 1, not as a block of its own. It used to be a `.f4-block` with its own
+ * heading, which meant section 1 read as fifteen numbered lines with four headed panels wedged
+ * between them: 1.3 arrived as a titled card, 1.10 and 1.11 as a differently-shaped one, and the
+ * document's own numbering — the thing an assessor reads down — broke four times on the way to
+ * 1.19. The answer is a finding rather than a transcription, and that is already said by the
+ * control being a live one on the staff page's own surface, where a reporter's line wears the
+ * orange form's (`.f4-value`). It does not also need a heading repeating the label beside it.
+ *
+ * `row.no` is the row's own number, which is also its A2 item key, so the review block below the
+ * row is the same `A2InlineDecision` every other reviewable item gets.
  */
 function AssessedDeviceField({
   row,
@@ -1039,42 +1048,50 @@ function AssessedDeviceField({
   };
 
   return (
-    <div class="f4-block">
-      <div class="f4-blocktitle">
+    <div class="f4-assessed">
+      <div class="f4-fact">
         <span class="f4-no" safe>
           {row.no}
-        </span>{" "}
-        <span safe>{row.label}</span>
-      </div>
+        </span>
+        <span class="f4-label" safe>
+          {row.label}
+        </span>
+        <div class="f4-answer">
+          {row.key === "device_type" && (
+            <Radios
+              name="device_type"
+              options={DEVICE_TYPE_OPTIONS}
+              answers={answers}
+              locked={locked}
+              a2={a2}
+            />
+          )}
 
-      {row.key === "device_type" && (
-        <Radios
-          name="device_type"
-          options={DEVICE_TYPE_OPTIONS}
-          answers={answers}
-          locked={locked}
-          a2={a2}
-        />
-      )}
+          {row.key === "report_stage" && (
+            <Radios
+              name="report_stage"
+              options={REPORT_STAGE_OPTIONS}
+              answers={answers}
+              locked={locked}
+              a2={a2}
+            />
+          )}
 
-      {row.key === "report_stage" && (
-        <Radios
-          name="report_stage"
-          options={REPORT_STAGE_OPTIONS}
-          answers={answers}
-          locked={locked}
-          a2={a2}
-        />
-      )}
-
-      {(row.key === "registration_number" || row.key === "device_class") && (
-        <div class="f4-field">
-          <label for={row.key} safe>
-            {row.label}
-          </label>
-          <input id={row.key} name={row.key} value={value(answers, row.key)} disabled={locked} />
+          {(row.key === "registration_number" || row.key === "device_class") && (
+            <>
+              <label class="vh" for={row.key} safe>
+                {row.label}
+              </label>
+              <input
+                id={row.key}
+                name={row.key}
+                value={value(answers, row.key)}
+                disabled={locked}
+              />
+            </>
+          )}
         </div>
-      )}
+      </div>
 
       <A2InlineDecision
         itemKey={row.no}
