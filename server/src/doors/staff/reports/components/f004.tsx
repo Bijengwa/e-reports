@@ -43,6 +43,7 @@ import {
   value,
   YES_NO,
 } from "../../../../domain/f004.js";
+import { reasonLabel } from "../../../../domain/f004-semantics.js";
 
 /** a, b, c, … — the paper's own sub-labels, for the IMDRF items and the signal criteria list. */
 const LETTERS = "abcdefghij";
@@ -563,23 +564,38 @@ function Radios({
   );
 }
 
+/**
+ * The prose an assessor writes beside one of their own answers.
+ *
+ * The caption is the item's own, not the word "Comment". The paper's second column is headed
+ * "Comments" and printing that over all six of them tells a reader nothing: the basis for calling
+ * an event a malfunction, the justification of a high risk level and a causality discussion are
+ * three different regulatory statements, and the final document is read by people deciding what
+ * to do about a device. `item` is the number, and `f004-semantics.ts` says what that item's prose
+ * is; `label` overrides it where the item's answer IS the prose (4.3, 7.1's conclusion) and the
+ * registry therefore has no reason role to name.
+ */
 function Comment({
   name,
   answers,
   rows = 5,
-  label = "Comment",
+  item,
+  label,
   locked,
 }: {
   name: string;
   answers: F004Answers;
   rows?: number;
+  item?: string;
   label?: string;
   locked: boolean;
 }): JSX.Element {
+  const caption = label ?? (item === undefined ? null : reasonLabel(item)) ?? "Comment";
+
   return (
     <div class="f4-field">
       <label for={name} safe>
-        {label}
+        {caption}
       </label>
       <textarea id={name} name={name} rows={String(rows)} disabled={locked} safe>
         {value(answers, name)}
@@ -903,6 +919,8 @@ function A2InlineDecision({
       ? (stored as Record<string, string>)
       : {};
 
+  const degrees = allowedDegrees(item);
+
   return (
     <>
       {history}
@@ -912,8 +930,8 @@ function A2InlineDecision({
           <span safe>{`${item.no} ${item.title}`}</span>
         </div>
 
-        <div class={item.clarifiable === false ? "a2-degrees a2-degrees-2" : "a2-degrees"}>
-          {allowedDegrees(item).map((degree) => (
+        <div class={degrees.length === 2 ? "a2-degrees a2-degrees-2" : "a2-degrees"}>
+          {degrees.map((degree) => (
             <label class={`a2-degree a2-${degree}`}>
               <input
                 type="radio"
@@ -984,7 +1002,7 @@ function A2InlineDecision({
           a child of the radio that used to be checked, both are reached by `:has()` on the box
           that holds all three, so there is nothing left over to fully un-hide again. */}
         <div class="a2-say">
-          {item.clarifiable !== false && (
+          {degrees.includes("clarification") && (
             <label class="a2-say-l for-clarification" for={`a2-statement-${item.key}`}>
               The corrected wording to be used. It replaces the statement beside their answer; the
               answer itself stands. Required.
@@ -1009,9 +1027,18 @@ function A2InlineDecision({
 }
 
 /**
- * One of the four section-1 rows the orange form never answers — `ASSESSED_DEVICE_KEYS` — drawn
- * as a finding rather than a fact: a choice or a line of text, required of A1, and reviewable by
- * A2 exactly as 2.5 onward is. `row.no` is the row's own number, which is also its A2 item key.
+ * One of the four section-1 rows the orange form never answers — `ASSESSED_DEVICE_KEYS`.
+ *
+ * Drawn as a row of section 1, not as a block of its own. It used to be a `.f4-block` with its own
+ * heading, which meant section 1 read as fifteen numbered lines with four headed panels wedged
+ * between them: 1.3 arrived as a titled card, 1.10 and 1.11 as a differently-shaped one, and the
+ * document's own numbering — the thing an assessor reads down — broke four times on the way to
+ * 1.19. The answer is a finding rather than a transcription, and that is already said by the
+ * control being a live one on the staff page's own surface, where a reporter's line wears the
+ * orange form's (`.f4-value`). It does not also need a heading repeating the label beside it.
+ *
+ * `row.no` is the row's own number, which is also its A2 item key, so the review block below the
+ * row is the same `A2InlineDecision` every other reviewable item gets.
  */
 function AssessedDeviceField({
   row,
@@ -1037,42 +1064,50 @@ function AssessedDeviceField({
   };
 
   return (
-    <div class="f4-block">
-      <div class="f4-blocktitle">
+    <div class="f4-assessed">
+      <div class="f4-fact">
         <span class="f4-no" safe>
           {row.no}
-        </span>{" "}
-        <span safe>{row.label}</span>
-      </div>
+        </span>
+        <span class="f4-label" safe>
+          {row.label}
+        </span>
+        <div class="f4-answer">
+          {row.key === "device_type" && (
+            <Radios
+              name="device_type"
+              options={DEVICE_TYPE_OPTIONS}
+              answers={answers}
+              locked={locked}
+              a2={a2}
+            />
+          )}
 
-      {row.key === "device_type" && (
-        <Radios
-          name="device_type"
-          options={DEVICE_TYPE_OPTIONS}
-          answers={answers}
-          locked={locked}
-          a2={a2}
-        />
-      )}
+          {row.key === "report_stage" && (
+            <Radios
+              name="report_stage"
+              options={REPORT_STAGE_OPTIONS}
+              answers={answers}
+              locked={locked}
+              a2={a2}
+            />
+          )}
 
-      {row.key === "report_stage" && (
-        <Radios
-          name="report_stage"
-          options={REPORT_STAGE_OPTIONS}
-          answers={answers}
-          locked={locked}
-          a2={a2}
-        />
-      )}
-
-      {(row.key === "registration_number" || row.key === "device_class") && (
-        <div class="f4-field">
-          <label for={row.key} safe>
-            {row.label}
-          </label>
-          <input id={row.key} name={row.key} value={value(answers, row.key)} disabled={locked} />
+          {(row.key === "registration_number" || row.key === "device_class") && (
+            <>
+              <label class="vh" for={row.key} safe>
+                {row.label}
+              </label>
+              <input
+                id={row.key}
+                name={row.key}
+                value={value(answers, row.key)}
+                disabled={locked}
+              />
+            </>
+          )}
         </div>
-      )}
+      </div>
 
       <A2InlineDecision
         itemKey={row.no}
@@ -1463,7 +1498,7 @@ export function F004Form({
                   }
                 }
               />
-              <Comment name="c2_5" answers={answers} locked={locked} />
+              <Comment name="c2_5" item="2.5" answers={answers} locked={locked} />
               <A2InlineDecision
                 itemKey="2.5"
                 answers={answers}
@@ -1500,7 +1535,7 @@ export function F004Form({
                   }
                 }
               />
-              <Comment name="c2_6" answers={answers} locked={locked} />
+              <Comment name="c2_6" item="2.6" answers={answers} locked={locked} />
               <A2InlineDecision
                 itemKey="2.6"
                 answers={answers}
@@ -1529,7 +1564,7 @@ export function F004Form({
                   }
                 }
               />
-              <Comment name="c2_7" answers={answers} locked={locked} />
+              <Comment name="c2_7" item="2.7" answers={answers} locked={locked} />
               <A2InlineDecision
                 itemKey="2.7"
                 answers={answers}
@@ -1643,7 +1678,7 @@ export function F004Form({
                   }
                 }
               />
-              <Comment name="c4_1" answers={answers} locked={locked} />
+              <Comment name="c4_1" item="4.1" answers={answers} locked={locked} />
               <A2InlineDecision
                 itemKey="4.1"
                 answers={answers}
@@ -1760,7 +1795,7 @@ export function F004Form({
                   }
                 }
               />
-              <Comment name="c5" answers={answers} rows={6} locked={locked} />
+              <Comment name="c5" item="5" answers={answers} rows={6} locked={locked} />
               <A2InlineDecision
                 itemKey="5"
                 answers={answers}
@@ -1824,7 +1859,7 @@ export function F004Form({
               <p class="f4-note" safe>
                 {RISK_IVD_NOTE}
               </p>
-              <Comment name="c6" answers={answers} locked={locked} />
+              <Comment name="c6" item="6" answers={answers} locked={locked} />
               <A2InlineDecision
                 itemKey="6"
                 answers={answers}

@@ -200,9 +200,11 @@ export function MyWorkItemPage({
           {/* The report this work is about, wearing the identity it wears on every other page. */}
           <OrangeReportIdentity report={report} />
         </div>
-        <a href={`/reports/${report.id}/final-document`} class="btn">
-          Final F004
-        </a>
+        {/* A label, not a link: it drives the drawer's checkbox, exactly as on the two assessment
+            pages. The Orange Report is reached the same way from every page that has one. */}
+        <label for="a1-drawer" class="btn a1-open orange-action">
+          Orange Report
+        </label>
         <a href="/my-work" class="btn ghost">
           ← Back to my work
         </a>
@@ -223,20 +225,45 @@ export function MyWorkItemPage({
         )}
       </div>
 
-      {/* The approved outcome, and the only assessment document on this page. This reader is
-          carrying out what the manager approved, so the approved document is the thing they need
-          — and the only one they are shown. Always present: a report only reaches this page
-          through the approval that writes the final document. */}
-      <p class="hint">
-        <a href={`/reports/${report.id}/final-document`}>
-          Open the final F004 — the approved assessment of this report
-        </a>
-      </p>
+      {/*
+        The approved outcome, first and at full weight.
 
-      <h2 class="report-heading">The report as filed</h2>
-      <OrangeReportSurface report={report}>
-        <ReportDocument report={report} />
-      </OrangeReportSurface>
+        This page used to print the Orange Report in full under a heading and offer the Final F004
+        as a line of hint text above it, which told the Officer that the thing they were here to
+        read was the report a member of the public filed. It is not. They have been handed the
+        office's position and asked to carry it out; the Final F004 IS that position, and the
+        report is the source it was reached from.
+
+        So the order is the order of the reader's task: what was decided, then what it was decided
+        about. Always present — a report only reaches this page through the approval that writes
+        the final document.
+      */}
+      <div class="mw-final">
+        <a href={`/reports/${report.id}/final-document`} class="btn">
+          Open the Final F004
+        </a>
+        <p class="hint">
+          The assessment of this report, as approved. This is the work to carry out.
+        </p>
+      </div>
+
+      {/* The source, in the drawer every other page keeps it in. Available in one click from the
+          header, and not competing with the document above for the first thing read. */}
+      <input type="checkbox" id="a1-drawer" class="a1-pick" data-a1-drawer />
+      <label for="a1-drawer" class="a1-scrim">
+        <span class="vh">Close the Orange Report</span>
+      </label>
+      <aside class="a1-drawer" aria-label="The report as filed">
+        <div class="a1-drawer-head">
+          <h3>The report as filed</h3>
+          <label for="a1-drawer" class="a1-drawer-close">
+            Close
+          </label>
+        </div>
+        <OrangeReportSurface report={report} withIdentity>
+          <ReportDocument report={report} />
+        </OrangeReportSurface>
+      </aside>
 
       {/* Nothing follows.
 
