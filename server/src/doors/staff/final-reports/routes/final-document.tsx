@@ -1,15 +1,17 @@
 import { sql } from "drizzle-orm";
-import type { FastifyInstance, FastifyReply } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { prefillDeviceRows, prefillEventRows } from "../../../../domain/f004.js";
 import {
+  type FinalDocument,
   isConcludedFinalDocument,
   normalizeFinalDocument,
 } from "../../../../domain/final-document.js";
+import type { ReportDetail } from "../../../../domain/report-detail.js";
 import { loadReport } from "../../../../domain/report-detail.js";
 import { currentSession } from "../../session-guard.js";
 import { ForbiddenPage } from "../../shared/forbidden.js";
-import { FinalDocumentPage } from "../pages/final-document.js";
+import { FinalDocumentDownloadPage, FinalDocumentPage } from "../pages/final-document.js";
 
 /** Same reason as every other report address: a uuid column against arbitrary text raises 22P02. */
 const ReportId = z.uuid();
@@ -62,83 +64,159 @@ type Row = {
  * concluded document does not exist until a manager approves one over a second assessment, and
  * saying so is the honest answer.
  */
+/** What both routes below need, once the row has been loaded and the reader cleared to see it. */
+type ResolvedFinalDocument = {
+  report: ReportDetail;
+  document: FinalDocument;
+  device: Record<string, string>;
+  event: Record<string, string>;
+  approvedByName: string;
+  approvedOn: string;
+  workOfficerName: string | null;
+  /** Whether this reader is the assigned Officer rather than the manager — decides the rail entry
+   *  and the way back on the screen route, and nothing on the download route. */
+  officer: boolean;
+  role: string;
+  fullName: string;
+};
+
+/**
+ * The authorization and the data-loading, shared by the screen and the download.
+ *
+ * Everything the module doc comment above says about who may read a final document is enforced
+ * here, once, on the one row this function loads — see that comment for the rule in full. A caller
+ * gets a value back only once every check has passed; the moment access is refused, this replies
+ * with the 403/404 itself and returns `null`, so neither route can go on to render past that point.
+ */
+async function resolveFinalDocument(
+  app: FastifyInstance,
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<ResolvedFinalDocument | null> {
+  const session = currentSession(request);
+  const forbid = (code: 403 | 404 = 403): null => {
+    reply.status(code).html(ForbiddenPage({ role: session.role }));
+    return null;
+  };
+
+  // Neither a manager nor an Officer has any business here, and there is no report-shaped
+  // question to ask on their behalf. Refused before a single row is read.
+  if (session.role !== "manager" && session.role !== "assessor") {
+    return forbid();
+  }
+
+  const target = ReportId.safeParse((request.params as { id: string }).id);
+  if (!target.success) return forbid(404);
+
+  // The work officer comes off the decision this document was written from, not off a second
+  // lookup that could name a different one: `decision_id` is the join, and it was set inside the
+  // same transaction that inserted this row. That is also what makes it safe to authorize from.
+  const rows = await app.db.execute(sql`
+    SELECT f.payload, f.approved_at, f.resolved_through_ordinal,
+           u.full_name AS approved_by_name,
+           d.work_officer_user_id,
+           wo.full_name AS work_officer_name
+      FROM report_final_documents f
+      JOIN users u ON u.id = f.approved_by_user_id
+      JOIN report_decisions d ON d.id = f.decision_id
+      LEFT JOIN users wo ON wo.id = d.work_officer_user_id
+     WHERE f.report_id = ${target.data}
+  `);
+
+  if (rows.length === 0) return forbid(404);
+
+  const row = rows[0] as Row;
+
+  // The authorization, on the row that was actually loaded, and ahead of everything else this
+  // function might say about the document. A reader who may not have it is told nothing about it —
+  // not whether it is concluded, and not whether it is a repairable legacy row.
+  const officer = session.role === "assessor";
+  if (officer && row.work_officer_user_id !== session.userId) {
+    return forbid();
+  }
+
+  // An A1-only snapshot is history, not a concluded document. It stays in the table untouched and
+  // is not served as a Final F004 to anybody, the manager included — offering one would be
+  // presenting an unreviewed first assessment as the office's settled position.
+  if (!isConcludedFinalDocument(row.resolved_through_ordinal)) {
+    return forbid(404);
+  }
+
+  const found = await loadReport(app, target.data);
+  if (found === null) return forbid(404);
+
+  return {
+    report: found.report,
+    document: normalizeFinalDocument(row.payload),
+    // Section 1's device rows and section 2's event rows, prefilled off the Orange Report's own
+    // payload — the same call both assessment workspaces make, so the final F004 reads the
+    // reporter's facts from exactly where every other rendering of this form reads them.
+    device: prefillDeviceRows(found.report.payload, found.report),
+    event: prefillEventRows(found.report.payload),
+    approvedByName: row.approved_by_name,
+    approvedOn: day(row.approved_at),
+    workOfficerName: row.work_officer_name,
+    officer,
+    role: session.role,
+    fullName: session.fullName,
+  };
+}
+
 export async function finalDocumentRoutes(app: FastifyInstance): Promise<void> {
-  const forbid = (reply: FastifyReply, role: string, code: 403 | 404 = 403) =>
-    reply.status(code).html(ForbiddenPage({ role }));
-
   app.get("/reports/:id/final-document", async (request, reply) => {
-    const session = currentSession(request);
-
-    // Neither a manager nor an Officer has any business here, and there is no report-shaped
-    // question to ask on their behalf. Refused before a single row is read.
-    if (session.role !== "manager" && session.role !== "assessor") {
-      return forbid(reply, session.role);
-    }
-
-    const target = ReportId.safeParse((request.params as { id: string }).id);
-    if (!target.success) return forbid(reply, session.role, 404);
-
-    // The work officer comes off the decision this document was written from, not off a second
-    // lookup that could name a different one: `decision_id` is the join, and it was set inside the
-    // same transaction that inserted this row. That is also what makes it safe to authorize from.
-    const rows = await app.db.execute(sql`
-      SELECT f.payload, f.approved_at, f.resolved_through_ordinal,
-             u.full_name AS approved_by_name,
-             d.work_officer_user_id,
-             wo.full_name AS work_officer_name
-        FROM report_final_documents f
-        JOIN users u ON u.id = f.approved_by_user_id
-        JOIN report_decisions d ON d.id = f.decision_id
-        LEFT JOIN users wo ON wo.id = d.work_officer_user_id
-       WHERE f.report_id = ${target.data}
-    `);
-
-    if (rows.length === 0) return forbid(reply, session.role, 404);
-
-    const row = rows[0] as Row;
-
-    // The authorization, on the row that was actually loaded, and ahead of everything else this
-    // route might say about the document. A reader who may not have it is told nothing about it —
-    // not whether it is concluded, and not whether it is a repairable legacy row.
-    const officer = session.role === "assessor";
-    if (officer && row.work_officer_user_id !== session.userId) {
-      return forbid(reply, session.role);
-    }
-
-    // An A1-only snapshot is history, not a concluded document. It stays in the table untouched and
-    // is not served as a Final F004 to anybody, the manager included — offering one would be
-    // presenting an unreviewed first assessment as the office's settled position.
-    if (!isConcludedFinalDocument(row.resolved_through_ordinal)) {
-      return forbid(reply, session.role, 404);
-    }
-
-    const found = await loadReport(app, target.data);
-    if (found === null) return forbid(reply, session.role, 404);
+    const resolved = await resolveFinalDocument(app, request, reply);
+    if (resolved === null) return; // 403/404 already sent by resolveFinalDocument.
 
     return reply.html(
       <FinalDocumentPage
-        report={found.report}
-        viewerRole={session.role}
-        viewerName={session.fullName}
+        report={resolved.report}
+        viewerRole={resolved.role}
+        viewerName={resolved.fullName}
         // The manager reads this as one of the Final Reports they hold the register of; the
         // Officer reads it as the document attached to one item of their own work. Two readers,
         // two rail entries, and no third sidebar concept invented for the page itself.
-        active={officer ? "my-work" : "final-reports"}
-        document={normalizeFinalDocument(row.payload)}
-        // Section 1's device rows and section 2's event rows, prefilled off the Orange Report's
-        // own payload — the same call both assessment workspaces make, so the final F004 reads
-        // the reporter's facts from exactly where every other rendering of this form reads them.
-        device={prefillDeviceRows(found.report.payload, found.report)}
-        event={prefillEventRows(found.report.payload)}
-        approvedByName={row.approved_by_name}
-        approvedOn={day(row.approved_at)}
-        workOfficerName={row.work_officer_name}
+        active={resolved.officer ? "my-work" : "final-reports"}
+        document={resolved.document}
+        device={resolved.device}
+        event={resolved.event}
+        approvedByName={resolved.approvedByName}
+        approvedOn={resolved.approvedOn}
+        workOfficerName={resolved.workOfficerName}
         // The manager may walk from the concluded document back to the Orange Report it was
         // assessed from — that page is theirs. An Officer may not: `/reports/:id` is the general
         // workflow, carrying every assessment and the manager's whole decision history, and this
         // page must not be the door into it. Their way back is their own work item.
-        backHref={officer ? `/my-work/${found.report.id}` : `/reports/${found.report.id}`}
-        backLabel={officer ? "← Back to my work" : "Open Orange Report"}
+        backHref={
+          resolved.officer ? `/my-work/${resolved.report.id}` : `/reports/${resolved.report.id}`
+        }
+        backLabel={resolved.officer ? "← Back to my work" : "Open Orange Report"}
+      />,
+    );
+  });
+
+  /**
+   * The same approved document, as the downloadable presentation.
+   *
+   * Same resolver, same row, same authorization as the screen above — `resolveFinalDocument` is
+   * the one place either route asks "may this reader see this document", so the two can never
+   * disagree. What differs is only what wraps the answers: `FinalDocumentDownloadPage` carries no
+   * rail, no title bar and no jump bar, and is styled to be read (and printed) as a standalone
+   * document rather than a page inside the staff portal — see that component and the
+   * `.fd-print-page`/`.f4-document` rules in app.css.
+   */
+  app.get("/reports/:id/final-document/download", async (request, reply) => {
+    const resolved = await resolveFinalDocument(app, request, reply);
+    if (resolved === null) return; // 403/404 already sent by resolveFinalDocument.
+
+    return reply.html(
+      <FinalDocumentDownloadPage
+        report={resolved.report}
+        document={resolved.document}
+        device={resolved.device}
+        event={resolved.event}
+        approvedByName={resolved.approvedByName}
+        approvedOn={resolved.approvedOn}
+        workOfficerName={resolved.workOfficerName}
       />,
     );
   });

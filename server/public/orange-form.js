@@ -50,12 +50,58 @@
       for (var j = 0; j < fields.length; j++) {
         var field = fields[j];
         field.disabled = !met;
+
+        if (field.type === "checkbox") {
+          // A checkbox group is satisfied once ANY option is checked, not once every option is.
+          // Native `required` on each checkbox demands all of them, so it is left off here and
+          // "at least one" is enforced below instead, the one thing `required` cannot express.
+          field.required = false;
+          if (!met) {
+            field.checked = false;
+            field.setCustomValidity("");
+          }
+          continue;
+        }
+
         // Mirrors the server rule: switched on means mandatory, not merely available.
         field.required = met;
 
         // A value left behind by a since-changed answer would be posted back as a hidden
         // input on the next step, so clear it the moment it stops applying.
         if (!met) field.value = "";
+      }
+
+      updateCheckboxGroupValidity(wrap, met);
+    }
+  }
+
+  /**
+   * Enforces "at least one checked" on every checkbox group inside a dependent wrap. HTML's
+   * `required` cannot express this for a checkbox group — set on each box it demands all of
+   * them — so this reports the group invalid, via `setCustomValidity`, only while it is switched
+   * on and nothing in it is checked.
+   */
+  function updateCheckboxGroupValidity(wrap, met) {
+    var groups = {};
+    var checkboxes = wrap.querySelectorAll('input[type="checkbox"]');
+
+    for (var i = 0; i < checkboxes.length; i++) {
+      var name = checkboxes[i].name;
+      groups[name] = groups[name] || [];
+      groups[name].push(checkboxes[i]);
+    }
+
+    for (var name in groups) {
+      if (!Object.prototype.hasOwnProperty.call(groups, name)) continue;
+
+      var group = groups[name];
+      var anyChecked = group.some(function (cb) {
+        return cb.checked;
+      });
+      var message = met && !anyChecked ? "Select at least one option." : "";
+
+      for (var k = 0; k < group.length; k++) {
+        group[k].setCustomValidity(message);
       }
     }
   }

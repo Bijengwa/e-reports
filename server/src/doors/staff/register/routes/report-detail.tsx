@@ -222,12 +222,17 @@ export async function renderCaseDetail(
  * is the case's home, and access to one case follows access to the register it belongs to. An
  * Officer's own extra restriction — must be a party to the case, and the case must not already be
  * over — is a fact about the row, so it is asked here rather than expressed as a scope.
+ *
+ * Registered twice, at `/register/:id` (canonical, per `caseHref`) and `/reports/:id`
+ * (compatibility alias — the address the rest of the workflow, its child routes and its redirects
+ * still use). Both resolve to the same handler so there is exactly one implementation of the page;
+ * neither redirects to the other, so there is no loop between them.
  */
 export async function caseDetailRoutes(app: FastifyInstance): Promise<void> {
   const forbid = (reply: FastifyReply, role: string) =>
     reply.status(403).html(ForbiddenPage({ role }));
 
-  app.get("/register/:id", async (request, reply) => {
+  const showCase = async (request: FastifyRequest, reply: FastifyReply) => {
     const session = currentSession(request);
 
     const target = ReportId.safeParse((request.params as { id: string }).id);
@@ -246,5 +251,8 @@ export async function caseDetailRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return renderCaseDetail(app, request, reply, target.data);
-  });
+  };
+
+  app.get("/register/:id", showCase);
+  app.get("/reports/:id", showCase);
 }

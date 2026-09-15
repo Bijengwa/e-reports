@@ -1,6 +1,7 @@
 import type { F004Answers } from "../../../../domain/f004.js";
 import type { FinalDocument } from "../../../../domain/final-document.js";
 import type { ReportDetail } from "../../../../domain/report-detail.js";
+import { Layout } from "../../../../views/shared/layout.js";
 import { F004Form } from "../../shared/components/f004.js";
 import { OrangeReportIdentity } from "../../shared/components/orange-report.js";
 import { StaffShell } from "../../shared/shell.js";
@@ -105,6 +106,17 @@ export function FinalDocumentPage({
           approval card and the form say so in the only way that matters. */}
       <div class="staff-head">
         <div class="sp"></div>
+        {/* The download's own route, `resolveFinalDocument` and all — see routes/final-document.tsx.
+            Opened in a new tab so the staff screen stays put behind it: the download is a document
+            to read or print, not a page this one navigates away to. */}
+        <a
+          href={`/reports/${report.id}/final-document/download`}
+          class="btn"
+          target="_blank"
+          rel="noopener"
+        >
+          Download Final F004
+        </a>
         <a href={backHref} class="btn ghost" safe>
           {backLabel}
         </a>
@@ -163,5 +175,91 @@ export function FinalDocumentPage({
         issues={[]}
       />
     </StaffShell>
+  );
+}
+
+export type FinalDocumentDownloadPageProps = {
+  report: ReportDetail;
+  document: FinalDocument;
+  device: Record<string, string>;
+  event: Record<string, string>;
+  approvedByName: string;
+  approvedOn: string;
+  workOfficerName: string | null;
+};
+
+/**
+ * The same approved Final F004, as the document a reader takes away rather than reads on screen.
+ *
+ * `resolveFinalDocument` (routes/final-document.tsx) is the one place either presentation asks "is
+ * this reader allowed to see this document" and the one place the row is loaded — this page trusts
+ * whatever it is handed and resolves nothing of its own, on the same argument `FinalDocumentPage`
+ * above already follows for the answers themselves.
+ *
+ * Built on `Layout` rather than `StaffShell`: the rail, the title bar and the jump bar are not
+ * hidden by CSS here, they are never rendered — a reader who saves or prints this page gets exactly
+ * the document and nothing the staff portal put around it. `F004Form` is the same component and the
+ * same `presentation="final"` / `documentMode` the screen uses; `interactiveNav={false}` is the one
+ * difference, dropping the section-jump bar and find box a printed page has no use for.
+ *
+ * `.fd-print-page` is what makes it read as a document rather than a bare page: an A4-width sheet
+ * on screen, and — under `@media print` in app.css — the page the browser's own Print/Save-as-PDF
+ * turns into. No PDF library sits behind this; the project already prints the staff portal's own
+ * chrome away for `Ctrl+P`, and this is that same architecture, applied to a page built to be
+ * printed rather than merely surviving it.
+ */
+export function FinalDocumentDownloadPage({
+  report,
+  document,
+  device,
+  event,
+  approvedByName,
+  approvedOn,
+  workOfficerName,
+}: FinalDocumentDownloadPageProps): JSX.Element {
+  return (
+    <Layout title={`Final F004 — ${report.number}`} locale="en" bodyClass="staff">
+      <div class="fd-print-page">
+        <p class="eyebrow">Final F004 — approved assessment</p>
+
+        <OrangeReportIdentity report={report} />
+
+        <div class="card card-b fd-approval">
+          <dl>
+            <dt>Approved by</dt>
+            <dd safe>{approvedByName}</dd>
+
+            <dt>Approved on</dt>
+            <dd safe>{approvedOn}</dd>
+
+            {workOfficerName === null ? (
+              <></>
+            ) : (
+              <>
+                <dt>Assigned for work to</dt>
+                <dd safe>{workOfficerName}</dd>
+              </>
+            )}
+          </dl>
+        </div>
+
+        <F004Form
+          reportId={report.id}
+          answers={document.answers as F004Answers}
+          resolvedNotes={resolvedNotes(document)}
+          device={device}
+          event={event}
+          assessorName=""
+          assessedOn=""
+          presentation="final"
+          approval={{ byName: approvedByName, on: approvedOn }}
+          submitted
+          readOnly
+          documentMode
+          interactiveNav={false}
+          issues={[]}
+        />
+      </div>
+    </Layout>
   );
 }

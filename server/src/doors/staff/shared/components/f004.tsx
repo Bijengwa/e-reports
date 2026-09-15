@@ -199,6 +199,15 @@ export type F004FormProps = {
    * ("IMDRF/AE WG/N43 · 2026") shown beside "IMDRF release".
    */
   imdrfReleaseLabel?: string;
+  /**
+   * Draw the sticky jump bar — the section links, and the "Find in this F004" search box.
+   *
+   * Defaults to on, which is every caller but one. The downloadable presentation turns it off: it
+   * is a printable document, not a page to search or jump around inside, and its whole point is to
+   * carry nothing a screen would offer and a printed page could not — see `F004Presentation` for
+   * the same argument applied to the assessor strip.
+   */
+  interactiveNav?: boolean;
 };
 
 /** One earlier secondary assessor's finished work, as the per-item history reads it. */
@@ -366,8 +375,10 @@ function Bar({
  * A requirement filed on the reporter's own form, in the reporter's own words.
  *
  * Read-only and unannotated: this is the record as filed, not a thing for the assessor to add a
- * note beside. Section 2.1-2.4 wears the same orange surface section 1's facts do, and for the
- * same reason — the value came off the paper, not out of the assessor's head.
+ * note beside. Number, then the label stacked above its value — the shape every read-only row in
+ * sections 1 and 2 shares, so the two sections read as one document rather than two layouts glued
+ * together. Section 1's facts (`DEVICE_ROWS`) and section 2's requirements (`EVENT_ROWS`) both use
+ * this component; only the caller's data source differs.
  */
 function RequirementRow({
   no,
@@ -395,39 +406,6 @@ function RequirementRow({
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-/**
- * Section 1 as the paper reads: the number, what is required, and what was filed.
- *
- * Read-only, and nothing beside it: every one of these is a fact off the orange form, not a
- * finding, so there is nothing here for an assessor to add a note to. The four rows the orange
- * form never asks — 1.3, 1.10, 1.11, 1.19 — are not `FactRow`s at all; see `AssessedDeviceField`.
- */
-function FactRow({
-  no,
-  label,
-  filled,
-}: {
-  no: string;
-  label: string;
-  filled: string;
-}): JSX.Element {
-  return (
-    <div class="f4-fact">
-      <span class="f4-no" safe>
-        {no}
-      </span>
-      <span class="f4-label" safe>
-        {label}
-      </span>
-      {filled === "" ? (
-        <span class="f4-blank">Not supplied by the reporter</span>
-      ) : (
-        <input class="f4-value" value={filled} readonly tabindex={-1} />
-      )}
     </div>
   );
 }
@@ -582,6 +560,7 @@ function Comment({
   item,
   label,
   locked,
+  variant = "comment",
 }: {
   name: string;
   answers: F004Answers;
@@ -589,11 +568,24 @@ function Comment({
   item?: string;
   label?: string;
   locked: boolean;
+  /**
+   * Whether this field's own prose IS the answer, or is a comment beside one.
+   *
+   * `"comment"` — the default, and every one of these but two — is the office's supporting
+   * explanation for an answer given elsewhere on the row: a Basis, a Justification, the discussion
+   * under a radio choice. `"answer"` is for the two items that carry no separate answer at all —
+   * 4.3 and 7.1's conclusion, where this textarea IS the finding. On the Final F004 the two must
+   * not read alike: an answer earns the document's green surface (`.f4-final-answer`), a comment
+   * stays the quieter, subordinate text beside it (`.f4-final-comment`) — see `.f4-document` in
+   * app.css. Both classes carry no rule outside that scope, so the working assessment form —
+   * which renders every `Comment` at its default variant too — is unaffected by this prop existing.
+   */
+  variant?: "answer" | "comment";
 }): JSX.Element {
   const caption = label ?? (item === undefined ? null : reasonLabel(item)) ?? "Comment";
 
   return (
-    <div class="f4-field">
+    <div class={variant === "answer" ? "f4-field f4-final-answer" : "f4-field f4-final-comment"}>
       <label for={name} safe>
         {caption}
       </label>
@@ -1035,7 +1027,8 @@ function A2InlineDecision({
  * document's own numbering — the thing an assessor reads down — broke four times on the way to
  * 1.19. The answer is a finding rather than a transcription, and that is already said by the
  * control being a live one on the staff page's own surface, where a reporter's line wears the
- * orange form's (`.f4-value`). It does not also need a heading repeating the label beside it.
+ * orange form's own surface (`.f4-filled`, in `RequirementRow`). It does not also need a heading
+ * repeating the label beside it.
  *
  * `row.no` is the row's own number, which is also its A2 item key, so the review block below the
  * row is the same `A2InlineDecision` every other reviewable item gets.
@@ -1065,47 +1058,51 @@ function AssessedDeviceField({
 
   return (
     <div class="f4-assessed">
-      <div class="f4-fact">
-        <span class="f4-no" safe>
-          {row.no}
-        </span>
-        <span class="f4-label" safe>
-          {row.label}
-        </span>
-        <div class="f4-answer">
-          {row.key === "device_type" && (
-            <Radios
-              name="device_type"
-              options={DEVICE_TYPE_OPTIONS}
-              answers={answers}
-              locked={locked}
-              a2={a2}
-            />
-          )}
+      <div class="f4-row">
+        <div class="f4-req">
+          <span class="f4-no" safe>
+            {row.no}
+          </span>
+          <div>
+            <div class="f4-label" safe>
+              {row.label}
+            </div>
+            <div class="f4-answer">
+              {row.key === "device_type" && (
+                <Radios
+                  name="device_type"
+                  options={DEVICE_TYPE_OPTIONS}
+                  answers={answers}
+                  locked={locked}
+                  a2={a2}
+                />
+              )}
 
-          {row.key === "report_stage" && (
-            <Radios
-              name="report_stage"
-              options={REPORT_STAGE_OPTIONS}
-              answers={answers}
-              locked={locked}
-              a2={a2}
-            />
-          )}
+              {row.key === "report_stage" && (
+                <Radios
+                  name="report_stage"
+                  options={REPORT_STAGE_OPTIONS}
+                  answers={answers}
+                  locked={locked}
+                  a2={a2}
+                />
+              )}
 
-          {(row.key === "registration_number" || row.key === "device_class") && (
-            <>
-              <label class="vh" for={row.key} safe>
-                {row.label}
-              </label>
-              <input
-                id={row.key}
-                name={row.key}
-                value={value(answers, row.key)}
-                disabled={locked}
-              />
-            </>
-          )}
+              {(row.key === "registration_number" || row.key === "device_class") && (
+                <>
+                  <label class="vh" for={row.key} safe>
+                    {row.label}
+                  </label>
+                  <input
+                    id={row.key}
+                    name={row.key}
+                    value={value(answers, row.key)}
+                    disabled={locked}
+                  />
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1254,6 +1251,7 @@ export function F004Form({
   priorReviews,
   issues,
   imdrfReleaseLabel,
+  interactiveNav = true,
 }: F004FormProps): JSX.Element {
   // The concluded document rather than the working one. See `F004Presentation` for what it drops
   // and, more to the point, for what it deliberately does not: every answer on the paper.
@@ -1372,38 +1370,45 @@ export function F004Form({
        * what it did. Out here its parent is the page, so it stays under the staff header for the
        * whole length of the form, which is the point of it on a document this long.
        */}
-      <div class="f4-jump">
-        <nav class="f4-jump-links" aria-label="Jump to a section of the F004">
-          <a href="#section-1">1 Admin</a>
-          <a href="#section-2">2 Event</a>
-          <a href="#section-3">3 IMDRF</a>
-          <a href="#section-4">4 Causality</a>
-          <a href="#section-5">5 Signal</a>
-          <a href="#section-6">6 Risk</a>
-          <a href="#section-7">7 Conclusion</a>
-          <a href="#section-8">8 Signature</a>
-        </nav>
+      {interactiveNav && (
+        <div class="f4-jump">
+          <nav class="f4-jump-links" aria-label="Jump to a section of the F004">
+            <a href="#section-1">1 Admin</a>
+            <a href="#section-2">2 Event</a>
+            <a href="#section-3">3 IMDRF</a>
+            <a href="#section-4">4 Causality</a>
+            <a href="#section-5">5 Signal</a>
+            <a href="#section-6">6 Risk</a>
+            <a href="#section-7">7 Conclusion</a>
+            <a href="#section-8">8 Signature</a>
+          </nav>
 
-        {/* type="button" on both steppers as well as living outside the form: two reasons a click
-            here can never submit, rather than one. */}
-        <div class="f4-find-wrap">
-          <input
-            type="search"
-            class="f4-find"
-            placeholder="Find in this F004…"
-            aria-label="Find in this F004"
-            autocomplete="off"
-            data-f4-find
-          />
-          <span class="f4-find-count" data-f4-find-count aria-live="polite"></span>
-          <button type="button" class="f4-find-step" data-f4-find-prev aria-label="Previous match">
-            ↑
-          </button>
-          <button type="button" class="f4-find-step" data-f4-find-next aria-label="Next match">
-            ↓
-          </button>
+          {/* type="button" on both steppers as well as living outside the form: two reasons a click
+              here can never submit, rather than one. */}
+          <div class="f4-find-wrap">
+            <input
+              type="search"
+              class="f4-find"
+              placeholder="Find in this F004…"
+              aria-label="Find in this F004"
+              autocomplete="off"
+              data-f4-find
+            />
+            <span class="f4-find-count" data-f4-find-count aria-live="polite"></span>
+            <button
+              type="button"
+              class="f4-find-step"
+              data-f4-find-prev
+              aria-label="Previous match"
+            >
+              ↑
+            </button>
+            <button type="button" class="f4-find-step" data-f4-find-next aria-label="Next match">
+              ↓
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       <Sheet
         locked={sheetLocked}
@@ -1444,7 +1449,7 @@ export function F004Form({
                   resolvedNotes={resolvedNotes}
                 />
               ) : (
-                <FactRow no={row.no} label={row.label} filled={device[row.key] ?? ""} />
+                <RequirementRow no={row.no} label={row.label} filled={device[row.key] ?? ""} />
               ),
             )}
           </section>
@@ -1745,7 +1750,14 @@ export function F004Form({
               <p class="f4-note" safe>
                 {CAUSALITY_DISCUSSION_NOTE}
               </p>
-              <Comment name="c4_3" answers={answers} rows={8} label="Discussion" locked={locked} />
+              <Comment
+                name="c4_3"
+                answers={answers}
+                rows={8}
+                label="Discussion"
+                locked={locked}
+                variant="answer"
+              />
               <A2InlineDecision
                 itemKey="4.3"
                 answers={answers}
@@ -1927,6 +1939,7 @@ export function F004Form({
                 rows={8}
                 label="Conclusion"
                 locked={locked}
+                variant="answer"
               />
               <A2InlineDecision
                 itemKey="7.1_actions"

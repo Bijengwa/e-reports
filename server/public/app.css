@@ -3082,62 +3082,25 @@ ul.f4-card-c li { margin-bottom: 3px; }
   margin: 14px 0 22px;
 }
 
-/* ---------- section 1: number | requirement | value ---------- */
-.f4-fact {
-  display: grid;
-  grid-template-columns: 46px minmax(150px, 1fr) minmax(0, 1.4fr);
-  gap: 10px 12px; padding: 9px 16px 5px; align-items: start; break-inside: avoid;
-}
-/* The same orange surface `.f4-filled` wears in section 2, for the same reason: this line came
-   off the reporter's form, and the assessor's own note sits under it as a plain staff input.
-   !important for the same reason as `.f4-filled`: this is a real `<input readonly>`, contesting
-   specificity against the shared `.f4 input:not(...)` reset rather than a span it cannot touch. */
-.f4-fact .f4-value {
-  font-weight: 500 !important; word-break: break-word; cursor: default;
-  background: var(--f4-value-bg) !important; color: var(--f4-value-ink) !important;
-  border: 1px solid var(--f4-value-border) !important; border-radius: var(--r); padding: 5px 9px !important;
-}
-.f4-fact .f4-blank { font-style: italic; color: var(--f4-ink-3); font-size: 12px; }
-.f4-note-line { padding: 0 16px 10px 74px; border-bottom: 1px solid var(--f4-line-2); }
-.f4-note-line label { font-size: 11px; color: var(--f4-ink-3); }
-.f4-note-line input { font-size: 12px; padding: 5px 10px; }
-
-@media (max-width: 900px) {
-  .f4-fact { grid-template-columns: 30px 1fr; }
-  .f4-fact .f4-value, .f4-fact .f4-blank, .f4-fact .f4-answer {
-    grid-column: 1 / -1; margin-top: 2px;
-  }
-  .f4-note-line { padding-left: 18px; }
-}
-
 /*
- * The four section-1 rows an assessor answers themselves (1.3, 1.10, 1.11, 1.19).
+ * Section 1's four assessor-answered rows (1.3, 1.10, 1.11, 1.19).
  *
- * The same `.f4-fact` three columns as the fifteen rows around them, so reading down section 1 is
- * reading down one numbered list. What differs is the third column: a live control on the staff
- * page's own surface where a transcribed row wears the orange form's `.f4-value`. That contrast
- * is the provenance cue already in use in sections 1 and 2, and it is enough — these rows do not
- * also need a heading of their own repeating the label beside them.
+ * Wraps the same `.f4-row`/`.f4-req` shape every read-only row in sections 1 and 2 uses — number,
+ * then the label stacked above its value — so section 1 reads as the same document as section 2
+ * rather than a layout of its own. What differs from a plain `RequirementRow` is what sits under
+ * the label: a live control here instead of the orange form's own transcribed text, and a review
+ * block that can follow it.
  */
 .f4-assessed { break-inside: avoid; }
-/* A rule only where there is something under the row to separate it from. On A1's own page there
-   is no review block, and a line under 1.3 and 1.11 alone would be the same visual outlier the
-   headings were. */
-.f4-assessed:has(> .a2-inline) { border-bottom: 1px solid var(--f4-line-2); }
-.f4-assessed:has(> .a2-inline):last-child { border-bottom: 0; }
-.f4-answer { min-width: 0; }
+.f4-answer { min-width: 0; margin-top: 4px; }
 /* A one-line answer fills the value column rather than sitting at a width the browser picked. */
 .f4-answer > input { width: 100%; }
-/* Two or three options in a table cell, not a form section: the group's own outer margins are the
-   row's padding here, so it does not add a second set. */
+/* Two or three options stacked under the label, not a form section: the group's own outer margins
+   are the row's padding here, so it does not add a second set. */
 .f4-answer .f4-radio-group { margin: 0; gap: 5px; }
-/* The review block spans the row and aligns under the value column, the same offset the
-   assessor's note under a section-2 requirement uses (`.f4-note-line`). */
-.f4-assessed > .a2-inline { margin: 6px 16px 12px 74px; }
-
-@media (max-width: 900px) {
-  .f4-assessed > .a2-inline { margin: 6px 16px 12px 18px; }
-}
+/* Aligned to the row's own side padding, the same inset every other secondary-assessment block
+   under a `.f4-block` question already sits at. */
+.f4-assessed > .a2-inline { margin: 0 16px 14px; }
 
 /*
  * My assessments: three filter tabs over one group at a time.
@@ -3468,6 +3431,62 @@ ul.f4-card-c li { margin-bottom: 3px; }
 }
 
 /*
+ * The downloadable presentation: `FinalDocumentDownloadPage`, built on `Layout` rather than
+ * `StaffShell`, so there is no rail and no title bar for this to sit beside — the page itself is
+ * the whole document. `.fd-print-page` gives it the shape a document has anyway: a sheet, floating
+ * on the portal's own background at a width close to A4, rather than the bare left-aligned text a
+ * page with no `.staff-main` padding around it would otherwise be.
+ *
+ * On screen this is a reading width. Under `@media print` below it becomes the page itself — the
+ * project's existing print architecture (see the `.rail, .top, .f4-buttons, .f4-jump` rule further
+ * up) extended to a page that has none of those elements to hide in the first place.
+ */
+.fd-print-page {
+  max-width: 850px;
+  margin: 28px auto;
+  padding: 30px 36px 60px;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+}
+
+.fd-print-page .eyebrow {
+  margin-bottom: 10px;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm 12mm;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .fd-print-page {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  /* Backgrounds are what a browser drops first when printing to save ink, and the resolved
+     answer's green surface is the one colour this document must keep — without it a reader loses
+     the whole point of `.f4-final-answer` the moment the page leaves the screen. */
+  .f4-document .f4-card.on,
+  .f4-document .f4-tick.on,
+  .f4-document .f4-radio-row,
+  .f4-document .f4-final-answer,
+  .f4-document .f4-assessed .f4-answer input,
+  .f4-document .f4-grid input {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
+
+/*
  * Section 8 on the concluded F004: the manager's approval, where the assessors' signatures sit on
  * a working assessment.
  *
@@ -3683,6 +3702,66 @@ ul.f4-card-c li { margin-bottom: 3px; }
   font-size: 14px;
   color: var(--f4-ink);
   white-space: pre-wrap;
+}
+
+/*
+ * The resolved answer, on the surface `.f4-card.on` and `.f4-tick.on` already use for a chosen
+ * card or tick — extended here to the plain single-line answers and the free-text fields whose own
+ * prose IS the answer (4.3, 7.1's conclusion), so every kind of resolved answer on the document
+ * reads as the same green surface and a comment underneath one is never mistaken for it.
+ *
+ * The same tokens throughout — `--f4-card-on-bg`/`--f4-bar`, which are the staff palette's own
+ * green, not a colour invented for this — and scoped to `.f4-document`, which only the Final F004
+ * ever sets. `.f4-final-answer` and `.f4-radio-row` carry no rule outside this scope, so the
+ * working assessment form is untouched by any of it.
+ */
+.f4-document .f4-radio-row {
+  background: var(--f4-card-on-bg);
+  border: 1px solid var(--f4-bar);
+  border-radius: var(--r);
+  padding: 7px 12px;
+  margin: 2px 0;
+}
+
+/* The assessor's own section-1 entries (1.10, 1.11) and the IMDRF grid's chosen levels/coding —
+   typed or picked by the assessor, not transcribed from the Orange Report, so they read as
+   findings rather than as the reporter's own facts `.f4-filled` already marks out. */
+.f4-document .f4-assessed .f4-answer input,
+.f4-document .f4-grid input {
+  background: var(--f4-card-on-bg) !important;
+  border: 1px solid var(--f4-bar) !important;
+  border-radius: var(--r);
+  color: var(--f4-ink) !important;
+  padding: 6px 9px !important;
+}
+
+.f4-document .f4-final-answer {
+  background: var(--f4-card-on-bg);
+  border: 1px solid var(--f4-bar);
+  border-radius: var(--r);
+  padding: 8px 12px;
+}
+
+/* The box already carries the surface; the textarea inside it drops the plain document's own
+   underline so the answer reads as filling the surface rather than sitting boxed within a box. */
+.f4-document .f4-final-answer textarea {
+  border-bottom: 0;
+}
+
+/*
+ * The comment beside a resolved answer — a Basis, a Justification, the discussion under a radio
+ * choice — kept visually subordinate to it: indented and set off by a rule, never boxed or
+ * coloured, so it never reads as a second answer. The same treatment `.f4-resolved-note` already
+ * carries for a clarification with nowhere else to print; this just reaches every other comment on
+ * the document, not only that one.
+ *
+ * Scoped to `.f4-document`: `Comment` renders this class on the working assessment form too — it
+ * is the component's own default — and there it must stay exactly as plain as `.f4-field` already
+ * makes it, per `variant` in `f004.tsx`.
+ */
+.f4-document .f4-final-comment {
+  padding-left: 16px;
+  border-left: 1px dashed var(--f4-divider);
 }
 
 /* ---------- IMDRF terminology ---------- */
