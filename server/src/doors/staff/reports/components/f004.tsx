@@ -1,11 +1,11 @@
 import type { Children } from "@kitajs/html";
 import {
   A2_DEGREE_LABELS,
-  A2_DEGREES,
   type A2ReviewItem,
   type A2Value,
   ACTIONS,
   ASSESSED_DEVICE_KEYS,
+  allowedDegrees,
   CAUSALITY_DISCUSSION_NOTE,
   CAUSALITY_OPTIONS,
   DEVICE_ROWS,
@@ -19,8 +19,8 @@ import {
   type F004Answers,
   IMDRF_GROUPS,
   IMDRF_NOTE,
-  imdrfItemForReviewKey,
   type Issue,
+  imdrfItemForReviewKey,
   isA1Blank,
   list,
   PUBLIC_HEALTH_QUESTION,
@@ -709,27 +709,28 @@ function A2FillIn({
         </textarea>
       )}
 
-      {item.valueKind === "fields" && (() => {
-        const imdrfItem = imdrfItemForReviewKey(item.key);
-        if (imdrfItem === undefined) return <></>;
-        const levelNames = (item.fields ?? [])
-          .filter((field) => field.key !== "code")
-          .map((field) => `a2_value_${item.key}_${field.key}`);
+      {item.valueKind === "fields" &&
+        (() => {
+          const imdrfItem = imdrfItemForReviewKey(item.key);
+          if (imdrfItem === undefined) return <></>;
+          const levelNames = (item.fields ?? [])
+            .filter((field) => field.key !== "code")
+            .map((field) => `a2_value_${item.key}_${field.key}`);
 
-        return (
-          <ImdrfPicker
-            idBase={`a2-supply-${item.key}`}
-            levelFieldNames={levelNames}
-            codeFieldName={`a2_value_${item.key}_code`}
-            termIdName={`a2_imdrf_term_${item.key}`}
-            values={storedFields}
-            termId={""}
-            annex={imdrfItem.annexLetter}
-            releaseId={releaseId}
-            locked={locked}
-          />
-        );
-      })()}
+          return (
+            <ImdrfPicker
+              idBase={`a2-supply-${item.key}`}
+              levelFieldNames={levelNames}
+              codeFieldName={`a2_value_${item.key}_code`}
+              termIdName={`a2_imdrf_term_${item.key}`}
+              values={storedFields}
+              termId={""}
+              annex={imdrfItem.annexLetter}
+              releaseId={releaseId}
+              locked={locked}
+            />
+          );
+        })()}
     </div>
   );
 }
@@ -911,8 +912,8 @@ function A2InlineDecision({
           <span safe>{`${item.no} ${item.title}`}</span>
         </div>
 
-        <div class="a2-degrees">
-          {A2_DEGREES.map((degree) => (
+        <div class={item.clarifiable === false ? "a2-degrees a2-degrees-2" : "a2-degrees"}>
+          {allowedDegrees(item).map((degree) => (
             <label class={`a2-degree a2-${degree}`}>
               <input
                 type="radio"
@@ -952,27 +953,28 @@ function A2InlineDecision({
               </div>
             )}
 
-            {item.valueKind === "fields" && (() => {
-              const imdrfItem = imdrfItemForReviewKey(item.key);
-              if (imdrfItem === undefined) return <></>;
-              const levelNames = (item.fields ?? [])
-                .filter((field) => field.key !== "code")
-                .map((field) => `a2_value_${item.key}_${field.key}`);
+            {item.valueKind === "fields" &&
+              (() => {
+                const imdrfItem = imdrfItemForReviewKey(item.key);
+                if (imdrfItem === undefined) return <></>;
+                const levelNames = (item.fields ?? [])
+                  .filter((field) => field.key !== "code")
+                  .map((field) => `a2_value_${item.key}_${field.key}`);
 
-              return (
-                <ImdrfPicker
-                  idBase={`a2-disagree-${item.key}`}
-                  levelFieldNames={levelNames}
-                  codeFieldName={`a2_value_${item.key}_code`}
-                  termIdName={`a2_imdrf_term_${item.key}`}
-                  values={storedFields}
-                  termId={""}
-                  annex={imdrfItem.annexLetter}
-                  releaseId={value(answers, "imdrf_release_id")}
-                  locked={locked}
-                />
-              );
-            })()}
+                return (
+                  <ImdrfPicker
+                    idBase={`a2-disagree-${item.key}`}
+                    levelFieldNames={levelNames}
+                    codeFieldName={`a2_value_${item.key}_code`}
+                    termIdName={`a2_imdrf_term_${item.key}`}
+                    values={storedFields}
+                    termId={""}
+                    annex={imdrfItem.annexLetter}
+                    releaseId={value(answers, "imdrf_release_id")}
+                    locked={locked}
+                  />
+                );
+              })()}
           </div>
         )}
 
@@ -982,10 +984,12 @@ function A2InlineDecision({
           a child of the radio that used to be checked, both are reached by `:has()` on the box
           that holds all three, so there is nothing left over to fully un-hide again. */}
         <div class="a2-say">
-          <label class="a2-say-l for-clarification" for={`a2-statement-${item.key}`}>
-            The corrected wording to be used. It replaces the statement beside their answer; the
-            answer itself stands. Required.
-          </label>
+          {item.clarifiable !== false && (
+            <label class="a2-say-l for-clarification" for={`a2-statement-${item.key}`}>
+              The corrected wording to be used. It replaces the statement beside their answer; the
+              answer itself stands. Required.
+            </label>
+          )}
           <label class="a2-say-l for-disagree" for={`a2-statement-${item.key}`}>
             Why the first assessor's answer is wrong. Required.
           </label>
@@ -1179,12 +1183,20 @@ function ImdrfPicker({
 }
 
 /** `{l1, l2, l3, code}` read off `answers`/a review value for one IMDRF item's own field prefix. */
-function imdrfFieldValues(source: F004Answers | Record<string, string>, prefix: string): Record<string, string> {
+function imdrfFieldValues(
+  source: F004Answers | Record<string, string>,
+  prefix: string,
+): Record<string, string> {
   const read = (key: string): string => {
     const raw = (source as Record<string, unknown>)[key];
     return typeof raw === "string" ? raw : "";
   };
-  return { l1: read(`${prefix}_l1`), l2: read(`${prefix}_l2`), l3: read(`${prefix}_l3`), code: read(`${prefix}_code`) };
+  return {
+    l1: read(`${prefix}_l1`),
+    l2: read(`${prefix}_l2`),
+    l3: read(`${prefix}_l3`),
+    code: read(`${prefix}_code`),
+  };
 }
 
 export function F004Form({
@@ -1889,7 +1901,6 @@ export function F004Form({
                 priorReviews={priorReviews}
                 notes={resolvedNotes}
               />
-
             </div>
           </section>
 
@@ -2067,4 +2078,3 @@ export function F004Form({
     </>
   );
 }
-

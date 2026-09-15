@@ -24,8 +24,8 @@ import {
   type F004Answers,
   IMDRF_GROUPS,
   type ImdrfItem,
-  imdrfItemForReviewKey,
   type Issue,
+  imdrfItemForReviewKey,
   type SecondaryReviewPayload,
   value,
 } from "../f004.js";
@@ -55,7 +55,10 @@ export async function resolveImdrfTerm(
   const label = item.title.replace(/\s*\(If applicable\)\s*$/, "");
   const term = await getTermCached(db, releaseId, termId);
   if (term === null) {
-    return { ok: false, message: `${label}: the selected term does not exist in the selected IMDRF release.` };
+    return {
+      ok: false,
+      message: `${label}: the selected term does not exist in the selected IMDRF release.`,
+    };
   }
 
   if (term.annex !== item.annexLetter) {

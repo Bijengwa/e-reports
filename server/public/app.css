@@ -2362,6 +2362,11 @@ textarea[aria-invalid="true"] {
   margin-top: 11px;
 }
 
+/* Agree/Disagree only — no clarification radio to make room for. */
+.a2-degrees-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .a2-degree {
   display: flex;
   align-items: center;

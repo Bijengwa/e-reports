@@ -215,6 +215,20 @@ describe("collecting an A2 review from a posted body", () => {
 
     expect(review.responses).not.toHaveProperty("1.10");
   });
+
+  it("refuses Required clarification on an item that does not offer it", () => {
+    // 1.3, 1.10, 1.11, 1.19 and every IMDRF row are `clarifiable: false` — a bare classification,
+    // not a claim to reword. A posted "clarification" against one is dropped exactly as an unknown
+    // degree would be, never stored to be silently honoured later.
+    for (const key of ["1.3", "1.10", "1.11", "1.19", "3.1.1", "3.3.3"]) {
+      const review = collectSecondaryReview(
+        { [`a2_degree_${key}`]: "clarification", [`a2_statement_${key}`]: "Smuggled in by hand." },
+        FILLED_A1_ANSWERS,
+      );
+
+      expect(review.responses).not.toHaveProperty(key);
+    }
+  });
 });
 
 describe("reading a stored A2 review back", () => {
@@ -269,6 +283,23 @@ describe("what an A2 submission must carry", () => {
 
     expect(issues).toHaveLength(1);
     expect(issues[0]?.field).toBe("a2_degree_4.2");
+  });
+
+  it("asks only for Agree or Disagree on an item with no clarification", () => {
+    const body = agreeWithEverything();
+    delete body["a2_degree_1.3"];
+
+    const issues = validateSecondaryReviewForSubmit(
+      collectSecondaryReview(body, FILLED_A1_ANSWERS),
+      FILLED_A1_ANSWERS,
+    );
+
+    expect(issues).toEqual([
+      {
+        field: "a2_degree_1.3",
+        message: "1.3 Type of device i.e., MD or IVD: choose Agree or Disagree.",
+      },
+    ]);
   });
 
   it("requires a statement for Required clarification, and asks for no value", () => {

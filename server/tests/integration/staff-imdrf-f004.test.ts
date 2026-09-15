@@ -435,6 +435,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("a secondary assessor's IMDRF Disagree rep
   function agreeExcept(overrides: Record<string, string>): Record<string, string> {
     const keys = [
       "1.3",
+      "1.10",
       "1.11",
       "1.19",
       "2.5",
@@ -538,7 +539,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("a secondary assessor's IMDRF Disagree rep
     expect(responses["3.3.1"]).not.toHaveProperty("value");
   });
 
-  it("Required clarification carries a statement and never a replacement value", async () => {
+  it("refuses Required clarification on an IMDRF row — a coded lookup takes only Agree or Disagree", async () => {
     const { report, second } = await readyForSecondary();
 
     const res = await post(
@@ -549,15 +550,10 @@ describe.skipIf(!INTEGRATION_ENABLED)("a secondary assessor's IMDRF Disagree rep
         "a2_statement_3.3.1": "Confirm which manufacturer report this investigation refers to.",
       }),
     );
-    expect(res.statusCode).toBe(302);
 
-    const payload = await payloadOf(report.id, 2);
-    const responses = (payload.responses ?? {}) as Record<
-      string,
-      { degree?: string; value?: unknown; statement?: string }
-    >;
-    expect(responses["3.3.1"]?.degree).toBe("clarification");
-    expect(responses["3.3.1"]).not.toHaveProperty("value");
-    expect(responses["3.3.1"]?.statement).toContain("Confirm which manufacturer report");
+    // Dropped on the way in, the same as any degree the item never offered — 3.3.1 is left with no
+    // degree at all, which `validateSecondaryReviewForSubmit` refuses to submit.
+    expect(res.statusCode).toBe(422);
+    expect(res.body).toContain("choose Agree or Disagree");
   });
 });

@@ -141,7 +141,10 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
     // the same one `resolveA1Imdrf` will stamp into the payload on save. Stamped into `answers`
     // itself rather than passed as a separate prop, so `F004Form`'s pickers read one source
     // (`answers.imdrf_release_id`) whether the page arrived here from a GET or a POST re-render.
-    const imdrfRelease = await imdrfReleaseForDisplay(app, value(draft.answers, "imdrf_release_id"));
+    const imdrfRelease = await imdrfReleaseForDisplay(
+      app,
+      value(draft.answers, "imdrf_release_id"),
+    );
     const answers: F004Answers = { ...draft.answers, imdrf_release_id: imdrfRelease.releaseId };
 
     return reply.html(
@@ -204,27 +207,25 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const page = async (status: 200 | 422, shown: readonly Issue[]) =>
-      reply
-        .status(status)
-        .html(
-          <Assessment1Page
-            report={found.report}
-            viewerRole={session.role}
-            viewerName={session.fullName}
-            answers={answers}
-            device={prefillDeviceRows(found.report.payload, found.report)}
-            event={prefillEventRows(found.report.payload)}
-            assessedOn={today()}
-            submitted={false}
-            issues={shown}
-            dueAt={found.assessor1DueAt}
-            // `answers.imdrf_release_id` is already resolved by `resolveA1Imdrf` above; only the
-            // display label needs a second lookup.
-            imdrfReleaseLabel={
-              (await imdrfReleaseForDisplay(app, value(answers, "imdrf_release_id"))).label
-            }
-          />,
-        );
+      reply.status(status).html(
+        <Assessment1Page
+          report={found.report}
+          viewerRole={session.role}
+          viewerName={session.fullName}
+          answers={answers}
+          device={prefillDeviceRows(found.report.payload, found.report)}
+          event={prefillEventRows(found.report.payload)}
+          assessedOn={today()}
+          submitted={false}
+          issues={shown}
+          dueAt={found.assessor1DueAt}
+          // `answers.imdrf_release_id` is already resolved by `resolveA1Imdrf` above; only the
+          // display label needs a second lookup.
+          imdrfReleaseLabel={
+            (await imdrfReleaseForDisplay(app, value(answers, "imdrf_release_id"))).label
+          }
+        />,
+      );
 
     if (issues.length > 0) return page(422, issues);
 

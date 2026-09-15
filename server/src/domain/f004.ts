@@ -122,6 +122,18 @@ export type A2ReviewItem = {
    * for each `valueKind`.
    */
   optional?: boolean;
+  /**
+   * Whether "Required clarification" is offered at all, alongside Agree and Disagree.
+   *
+   * True unless stated otherwise. Set to `false` for the handful of items that are a bare,
+   * assessor-supplied classification rather than a reporter's claim being checked — 1.3 (MD or
+   * IVD), 1.10/1.11 (registration number, device class), 1.19 (report stage), and every IMDRF row.
+   * A second assessor reading one of these has exactly two honest positions: the classification is
+   * right, or it is wrong and here is the correct one. "Clarification" on a single controlled
+   * value would ask the reader to keep an unchanged answer while attaching words that amend it —
+   * which is what Disagree is for once the value itself is what is being corrected.
+   */
+  clarifiable?: boolean;
 };
 
 /** A replacement answer, shaped like the A1 control it stands in for. */
@@ -155,6 +167,11 @@ export type SecondaryReviewPayload = {
 
 function isA2Degree(value: string): value is A2Degree {
   return (A2_DEGREES as readonly string[]).includes(value);
+}
+
+/** The degrees this item actually offers — all three, or Agree/Disagree where clarification is not. */
+export function allowedDegrees(item: A2ReviewItem): readonly A2Degree[] {
+  return item.clarifiable === false ? (["agree", "disagree"] as const) : A2_DEGREES;
 }
 
 /** Nothing was chosen or written, whichever of the three shapes the value happens to be. */
@@ -756,6 +773,10 @@ const IMDRF_A2_ITEMS: readonly A2ReviewItem[] = IMDRF_GROUPS.flatMap((group) =>
       `imdrf_${item.key}_code`,
     ],
     optional: item.optional === true,
+    // Every IMDRF row is a coded terminology lookup, not a claim to be reworded: the second
+    // assessor either accepts the term/code A1 picked or picks the correct one — see `clarifiable`
+    // on `A2ReviewItem`.
+    clarifiable: false,
   })),
 );
 
@@ -779,6 +800,7 @@ export const SECONDARY_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     valueLabel: "device type",
     valueKind: "single",
     a1Fields: ["device_type"],
+    clarifiable: false,
   },
   {
     key: "1.10",
@@ -788,6 +810,7 @@ export const SECONDARY_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     valueKind: "text",
     a1Fields: ["registration_number"],
     optional: true,
+    clarifiable: false,
   },
   {
     key: "1.11",
@@ -799,6 +822,7 @@ export const SECONDARY_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     // Deliberately not optional. 1.10 beside it carries "(If applicable)" on the paper and 1.11
     // does not, so the class is a finding every submitted assessment owes — one of the four rows
     // the orange form never asks the reporter for, which is why the assessor determines it.
+    clarifiable: false,
   },
   {
     key: "1.19",
@@ -807,6 +831,7 @@ export const SECONDARY_REVIEW_ITEMS: readonly A2ReviewItem[] = [
     valueLabel: "report stage",
     valueKind: "single",
     a1Fields: ["report_stage"],
+    clarifiable: false,
   },
   {
     key: "2.5",
@@ -1084,7 +1109,9 @@ export const F004_SECONDARY_FIELDS: readonly string[] = [
   // would change what every existing review renders and stores. `f004-integration.ts` reads this,
   // resolves it against the repository, and overwrites `value.l1`/`l2`/`l3`/`code` with the
   // authoritative text — the same relationship `imdrf_<key>_term_id` above has to A1's own fields.
-  ...IMDRF_GROUPS.flatMap((group) => group.items.map((item) => `a2_imdrf_term_${group.no}.${item.letter}`)),
+  ...IMDRF_GROUPS.flatMap((group) =>
+    group.items.map((item) => `a2_imdrf_term_${group.no}.${item.letter}`),
+  ),
 ];
 
 /** Keep what the named set owns and drop the rest, so a payload is the document and nothing else. */
@@ -1145,6 +1172,10 @@ export function collectSecondaryReview(
 
     const degree = value(fields, `a2_degree_${item.key}`);
     if (!isA2Degree(degree)) continue;
+    // A hand-edited request naming a degree the page never offers this item — "clarification" on
+    // an item that is `clarifiable: false` — is refused the same as any other degree the item does
+    // not have, rather than stored to be silently honoured later.
+    if (!allowedDegrees(item).includes(degree)) continue;
 
     if (degree === "agree") {
       responses[item.key] = { degree };
@@ -1368,9 +1399,13 @@ export function validateSecondaryReviewForSubmit(
     const degree = response?.degree;
 
     if (degree === undefined) {
+      const choices =
+        item.clarifiable === false
+          ? "Agree or Disagree"
+          : "Agree, Required clarification, or Disagree";
       issues.push({
         field: `a2_degree_${item.key}`,
-        message: `${item.no} ${item.title}: choose Agree, Required clarification, or Disagree.`,
+        message: `${item.no} ${item.title}: choose ${choices}.`,
       });
       continue;
     }
