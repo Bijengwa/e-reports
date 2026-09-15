@@ -962,6 +962,19 @@ function imdrfMissing(item: A2ReviewItem, answers: F004Answers): string | undefi
 }
 
 /**
+ * Whether this item belongs to section 3 (IMDRF terminology) or section 4 (causality
+ * assessment) — the two sections an Officer may leave entirely blank on submission.
+ *
+ * Read off the item's own number rather than added as a second `optional` flag on each of the
+ * ten items concerned, so the rule lives in one place and cannot drift item by item. Every item
+ * in `SECONDARY_REVIEW_ITEMS` is numbered off the section it belongs to (`"3.1.1"`, `"4.2"`), so
+ * the section is already there to read.
+ */
+function isSectionThreeOrFour(item: A2ReviewItem): boolean {
+  return item.no.startsWith("3.") || item.no.startsWith("4.");
+}
+
+/**
  * What a submission must carry.
  *
  * A draft may be as empty as the assessor likes — half an assessment saved at the end of the day
@@ -979,6 +992,8 @@ function imdrfMissing(item: A2ReviewItem, answers: F004Answers): string | undefi
  * that answer the comment is required with it — a ticked radio over an empty box is a verdict with
  * no reasoning. An optional item may be left entirely alone, but once touched it owes the same
  * completeness as a required one, so "(If applicable)" cannot be used to submit half an answer.
+ * Section 3 (IMDRF terminology) and section 4 (causality assessment) are optional the same way, as
+ * whole sections rather than item by item — `isSectionThreeOrFour` is what says so.
  *
  * The signature is required with them. The paper is signed, and a submitted assessment nobody put
  * their name to is not the same document. It is checked against the signed-in name rather than
@@ -990,11 +1005,12 @@ export function validateForSubmit(answers: F004Answers): Issue[] {
   for (const item of SECONDARY_REVIEW_ITEMS) {
     const label = itemLabel(item);
     const answered = isAnswered(item, answers);
+    const optional = item.optional === true || isSectionThreeOrFour(item);
 
     // "(If applicable)" and untouched: the paper allows exactly this, so there is nothing to
     // check. Touched, and it owes the same completeness a required row does — an optional item is
     // optional as a whole, not field by field.
-    if (item.optional === true && !answered && !isTouched(item, answers)) continue;
+    if (optional && !answered && !isTouched(item, answers)) continue;
 
     if (!answered) {
       issues.push({ field: answerField(item), message: `${label} is required.` });
