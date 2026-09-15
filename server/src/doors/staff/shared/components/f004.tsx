@@ -1933,6 +1933,14 @@ export function F004Form({
                   </div>
                 ))}
               </div>
+              <A2InlineDecision
+                itemKey="7.1_actions"
+                answers={answers}
+                review={a2Review?.review}
+                locked={a2Review?.submitted ?? true}
+                priorReviews={priorReviews}
+                notes={resolvedNotes}
+              />
               <Comment
                 name="conclusion"
                 answers={answers}
@@ -1942,7 +1950,7 @@ export function F004Form({
                 variant="answer"
               />
               <A2InlineDecision
-                itemKey="7.1_actions"
+                itemKey="7.1_conclusion"
                 answers={answers}
                 review={a2Review?.review}
                 locked={a2Review?.submitted ?? true}

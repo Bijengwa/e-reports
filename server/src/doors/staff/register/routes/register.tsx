@@ -55,7 +55,7 @@ async function loadRegisterRows(db: Database): Promise<ReadonlyArray<RegisterRow
       (r.payload->>'common_name')::text as device_common_name,
       r.device_name,
       (r.payload->>'size')::text as size,
-      COALESCE((r.payload->>'batch_number'), (r.payload->>'serial_number'), '')::text as batch_lot_serial_number,
+      CONCAT_WS(' · ', NULLIF(r.payload->>'batch_number', ''), NULLIF(r.payload->>'serial_number', ''))::text as batch_lot_serial_number,
       (r.payload->>'device_type')::text as device_type,
       (r.payload->>'manufacturing_date')::text as manufacturing_date,
       (r.payload->>'expiry_date')::text as expiry_date,
