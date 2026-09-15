@@ -21,8 +21,8 @@ import {
   resolveAssessmentRelease,
   resolveSecondaryImdrfReplacements,
 } from "../../../../domain/imdrf/f004-integration.js";
+import { loadReport } from "../../../../domain/report-detail.js";
 import { notifyAssessmentSubmitted } from "../../../../notifications/index.js";
-import { loadReport } from "../../reports/routes/reports.js";
 import { currentSession } from "../../session-guard.js";
 import { ForbiddenPage } from "../../shared/forbidden.js";
 import { Assessment1Page } from "../pages/assessment.js";

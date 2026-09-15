@@ -6,10 +6,10 @@ import {
   isConcludedFinalDocument,
   normalizeFinalDocument,
 } from "../../../../domain/final-document.js";
+import { loadReport } from "../../../../domain/report-detail.js";
 import { currentSession } from "../../session-guard.js";
-import { FinalDocumentPage } from "../pages/final-document.js";
 import { ForbiddenPage } from "../../shared/forbidden.js";
-import { loadReport } from "../../reports/routes/reports.js";
+import { FinalDocumentPage } from "../pages/final-document.js";
 
 /** Same reason as every other report address: a uuid column against arbitrary text raises 22P02. */
 const ReportId = z.uuid();
@@ -143,10 +143,3 @@ export async function finalDocumentRoutes(app: FastifyInstance): Promise<void> {
     );
   });
 }
-
-
-
-
-
-
-

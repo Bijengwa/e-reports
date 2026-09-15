@@ -1,10 +1,10 @@
 import { sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
+import { loadReport } from "../../../../domain/report-detail.js";
 import { currentSession } from "../../session-guard.js";
 import { ForbiddenPage } from "../../shared/forbidden.js";
 import { MyWorkItemPage, MyWorkPage, type WorkRow } from "../pages/my-work.js";
-import { loadReport } from "../../reports/routes/reports.js";
 
 /** Same reason as every other page's: a uuid column compared against arbitrary text raises 22P02. */
 const ReportId = z.uuid();
@@ -139,10 +139,3 @@ export async function myWorkRoutes(app: FastifyInstance): Promise<void> {
     );
   });
 }
-
-
-
-
-
-
-

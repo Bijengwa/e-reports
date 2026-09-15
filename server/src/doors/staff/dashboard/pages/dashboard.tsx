@@ -1,5 +1,6 @@
+import type { ReceivedRow } from "../../../../domain/report-detail.js";
 import { type ActivityEntry, ActivityTable } from "../../activity/pages/activity.js";
-import { type ReceivedRow, ReceivedRows } from "../../reports/pages/reports.js";
+import { ReceivedRows } from "../../shared/components/report-views.js";
 import { StaffShell } from "../../shared/shell.js";
 
 export type DashboardPageProps = {
@@ -133,7 +134,7 @@ export function DashboardPage({
             where they act on it. The register is beside it, not replaced by it.
 
             An Officer gets their own two lists instead. The register is not theirs — it lists
-            every report in the office, and `reportsRoutes` refuses it to them — so a button
+            every report in the office, and `caseDetailRoutes` refuses it to them — so a button
             offering it here would be a button that answers 403. `received` is the flag, because
             it is defined for exactly one role and this page already reads it that way. */}
         {received !== undefined ? (
@@ -202,6 +203,3 @@ export function DashboardPage({
     </StaffShell>
   );
 }
-
-
-

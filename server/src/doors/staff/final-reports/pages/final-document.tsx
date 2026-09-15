@@ -1,8 +1,8 @@
 import type { F004Answers } from "../../../../domain/f004.js";
 import type { FinalDocument } from "../../../../domain/final-document.js";
-import { F004Form } from "../../reports/components/f004.js";
-import { OrangeReportIdentity } from "../../reports/components/orange-report.js";
-import type { ReportDetail } from "../../reports/pages/reports.js";
+import type { ReportDetail } from "../../../../domain/report-detail.js";
+import { F004Form } from "../../shared/components/f004.js";
+import { OrangeReportIdentity } from "../../shared/components/orange-report.js";
 import { StaffShell } from "../../shared/shell.js";
 
 /**
@@ -165,5 +165,3 @@ export function FinalDocumentPage({
     </StaffShell>
   );
 }
-
-

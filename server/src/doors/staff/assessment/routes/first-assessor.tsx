@@ -9,9 +9,10 @@ import {
   isDeadlineValue,
 } from "../../../../domain/assignment.js";
 import { F004_VERSION, FIRST_ASSESSMENT } from "../../../../domain/f004.js";
+import { loadReport } from "../../../../domain/report-detail.js";
+import { renderCaseDetail } from "../../register/routes/report-detail.js";
 import { currentSession } from "../../session-guard.js";
 import { ForbiddenPage } from "../../shared/forbidden.js";
-import { loadReport, renderReport } from "../../reports/routes/reports.js";
 
 const ReportId = z.uuid();
 const UserId = z.uuid();
@@ -58,7 +59,7 @@ export async function firstAssessorRoutes(app: FastifyInstance): Promise<void> {
     const deadlineUnit = rawUnit === "" ? DEFAULT_DEADLINE.unit : rawUnit;
 
     if (!isDeadlineValue(deadlineValue)) {
-      return renderReport(
+      return renderCaseDetail(
         app,
         request,
         reply,
@@ -68,7 +69,7 @@ export async function firstAssessorRoutes(app: FastifyInstance): Promise<void> {
       );
     }
     if (!isDeadlineUnit(deadlineUnit)) {
-      return renderReport(
+      return renderCaseDetail(
         app,
         request,
         reply,
@@ -127,13 +128,6 @@ export async function firstAssessorRoutes(app: FastifyInstance): Promise<void> {
       "first assessor assigned",
     );
 
-    return reply.redirect(`/reports/${found.report.id}`, 302);
+    return reply.redirect(`/register/${found.report.id}`, 302);
   });
 }
-
-
-
-
-
-
-

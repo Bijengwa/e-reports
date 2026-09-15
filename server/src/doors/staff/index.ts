@@ -17,9 +17,9 @@ import { finalReportsRoutes } from "./final-reports/routes/final-reports.js";
 import { imdrfAdminRoutes } from "./imdrf/routes/admin.js";
 import { imdrfBrowserRoutes } from "./imdrf/routes/imdrf.js";
 import { myWorkRoutes } from "./my-work/routes/my-work.js";
+import { newReportRoutes } from "./register/routes/new-report.js";
+import { caseDetailRoutes } from "./register/routes/report-detail.js";
 import { registerRoutes } from "./register/routes/register.js";
-import { newReportRoutes } from "./reports/routes/new-report.js";
-import { reportsRoutes } from "./reports/routes/reports.js";
 import { requirePasswordChanged, requireRole, requireSession } from "./session-guard.js";
 import { usersRoutes } from "./users/routes/users.js";
 import { workloadRoutes } from "./workload/routes/workload.js";
@@ -82,10 +82,6 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
 
       await active.register(dashboardRoutes);
 
-      // Every signed-in role, so it sits here rather than in the administrator scope below. An
-      // administrator's extra powers are over accounts, not over who may read a report.
-      await active.register(reportsRoutes);
-
       // The read-only IMDRF terminology browser. Every signed-in role, same as the register
       // above's opposite — this is a reference vocabulary, not a vigilance record, so there is
       // no role this door withholds it from. The write side (`imdrfAdminRoutes`, under
@@ -105,6 +101,11 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
       await active.register(async (registerAccess) => {
         requireRole(registerAccess, ["manager", "assessor"]);
         await registerAccess.register(registerRoutes);
+
+        // The Register's own case page. An Officer's extra restriction — must be a party to the
+        // case, and the case must not already be over — is a fact about the row, and is asked
+        // inside the route itself rather than expressed as a further scope.
+        await registerAccess.register(caseDetailRoutes);
       });
 
       await active.register(async (registration) => {
@@ -137,7 +138,7 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
       await active.register(async (management) => {
         // Narrower again, and beside the administrator's scope rather than inside it: naming a
         // second assessor is the manager's alone, and an administrator's business here is
-        // unchanged by this slice, exactly as `reportsRoutes`'s own comment already argues.
+        // unchanged by this slice, exactly as `caseDetailRoutes`'s own comment already argues.
         requireRole(management, ["manager"]);
 
         // Where a manager lands and works: the whole pipeline, in the four states a manager acts

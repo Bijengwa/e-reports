@@ -47,7 +47,6 @@ export type StaffShellProps = {
     | "register"
     | "assessments"
     | "my-work"
-    | "reports"
     | "new-report"
     | "imdrf"
     | "imdrf-manage"
@@ -120,17 +119,6 @@ function IconWorkload(): JSX.Element {
       <rect x="3" y="9" width="4.5" height="12" rx="1.2" />
       <rect x="9.75" y="4" width="4.5" height="17" rx="1.2" />
       <rect x="16.5" y="13" width="4.5" height="8" rx="1.2" />
-    </svg>
-  );
-}
-
-function IconReports(): JSX.Element {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="M6 3h8l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
-      <path d="M14 3v5h5" />
-      <path d="M9 13h6" />
-      <path d="M9 17h4" />
     </svg>
   );
 }
@@ -331,7 +319,7 @@ export function StaffShell({
 
             {/* Ungated, like Dashboard: the terminology browser is a reference tool every signed-in
                 role reads, not a vigilance record — `active.register(imdrfBrowserRoutes)` sits at
-                the same "every role" nesting level as `reportsRoutes`, not inside a role scope. */}
+                the "every role" nesting level, not inside a role scope. */}
             <a
               href="/imdrf"
               class={active === "imdrf" ? "on" : ""}
@@ -349,28 +337,6 @@ export function StaffShell({
               >
                 <IconWorkload />
                 <span class="rail-label">Workload</span>
-              </a>
-            )}
-
-            {/* The register — and not everyone's after all.
-
-                It used to be here for every role on the argument that everyone may read a report.
-                That was true of a slice where nobody could do anything with one; it is not true of
-                a workflow whose report page now carries every assessment, every manager decision
-                and the whole record of how a conclusion was reached. An Officer's own work is the
-                two lists below, and this entry is gone for them.
-
-                Presentation only, as ever — `reportsRoutes` refuses an Officer the register, and
-                refuses them any report they are not a party to, whatever the rail shows. The two
-                agree so that no link answers 403 when clicked. */}
-            {!isOfficer && (
-              <a
-                href="/reports"
-                class={active === "reports" ? "on" : ""}
-                aria-current={active === "reports" ? "page" : undefined}
-              >
-                <IconReports />
-                <span class="rail-label">Reports</span>
               </a>
             )}
 

@@ -58,7 +58,7 @@ function toRow(raw: unknown): AssignmentRow {
     assignedAt: row.assigned_at === null ? null : new Date(row.assigned_at),
     completedAt: row.submitted_at === null ? null : new Date(row.submitted_at),
     // Whether the report page is still open to this Officer, decided by the same rule
-    // `reportsRoutes` decides it by. Once the manager has approved and handed the work out, the
+    // `caseDetailRoutes` decides it by. Once the manager has approved and handed the work out, the
     // assessment workflow is over for an Officer and the page is refused them — so the number
     // stops being a link rather than becoming one that answers 403.
     reportOpen: row.status !== "assigned_for_work",
@@ -124,4 +124,3 @@ export async function myAssessmentsRoutes(app: FastifyInstance): Promise<void> {
     );
   });
 }
-

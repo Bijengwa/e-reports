@@ -4,9 +4,10 @@ import { z } from "zod";
 import { computeDueAt, DEFAULT_DEADLINE } from "../../../../domain/assignment.js";
 import { F004_VERSION } from "../../../../domain/f004.js";
 import { resolveFinalDocument } from "../../../../domain/final-document.js";
+import { loadReport } from "../../../../domain/report-detail.js";
+import { renderCaseDetail } from "../../register/routes/report-detail.js";
 import { currentSession } from "../../session-guard.js";
 import { ForbiddenPage } from "../../shared/forbidden.js";
-import { loadReport, renderReport } from "../../reports/routes/reports.js";
 
 const ReportId = z.uuid();
 const UserId = z.uuid();
@@ -57,7 +58,7 @@ export async function decisionRoutes(app: FastifyInstance): Promise<void> {
     // the very first handoff, matching the UX this replaces (naming A2 has never asked for words).
     const rawComment = typeof body.comment === "string" ? body.comment.trim() : "";
     if (found.report.status === "awaiting_decision" && rawComment === "") {
-      return renderReport(
+      return renderCaseDetail(
         app,
         request,
         reply,
@@ -136,7 +137,7 @@ export async function decisionRoutes(app: FastifyInstance): Promise<void> {
       "next assessor assigned",
     );
 
-    return reply.redirect(`/reports/${found.report.id}`, 302);
+    return reply.redirect(`/register/${found.report.id}`, 302);
   });
 
   app.post("/reports/:id/assign-work-officer", async (request, reply) => {
@@ -249,13 +250,6 @@ export async function decisionRoutes(app: FastifyInstance): Promise<void> {
       "work officer assigned",
     );
 
-    return reply.redirect(`/reports/${found.report.id}`, 302);
+    return reply.redirect(`/register/${found.report.id}`, 302);
   });
 }
-
-
-
-
-
-
-

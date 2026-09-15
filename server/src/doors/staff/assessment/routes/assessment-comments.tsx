@@ -2,9 +2,10 @@ import { sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import { F004_SECTION_KEYS, FIRST_ASSESSMENT } from "../../../../domain/f004.js";
+import { loadReport } from "../../../../domain/report-detail.js";
+import { renderCaseDetail } from "../../register/routes/report-detail.js";
 import { currentSession } from "../../session-guard.js";
 import { ForbiddenPage } from "../../shared/forbidden.js";
-import { loadReport, renderReport } from "../../reports/routes/reports.js";
 
 /** Same reason as every other report address: a uuid column against arbitrary text raises 22P02. */
 const ReportId = z.uuid();
@@ -80,7 +81,7 @@ export async function assessmentCommentRoutes(app: FastifyInstance): Promise<voi
     // 422, not 403. The manager may write this; this attempt just said nothing. Re-rendered on the
     // report itself so the assessment they were reading is still in front of them.
     if (!posted.success) {
-      return renderReport(app, request, reply, found.report.id, 422, EMPTY);
+      return renderCaseDetail(app, request, reply, found.report.id, 422, EMPTY);
     }
 
     // The assessment named by the address, and only while it is still a submitted first
@@ -125,10 +126,3 @@ export async function assessmentCommentRoutes(app: FastifyInstance): Promise<voi
     return reply.redirect(`/reports/${found.report.id}#section-${section.data}`, 302);
   });
 }
-
-
-
-
-
-
-

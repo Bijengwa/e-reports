@@ -1,14 +1,14 @@
 import {
-  OrangeReportIdentity,
-  OrangeReportSurface,
-} from "../../reports/components/orange-report.js";
-import {
   day,
   type ReportDetail,
-  ReportDocument,
   SEVERITY_LABELS,
   severityTone,
-} from "../../reports/pages/reports.js";
+} from "../../../../domain/report-detail.js";
+import {
+  OrangeReportIdentity,
+  OrangeReportSurface,
+} from "../../shared/components/orange-report.js";
+import { ReportDocument } from "../../shared/components/report-views.js";
 import { StaffShell } from "../../shared/shell.js";
 
 /**
@@ -272,7 +272,7 @@ export function MyWorkItemPage({
           what was decided and why, to a reader whose business is carrying out the conclusion. The
           way to the general report page went with them — `/reports/:id` is the assessment
           workflow, and an Officer whose report has reached `assigned_for_work` is refused it by
-          `reportsRoutes` regardless, so a link to it here would be a dead end drawn on purpose. */}
+          `caseDetailRoutes` regardless, so a link to it here would be a dead end drawn on purpose. */}
     </StaffShell>
   );
 }

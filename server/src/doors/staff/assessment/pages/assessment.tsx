@@ -1,10 +1,11 @@
 import type { F004Answers, Issue } from "../../../../domain/f004.js";
-import { F004Form } from "../../reports/components/f004.js";
+import type { ReportDetail } from "../../../../domain/report-detail.js";
+import { F004Form } from "../../shared/components/f004.js";
 import {
   OrangeReportIdentity,
   OrangeReportSurface,
-} from "../../reports/components/orange-report.js";
-import { type ReportDetail, ReportDocument } from "../../reports/pages/reports.js";
+} from "../../shared/components/orange-report.js";
+import { ReportDocument } from "../../shared/components/report-views.js";
 import { StaffShell } from "../../shared/shell.js";
 import { Countdown } from "../components/countdown.js";
 
@@ -90,7 +91,7 @@ export function Assessment1Page({
         </label>
         {/* My assessments, not the report page. This is an Officer's own workspace and their own
             queue is where they came from; the report page is the general workflow, and once the
-            manager has approved and handed the work out `reportsRoutes` refuses it to them — a
+            manager has approved and handed the work out `caseDetailRoutes` refuses it to them — a
             back button that works until the case closes and then answers 403 is worse than one
             that always goes somewhere theirs. The Orange Report is a drawer on this page already,
             so nothing they need is behind that link. */}

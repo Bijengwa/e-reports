@@ -1,11 +1,11 @@
-import { Countdown } from "../../assessment/components/countdown.js";
 import {
   assessment1Href,
   day,
   SEVERITY_LABELS,
   secondaryAssessmentHref,
   severityTone,
-} from "../../reports/pages/reports.js";
+} from "../../../../domain/report-detail.js";
+import { Countdown } from "../../assessment/components/countdown.js";
 import { StaffShell } from "../../shared/shell.js";
 
 /**
@@ -79,7 +79,7 @@ export type AssignmentRow = {
    *
    * False once the manager has approved and assigned the work: at that point the report page is
    * the settled record of an argument that is over, carrying every assessor's document and the
-   * manager's whole decision history, and `reportsRoutes` refuses it to an Officer. The number
+   * manager's whole decision history, and `caseDetailRoutes` refuses it to an Officer. The number
    * stays on the row and stops being a link, which is the honest rendering of "this is no longer
    * yours to open" — a link that answers 403 would be worse.
    */

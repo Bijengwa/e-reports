@@ -460,6 +460,19 @@ export function RegisterPage({ rows, viewerRole, viewerName }: RegisterPageProps
                        * here. That is what keeps the search below, the Excel export and assistive
                        * technology reading the record rather than the preview of it.
                        */
+                      // The report number is the row's own way into its case: the Register is the
+                      // index, and a case's full record — the Orange Report, every assessment,
+                      // every manager decision — lives at the case-detail page this links to.
+                      if (col.header === "TMDA Report Number") {
+                        return (
+                          <td class={stickyClass(i)}>
+                            <a href={`/register/${row.reportId}`} class={textClass} safe>
+                              {text}
+                            </a>
+                          </td>
+                        );
+                      }
+
                       return (
                         <td class={stickyClass(i)}>
                           {cellOverflows(col, text) ? (

@@ -1,5 +1,5 @@
+import { SEVERITY_LABELS, severityTone } from "../../../../domain/report-detail.js";
 import { Countdown } from "../../assessment/components/countdown.js";
-import { SEVERITY_LABELS, severityTone } from "../../reports/pages/reports.js";
 import { StaffShell } from "../../shared/shell.js";
 
 /**

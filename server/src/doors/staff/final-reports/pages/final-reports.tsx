@@ -1,5 +1,5 @@
-import { receivedDay } from "../../reports/components/orange-report.js";
-import { SEVERITY_LABELS, severityTone } from "../../reports/pages/reports.js";
+import { SEVERITY_LABELS, severityTone } from "../../../../domain/report-detail.js";
+import { receivedDay } from "../../shared/components/orange-report.js";
 import { StaffShell } from "../../shared/shell.js";
 
 /**

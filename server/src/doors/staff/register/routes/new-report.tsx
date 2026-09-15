@@ -138,7 +138,7 @@ export async function newReportRoutes(app: FastifyInstance): Promise<void> {
       // Straight to the report they just filed, rather than to a confirmation page: an Officer
       // has no number to quote back at anybody, they need to see what they entered. A redirect
       // rather than a render, so a refresh cannot post the form a second time.
-      return reply.redirect(`/reports/${id}`, 302);
+      return reply.redirect(`/register/${id}`, 302);
     } catch (error) {
       // The Officer must not be told this succeeded, and must not lose what they typed.
       request.log.error({ err: error }, "could not store staff report");
@@ -147,4 +147,3 @@ export async function newReportRoutes(app: FastifyInstance): Promise<void> {
     }
   });
 }
-

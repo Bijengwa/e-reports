@@ -2,7 +2,7 @@
  * The read-only IMDRF terminology sidebar/browser, reachable by every signed-in staff role.
  *
  * Registered in the staff door's `active` scope (`doors/staff/index.ts`) — the same nesting level
- * as `reportsRoutes` — because this is a reference tool, not a vigilance record: nothing here
+ * as `caseDetailRoutes` — because this is a reference tool, not a vigilance record: nothing here
  * writes, and every function it calls (`domain/imdrf/query-service.ts`) is read-only by
  * construction. `requirePublishedRelease` is what keeps a draft release invisible to this door:
  * called first by every handler below, so "drafts are not exposed to normal read-only consumers"

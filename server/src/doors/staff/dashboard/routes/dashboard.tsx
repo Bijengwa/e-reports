@@ -1,9 +1,9 @@
 import { sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
+import type { ReceivedRow } from "../../../../domain/report-detail.js";
+import { loadActivity } from "../../activity/routes/activity.js";
 import { currentSession } from "../../session-guard.js";
 import { DashboardPage } from "../pages/dashboard.js";
-import type { ReceivedRow } from "../../reports/pages/reports.js";
-import { loadActivity } from "../../activity/routes/activity.js";
 
 /** Enough of the trail to see what happened last, without becoming a second /activity. */
 const RECENT_ACTIVITY = 5;
@@ -156,5 +156,3 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
     );
   });
 }
-
-
