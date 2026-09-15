@@ -1,5 +1,7 @@
+import type { HistoryEvent } from "../../../../domain/assessment-history.js";
 import type { F004Answers } from "../../../../domain/f004.js";
 import type { FinalDocument } from "../../../../domain/final-document.js";
+import { Layout } from "../../../../views/shared/layout.js";
 import { F004Form } from "../../reports/components/f004.js";
 import { OrangeReportIdentity } from "../../reports/components/orange-report.js";
 import type { ReportDetail } from "../../reports/pages/reports.js";
@@ -35,6 +37,21 @@ import { StaffShell } from "../../shared/shell.js";
  * is editable, and nothing on it advertises a route that would refuse the reader.
  */
 
+/**
+ * Which of the two final presentations this is.
+ *
+ * Not two outcomes and not two documents — one concluded case, presented twice. `"clean"` is the
+ * office's position on its own, which is what the position is when anybody asks what it is.
+ * `"history"` is that same document with the working record attached under it, for the manager and
+ * for audit.
+ *
+ * One mode flag on one renderer rather than two pages, because the thing that must never drift is
+ * Part A: a history document whose final answers disagreed with the clean one would not be an
+ * audit trail, it would be a contradiction. There is exactly one place below that builds Part A
+ * and both modes go through it.
+ */
+export type FinalDocumentMode = "clean" | "history";
+
 export type FinalDocumentPageProps = {
   report: ReportDetail;
   viewerRole: string;
@@ -59,6 +76,22 @@ export type FinalDocumentPageProps = {
   /** Where the reader came from, so the way back is the way they arrived. */
   backHref: string;
   backLabel: string;
+  mode: FinalDocumentMode;
+  /**
+   * The working record, oldest first. Required by `mode="history"` and meaningless without it.
+   *
+   * Passed in already built. This component decides how a recorded action is printed and nothing
+   * else: which events exist, and what each assessor was looking at, is `buildAssessmentHistory`'s
+   * answer, and a renderer that could add an event would be a renderer that could invent one.
+   */
+  history?: readonly HistoryEvent[];
+  /**
+   * Whether the reader may open the history presentation, and therefore be offered it.
+   *
+   * Presentation only. The route decides, on the same rule, before rendering anything — see
+   * `finalDocumentRoutes`. A link is not access, and its absence is not protection.
+   */
+  canReadHistory: boolean;
 };
 
 /**
@@ -76,40 +109,30 @@ function resolvedNotes(document: FinalDocument): Record<string, string> {
   return notes;
 }
 
-export function FinalDocumentPage({
+type PartAProps = Pick<
+  FinalDocumentPageProps,
+  "report" | "document" | "device" | "event" | "approvedByName" | "approvedOn" | "workOfficerName"
+>;
+
+/**
+ * Part A: the Final F004, and nothing else.
+ *
+ * The one implementation of the concluded document. The clean presentation is this; the history
+ * presentation is this plus a record underneath it; both PDFs are this through the print
+ * stylesheet. Anything a reader must see in the office's settled position goes here once, and
+ * every presentation gets it by construction rather than by three pages remembering to.
+ */
+function FinalF004({
   report,
-  viewerRole,
-  viewerName,
-  active,
   document,
   device,
   event,
   approvedByName,
   approvedOn,
   workOfficerName,
-  backHref,
-  backLabel,
-}: FinalDocumentPageProps): JSX.Element {
+}: PartAProps): JSX.Element {
   return (
-    <StaffShell
-      title={`Final F004 — ${report.number}`}
-      pageTitle="Final F004"
-      role={viewerRole}
-      fullName={viewerName}
-      active={active}
-      f4Find
-    >
-      {/* The title bar above already says "Final F004" once. A heading here said it a second time
-          twenty pixels below the first, and the sentence under that explained a document that
-          explains itself — this page IS the approved assessment, and the identity card, the
-          approval card and the form say so in the only way that matters. */}
-      <div class="staff-head">
-        <div class="sp"></div>
-        <a href={backHref} class="btn ghost" safe>
-          {backLabel}
-        </a>
-      </div>
-
+    <>
       {/* The source document this F004 assesses, wearing the identity it wears everywhere else.
           It is not part of the F004 and is not restated inside it — sections 1 and 2 already carry
           the reporter's own facts, read from the same immutable payload. */}
@@ -162,8 +185,369 @@ export function FinalDocumentPage({
         documentMode
         issues={[]}
       />
+    </>
+  );
+}
+
+/** One assessment's or decision's attribution lines — who, when, and in what capacity. */
+function EventMeta({ pairs }: { pairs: readonly [string, string][] }): JSX.Element {
+  return (
+    <dl class="ah-meta">
+      {pairs
+        .filter(([, value]) => value.trim() !== "")
+        .map(([label, value]) => (
+          <>
+            <dt safe>{label}</dt>
+            <dd safe>{value}</dd>
+          </>
+        ))}
+    </dl>
+  );
+}
+
+/**
+ * One secondary assessor's recorded actions, item by item.
+ *
+ * A table, because that is what the content is: one row per item, the same four facts on each.
+ * What the assessor was looking at, what they did, what they put in its place where they replaced
+ * it, and the words they recorded — and a cell is empty exactly when nothing was recorded in it.
+ * An empty Replacement against an Agree is not a gap in the record; it is what agreeing is.
+ */
+function ActionTable({
+  actions,
+}: {
+  actions: readonly Extract<HistoryEvent, { kind: "secondary_assessment" }>["actions"][number][];
+}): JSX.Element {
+  return (
+    <table class="ah-items">
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>Value reviewed</th>
+          <th>Action</th>
+          <th>Replacement</th>
+          <th>Recorded reason</th>
+        </tr>
+      </thead>
+      <tbody>
+        {actions.map((action) => (
+          <tr>
+            <td class="ah-no">
+              <b safe>{action.itemNo}</b> <span safe>{action.itemTitle}</span>
+            </td>
+            <td safe>{action.asReviewed}</td>
+            <td safe>{action.degreeLabel}</td>
+            <td safe>{action.replacement ?? ""}</td>
+            <td>
+              {action.reason === undefined ? (
+                <></>
+              ) : (
+                <>
+                  <span class="ah-reason-l" safe>
+                    {action.reasonLabel}
+                  </span>
+                  <span safe>{action.reason}</span>
+                </>
+              )}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+/**
+ * Part B: the working record, in the order it happened.
+ *
+ * Rendered from the events it is given and only from those. A case assessed once and concluded
+ * prints two entries; one that went round a third assessor prints that assessor because the row
+ * exists. There is no placeholder for an assessment that was never made, no heading reserved for
+ * one, and nothing anywhere below that counts up to a number of expected assessments.
+ *
+ * There is also no narrative. No entry explains why the case moved, because no column records
+ * why: a manager's recorded grounds are printed where they wrote any, and where they wrote none
+ * the record says nothing rather than supplying a reason on their behalf.
+ *
+ * Not styled as an F004. The final document above is the form; this is a dated list of entries
+ * under a heading, which is what an audit record looks like on paper.
+ */
+function AssessmentHistory({ events }: { events: readonly HistoryEvent[] }): JSX.Element {
+  return (
+    <section class="fd-history" aria-label="Assessment history">
+      <h2 class="fd-part">Assessment history</h2>
+      <p class="fd-part-note">
+        The working record of this assessment, in the order it was made. Recorded entries only.
+      </p>
+
+      {events.length === 0 ? (
+        <p class="hint">No submitted assessment is recorded against this report.</p>
+      ) : (
+        <ol class="ah">
+          {events.map((event) => {
+            if (event.kind === "first_assessment") {
+              return (
+                <li class="ah-e">
+                  <p class="ah-h">First assessment</p>
+                  <EventMeta
+                    pairs={[
+                      ["Assessor", event.assessorName],
+                      ["Role", event.role],
+                      ["Date", event.on],
+                      ["Status", event.status],
+                    ]}
+                  />
+                  {event.results.length === 0 ? (
+                    <></>
+                  ) : (
+                    <table class="ah-items">
+                      <thead>
+                        <tr>
+                          <th>Item</th>
+                          <th>Assessed value</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {event.results.map((result) => (
+                          <tr>
+                            <td class="ah-no">
+                              <b safe>{result.itemNo}</b> <span safe>{result.itemTitle}</span>
+                            </td>
+                            <td safe>{result.value}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </li>
+              );
+            }
+
+            if (event.kind === "secondary_assessment") {
+              return (
+                <li class="ah-e">
+                  <p class="ah-h" safe>
+                    {`Secondary assessment ${event.ordinal}`}
+                  </p>
+                  <EventMeta
+                    pairs={[
+                      ["Assessor", event.assessorName],
+                      ["Role", event.role],
+                      ["Date", event.on],
+                      ["Status", event.status],
+                    ]}
+                  />
+                  {event.actions.length === 0 ? (
+                    <p class="hint">No item-level action is recorded against this assessment.</p>
+                  ) : (
+                    <ActionTable actions={[...event.actions]} />
+                  )}
+                </li>
+              );
+            }
+
+            if (event.kind === "manager_review") {
+              return (
+                <li class="ah-e ah-m">
+                  <p class="ah-h" safe>
+                    {event.ordinal === 1
+                      ? "Manager review of the first assessment"
+                      : `Manager review of secondary assessment ${event.ordinal}`}
+                  </p>
+                  <EventMeta
+                    pairs={[
+                      ["Reviewer", event.reviewerName],
+                      ["Date", event.on],
+                    ]}
+                  />
+                  {event.comment === undefined ? (
+                    <></>
+                  ) : (
+                    <p class="ah-text" safe>
+                      {event.comment}
+                    </p>
+                  )}
+                </li>
+              );
+            }
+
+            return (
+              <li class="ah-e ah-m">
+                <p class="ah-h" safe>
+                  {event.decision}
+                </p>
+                <EventMeta
+                  pairs={[
+                    ["Decided by", event.decidedByName],
+                    ["Date", event.on],
+                    ["Handed to", event.handedTo ?? ""],
+                  ]}
+                />
+                {event.grounds === undefined ? (
+                  <></>
+                ) : (
+                  <p class="ah-text" safe>
+                    {event.grounds}
+                  </p>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+/**
+ * The document itself: Part A always, Part B when the presentation is the history one.
+ *
+ * Shared by the screen pages and the printable ones, which is what makes "the PDF is the same
+ * document" true rather than aspirational. The divider between the two parts is a rule with the
+ * next part's name on it, so a reader who has scrolled past the F004's own section 8 knows the
+ * document has ended and a record has begun.
+ */
+function FinalDocumentBody(props: FinalDocumentPageProps): JSX.Element {
+  return (
+    <div class="fd-doc" data-print-document>
+      {/* Part A, boxed in its own element in every mode — including the clean one, where it is the
+          whole document. The two presentations must be the same document in the same wrapper, so
+          that "Part A is identical" is a property of the markup rather than of where a divider
+          happens to fall. */}
+      <section class="fd-final" aria-label="Final F004">
+        <FinalF004
+          report={props.report}
+          document={props.document}
+          device={props.device}
+          event={props.event}
+          approvedByName={props.approvedByName}
+          approvedOn={props.approvedOn}
+          workOfficerName={props.workOfficerName}
+        />
+      </section>
+
+      {props.mode === "history" ? (
+        <>
+          <hr class="fd-divide" />
+          <AssessmentHistory events={props.history ?? []} />
+        </>
+      ) : (
+        <></>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The two downloads, offered only on a document that exists.
+ *
+ * This page is only reachable for a report a manager has approved — the route serves nothing
+ * before the snapshot is written — so there is no state here in which a download could offer a
+ * final document that has not been concluded. The working F004 has no download at all, which is
+ * the same rule from the other side: an assessment in progress is not a document to file.
+ *
+ * The history download is offered to the reader who may read the history, and to nobody else.
+ */
+function Downloads({
+  reportId,
+  canReadHistory,
+}: {
+  reportId: string;
+  canReadHistory: boolean;
+}): JSX.Element {
+  return (
+    <>
+      <a href={`/reports/${reportId}/final-document/print`} class="btn ghost">
+        Download Final F004 (PDF)
+      </a>
+      {canReadHistory ? (
+        <a href={`/reports/${reportId}/final-document/history/print`} class="btn ghost">
+          Download Final F004 with Assessment History (PDF)
+        </a>
+      ) : (
+        <></>
+      )}
+    </>
+  );
+}
+
+export function FinalDocumentPage(props: FinalDocumentPageProps): JSX.Element {
+  const { report, viewerRole, viewerName, active, mode, canReadHistory, backHref, backLabel } =
+    props;
+
+  return (
+    <StaffShell
+      title={
+        mode === "history"
+          ? `Final F004 with assessment history — ${report.number}`
+          : `Final F004 — ${report.number}`
+      }
+      pageTitle={mode === "history" ? "Final F004 + assessment history" : "Final F004"}
+      role={viewerRole}
+      fullName={viewerName}
+      active={active}
+      f4Find
+    >
+      {/* The title bar above already says which document this is. A heading here said it a second
+          time twenty pixels below the first, and the sentence under that explained a document that
+          explains itself — this page IS the approved assessment, and the identity card, the
+          approval card and the form say so in the only way that matters. */}
+      <div class="staff-head">
+        <div class="sp"></div>
+        {/* The other presentation of the same case, for the reader entitled to it. Not a second
+            document to choose between: the history view is this document with the working record
+            attached, and the way back to the document alone is the same pair of links. */}
+        {canReadHistory ? (
+          mode === "history" ? (
+            <a href={`/reports/${report.id}/final-document`} class="btn ghost">
+              Final F004 only
+            </a>
+          ) : (
+            <a href={`/reports/${report.id}/final-document/history`} class="btn ghost">
+              Assessment history
+            </a>
+          )
+        ) : (
+          <></>
+        )}
+        <Downloads reportId={report.id} canReadHistory={canReadHistory} />
+        <a href={backHref} class="btn ghost" safe>
+          {backLabel}
+        </a>
+      </div>
+
+      <FinalDocumentBody {...props} />
     </StaffShell>
   );
 }
 
-
+/**
+ * The printable document: the same body, with the application taken off it.
+ *
+ * No rail, no title bar, no links — a reader printing a regulatory document does not want this
+ * system's navigation in the file, and a PDF that carried a "Back to my work" button would be a
+ * screenshot of an application rather than a document. `print.js` opens the print dialogue; the
+ * page is the finished document with or without it.
+ *
+ * Deliberately the same `FinalDocumentBody` the screen pages render. There is no print-only copy
+ * of the F004 and no second resolution of the answers: if the two could differ, the file somebody
+ * archives would not be the document somebody approved.
+ */
+export function FinalDocumentPrintPage(props: FinalDocumentPageProps): JSX.Element {
+  return (
+    <Layout
+      title={
+        props.mode === "history"
+          ? `Final F004 with assessment history — ${props.report.number}`
+          : `Final F004 — ${props.report.number}`
+      }
+      locale="en"
+      bodyClass="staff fd-print"
+      printDocument
+    >
+      <main class="fd-print-page">
+        <FinalDocumentBody {...props} />
+      </main>
+    </Layout>
+  );
+}

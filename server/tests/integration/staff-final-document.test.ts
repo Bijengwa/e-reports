@@ -949,4 +949,120 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
     expect(after.headers.location).toBe("/");
     expect(after.headers["cache-control"]).toContain("no-store");
   });
+  /*
+   * The assessment history, and who the office lets read it.
+   *
+   * The final document is the answer and the history is how the office got there. The product rule
+   * is that the second of those is the manager's and the auditor's, not the Officer's who has to
+   * carry the conclusion out — the same rule that stripped the assessments and the decision history
+   * out of the Officer's work item. This pins it on the address rather than on the page, because a
+   * missing link is not protection.
+   */
+  it("serves the assessment history to the manager and refuses it to the Officer", async () => {
+    const { manager, a1, secondAssessor, worker, id } = await approvedReport("history-access");
+
+    // The manager's two presentations of the same case.
+    const clean = await get(`/reports/${id}/final-document`, manager.cookie);
+    expect(clean.statusCode).toBe(200);
+    expect(clean.body).not.toContain('class="fd-history"');
+
+    const history = await get(`/reports/${id}/final-document/history`, manager.cookie);
+    expect(history.statusCode).toBe(200);
+    expect(history.body).toContain("Assessment history");
+    expect(history.body).toContain("First assessment");
+    expect(history.body).toContain("Secondary assessment 2");
+    // The real chain, off the real rows: both assessors are named in the record.
+    expect(history.body).toContain(a1.name);
+    expect(history.body).toContain(secondAssessor.name);
+    // And a third assessment is not invented for a case that had two.
+    expect(history.body).not.toContain("Secondary assessment 3");
+
+    // The work Officer may read the document that tells them what to do. Typing the history
+    // address does not get them the working record, and neither does the download.
+    expect((await get(`/reports/${id}/final-document`, worker.cookie)).statusCode).toBe(200);
+    expect((await get(`/reports/${id}/final-document/history`, worker.cookie)).statusCode).toBe(
+      403,
+    );
+    expect(
+      (await get(`/reports/${id}/final-document/history/print`, worker.cookie)).statusCode,
+    ).toBe(403);
+
+    // Nor is it offered to them.
+    const theirs = await get(`/reports/${id}/final-document`, worker.cookie);
+    expect(theirs.body).not.toContain("final-document/history");
+    expect(theirs.body).not.toContain("Download Final F004 with Assessment History (PDF)");
+
+    // An Officer with no claim on this report at all is refused both, as before.
+    expect((await get(`/reports/${id}/final-document`, a1.cookie)).statusCode).toBe(403);
+    expect((await get(`/reports/${id}/final-document/history`, a1.cookie)).statusCode).toBe(403);
+  });
+
+  /*
+   * The two downloads.
+   *
+   * The same document the screen shows, with the application taken off it, handed to the browser's
+   * own print pipeline. There is no PDF library and no headless browser in this deployment, and a
+   * second renderer is the one thing a final document must not have: the file somebody archives
+   * has to be the document somebody approved.
+   */
+  it("serves both downloads as the same document, and neither before the case concludes", async () => {
+    const { manager, report, rest } = await afterFirstAssessment();
+    const [second, worker] = rest;
+    if (second === undefined || worker === undefined) throw new Error("need two Officers");
+
+    // Nothing to download while the assessment is still being argued. The working F004 carries no
+    // final-document action of any kind, and the addresses themselves serve nothing.
+    const working = await get(`/reports/${report.id}/assessment-1`, manager.cookie);
+    expect(working.body).not.toContain("Download Final F004");
+    expect(
+      (await get(`/reports/${report.id}/final-document/print`, manager.cookie)).statusCode,
+    ).toBe(404);
+    expect(
+      (await get(`/reports/${report.id}/final-document/history/print`, manager.cookie)).statusCode,
+    ).toBe(404);
+
+    await post(`/reports/${report.id}/assign-next-assessor`, manager.cookie, {
+      assessor_id: second.id,
+      comment: "Please review it.",
+    });
+    await post(`/reports/${report.id}/secondary-assessment`, second.cookie, completeSecondary());
+    await post(`/reports/${report.id}/assign-work-officer`, manager.cookie, {
+      officer_id: worker.id,
+    });
+
+    const cleanPdf = await get(`/reports/${report.id}/final-document/print`, manager.cookie);
+    const historyPdf = await get(
+      `/reports/${report.id}/final-document/history/print`,
+      manager.cookie,
+    );
+    expect(cleanPdf.statusCode).toBe(200);
+    expect(historyPdf.statusCode).toBe(200);
+
+    // The clean file carries no history and the history file does.
+    expect(cleanPdf.body).not.toContain("Assessment history");
+    expect(historyPdf.body).toContain("Assessment history");
+
+    // Both are the document alone: no rail, no title bar, nothing to navigate out of a file.
+    for (const pdf of [cleanPdf, historyPdf]) {
+      expect(pdf.body).not.toContain('class="rail on-dark"');
+      expect(pdf.body).not.toContain("Open Orange Report");
+      expect(pdf.body).toContain("data-print-document");
+    }
+
+    // And Part A is one document in both, which is what "one renderer" means in practice.
+    const partA = (html: string) => {
+      const after = html.split('<section class="fd-final"')[1] ?? "";
+      const upToDivider = after.split('<hr class="fd-divide"')[0] ?? "";
+      return (upToDivider.split("</section></div></main>")[0] ?? upToDivider).replace(
+        /<\/section>$/,
+        "",
+      );
+    };
+    expect(partA(historyPdf.body)).toBe(partA(cleanPdf.body));
+
+    // The document, on screen, offers them both — and only now that it exists.
+    const page = await get(`/reports/${report.id}/final-document`, manager.cookie);
+    expect(page.body).toContain("Download Final F004 (PDF)");
+    expect(page.body).toContain("Download Final F004 with Assessment History (PDF)");
+  });
 });

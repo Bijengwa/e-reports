@@ -510,6 +510,15 @@ export type SecondaryAssignment = {
   submittedOn: string | null;
   dueAt: Date | null;
   answers: SecondaryReviewPayload;
+  /**
+   * The manager's review of THIS ordinal, where they have written one.
+   *
+   * The column has always been on every `assessments` row — ordinal 2's `manager_comment` is the
+   * manager's later review of the second assessment, exactly as ordinal 1's is of the first — and
+   * only the first was ever read. The assessment history needs both, because a review the manager
+   * recorded against A2 is part of how the case reached its conclusion.
+   */
+  managerComment: ManagerReviewNote | null;
 };
 
 /** One manager decision, as the decision-history block prints it. */

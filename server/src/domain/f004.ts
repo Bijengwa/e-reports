@@ -1299,6 +1299,53 @@ function sameText(a: string, b: string): boolean {
 }
 
 /**
+ * The option list one review item's answer is drawn from, or an empty list for a free-text one.
+ *
+ * Here rather than beside the form, because three documents now have to print the same words: the
+ * assessment workspace, the Final F004, and the assessment history attached to it. A resolved
+ * answer stored as `"non_serious"` is a code, and a document that showed a reader the code rather
+ * than "Non-serious" would be a different document from the one they assessed.
+ */
+export function a2FillInOptions(item: A2ReviewItem): readonly { value: string; label: string }[] {
+  if (item.key === "1.3") return DEVICE_TYPE_OPTIONS;
+  if (item.key === "1.19") return REPORT_STAGE_OPTIONS;
+  if (item.key === "2.5") return SOURCE_OPTIONS;
+  if (item.key === "2.6") return SERIOUSNESS_OPTIONS;
+  if (item.key === "2.7") return YES_NO;
+  if (item.key === "4.1") return EXPECTEDNESS_OPTIONS;
+  if (item.key === "4.2") return CAUSALITY_OPTIONS;
+  if (item.key === "5") return SIGNAL_OPTIONS;
+  if (item.key === "6") return RISK_OPTIONS;
+  return [];
+}
+
+/**
+ * One item's value, resolved to the words a reader recognises.
+ *
+ * Every shape an `A2Value` takes, because every one of them is stored as something other than
+ * what a document should print: a coded option as its code, an IMDRF row as four boxes, a
+ * checkbox list as an array. An unrecognised code is printed as itself rather than dropped — in a
+ * document that is evidence, an unlovely value is recoverable and a blank one is not.
+ */
+export function describeA2Value(item: A2ReviewItem, val: A2Value | undefined): string {
+  if (val === undefined) return "";
+  if (item.valueKind === "text") return typeof val === "string" ? val : "";
+  if (item.valueKind === "fields") {
+    const rec =
+      typeof val === "object" && val !== null && !Array.isArray(val)
+        ? (val as Record<string, string>)
+        : {};
+    return (item.fields ?? [])
+      .map((field) => (rec[field.key] ? `${field.label}: ${rec[field.key]}` : ""))
+      .filter(Boolean)
+      .join("; ");
+  }
+  const chosen = Array.isArray(val) ? val : typeof val === "string" && val !== "" ? [val] : [];
+  const options = a2FillInOptions(item);
+  return chosen.map((v) => options.find((o) => o.value === v)?.label ?? v).join(", ");
+}
+
+/**
  * The first assessor's own answer to one review item, in the shape that item's replacement takes.
  *
  * Read through the item rather than through the field name, so the four `valueKind`s answer in the
@@ -1310,7 +1357,7 @@ function sameText(a: string, b: string): boolean {
  * this row has, then its coding box — so the pairing is a property of that generator rather than
  * an assumption made here about it.
  */
-function a1ValueOf(item: A2ReviewItem, a1Answers: F004Answers): A2Value {
+export function a1ValueOf(item: A2ReviewItem, a1Answers: F004Answers): A2Value {
   if (item.valueKind === "multi") return list(a1Answers, answerField(item));
 
   if (item.valueKind === "fields") {

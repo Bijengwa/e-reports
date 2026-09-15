@@ -9,8 +9,8 @@ import {
   prefillEventRows,
 } from "../../../../domain/f004.js";
 import { currentSession } from "../../session-guard.js";
-import type { SectionComment } from "../components/f004.js";
 import { ForbiddenPage } from "../../shared/forbidden.js";
+import type { SectionComment } from "../components/f004.js";
 import {
   type AssessorOption,
   type DecisionEntry,
@@ -197,9 +197,11 @@ export async function loadReport(
   // Every secondary assessment this report has ever had, ordinal 2 upward, draft or submitted.
   const secondaryRows = await app.db.execute(sql`
     SELECT a.ordinal, a.assessor_id, u.full_name AS assessor_name, a.payload, a.submitted_at,
-           a.due_at
+           a.due_at,
+           a.manager_comment, a.manager_comment_at, mc.full_name AS manager_comment_by
       FROM assessments a
       JOIN users u ON u.id = a.assessor_id
+      LEFT JOIN users mc ON mc.id = a.manager_comment_by
      WHERE a.report_id = ${id} AND a.ordinal > 1
      ORDER BY a.ordinal ASC
   `);
@@ -212,6 +214,9 @@ export async function loadReport(
       payload: unknown;
       submitted_at: Date | null;
       due_at: Date | null;
+      manager_comment: string | null;
+      manager_comment_at: Date | null;
+      manager_comment_by: string | null;
     };
 
     return {
@@ -222,6 +227,14 @@ export async function loadReport(
       submittedOn: r.submitted_at === null ? null : day(r.submitted_at),
       dueAt: r.due_at === null ? null : new Date(r.due_at),
       answers: normalizeSecondaryReview(r.payload) as SecondaryReviewPayload,
+      managerComment:
+        r.manager_comment_at === null
+          ? null
+          : {
+              text: r.manager_comment ?? "",
+              byName: r.manager_comment_by ?? "",
+              on: day(r.manager_comment_at),
+            },
     };
   });
 
@@ -606,4 +619,3 @@ export async function reportsRoutes(app: FastifyInstance): Promise<void> {
     return renderReport(app, request, reply, target.data);
   });
 }
-

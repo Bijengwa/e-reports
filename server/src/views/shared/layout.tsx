@@ -51,6 +51,15 @@ export type LayoutProps = {
    * must not be made to fetch a script that would find nothing to attach to.
    */
   imdrfPicker?: boolean;
+  /**
+   * Open the browser's print dialogue once the document has rendered.
+   *
+   * For the two final-document downloads, which are the same document this application renders on
+   * screen, handed to the browser's own print pipeline to become a PDF. Opt-in for the same reason
+   * every script above is, and enhancement only in the same way: a browser that refuses it shows
+   * the printable document with the chrome already stripped, and the reader prints it themselves.
+   */
+  printDocument?: boolean;
   children?: Children;
 };
 
@@ -71,6 +80,7 @@ export function Layout({
   countdown,
   registerDownload,
   imdrfPicker,
+  printDocument,
   children,
 }: LayoutProps): JSX.Element {
   return (
@@ -107,6 +117,9 @@ export function Layout({
             button doing nothing rather than a broken form — the assessor is told to try again
             without JavaScript blocked, and nothing already chosen is lost. */}
         {imdrfPicker && <script src="/assets/f004-imdrf-picker.js" defer></script>}
+        {/* Enhancement only: with it blocked the page is still the finished printable document,
+            and the reader reaches the same PDF through their browser's own print command. */}
+        {printDocument && <script src="/assets/print.js" defer></script>}
       </head>
       <body class={bodyClass ?? ""}>{children}</body>
     </html>

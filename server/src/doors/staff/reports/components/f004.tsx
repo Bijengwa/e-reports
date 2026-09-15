@@ -1,13 +1,14 @@
 import type { Children } from "@kitajs/html";
 import {
   A2_DEGREE_LABELS,
+  a2FillInOptions,
   type A2ReviewItem,
-  type A2Value,
   ACTIONS,
   ASSESSED_DEVICE_KEYS,
   allowedDegrees,
   CAUSALITY_DISCUSSION_NOTE,
   CAUSALITY_OPTIONS,
+  describeA2Value,
   DEVICE_ROWS,
   DEVICE_TYPE_OPTIONS,
   type DeviceRow,
@@ -617,27 +618,6 @@ function Comment({
  * hidden is also the branch that cannot be stored — the page and the payload agree by construction
  * rather than by both being careful.
  */
-/** The options a "single"/"multi" item's fill-in box offers, when A1 left it blank to fill. */
-/**
- * The option list one review item's answer is drawn from, or an empty list for a free-text one.
- *
- * Exported because the Final Document has to print the same words this form does. A resolved
- * answer stored as `"non_serious"` is a code, and a document that showed the reader the code
- * rather than "Non-serious" would be a different document from the one they assessed.
- */
-export function a2FillInOptions(item: A2ReviewItem): readonly { value: string; label: string }[] {
-  if (item.key === "1.3") return DEVICE_TYPE_OPTIONS;
-  if (item.key === "1.19") return REPORT_STAGE_OPTIONS;
-  if (item.key === "2.5") return SOURCE_OPTIONS;
-  if (item.key === "2.6") return SERIOUSNESS_OPTIONS;
-  if (item.key === "2.7") return YES_NO;
-  if (item.key === "4.1") return EXPECTEDNESS_OPTIONS;
-  if (item.key === "4.2") return CAUSALITY_OPTIONS;
-  if (item.key === "5") return SIGNAL_OPTIONS;
-  if (item.key === "6") return RISK_OPTIONS;
-  return [];
-}
-
 /**
  * An item A1 left blank — one of the "(If applicable)" rows. There is no A1 position to agree,
  * clarify or disagree with, so this offers none of the three: a single optional control, stored
@@ -751,25 +731,6 @@ function A2FillIn({
   );
 }
 
-/** The value half of one item's response, resolved to the label a reader recognises. */
-function describeReviewValue(item: A2ReviewItem, val: A2Value | undefined): string {
-  if (val === undefined) return "";
-  if (item.valueKind === "text") return typeof val === "string" ? val : "";
-  if (item.valueKind === "fields") {
-    const rec =
-      typeof val === "object" && val !== null && !Array.isArray(val)
-        ? (val as Record<string, string>)
-        : {};
-    return (item.fields ?? [])
-      .map((field) => (rec[field.key] ? `${field.label}: ${rec[field.key]}` : ""))
-      .filter(Boolean)
-      .join("; ");
-  }
-  const chosen = Array.isArray(val) ? val : typeof val === "string" && val !== "" ? [val] : [];
-  const options = a2FillInOptions(item);
-  return chosen.map((v) => options.find((o) => o.value === v)?.label ?? v).join(", ");
-}
-
 /**
  * Every earlier secondary assessor's finished position on one item, collapsed until asked for.
  *
@@ -817,11 +778,11 @@ function PriorReviewHistory({
                 {A2_DEGREE_LABELS[response.degree]}
               </div>
             )}
-            {describeReviewValue(item, response.value) !== "" && (
+            {describeA2Value(item, response.value) !== "" && (
               <p
                 class="a2-history-value"
                 safe
-              >{`Value: ${describeReviewValue(item, response.value)}`}</p>
+              >{`Value: ${describeA2Value(item, response.value)}`}</p>
             )}
             {response.statement && (
               <p class="a2-history-statement" safe>

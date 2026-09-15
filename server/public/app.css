@@ -3467,6 +3467,203 @@ ul.f4-card-c li { margin-bottom: 3px; }
   color: var(--ink);
 }
 
+/* ---------- the assessment history attached to the final F004 ---------- */
+/*
+ * Part B, and it must not read as a second F004.
+ *
+ * The document above is the form: numbered sections, bordered blocks, the paper's own shape. This
+ * is a dated list of entries under a heading, which is what a working record looks like on paper
+ * and what a reader of an audit trail expects to be handed. So: no card, no block borders, no
+ * status colours, no badges. A rule, a heading, and rows.
+ */
+.fd-divide {
+  border: 0;
+  border-top: 2px solid var(--ink);
+  margin: 34px 0 0;
+}
+
+.fd-part {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin: 14px 0 2px;
+}
+
+.fd-part-note {
+  font-size: 12px;
+  color: var(--ink-3);
+  margin: 0 0 18px;
+}
+
+/* The entries. Numbered by the list itself, because the order IS the record. */
+.ah {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ah-e {
+  border-top: 1px solid var(--rule);
+  padding: 14px 0 16px;
+  break-inside: avoid;
+}
+
+/*
+ * A manager's entry is indented rather than coloured. The record alternates between assessments
+ * and the manager's reading of them, and the reader needs to see which is which at a glance —
+ * indentation says "this is about the entry above it" without a badge or a second palette.
+ */
+.ah-m {
+  padding-left: 22px;
+}
+
+.ah-h {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.ah-meta {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 3px 16px;
+  margin: 0 0 10px;
+  font-size: 12px;
+}
+
+.ah-meta dt {
+  color: var(--ink-3);
+}
+
+.ah-meta dd {
+  margin: 0;
+  color: var(--ink);
+}
+
+/* One row per item, the same facts in the same columns. Rules, not fills. */
+.ah-items {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.ah-items th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--ink-3);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 4px 10px 4px 0;
+  border-bottom: 1px solid var(--rule);
+  white-space: nowrap;
+}
+
+.ah-items td {
+  padding: 6px 10px 6px 0;
+  border-bottom: 1px solid var(--f4-line-2);
+  vertical-align: top;
+  color: var(--ink);
+}
+
+.ah-items tr:last-child td {
+  border-bottom: 0;
+}
+
+.ah-no b {
+  font-variant-numeric: tabular-nums;
+  margin-right: 6px;
+}
+
+.ah-no span {
+  color: var(--ink-2);
+}
+
+/* The name of the recorded prose, above the prose — "Basis", "Justification". The item decides
+   the word; see `reasonLabel` in f004-semantics.ts. */
+.ah-reason-l {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+
+/* A manager's recorded words, verbatim. Whitespace preserved: they wrote paragraphs. */
+.ah-text {
+  margin: 0;
+  font-size: 13px;
+  white-space: pre-wrap;
+  max-width: 78ch;
+}
+
+@media (max-width: 760px) {
+  /* The table stops being a table. Five columns of regulatory text in 360px is a column of
+     single words, so each row becomes its own labelled block. */
+  .ah-items thead {
+    display: none;
+  }
+  .ah-items,
+  .ah-items tbody,
+  .ah-items tr,
+  .ah-items td {
+    display: block;
+    width: auto;
+  }
+  .ah-items tr {
+    border-bottom: 1px solid var(--rule);
+    padding: 8px 0;
+  }
+  .ah-items td {
+    border-bottom: 0;
+    padding: 1px 0;
+  }
+  .ah-items td:empty {
+    display: none;
+  }
+}
+
+/* ---------- the printable final document ---------- */
+/*
+ * The same document, with the application taken off it. No rail and no title bar are rendered at
+ * all on these two addresses — this is only the page geometry, so the file has a document's
+ * margins rather than an application's.
+ */
+.fd-print-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px 28px 40px;
+}
+
+@page {
+  margin: 16mm 14mm;
+}
+
+@media print {
+  /* Both parts are one document and the reader is printing it whole: a page break between an
+     entry's heading and its own rows would put a manager's name on one page and their decision on
+     the next. */
+  .fd-print-page {
+    max-width: none;
+    padding: 0;
+  }
+  .fd-history,
+  .ah-e,
+  .ah-meta,
+  .ah-items tr {
+    break-inside: avoid;
+  }
+  .fd-part {
+    break-after: avoid;
+  }
+  /* The rule between the document and its history is a real divider on paper too — the F004 ends
+     there, and a reader holding the printout must not read the record as part of the form. */
+  .fd-divide {
+    break-before: page;
+  }
+}
+
 /*
  * Section 8 on the concluded F004: the manager's approval, where the assessors' signatures sit on
  * a working assessment.
