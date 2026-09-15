@@ -43,6 +43,7 @@ import {
   value,
   YES_NO,
 } from "../../../../domain/f004.js";
+import { reasonLabel } from "../../../../domain/f004-semantics.js";
 
 /** a, b, c, … — the paper's own sub-labels, for the IMDRF items and the signal criteria list. */
 const LETTERS = "abcdefghij";
@@ -563,23 +564,38 @@ function Radios({
   );
 }
 
+/**
+ * The prose an assessor writes beside one of their own answers.
+ *
+ * The caption is the item's own, not the word "Comment". The paper's second column is headed
+ * "Comments" and printing that over all six of them tells a reader nothing: the basis for calling
+ * an event a malfunction, the justification of a high risk level and a causality discussion are
+ * three different regulatory statements, and the final document is read by people deciding what
+ * to do about a device. `item` is the number, and `f004-semantics.ts` says what that item's prose
+ * is; `label` overrides it where the item's answer IS the prose (4.3, 7.1's conclusion) and the
+ * registry therefore has no reason role to name.
+ */
 function Comment({
   name,
   answers,
   rows = 5,
-  label = "Comment",
+  item,
+  label,
   locked,
 }: {
   name: string;
   answers: F004Answers;
   rows?: number;
+  item?: string;
   label?: string;
   locked: boolean;
 }): JSX.Element {
+  const caption = label ?? (item === undefined ? null : reasonLabel(item)) ?? "Comment";
+
   return (
     <div class="f4-field">
       <label for={name} safe>
-        {label}
+        {caption}
       </label>
       <textarea id={name} name={name} rows={String(rows)} disabled={locked} safe>
         {value(answers, name)}
@@ -1482,7 +1498,7 @@ export function F004Form({
                   }
                 }
               />
-              <Comment name="c2_5" answers={answers} locked={locked} />
+              <Comment name="c2_5" item="2.5" answers={answers} locked={locked} />
               <A2InlineDecision
                 itemKey="2.5"
                 answers={answers}
@@ -1519,7 +1535,7 @@ export function F004Form({
                   }
                 }
               />
-              <Comment name="c2_6" answers={answers} locked={locked} />
+              <Comment name="c2_6" item="2.6" answers={answers} locked={locked} />
               <A2InlineDecision
                 itemKey="2.6"
                 answers={answers}
@@ -1548,7 +1564,7 @@ export function F004Form({
                   }
                 }
               />
-              <Comment name="c2_7" answers={answers} locked={locked} />
+              <Comment name="c2_7" item="2.7" answers={answers} locked={locked} />
               <A2InlineDecision
                 itemKey="2.7"
                 answers={answers}
@@ -1662,7 +1678,7 @@ export function F004Form({
                   }
                 }
               />
-              <Comment name="c4_1" answers={answers} locked={locked} />
+              <Comment name="c4_1" item="4.1" answers={answers} locked={locked} />
               <A2InlineDecision
                 itemKey="4.1"
                 answers={answers}
@@ -1779,7 +1795,7 @@ export function F004Form({
                   }
                 }
               />
-              <Comment name="c5" answers={answers} rows={6} locked={locked} />
+              <Comment name="c5" item="5" answers={answers} rows={6} locked={locked} />
               <A2InlineDecision
                 itemKey="5"
                 answers={answers}
@@ -1843,7 +1859,7 @@ export function F004Form({
               <p class="f4-note" safe>
                 {RISK_IVD_NOTE}
               </p>
-              <Comment name="c6" answers={answers} locked={locked} />
+              <Comment name="c6" item="6" answers={answers} locked={locked} />
               <A2InlineDecision
                 itemKey="6"
                 answers={answers}
