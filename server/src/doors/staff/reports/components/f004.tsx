@@ -903,6 +903,8 @@ function A2InlineDecision({
       ? (stored as Record<string, string>)
       : {};
 
+  const degrees = allowedDegrees(item);
+
   return (
     <>
       {history}
@@ -912,8 +914,8 @@ function A2InlineDecision({
           <span safe>{`${item.no} ${item.title}`}</span>
         </div>
 
-        <div class={item.clarifiable === false ? "a2-degrees a2-degrees-2" : "a2-degrees"}>
-          {allowedDegrees(item).map((degree) => (
+        <div class={degrees.length === 2 ? "a2-degrees a2-degrees-2" : "a2-degrees"}>
+          {degrees.map((degree) => (
             <label class={`a2-degree a2-${degree}`}>
               <input
                 type="radio"
@@ -984,7 +986,7 @@ function A2InlineDecision({
           a child of the radio that used to be checked, both are reached by `:has()` on the box
           that holds all three, so there is nothing left over to fully un-hide again. */}
         <div class="a2-say">
-          {item.clarifiable !== false && (
+          {degrees.includes("clarification") && (
             <label class="a2-say-l for-clarification" for={`a2-statement-${item.key}`}>
               The corrected wording to be used. It replaces the statement beside their answer; the
               answer itself stands. Required.
