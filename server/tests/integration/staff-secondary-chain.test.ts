@@ -110,6 +110,7 @@ function fileAtThePublicDoor() {
     payload: new URLSearchParams({
       step: "5",
       action: "submit",
+      report_type: "adverse_event",
       device_name: "Philips IntelliVue MX450",
       common_name: "Patient Monitor",
       incident_date: "2026-08-01",

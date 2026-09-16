@@ -33,16 +33,20 @@ const ReportId = z.uuid();
 
 /**
  * The release every IMDRF picker on this rendering is scoped to, and its passive display label —
- * never a choice offered to the reader. `existingReleaseId` is whatever `answers.imdrf_release_id`
- * already holds (empty for a report with no A1 draft yet); `resolveAssessmentRelease` is the same
- * function `resolveA1Imdrf` uses to stamp the answers themselves, so a page render and the save it
- * is about always agree on which release is "current" for this report.
+ * never a choice offered to the reader.
+ *
+ * `submitted` decides everything: a submitted A1 (or the A1 an A2/A3 page is reading) shows the
+ * release it actually, historically used — `existingReleaseId`, looked up as-is, never relabelled
+ * onto whatever is newest today. Anything not yet submitted shows the current latest published
+ * release regardless of `existingReleaseId`, which is what keeps a page render and the save it is
+ * about to make always agreeing with `resolveA1Imdrf`.
  */
 async function imdrfReleaseForDisplay(
   app: FastifyInstance,
   existingReleaseId: string,
+  submitted: boolean,
 ): Promise<{ releaseId: string; label: string | undefined }> {
-  const release = await resolveAssessmentRelease(app.db, existingReleaseId);
+  const release = await resolveAssessmentRelease(app.db, existingReleaseId, submitted);
   if (release === null) return { releaseId: "", label: undefined };
   return {
     releaseId: release.id,
@@ -144,6 +148,7 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
     const imdrfRelease = await imdrfReleaseForDisplay(
       app,
       value(draft.answers, "imdrf_release_id"),
+      draft.submitted,
     );
     const answers: F004Answers = { ...draft.answers, imdrf_release_id: imdrfRelease.releaseId };
 
@@ -193,12 +198,7 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
     // to decide whether an item was answered at all, and the page no longer posts those two by
     // hand — only the term id. Resolving first is what lets a real selection still read as
     // "answered" to a check that predates this feature and does not know term ids exist.
-    const issues: Issue[] = await resolveA1Imdrf(
-      app.db,
-      answers,
-      value(existing.answers, "imdrf_release_id"),
-      submitting,
-    );
+    const issues: Issue[] = await resolveA1Imdrf(app.db, answers, submitting);
     if (submitting) issues.push(...validateForSubmit(answers));
 
     if (submitting && issues.length === 0) {
@@ -220,9 +220,10 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
           issues={shown}
           dueAt={found.assessor1DueAt}
           // `answers.imdrf_release_id` is already resolved by `resolveA1Imdrf` above; only the
-          // display label needs a second lookup.
+          // display label needs a second lookup. Never submitted at this point — a submitted row
+          // is refused earlier and never reaches this re-render.
           imdrfReleaseLabel={
-            (await imdrfReleaseForDisplay(app, value(answers, "imdrf_release_id"))).label
+            (await imdrfReleaseForDisplay(app, value(answers, "imdrf_release_id"), false)).label
           }
         />,
       );
@@ -371,8 +372,10 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
         submitted={mine?.submitted ?? false}
         issues={[]}
         dueAt={mine?.dueAt ?? null}
+        // A1 is always already submitted by the time a secondary assessment exists — this shows
+        // A1's own, actual historical release, never "whatever is latest today".
         imdrfReleaseLabel={
-          (await imdrfReleaseForDisplay(app, value(first.answers, "imdrf_release_id"))).label
+          (await imdrfReleaseForDisplay(app, value(first.answers, "imdrf_release_id"), true)).label
         }
       />,
     );
@@ -449,7 +452,8 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
           issues={issues}
           dueAt={mine?.dueAt ?? null}
           imdrfReleaseLabel={
-            (await imdrfReleaseForDisplay(app, value(first.answers, "imdrf_release_id"))).label
+            (await imdrfReleaseForDisplay(app, value(first.answers, "imdrf_release_id"), true))
+              .label
           }
         />,
       );

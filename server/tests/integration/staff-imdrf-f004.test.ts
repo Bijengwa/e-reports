@@ -97,6 +97,7 @@ function fileAtThePublicDoor() {
     payload: new URLSearchParams({
       step: "5",
       action: "submit",
+      report_type: "adverse_event",
       device_name: "Philips IntelliVue MX450",
       common_name: "Patient Monitor",
       incident_date: "2026-08-01",
@@ -291,7 +292,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("A1's IMDRF term selection", () => {
     expect((await payloadOf(report.id, 1)).imdrf_release_id).toBe(newer.releaseId);
   });
 
-  it("keeps an existing assessment on its original release even after a newer one is published", async () => {
+  it("moves an in-progress draft onto a newer release the moment one is published — a draft is never sticky", async () => {
     const { officer, report } = await assigned();
 
     const draft = await post(
@@ -302,8 +303,33 @@ describe.skipIf(!INTEGRATION_ENABLED)("A1's IMDRF term selection", () => {
     expect(draft.statusCode).toBe(302);
     expect((await payloadOf(report.id, 1)).imdrf_release_id).toBe(imdrf.releaseId);
 
-    // A new, later release goes live after work on this report already started.
-    await seedImdrfForF004(owner.db);
+    // A newer release goes live after work on this report already started, and before it submits.
+    const newer = await seedImdrfForF004(owner.db);
+
+    // The draft's own (older) terms no longer resolve, because F004 re-resolves the *current*
+    // latest release on every save while nothing has been submitted yet — it does not keep using
+    // whatever was current when the draft began.
+    const staleTerms = await post(
+      `/reports/${report.id}/assessment-1`,
+      officer.cookie,
+      baseAssessment(),
+    );
+    expect(staleTerms.statusCode).toBe(422);
+    expect(staleTerms.body).toContain("does not exist in the selected IMDRF release");
+
+    // Once resubmitted with the newer release's own terms, it succeeds and is stamped to it —
+    // never to the release this draft happened to start on.
+    const submitted = await post(
+      `/reports/${report.id}/assessment-1`,
+      officer.cookie,
+      baseAssessment(imdrfAssessmentFields(newer)),
+    );
+    expect(submitted.statusCode).toBe(302);
+    expect((await payloadOf(report.id, 1)).imdrf_release_id).toBe(newer.releaseId);
+  });
+
+  it("keeps a submitted A1 on the release it actually used, forever — a submission is a historical record", async () => {
+    const { officer, report } = await assigned();
 
     const submitted = await post(
       `/reports/${report.id}/assessment-1`,
@@ -311,7 +337,19 @@ describe.skipIf(!INTEGRATION_ENABLED)("A1's IMDRF term selection", () => {
       baseAssessment(),
     );
     expect(submitted.statusCode).toBe(302);
-    // Still the release this report started on — never silently moved onto the new one.
+    expect((await payloadOf(report.id, 1)).imdrf_release_id).toBe(imdrf.releaseId);
+
+    // A newer release goes live after A1 has already submitted.
+    await seedImdrfForF004(owner.db);
+
+    // A1 cannot be resaved once submitted (refused before any release resolution runs), so its own
+    // record of which release it used is never re-evaluated, let alone moved.
+    const reattempt = await post(
+      `/reports/${report.id}/assessment-1`,
+      officer.cookie,
+      baseAssessment(),
+    );
+    expect(reattempt.statusCode).toBe(403);
     expect((await payloadOf(report.id, 1)).imdrf_release_id).toBe(imdrf.releaseId);
   });
 

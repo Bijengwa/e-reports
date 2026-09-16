@@ -94,19 +94,23 @@ async function requirePublishedRelease(db: Database, releaseId: string): Promise
 /**
  * The one release an assessment's IMDRF coding uses — never a choice the assessor makes.
  *
- * `existingReleaseId` is whatever this report's A1 has already stored (empty string for a report
- * with no draft yet). Once set, it is returned unchanged for the whole life of the report: a later
- * administrator publishing a new release must never move a report already coded against an older
- * one onto it — see "RELEASE CONSISTENCY" below. Only when nothing has been established yet does
- * this resolve the current `getLatestPublishedRelease()`, so a brand-new A1 always starts on the
- * newest terminology without anyone choosing it, and a report started before any release existed
- * simply has none until one is published.
+ * F004 always codes against the newest published release: `submitted` is the only thing that ever
+ * turns that off. A submission is a signed, historical record — once `submitted` is true,
+ * `existingReleaseId` (whatever was actually stamped into it at that moment) is returned unchanged
+ * forever, because the record must keep saying what it truly used, not be silently relabelled onto
+ * whatever is newest today. Anything still unsubmitted — a draft with nothing chosen yet, or one an
+ * assessor has been sitting on for a week — always resolves the current `getLatestPublishedRelease()`
+ * again on every read and every save, discarding whatever release an earlier draft save happened to
+ * pick up: nothing is "established" and sticky before submission. Older releases stay in the
+ * repository as reference/research data; this function is the one place that decides they are never
+ * selected for live F004 work, no matter how a report or its A1 got there.
  */
 export async function resolveAssessmentRelease(
   db: Database,
   existingReleaseId: string,
+  submitted: boolean,
 ): Promise<ReleaseSummary | null> {
-  if (existingReleaseId !== "") return getReleaseCached(db, existingReleaseId);
+  if (submitted) return existingReleaseId === "" ? null : getReleaseCached(db, existingReleaseId);
   return getLatestPublishedRelease(db);
 }
 
@@ -191,9 +195,12 @@ async function resolveOneA1Item(
  *
  * The release itself is never read from the posted body — there is no control on the page for an
  * assessor to set it, and a hand-edited `imdrf_release_id` in the POST is simply overwritten here
- * with `resolveAssessmentRelease(db, existingReleaseId)`'s own answer: whatever this report's A1
- * already established, or the current latest published release for a report with none yet. This is
- * the one function that decides and stamps that value; nothing downstream may second-guess it.
+ * with the current latest published release. This function is only ever called for a row that has
+ * not been submitted yet (the route refuses to reach it otherwise), so there is nothing "already
+ * established" to honour — every draft save and the eventual submission all resolve fresh via
+ * `resolveAssessmentRelease(db, "", false)`, which is what makes F004 always track the newest
+ * release right up until the moment it is actually submitted. This is the one function that decides
+ * and stamps that value; nothing downstream may second-guess it.
  *
  * `strict` distinguishes a submission from a draft. A draft resolves best-effort and reports
  * nothing: an assessor mid-work may have an item half chosen, and a draft is allowed to be as
@@ -207,12 +214,11 @@ async function resolveOneA1Item(
 export async function resolveA1Imdrf(
   db: Database,
   answers: F004Answers,
-  existingReleaseId: string,
   strict: boolean,
 ): Promise<Issue[]> {
   const issues: Issue[] = [];
 
-  const release = await resolveAssessmentRelease(db, existingReleaseId);
+  const release = await resolveAssessmentRelease(db, "", false);
   const releaseId = release?.id ?? "";
   answers.imdrf_release_id = releaseId;
 
