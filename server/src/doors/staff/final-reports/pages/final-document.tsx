@@ -2,8 +2,14 @@ import type { F004Answers } from "../../../../domain/f004.js";
 import type { FinalDocument } from "../../../../domain/final-document.js";
 import type { ReportDetail } from "../../../../domain/report-detail.js";
 import { Layout } from "../../../../views/shared/layout.js";
-import { F004Form } from "../../shared/components/f004.js";
-import { OrangeReportIdentity } from "../../shared/components/orange-report.js";
+import { DocHeader } from "../../shared/components/doc-header.js";
+import { F004Form, type PriorSecondaryReview } from "../../shared/components/f004.js";
+import { IconClose, IconDownload, IconPrint } from "../../shared/components/icons.js";
+import {
+  OrangeReportIdentity,
+  OrangeReportSurface,
+} from "../../shared/components/orange-report.js";
+import { ReportDocument } from "../../shared/components/report-views.js";
 import { StaffShell } from "../../shared/shell.js";
 
 /**
@@ -20,21 +26,27 @@ import { StaffShell } from "../../shared/shell.js";
  * thing a consolidated assessment must be is recognisable as the thing it consolidates. Every
  * section number, every criterion card and every IMDRF grid is the form's own.
  *
- * What is deliberately NOT passed is `a2Review` and `priorReviews`. Those are what draw the
- * agree/clarify/disagree blocks and the per-item history through the body of the form, and they
- * are exactly what must not appear here: the argument stays in `assessments`, readable on the
- * report page and in the audit trail, and this document carries only the answer it settled on.
- * `sectionComments` and `commentAction` are omitted for the same reason.
+ * `presentation="final"` is the form's own flag rather than this page hiding things after the fact
+ * — see `F004Presentation` in `f004.tsx`. No assessor is named on this document, no assessment date
+ * is printed on it, 7.2 is absent, and section 8 is the manager's approval.
  *
- * `presentation="final"` is the rest of it, and it is the form's own flag rather than this page
- * hiding things after the fact — see `F004Presentation` in `f004.tsx`. No assessor is named on this
- * document, no assessment date is printed on it, 7.2 is absent, and section 8 is the manager's
- * approval. Nothing about who assessed the report reaches this component at all, which is a
- * stronger statement than not rendering it.
+ * Two presentation TYPES sit over that one document, both resolved to the same snapshot:
  *
- * `readOnly` and `submitted` together mean there is no form element at all — nothing on this page
- * is editable, and nothing on it advertises a route that would refuse the reader.
+ *   - "clean": `priorReviews` is empty. Every item's `A2InlineDecision` then renders only the
+ *     resolved answer and its resolved statement (`resolvedNotes`) — no per-item history, because
+ *     there is nothing to expand. This is `a2Review`/`priorReviews` omitted exactly as the single
+ *     original rendering always did.
+ *   - "history": `priorReviews` carries every submitted secondary assessment in the chain, in the
+ *     same shape the working secondary-assessment page already builds for its own read-only
+ *     context. The same `A2InlineDecision`/`PriorReviewHistory` machinery that page uses to show
+ *     "Previous assessments (N)" per item now shows the SAME thing here — collapsed by default,
+ *     expandable per question — with no second history renderer written for it.
+ *
+ * There is deliberately no third component and no branch inside `F004Form` for either type: the
+ * type is entirely the presence or absence of one prop already defined on the shared renderer.
  */
+
+export type FinalDocumentType = "clean" | "history";
 
 export type FinalDocumentPageProps = {
   report: ReportDetail;
@@ -60,6 +72,29 @@ export type FinalDocumentPageProps = {
   /** Where the reader came from, so the way back is the way they arrived. */
   backHref: string;
   backLabel: string;
+  /** Which of the two presentations is showing. */
+  type: FinalDocumentType;
+  /**
+   * `{ clean, history }` — the same page, with `?type=` set to the other value.
+   *
+   * `null` when this reader may not see "Assessment History" at all — the assigned Officer, who
+   * `resolveFinalDocument`'s own route keeps to "clean" regardless of what `?type=` says, because
+   * that presentation names every secondary assessor and their individual positions. See the
+   * route's own comment. The switch itself is not rendered for that reader, rather than rendered
+   * and disabled: a control offering a document they will never receive is worse than no control.
+   */
+  typeHrefs: Record<FinalDocumentType, string> | null;
+  /** The PDF attachment endpoint for the current `type`. */
+  downloadHref: string;
+  /**
+   * Every submitted secondary assessment in the chain — A2, A3, …, whatever the case actually has.
+   *
+   * Empty for "clean". For "history", this is exactly what `SecondaryAssessmentPage` already
+   * builds as its own `priorReviews`, reused verbatim: `F004Form` does not know or care that no
+   * assessor is "currently" reviewing here, only that these are read-only positions to fold into
+   * each item's expandable history.
+   */
+  priorReviews: readonly PriorSecondaryReview[];
 };
 
 /**
@@ -77,6 +112,26 @@ function resolvedNotes(document: FinalDocument): Record<string, string> {
   return notes;
 }
 
+/** The two-way Clean / Assessment History switch — see the module doc comment for what each does. */
+function TypeSwitch({
+  type,
+  typeHrefs,
+}: {
+  type: FinalDocumentType;
+  typeHrefs: Record<FinalDocumentType, string>;
+}): JSX.Element {
+  return (
+    <nav class="f4-type-switch" aria-label="Final F004 presentation">
+      <a href={typeHrefs.clean} aria-current={type === "clean" ? "page" : undefined}>
+        Clean
+      </a>
+      <a href={typeHrefs.history} aria-current={type === "history" ? "page" : undefined}>
+        Assessment History
+      </a>
+    </nav>
+  );
+}
+
 export function FinalDocumentPage({
   report,
   viewerRole,
@@ -90,6 +145,10 @@ export function FinalDocumentPage({
   workOfficerName,
   backHref,
   backLabel,
+  type,
+  typeHrefs,
+  downloadHref,
+  priorReviews,
 }: FinalDocumentPageProps): JSX.Element {
   return (
     <StaffShell
@@ -99,86 +158,109 @@ export function FinalDocumentPage({
       fullName={viewerName}
       active={active}
       f4Find
+      f4Print
     >
-      {/* The title bar above already says "Final F004" once. A heading here said it a second time
-          twenty pixels below the first, and the sentence under that explained a document that
-          explains itself — this page IS the approved assessment, and the identity card, the
-          approval card and the form say so in the only way that matters. */}
-      <div class="staff-head">
-        <div class="sp"></div>
-        {/* The download's own route, `resolveFinalDocument` and all — see routes/final-document.tsx.
-            Opened in a new tab so the staff screen stays put behind it: the download is a document
-            to read or print, not a page this one navigates away to. */}
+      {/* The old top area — a second "Final F004" heading, the Orange Report identity card as a
+          standalone block, and the download/back buttons on their own row — is gone. `DocHeader`
+          carries the back control, the title, the type switch and the two document-output
+          controls in one row; the official F004 masthead follows immediately after it. The Orange
+          Report is reached from here too, now as a drawer rather than a card printed above the
+          document. */}
+      <DocHeader backHref={backHref} backLabel={backLabel} title="Final F004">
+        {typeHrefs !== null && <TypeSwitch type={type} typeHrefs={typeHrefs} />}
         <a
-          href={`/reports/${report.id}/final-document/download`}
-          class="btn"
-          target="_blank"
-          rel="noopener"
+          href={downloadHref}
+          class="f4-icon-btn"
+          aria-label="Download this Final F004"
+          download=""
         >
-          Download Final F004
+          <IconDownload />
         </a>
-        <a href={backHref} class="btn ghost" safe>
-          {backLabel}
-        </a>
+        <button type="button" class="f4-icon-btn" data-f4-print aria-label="Print this Final F004">
+          <IconPrint />
+        </button>
+        <label for="a1-drawer" class="btn a1-open orange-action">
+          Orange Report
+        </label>
+      </DocHeader>
+
+      <div class="a1-work">
+        <input type="checkbox" id="a1-drawer" class="a1-pick" data-a1-drawer />
+
+        <div>
+          {/* The approval, and who is carrying it out. Metadata about the document, outside the
+              document — how far the assessment chain ran is a fact about the working record and is
+              printed on the Final Reports register, which is the manager's index over it. It has
+              no place on the concluded F004, where it would be the one line still describing the
+              argument. */}
+          <div class="card card-b fd-approval">
+            <dl>
+              <dt>Approved by</dt>
+              <dd safe>{approvedByName}</dd>
+
+              <dt>Approved on</dt>
+              <dd safe>{approvedOn}</dd>
+
+              {workOfficerName === null ? (
+                <></>
+              ) : (
+                <>
+                  <dt>Assigned for work to</dt>
+                  <dd safe>{workOfficerName}</dd>
+                </>
+              )}
+            </dl>
+          </div>
+
+          <F004Form
+            reportId={report.id}
+            answers={document.answers as F004Answers}
+            // The clarifications the F004 has no comment box for. Everything else a clarification
+            // touched is already inside `answers`, written there by the resolver.
+            resolvedNotes={resolvedNotes(document)}
+            device={device}
+            event={event}
+            // Nothing. The concluded document names no assessor and carries no assessment date, and
+            // the honest way to say that is to have nothing to say it with — see `presentation`.
+            assessorName=""
+            assessedOn=""
+            // The concluded F004, not a working assessment: no assessor strip, no assessor dates, no
+            // 7.2, no secondary-assessor slot, and section 8 signed by the manager who approved it.
+            presentation="final"
+            approval={{ byName: approvedByName, on: approvedOn }}
+            submitted
+            readOnly
+            // The approved F004 is a document, not a filled-in form: the answer is shown, the
+            // twenty-odd options it was chosen from are not. See `documentMode` in `f004.tsx`.
+            documentMode
+            // Empty for "clean"; the full chain for "history" — see the module doc comment. This
+            // is the entire difference between the two presentations.
+            priorReviews={priorReviews}
+            issues={[]}
+          />
+        </div>
+
+        <label for="a1-drawer" class="a1-scrim">
+          <span class="vh">Close the report</span>
+        </label>
+
+        <aside class="a1-drawer" aria-label="The report as filed">
+          <div class="a1-drawer-head">
+            <h3>The report as filed</h3>
+            <label for="a1-drawer" class="a1-drawer-close" aria-label="Close the report">
+              <IconClose />
+            </label>
+          </div>
+          <OrangeReportSurface report={report} withIdentity>
+            <ReportDocument report={report} />
+          </OrangeReportSurface>
+        </aside>
       </div>
-
-      {/* The source document this F004 assesses, wearing the identity it wears everywhere else.
-          It is not part of the F004 and is not restated inside it — sections 1 and 2 already carry
-          the reporter's own facts, read from the same immutable payload. */}
-      <OrangeReportIdentity report={report} />
-
-      {/* The approval, and who is carrying it out. Metadata about the document, outside the
-          document — how far the assessment chain ran is a fact about the working record and is
-          printed on the Final Reports register, which is the manager's index over it. It has no
-          place on the concluded F004, where it would be the one line still describing the
-          argument. */}
-      <div class="card card-b fd-approval">
-        <dl>
-          <dt>Approved by</dt>
-          <dd safe>{approvedByName}</dd>
-
-          <dt>Approved on</dt>
-          <dd safe>{approvedOn}</dd>
-
-          {workOfficerName === null ? (
-            <></>
-          ) : (
-            <>
-              <dt>Assigned for work to</dt>
-              <dd safe>{workOfficerName}</dd>
-            </>
-          )}
-        </dl>
-      </div>
-
-      <F004Form
-        reportId={report.id}
-        answers={document.answers as F004Answers}
-        // The clarifications the F004 has no comment box for. Everything else a clarification
-        // touched is already inside `answers`, written there by the resolver.
-        resolvedNotes={resolvedNotes(document)}
-        device={device}
-        event={event}
-        // Nothing. The concluded document names no assessor and carries no assessment date, and
-        // the honest way to say that is to have nothing to say it with — see `presentation` below.
-        assessorName=""
-        assessedOn=""
-        // The concluded F004, not a working assessment: no assessor strip, no assessor dates, no
-        // 7.2, no secondary-assessor slot, and section 8 signed by the manager who approved it.
-        presentation="final"
-        approval={{ byName: approvedByName, on: approvedOn }}
-        submitted
-        readOnly
-        // The approved F004 is a document, not a filled-in form: the answer is shown, the
-        // twenty-odd options it was chosen from are not. See `documentMode` in `f004.tsx`.
-        documentMode
-        issues={[]}
-      />
     </StaffShell>
   );
 }
 
-export type FinalDocumentDownloadPageProps = {
+export type FinalDocumentPrintPageProps = {
   report: ReportDetail;
   document: FinalDocument;
   device: Record<string, string>;
@@ -186,29 +268,30 @@ export type FinalDocumentDownloadPageProps = {
   approvedByName: string;
   approvedOn: string;
   workOfficerName: string | null;
+  type: FinalDocumentType;
+  priorReviews: readonly PriorSecondaryReview[];
 };
 
 /**
  * The same approved Final F004, as the document a reader takes away rather than reads on screen.
  *
- * `resolveFinalDocument` (routes/final-document.tsx) is the one place either presentation asks "is
- * this reader allowed to see this document" and the one place the row is loaded — this page trusts
- * whatever it is handed and resolves nothing of its own, on the same argument `FinalDocumentPage`
- * above already follows for the answers themselves.
+ * Rendered server-side to a PDF, not served directly as a browser tab — see
+ * `routes/final-document.tsx`'s download route and `../../../../pdf/index.js`. This component's
+ * job is only to produce the HTML that PDF is made from: an A4-width sheet with no staff-portal
+ * chrome at all — no rail, no title bar, no jump bar, no toolbar, no drawer — built on `Layout`
+ * rather than `StaffShell` for the same reason it always was: this page IS the document, so there
+ * is nothing here to hide with CSS, only nothing to render in the first place.
  *
- * Built on `Layout` rather than `StaffShell`: the rail, the title bar and the jump bar are not
- * hidden by CSS here, they are never rendered — a reader who saves or prints this page gets exactly
- * the document and nothing the staff portal put around it. `F004Form` is the same component and the
- * same `presentation="final"` / `documentMode` the screen uses; `interactiveNav={false}` is the one
- * difference, dropping the section-jump bar and find box a printed page has no use for.
+ * `F004Form` is the same component and the same `presentation="final"` / `documentMode` the screen
+ * uses, with `interactiveNav={false}` dropping the section-jump bar and find box a printed page has
+ * no use for, and `priorReviews` carrying the same Clean/History difference the screen page does —
+ * see `FinalDocumentPage`'s module doc comment.
  *
- * `.fd-print-page` is what makes it read as a document rather than a bare page: an A4-width sheet
- * on screen, and — under `@media print` in app.css — the page the browser's own Print/Save-as-PDF
- * turns into. No PDF library sits behind this; the project already prints the staff portal's own
- * chrome away for `Ctrl+P`, and this is that same architecture, applied to a page built to be
- * printed rather than merely surviving it.
+ * `.fd-print-page` is what makes it read as a document rather than a bare page: an A4-ish sheet on
+ * screen, and — under `@media print` in app.css — the shape both the browser's own Print/Save-as-
+ * PDF and this module's headless-Chromium render turn it into.
  */
-export function FinalDocumentDownloadPage({
+export function FinalDocumentPrintPage({
   report,
   document,
   device,
@@ -216,11 +299,17 @@ export function FinalDocumentDownloadPage({
   approvedByName,
   approvedOn,
   workOfficerName,
-}: FinalDocumentDownloadPageProps): JSX.Element {
+  type,
+  priorReviews,
+}: FinalDocumentPrintPageProps): JSX.Element {
   return (
     <Layout title={`Final F004 — ${report.number}`} locale="en" bodyClass="staff">
       <div class="fd-print-page">
-        <p class="eyebrow">Final F004 — approved assessment</p>
+        <p class="eyebrow">
+          {type === "history"
+            ? "Final F004 — approved assessment, with assessment history"
+            : "Final F004 — approved assessment"}
+        </p>
 
         <OrangeReportIdentity report={report} />
 
@@ -257,6 +346,7 @@ export function FinalDocumentDownloadPage({
           readOnly
           documentMode
           interactiveNav={false}
+          priorReviews={priorReviews}
           issues={[]}
         />
       </div>

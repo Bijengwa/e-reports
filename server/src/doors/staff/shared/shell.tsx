@@ -80,6 +80,13 @@ export type StaffShellProps = {
    * must not be made to fetch a script that would find nothing to attach to.
    */
   imdrfPicker?: boolean;
+  /**
+   * Load the Final F004 print button's enhancement.
+   *
+   * Opt-in for the same reason `imdrfPicker` is: a page with no `[data-f4-print]` button on it
+   * must not be made to fetch a script that would find nothing to attach to.
+   */
+  f4Print?: boolean;
   children?: Children;
 };
 
@@ -274,6 +281,7 @@ export function StaffShell({
   countdown,
   registerDownload,
   imdrfPicker,
+  f4Print,
   children,
 }: StaffShellProps): JSX.Element {
   const isAdministrator = role === "administrator";
@@ -291,6 +299,7 @@ export function StaffShell({
       countdown={countdown}
       registerDownload={registerDownload}
       imdrfPicker={imdrfPicker}
+      f4Print={f4Print}
     >
       <div class="shell">
         {/* `on-dark` is what recolours the mark for the rail: white folder, green cross. The

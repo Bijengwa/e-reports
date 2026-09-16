@@ -51,6 +51,13 @@ export type LayoutProps = {
    * must not be made to fetch a script that would find nothing to attach to.
    */
   imdrfPicker?: boolean;
+  /**
+   * Load the Final F004 print button's enhancement.
+   *
+   * Opt-in for the same reason `countdown` is: a page with no `[data-f4-print]` button on it must
+   * not be made to fetch a script that would find nothing to attach to.
+   */
+  f4Print?: boolean;
   children?: Children;
 };
 
@@ -71,6 +78,7 @@ export function Layout({
   countdown,
   registerDownload,
   imdrfPicker,
+  f4Print,
   children,
 }: LayoutProps): JSX.Element {
   return (
@@ -102,6 +110,11 @@ export function Layout({
             file with this blocked, so a browser refusing the script leaves a working, merely
             plainer, download in its place. Served from our own origin to satisfy the CSP. */}
         {registerDownload && <script src="/assets/register.js" defer></script>}
+        {/* Enhancement only: the button this attaches to has no non-script equivalent
+            (`window.print()` cannot be reached from a bare href), so a browser that blocks this
+            leaves the button inert rather than broken — the document itself, and the browser's own
+            Ctrl+P, are both still there. Served from our own origin to satisfy the CSP. */}
+        {f4Print && <script src="/assets/f4-print.js" defer></script>}
         {/* Enhancement only: the hidden term-id input and the read-only display boxes it fills
             are both rendered server-side already, so a browser refusing this leaves the picker
             button doing nothing rather than a broken form — the assessor is told to try again

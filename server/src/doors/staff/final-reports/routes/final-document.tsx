@@ -7,14 +7,23 @@ import {
   isConcludedFinalDocument,
   normalizeFinalDocument,
 } from "../../../../domain/final-document.js";
-import type { ReportDetail } from "../../../../domain/report-detail.js";
+import type { ReportDetail, SecondaryAssignment } from "../../../../domain/report-detail.js";
 import { loadReport } from "../../../../domain/report-detail.js";
+import { sanitizeFilename } from "../../../../storage/index.js";
 import { currentSession } from "../../session-guard.js";
+import type { PriorSecondaryReview } from "../../shared/components/f004.js";
 import { ForbiddenPage } from "../../shared/forbidden.js";
-import { FinalDocumentDownloadPage, FinalDocumentPage } from "../pages/final-document.js";
+import {
+  FinalDocumentPage,
+  FinalDocumentPrintPage,
+  type FinalDocumentType,
+} from "../pages/final-document.js";
 
 /** Same reason as every other report address: a uuid column against arbitrary text raises 22P02. */
 const ReportId = z.uuid();
+
+/** `?type=` on either route — anything else (including absent) reads as "clean". */
+const TypeParam = z.enum(["clean", "history"]).catch("clean");
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -78,6 +87,9 @@ type ResolvedFinalDocument = {
   officer: boolean;
   role: string;
   fullName: string;
+  /** Every submitted secondary assessment in the chain — the "Assessment History" type's raw
+   *  material. Read once here rather than a second time per route. */
+  secondaryAssessments: readonly SecondaryAssignment[];
 };
 
 /**
@@ -159,13 +171,52 @@ async function resolveFinalDocument(
     officer,
     role: session.role,
     fullName: session.fullName,
+    secondaryAssessments: found.secondaryAssessments,
   };
+}
+
+/**
+ * Every submitted secondary assessment in the chain, in the shape `A2InlineDecision`'s per-item
+ * history already knows how to read — the same builder `routes/assessment.tsx` uses for its own
+ * `priorReviews`, with nobody excluded: the working page leaves out the reader's own still-open
+ * row, but nobody is "reviewing" a concluded Final F004, so every submitted entry belongs here.
+ *
+ * `[]` for "clean" — see `FinalDocumentPage`'s module doc comment for what that empty list buys.
+ */
+function priorReviewsFor(
+  type: FinalDocumentType,
+  secondaryAssessments: readonly SecondaryAssignment[],
+): PriorSecondaryReview[] {
+  if (type === "clean") return [];
+
+  return secondaryAssessments
+    .filter((a) => a.submitted)
+    .map((a) => ({
+      ordinal: a.ordinal,
+      assessorName: a.assessorName,
+      submittedOn: a.submittedOn ?? "",
+      review: a.answers,
+    }));
 }
 
 export async function finalDocumentRoutes(app: FastifyInstance): Promise<void> {
   app.get("/reports/:id/final-document", async (request, reply) => {
     const resolved = await resolveFinalDocument(app, request, reply);
     if (resolved === null) return; // 403/404 already sent by resolveFinalDocument.
+
+    // "Assessment History" names every secondary assessor and shows their individual positions —
+    // exactly what `MyWorkItemPage` (`doors/staff/my-work/pages/my-work.tsx`) deliberately keeps
+    // from an Officer carrying out the work: they are handed the office's settled position, not
+    // the internal argument that produced it. The manager, who already reads the full decision
+    // history on the report page, has no such restriction. An Officer's `?type=history` is refused
+    // the same way a stale link to a page they've lost access to would be — silently read as
+    // "clean" — rather than answering with an error over a query string nobody but a curious
+    // Officer would ever type by hand.
+    const canViewHistory = !resolved.officer;
+    const type = canViewHistory
+      ? TypeParam.parse((request.query as { type?: string }).type)
+      : "clean";
+    const base = `/reports/${resolved.report.id}/final-document`;
 
     return reply.html(
       <FinalDocumentPage
@@ -189,27 +240,37 @@ export async function finalDocumentRoutes(app: FastifyInstance): Promise<void> {
         backHref={
           resolved.officer ? `/my-work/${resolved.report.id}` : `/reports/${resolved.report.id}`
         }
-        backLabel={resolved.officer ? "← Back to my work" : "Open Orange Report"}
+        backLabel={resolved.officer ? "Back to my work" : "Open Orange Report"}
+        type={type}
+        typeHrefs={canViewHistory ? { clean: base, history: `${base}?type=history` } : null}
+        downloadHref={`${base}/download${type === "history" ? "?type=history" : ""}`}
+        priorReviews={priorReviewsFor(type, resolved.secondaryAssessments)}
       />,
     );
   });
 
   /**
-   * The same approved document, as the downloadable presentation.
+   * The same approved document, as a real PDF attachment.
    *
    * Same resolver, same row, same authorization as the screen above — `resolveFinalDocument` is
    * the one place either route asks "may this reader see this document", so the two can never
-   * disagree. What differs is only what wraps the answers: `FinalDocumentDownloadPage` carries no
-   * rail, no title bar and no jump bar, and is styled to be read (and printed) as a standalone
-   * document rather than a page inside the staff portal — see that component and the
-   * `.fd-print-page`/`.f4-document` rules in app.css.
+   * disagree. What differs is only what wraps the answers: `FinalDocumentPrintPage` renders to
+   * plain HTML (no rail, no title bar, no toolbar), which `app.pdf.render` turns into a PDF the
+   * response sends back as `Content-Disposition: attachment` — a file the browser downloads,
+   * never a second page it navigates to. See `../../../../pdf/index.js`.
    */
   app.get("/reports/:id/final-document/download", async (request, reply) => {
     const resolved = await resolveFinalDocument(app, request, reply);
     if (resolved === null) return; // 403/404 already sent by resolveFinalDocument.
 
-    return reply.html(
-      <FinalDocumentDownloadPage
+    // Same restriction as the screen route, and for the same reason — see its own comment. An
+    // Officer's download is always the clean document, whatever `?type=` says.
+    const type = resolved.officer
+      ? "clean"
+      : TypeParam.parse((request.query as { type?: string }).type);
+
+    const rendered = (
+      <FinalDocumentPrintPage
         report={resolved.report}
         document={resolved.document}
         device={resolved.device}
@@ -217,7 +278,19 @@ export async function finalDocumentRoutes(app: FastifyInstance): Promise<void> {
         approvedByName={resolved.approvedByName}
         approvedOn={resolved.approvedOn}
         workOfficerName={resolved.workOfficerName}
-      />,
+        type={type}
+        priorReviews={priorReviewsFor(type, resolved.secondaryAssessments)}
+      />
     );
+    const html = typeof rendered === "string" ? rendered : await rendered;
+
+    const pdf = await app.pdf.render(html);
+    const suffix = type === "history" ? "-history" : "";
+    const filename = `Final-F004-${sanitizeFilename(resolved.report.number)}${suffix}.pdf`;
+
+    return reply
+      .header("Content-Type", "application/pdf")
+      .header("Content-Disposition", `attachment; filename="${filename}"`)
+      .send(pdf);
   });
 }

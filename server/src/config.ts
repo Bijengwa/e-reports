@@ -35,6 +35,16 @@ const EnvSchema = z.object({
   STORAGE_ROOT: z.string().min(1).default("./var/storage"),
   /** Per-file ceiling. A device photograph from a phone is a few MB; ten is generous. */
   MAX_UPLOAD_MB: z.coerce.number().int().min(1).max(50).default(10),
+
+  /**
+   * The Chromium binary the Final F004 PDF renderer launches.
+   *
+   * Undefined in development, where Playwright's own `npx playwright install chromium` has put a
+   * build where the `playwright` package already expects it. Set in the production container to a
+   * system Chromium (`apk add chromium`) instead — Playwright's bundled build does not run on
+   * Alpine's musl libc, and installing one there is the standard workaround.
+   */
+  PDF_CHROMIUM_PATH: z.string().min(1).optional(),
 });
 
 export type Config = Readonly<z.infer<typeof EnvSchema>>;

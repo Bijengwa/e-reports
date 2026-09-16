@@ -317,187 +317,194 @@ async function finalDocumentPayload(reportId: string): Promise<AssessmentPayload
   );
 }
 
-describe.skipIf(!INTEGRATION_ENABLED)("Gate 2 — F004 always resolves the latest published IMDRF release", () => {
-  beforeEach(start);
+describe.skipIf(!INTEGRATION_ENABLED)(
+  "Gate 2 — F004 always resolves the latest published IMDRF release",
+  () => {
+    beforeEach(start);
 
-  it("moves an in-progress workflow onto a newly published release, sends a brand-new workflow straight to it, refuses a client override, and leaves the older release intact as reference data", async () => {
-    const admin = await signedInAs("administrator");
-    const manager = await signedInAs("manager", "Grace Mollel");
+    it("moves an in-progress workflow onto a newly published release, sends a brand-new workflow straight to it, refuses a client override, and leaves the older release intact as reference data", async () => {
+      const admin = await signedInAs("administrator");
+      const manager = await signedInAs("manager", "Grace Mollel");
 
-    // ───────────── STEP 1 — Release X: the only, and therefore latest, published release ─────────────
-    const releaseX = await importAndPublishRelease(admin.cookie, 2024);
-    const termsX = await leafTermIds(releaseX);
+      // ───────────── STEP 1 — Release X: the only, and therefore latest, published release ─────────────
+      const releaseX = await importAndPublishRelease(admin.cookie, 2024);
+      const termsX = await leafTermIds(releaseX);
 
-    // ───────────── STEP 2/3 — a real F004 workflow starts while X is current ─────────────
-    const firstOfficer1 = await signedInAs("assessor", "Asha Mrema");
-    await fileAtThePublicDoor("Philips IntelliVue MX450 (first workflow)");
-    const [firstReport] = await reportsOrderedByFiling();
-    if (firstReport === undefined) throw new Error("first report was not filed");
-    await assignAssessor1(firstReport.id, firstOfficer1.id);
+      // ───────────── STEP 2/3 — a real F004 workflow starts while X is current ─────────────
+      const firstOfficer1 = await signedInAs("assessor", "Asha Mrema");
+      await fileAtThePublicDoor("Philips IntelliVue MX450 (first workflow)");
+      const [firstReport] = await reportsOrderedByFiling();
+      if (firstReport === undefined) throw new Error("first report was not filed");
+      await assignAssessor1(firstReport.id, firstOfficer1.id);
 
-    const draftUnderX = await post(
-      `/reports/${firstReport.id}/assessment-1`,
-      firstOfficer1.cookie,
-      baseAssessment({ intent: "save", ...imdrfTermFields(termsX) }),
-    );
-    expect(draftUnderX.statusCode).toBe(302);
-    const draftPayload = await assessmentPayload(firstReport.id, 1);
-    expect(draftPayload.imdrf_release_id).toBe(releaseX); // correct: X *is* the latest right now
-    expect(draftPayload.imdrf_component_code).toBe("G01001");
+      const draftUnderX = await post(
+        `/reports/${firstReport.id}/assessment-1`,
+        firstOfficer1.cookie,
+        baseAssessment({ intent: "save", ...imdrfTermFields(termsX) }),
+      );
+      expect(draftUnderX.statusCode).toBe(302);
+      const draftPayload = await assessmentPayload(firstReport.id, 1);
+      expect(draftPayload.imdrf_release_id).toBe(releaseX); // correct: X *is* the latest right now
+      expect(draftPayload.imdrf_component_code).toBe("G01001");
 
-    // ───────────── STEP 4 — publish Y through the real admin lifecycle, mid-flight ─────────────
-    const releaseY = await importAndPublishRelease(admin.cookie, 2025);
-    const termsY = await leafTermIds(releaseY);
-    expect(releaseY).not.toBe(releaseX);
+      // ───────────── STEP 4 — publish Y through the real admin lifecycle, mid-flight ─────────────
+      const releaseY = await importAndPublishRelease(admin.cookie, 2025);
+      const termsY = await leafTermIds(releaseY);
+      expect(releaseY).not.toBe(releaseX);
 
-    // ───────────── STEP 9 — normal F004 no longer exposes/selects X, even for work already open ─────────────
-    // The still-unsubmitted draft's own (older) terms no longer resolve — F004 re-resolves the
-    // *current* latest release on every save while nothing is submitted, it does not keep using
-    // whatever was current when the draft began.
-    const staleResubmit = await post(
-      `/reports/${firstReport.id}/assessment-1`,
-      firstOfficer1.cookie,
-      baseAssessment(imdrfTermFields(termsX)),
-    );
-    expect(staleResubmit.statusCode).toBe(422);
-    expect(staleResubmit.body).toContain("does not exist in the selected IMDRF release");
+      // ───────────── STEP 9 — normal F004 no longer exposes/selects X, even for work already open ─────────────
+      // The still-unsubmitted draft's own (older) terms no longer resolve — F004 re-resolves the
+      // *current* latest release on every save while nothing is submitted, it does not keep using
+      // whatever was current when the draft began.
+      const staleResubmit = await post(
+        `/reports/${firstReport.id}/assessment-1`,
+        firstOfficer1.cookie,
+        baseAssessment(imdrfTermFields(termsX)),
+      );
+      expect(staleResubmit.statusCode).toBe(422);
+      expect(staleResubmit.body).toContain("does not exist in the selected IMDRF release");
 
-    // A plain draft save (nothing IMDRF-related touched) proves the same thing without relying on
-    // a validation error: the payload's own release id moves onto Y by itself.
-    const draftAfterY = await post(
-      `/reports/${firstReport.id}/assessment-1`,
-      firstOfficer1.cookie,
-      baseAssessment({ intent: "save" }),
-    );
-    expect(draftAfterY.statusCode).toBe(302);
-    expect((await assessmentPayload(firstReport.id, 1)).imdrf_release_id).toBe(releaseY);
+      // A plain draft save (nothing IMDRF-related touched) proves the same thing without relying on
+      // a validation error: the payload's own release id moves onto Y by itself.
+      const draftAfterY = await post(
+        `/reports/${firstReport.id}/assessment-1`,
+        firstOfficer1.cookie,
+        baseAssessment({ intent: "save" }),
+      );
+      expect(draftAfterY.statusCode).toBe(302);
+      expect((await assessmentPayload(firstReport.id, 1)).imdrf_release_id).toBe(releaseY);
 
-    // The workflow finishes using Y's own terms — its final, submitted release is Y, the release
-    // that was actually current the moment it was signed, regardless of having started under X.
-    const firstSubmit = await post(
-      `/reports/${firstReport.id}/assessment-1`,
-      firstOfficer1.cookie,
-      baseAssessment(imdrfTermFields(termsY)),
-    );
-    expect(firstSubmit.statusCode).toBe(302);
-    const firstA1 = await assessmentPayload(firstReport.id, 1);
-    expect(firstA1.imdrf_release_id).toBe(releaseY);
-    expect(firstA1.imdrf_component_code).toBe("G01001");
+      // The workflow finishes using Y's own terms — its final, submitted release is Y, the release
+      // that was actually current the moment it was signed, regardless of having started under X.
+      const firstSubmit = await post(
+        `/reports/${firstReport.id}/assessment-1`,
+        firstOfficer1.cookie,
+        baseAssessment(imdrfTermFields(termsY)),
+      );
+      expect(firstSubmit.statusCode).toBe(302);
+      const firstA1 = await assessmentPayload(firstReport.id, 1);
+      expect(firstA1.imdrf_release_id).toBe(releaseY);
+      expect(firstA1.imdrf_component_code).toBe("G01001");
 
-    // Once submitted, A1 is a historical record: it cannot be resaved, so its own release is never
-    // re-evaluated again — this is reporting a historical fact, not "selecting" anything.
-    const resaveAfterSubmit = await post(
-      `/reports/${firstReport.id}/assessment-1`,
-      firstOfficer1.cookie,
-      baseAssessment(),
-    );
-    expect(resaveAfterSubmit.statusCode).toBe(403);
-    expect((await assessmentPayload(firstReport.id, 1)).imdrf_release_id).toBe(releaseY);
+      // Once submitted, A1 is a historical record: it cannot be resaved, so its own release is never
+      // re-evaluated again — this is reporting a historical fact, not "selecting" anything.
+      const resaveAfterSubmit = await post(
+        `/reports/${firstReport.id}/assessment-1`,
+        firstOfficer1.cookie,
+        baseAssessment(),
+      );
+      expect(resaveAfterSubmit.statusCode).toBe(403);
+      expect((await assessmentPayload(firstReport.id, 1)).imdrf_release_id).toBe(releaseY);
 
-    const firstOfficer2 = await signedInAs("assessor", "Baraka Nyoni");
-    const firstAssign2 = await post(
-      `/reports/${firstReport.id}/assign-next-assessor`,
-      manager.cookie,
-      { assessor_id: firstOfficer2.id, comment: "Please take a second look." },
-    );
-    expect(firstAssign2.statusCode).toBe(302);
+      const firstOfficer2 = await signedInAs("assessor", "Baraka Nyoni");
+      const firstAssign2 = await post(
+        `/reports/${firstReport.id}/assign-next-assessor`,
+        manager.cookie,
+        { assessor_id: firstOfficer2.id, comment: "Please take a second look." },
+      );
+      expect(firstAssign2.statusCode).toBe(302);
 
-    // A2 follows A1's own (now Y) release — never independently, never onto X.
-    const firstA2Reject = await post(
-      `/reports/${firstReport.id}/secondary-assessment`,
-      firstOfficer2.cookie,
-      agreeAllSecondary({
-        "a2_degree_3.1.1": "disagree",
-        "a2_statement_3.1.1": "Attempting to replace with a term from a release A1 never used.",
-        "a2_imdrf_term_3.1.1": termsX.investigation_type ?? "",
-      }),
-    );
-    expect(firstA2Reject.statusCode).toBe(422);
-    expect(firstA2Reject.body).toContain("does not exist in the selected IMDRF release");
+      // A2 follows A1's own (now Y) release — never independently, never onto X.
+      const firstA2Reject = await post(
+        `/reports/${firstReport.id}/secondary-assessment`,
+        firstOfficer2.cookie,
+        agreeAllSecondary({
+          "a2_degree_3.1.1": "disagree",
+          "a2_statement_3.1.1": "Attempting to replace with a term from a release A1 never used.",
+          "a2_imdrf_term_3.1.1": termsX.investigation_type ?? "",
+        }),
+      );
+      expect(firstA2Reject.statusCode).toBe(422);
+      expect(firstA2Reject.body).toContain("does not exist in the selected IMDRF release");
 
-    const firstA2Submit = await post(
-      `/reports/${firstReport.id}/secondary-assessment`,
-      firstOfficer2.cookie,
-      agreeAllSecondary(),
-    );
-    expect(firstA2Submit.statusCode).toBe(302);
+      const firstA2Submit = await post(
+        `/reports/${firstReport.id}/secondary-assessment`,
+        firstOfficer2.cookie,
+        agreeAllSecondary(),
+      );
+      expect(firstA2Submit.statusCode).toBe(302);
 
-    // Final document / provenance: the release actually used (Y), never the one the workflow
-    // happened to begin under (X).
-    const firstWorker = await signedInAs("assessor", "Eliza Komba");
-    const firstApprove = await post(
-      `/reports/${firstReport.id}/assign-work-officer`,
-      manager.cookie,
-      { officer_id: firstWorker.id },
-    );
-    expect(firstApprove.statusCode).toBe(302);
-    const firstFinal = await finalDocumentPayload(firstReport.id);
-    if (firstFinal === null) throw new Error("first report has no final document");
-    expect(firstFinal.imdrf_release_id).toBe(releaseY);
-    expect(firstFinal.imdrf_component_code).toBe("G01001");
+      // Final document / provenance: the release actually used (Y), never the one the workflow
+      // happened to begin under (X).
+      const firstWorker = await signedInAs("assessor", "Eliza Komba");
+      const firstApprove = await post(
+        `/reports/${firstReport.id}/assign-work-officer`,
+        manager.cookie,
+        { officer_id: firstWorker.id },
+      );
+      expect(firstApprove.statusCode).toBe(302);
+      const firstFinal = await finalDocumentPayload(firstReport.id);
+      if (firstFinal === null) throw new Error("first report has no final document");
+      expect(firstFinal.imdrf_release_id).toBe(releaseY);
+      expect(firstFinal.imdrf_component_code).toBe("G01001");
 
-    // ───────────── STEP 5/6 — a brand-new workflow, started only after Y is already current ─────────────
-    const newOfficer1 = await signedInAs("assessor", "Chausiku Njau");
-    await fileAtThePublicDoor("Philips IntelliVue MX450 (new workflow)");
-    const filedAfterY = await reportsOrderedByFiling();
-    const newReport = filedAfterY[filedAfterY.length - 1];
-    if (newReport === undefined || newReport.id === firstReport.id) {
-      throw new Error("new report was not filed");
-    }
-    await assignAssessor1(newReport.id, newOfficer1.id);
+      // ───────────── STEP 5/6 — a brand-new workflow, started only after Y is already current ─────────────
+      const newOfficer1 = await signedInAs("assessor", "Chausiku Njau");
+      await fileAtThePublicDoor("Philips IntelliVue MX450 (new workflow)");
+      const filedAfterY = await reportsOrderedByFiling();
+      const newReport = filedAfterY[filedAfterY.length - 1];
+      if (newReport === undefined || newReport.id === firstReport.id) {
+        throw new Error("new report was not filed");
+      }
+      await assignAssessor1(newReport.id, newOfficer1.id);
 
-    // ───────────── STEP 7 — override attack: hand-craft a POST naming X while Y is latest ─────────────
-    // This is the very first save for this report's A1 — the case a broken implementation would be
-    // most tempted to trust a client-supplied release. `resolveAssessmentRelease` must ignore both
-    // the posted `imdrf_release_id` and the posted term ids' implied release, and resolve the
-    // current latest published release (Y) regardless — which makes X's own term id foreign and
-    // unresolvable, and the submission must be refused.
-    const overrideAttempt = await post(
-      `/reports/${newReport.id}/assessment-1`,
-      newOfficer1.cookie,
-      baseAssessment({ ...imdrfTermFields(termsX), imdrf_release_id: releaseX }),
-    );
-    expect(overrideAttempt.statusCode).toBe(422);
-    expect(overrideAttempt.body).toContain("does not exist in the selected IMDRF release");
-    // Nothing was persisted by the rejected attempt — no assessments row exists yet at all.
-    expect(await assessmentPayload(newReport.id, 1)).toEqual({});
+      // ───────────── STEP 7 — override attack: hand-craft a POST naming X while Y is latest ─────────────
+      // This is the very first save for this report's A1 — the case a broken implementation would be
+      // most tempted to trust a client-supplied release. `resolveAssessmentRelease` must ignore both
+      // the posted `imdrf_release_id` and the posted term ids' implied release, and resolve the
+      // current latest published release (Y) regardless — which makes X's own term id foreign and
+      // unresolvable, and the submission must be refused.
+      const overrideAttempt = await post(
+        `/reports/${newReport.id}/assessment-1`,
+        newOfficer1.cookie,
+        baseAssessment({ ...imdrfTermFields(termsX), imdrf_release_id: releaseX }),
+      );
+      expect(overrideAttempt.statusCode).toBe(422);
+      expect(overrideAttempt.body).toContain("does not exist in the selected IMDRF release");
+      // Nothing was persisted by the rejected attempt — no assessments row exists yet at all.
+      expect(await assessmentPayload(newReport.id, 1)).toEqual({});
 
-    const newA1Submit = await post(
-      `/reports/${newReport.id}/assessment-1`,
-      newOfficer1.cookie,
-      baseAssessment(imdrfTermFields(termsY)),
-    );
-    expect(newA1Submit.statusCode).toBe(302);
-    const newA1 = await assessmentPayload(newReport.id, 1);
-    expect(newA1.imdrf_release_id).toBe(releaseY);
-    expect(newA1.imdrf_component_code).toBe("G01001");
+      const newA1Submit = await post(
+        `/reports/${newReport.id}/assessment-1`,
+        newOfficer1.cookie,
+        baseAssessment(imdrfTermFields(termsY)),
+      );
+      expect(newA1Submit.statusCode).toBe(302);
+      const newA1 = await assessmentPayload(newReport.id, 1);
+      expect(newA1.imdrf_release_id).toBe(releaseY);
+      expect(newA1.imdrf_component_code).toBe("G01001");
 
-    const newOfficer2 = await signedInAs("assessor", "Daudi Kimaro");
-    const newAssign2 = await post(`/reports/${newReport.id}/assign-next-assessor`, manager.cookie, {
-      assessor_id: newOfficer2.id,
-      comment: "Please take a second look.",
-    });
-    expect(newAssign2.statusCode).toBe(302);
-    const newA2Submit = await post(
-      `/reports/${newReport.id}/secondary-assessment`,
-      newOfficer2.cookie,
-      agreeAllSecondary(),
-    );
-    expect(newA2Submit.statusCode).toBe(302);
+      const newOfficer2 = await signedInAs("assessor", "Daudi Kimaro");
+      const newAssign2 = await post(
+        `/reports/${newReport.id}/assign-next-assessor`,
+        manager.cookie,
+        {
+          assessor_id: newOfficer2.id,
+          comment: "Please take a second look.",
+        },
+      );
+      expect(newAssign2.statusCode).toBe(302);
+      const newA2Submit = await post(
+        `/reports/${newReport.id}/secondary-assessment`,
+        newOfficer2.cookie,
+        agreeAllSecondary(),
+      );
+      expect(newA2Submit.statusCode).toBe(302);
 
-    // ───────────── STEP 8 — X still exists, untouched, as reference/research data ─────────────
-    const xRow = await owner.db.execute(sql`
+      // ───────────── STEP 8 — X still exists, untouched, as reference/research data ─────────────
+      const xRow = await owner.db.execute(sql`
       SELECT status::text AS status FROM imdrf_releases WHERE id = ${releaseX}
     `);
-    expect(xRow[0]).toMatchObject({ status: "published" });
-    const xTermsStill = await owner.db.execute(sql`
+      expect(xRow[0]).toMatchObject({ status: "published" });
+      const xTermsStill = await owner.db.execute(sql`
       SELECT count(*)::int AS count FROM imdrf_terms WHERE release_id = ${releaseX}
     `);
-    expect((xTermsStill[0] as { count: number }).count).toBeGreaterThan(0);
+      expect((xTermsStill[0] as { count: number }).count).toBeGreaterThan(0);
 
-    // ───────────── The invariant, restated as one direct comparison ─────────────
-    expect(releaseX).not.toBe(releaseY);
-    expect(firstFinal.imdrf_release_id).toBe(releaseY); // finished under the newest release, not the one it began under
-    expect(newA1.imdrf_release_id).toBe(releaseY); // a fresh workflow goes straight to it
-  });
-});
+      // ───────────── The invariant, restated as one direct comparison ─────────────
+      expect(releaseX).not.toBe(releaseY);
+      expect(firstFinal.imdrf_release_id).toBe(releaseY); // finished under the newest release, not the one it began under
+      expect(newA1.imdrf_release_id).toBe(releaseY); // a fresh workflow goes straight to it
+    });
+  },
+);

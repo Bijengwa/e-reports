@@ -1,10 +1,9 @@
 import type { F004Answers, Issue, SecondaryReviewPayload } from "../../../../domain/f004.js";
 import type { ManagerReviewNote, ReportDetail } from "../../../../domain/report-detail.js";
+import { DocHeader } from "../../shared/components/doc-header.js";
 import { F004Form, type PriorSecondaryReview } from "../../shared/components/f004.js";
-import {
-  OrangeReportIdentity,
-  OrangeReportSurface,
-} from "../../shared/components/orange-report.js";
+import { IconClose } from "../../shared/components/icons.js";
+import { OrangeReportSurface } from "../../shared/components/orange-report.js";
 import { ManagerReviewBlock, ReportDocument } from "../../shared/components/report-views.js";
 import { StaffShell } from "../../shared/shell.js";
 import { Countdown } from "../components/countdown.js";
@@ -63,8 +62,9 @@ export function SecondaryAssessmentPage({
   return (
     <StaffShell
       title={`Secondary assessment — ${report.number}`}
+      // The compact `DocHeader` below is now the page's own title row — see the same note on
+      // `Assessment1Page`.
       pageTitle={`Secondary assessment (A${ordinal})`}
-      titleExtra={<Countdown dueAt={dueAt} completed={submitted} />}
       role={viewerRole}
       fullName={viewerName}
       active="assessments"
@@ -72,49 +72,27 @@ export function SecondaryAssessmentPage({
       countdown
       imdrfPicker
     >
-      <div class="staff-head">
-        <div class="sp">
-          {/* The Orange Report this assessment is OF, wearing its own identity. The assessment
-              being written has its own heading and its own dates below; the two must not read as
-              one document. */}
-          <OrangeReportIdentity report={report} />
-        </div>
+      {/* Everything that used to sit here — the Orange Report identity card, a standalone back
+          button, the "Secondary assessment" heading and explanatory paragraph, and the
+          Agree/Clarification/Disagree legend — is gone. What each of those colours means is
+          already carried by the inline review controls themselves (`A2InlineDecision`'s own
+          labelled radios), so the legend was restating, not teaching. `DocHeader` is the one row
+          the page opens with; the official F004 masthead follows immediately after it. */}
+      <DocHeader
+        backHref="/assessments"
+        backLabel="Back to my assessments"
+        title={`Secondary assessment (A${ordinal})`}
+        badge={<Countdown dueAt={dueAt} completed={submitted} />}
+      >
         <label for="a1-drawer" class="btn a1-open orange-action">
           Orange Report
         </label>
-        {/* My assessments, not the report page. This is an Officer's own workspace and their own
-            queue is where they came from; the report page is the general workflow, and once the
-            manager has approved and handed the work out `caseDetailRoutes` refuses it to them — a
-            back button that works until the case closes and then answers 403 is worse than one
-            that always goes somewhere theirs. The Orange Report is a drawer on this page already,
-            so nothing they need is behind that link. */}
-        <a href="/assessments" class="btn ghost">
-          ← Back to my assessments
-        </a>
-      </div>
+      </DocHeader>
 
       <div class="a1-work">
         <input type="checkbox" id="a1-drawer" class="a1-pick" data-a1-drawer />
 
         <div>
-          <div class="a2-intro">
-            <h2>Secondary assessment</h2>
-            <p>
-              This is the first assessor's submitted F004, read-only. Take a position on each of
-              their answers where the form asks you to, using the block beside the answer itself.
-              Every one of them needs a position before you can submit. Where an earlier secondary
-              assessor has already reviewed a field, their finding is folded away above yours — open
-              it if you want it before deciding your own.
-            </p>
-            <div class="a2-legend">
-              <span class="k-agree">Agree — keeps their answer, nothing to write</span>
-              <span class="k-clarification">
-                Required clarification — your corrected wording, their answer stands
-              </span>
-              <span class="k-disagree">Disagree — your corrected answer, and why</span>
-            </div>
-          </div>
-
           {/* The manager's reason for handing THIS assessor the report, prominently, once — not
               repeated at every section. A reader who wants the fuller decision history reads it on
               the report page instead; this is oriented to the one instruction that explains why
@@ -167,8 +145,8 @@ export function SecondaryAssessmentPage({
         <aside class="a1-drawer" aria-label="The report as filed">
           <div class="a1-drawer-head">
             <h3>The report as filed</h3>
-            <label for="a1-drawer" class="a1-drawer-close">
-              Close
+            <label for="a1-drawer" class="a1-drawer-close" aria-label="Close the report">
+              <IconClose />
             </label>
           </div>
           <OrangeReportSurface report={report} withIdentity>

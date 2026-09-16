@@ -1,5 +1,5 @@
-import path from "node:path";
 import { STATUS_CODES } from "node:http";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import cookie from "@fastify/cookie";
 import formbody from "@fastify/formbody";
@@ -12,6 +12,7 @@ import { type Config, loadConfig, publicOrigin } from "./config.js";
 import { createDatabase } from "./db/client.js";
 import { publicDoor } from "./doors/public/index.js";
 import { staffDoor } from "./doors/staff/index.js";
+import { createPdfRenderer } from "./pdf/index.js";
 import { createStorage, MAX_ATTACHMENTS } from "./storage/index.js";
 import { RequestErrorPage } from "./views/shared/request-error-page.js";
 
@@ -104,6 +105,12 @@ export async function buildServer(config: Config = loadConfig()): Promise<Fastif
   app.decorate("db", database.db);
   app.addHook("onClose", async () => {
     await database.close();
+  });
+
+  const pdf = createPdfRenderer({ executablePath: config.PDF_CHROMIUM_PATH });
+  app.decorate("pdf", pdf);
+  app.addHook("onClose", async () => {
+    await pdf.close();
   });
 
   await app.register(publicDoor, { host: config.PUBLIC_HOST });

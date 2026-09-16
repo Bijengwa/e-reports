@@ -1,10 +1,9 @@
 import type { F004Answers, Issue } from "../../../../domain/f004.js";
 import type { ReportDetail } from "../../../../domain/report-detail.js";
+import { DocHeader } from "../../shared/components/doc-header.js";
 import { F004Form } from "../../shared/components/f004.js";
-import {
-  OrangeReportIdentity,
-  OrangeReportSurface,
-} from "../../shared/components/orange-report.js";
+import { IconClose } from "../../shared/components/icons.js";
+import { OrangeReportSurface } from "../../shared/components/orange-report.js";
 import { ReportDocument } from "../../shared/components/report-views.js";
 import { StaffShell } from "../../shared/shell.js";
 import { Countdown } from "../components/countdown.js";
@@ -64,12 +63,11 @@ export function Assessment1Page({
   return (
     <StaffShell
       title={`Assessment 1 — F004 — ${report.number}`}
-      // Short, because the title bar is one line on a phone. The document says what it is in its
-      // own masthead, which is where a reader looks for a form's identity anyway.
+      // The compact `DocHeader` below is now the page's own title row — an F004's identity, its
+      // countdown and its way back all live there, in one line, directly above the document. The
+      // shell's own title bar keeps a short label for the tab/a11y landmark and nothing that would
+      // print the same fact twice.
       pageTitle="Assessment 1 — F004"
-      // Right beside "Assessment 1 — F004": how much time is left on it, reusing the exact
-      // `Countdown` every other queue draws the same fact with — never a second deadline display.
-      titleExtra={<Countdown dueAt={dueAt} completed={submitted} />}
       role={viewerRole}
       fullName={viewerName}
       active="assessments"
@@ -77,28 +75,23 @@ export function Assessment1Page({
       countdown
       imdrfPicker
     >
-      <div class="staff-head">
-        <div class="sp">
-          {/* The Orange Report this assessment is OF, wearing its own identity. The assessment
-              being written has its own heading and its own dates below; the two must not read as
-              one document. */}
-          <OrangeReportIdentity report={report} />
-        </div>
+      {/* Everything that used to sit here — the Orange Report identity card, a standalone back
+          button, the divider under them — is gone. `DocHeader` is the one row the page opens
+          with; the official F004 masthead (`.f4-doc-head`, inside `F004Form`) follows immediately
+          after it. */}
+      <DocHeader
+        backHref="/assessments"
+        backLabel="Back to my assessments"
+        title="Assessment 1 — F004"
+        badge={<Countdown dueAt={dueAt} completed={submitted} />}
+      >
         {/* A label, not a button: it drives the checkbox below, so it opens the drawer with or
-            without a script running. */}
+            without a script running. Text, not an icon — the Orange Report control is named, not
+            just symbolised, the same way it always has been. */}
         <label for="a1-drawer" class="btn a1-open orange-action">
           Orange Report
         </label>
-        {/* My assessments, not the report page. This is an Officer's own workspace and their own
-            queue is where they came from; the report page is the general workflow, and once the
-            manager has approved and handed the work out `caseDetailRoutes` refuses it to them — a
-            back button that works until the case closes and then answers 403 is worse than one
-            that always goes somewhere theirs. The Orange Report is a drawer on this page already,
-            so nothing they need is behind that link. */}
-        <a href="/assessments" class="btn ghost">
-          ← Back to my assessments
-        </a>
-      </div>
+      </DocHeader>
 
       <div class="a1-work">
         {/* No name, so it is never posted; outside the F004's form, so it is not its business. */}
@@ -132,8 +125,8 @@ export function Assessment1Page({
         <aside class="a1-drawer" aria-label="The report as filed">
           <div class="a1-drawer-head">
             <h3>The report as filed</h3>
-            <label for="a1-drawer" class="a1-drawer-close">
-              Close
+            <label for="a1-drawer" class="a1-drawer-close" aria-label="Close the report">
+              <IconClose />
             </label>
           </div>
           <OrangeReportSurface report={report} withIdentity>

@@ -2209,42 +2209,6 @@ textarea[aria-invalid="true"] {
  * it never redraws A1's choices, because it does not replace them. Disagree is full red, redraws
  * the choices, and asks for words too.
  */
-.a2-intro {
-  border-left: 4px solid var(--green);
-  padding: 2px 0 2px 14px;
-  margin-bottom: 18px;
-}
-
-.a2-intro h2 {
-  font-size: 17px;
-  font-weight: 600;
-  margin-bottom: 4px;
-}
-
-.a2-intro p {
-  color: var(--ink-2);
-  max-width: 78ch;
-}
-
-.a2-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.a2-legend span {
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 999px;
-  padding: 3px 10px;
-  color: #fff;
-}
-
-.a2-legend .k-agree { background: #16803c; }
-.a2-legend .k-clarification { background: #7f173a; }
-.a2-legend .k-disagree { background: #c20f0f; }
-
 .a2-summary {
   display: grid;
   gap: 12px;
@@ -2993,8 +2957,127 @@ ul.f4-card-c li { margin-bottom: 3px; }
   .f4-cards.f4-risk { grid-template-columns: 1fr; }
 }
 @media print {
-  .rail, .top, .f4-buttons, .f4-jump, .a1-open { display: none !important; }
+  .rail, .top, .f4-buttons, .f4-jump, .a1-open,
+  .f4-toolbar, .a1-drawer, .a1-scrim { display: none !important; }
   .f4-section, .f4-row, .f4-block, .f4-card { break-inside: avoid; }
+}
+
+/*
+ * The compact document toolbar: back, the dynamic F004 title, an optional badge (the
+ * `Countdown`), and the surface's own actions (Orange Report / the Final F004 type selector /
+ * download / print), all on one row, immediately above the F004's own masthead.
+ *
+ * Replaces `.staff-head` on every F004 surface — see `DocHeader`. Icon-only controls (back,
+ * download, print, close) share `.f4-icon-btn`, a square button the same shape as `.pw-toggle`
+ * elsewhere in the app, so an icon-only control always looks like one thing across the portal.
+ */
+.f4-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.f4-toolbar-title {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-right: auto;
+}
+
+.f4-toolbar-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.f4-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r);
+  background: var(--card);
+  color: var(--ink-2);
+  cursor: pointer;
+  flex: none;
+}
+
+.f4-icon-btn:hover {
+  background: var(--green-bg);
+  border-color: var(--green);
+  color: var(--ink);
+}
+
+.f4-icon-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.a1-drawer-close svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/*
+ * The Final F004 presentation switch: two plain links styled as a segmented control, one
+ * `aria-current="page"` for whichever the query string already selected.
+ *
+ * Not a <select> with an onchange script — the CSP carries no 'unsafe-inline', so nothing here may
+ * depend on a script running, and a link the reader can already see the destination of degrades to
+ * nothing worse than itself.
+ */
+.f4-type-switch {
+  display: flex;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r);
+  overflow: hidden;
+  height: 34px;
+}
+
+.f4-type-switch a {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-2);
+  text-decoration: none;
+  background: var(--card);
+}
+
+.f4-type-switch a + a {
+  border-left: 1px solid var(--rule-2);
+}
+
+.f4-type-switch a:hover {
+  background: var(--green-bg);
+}
+
+.f4-type-switch a[aria-current="page"] {
+  background: var(--green);
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  .f4-toolbar-title { width: 100%; order: -1; margin-right: 0; }
 }
 
 /* ---------- assessment workspace: the F004 in full, the report in a drawer ---------- */
