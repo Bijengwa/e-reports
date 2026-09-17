@@ -1,5 +1,6 @@
 import type { F004Answers, Issue } from "../../../../domain/f004.js";
 import type { ReportDetail } from "../../../../domain/report-detail.js";
+import { isSeriousCase } from "../../../../domain/reports.js";
 import { DocHeader } from "../../shared/components/doc-header.js";
 import { F004Form } from "../../shared/components/f004.js";
 import { IconClose } from "../../shared/components/icons.js";
@@ -83,7 +84,9 @@ export function Assessment1Page({
         backHref="/assessments"
         backLabel="Back to my assessments"
         title="Assessment 1 — F004"
-        badge={<Countdown dueAt={dueAt} completed={submitted} />}
+        badge={
+          <Countdown dueAt={dueAt} completed={submitted} serious={isSeriousCase(report.severity)} />
+        }
       >
         {/* A label, not a button: it drives the checkbox below, so it opens the drawer with or
             without a script running. Text, not an icon — the Orange Report control is named, not

@@ -25,6 +25,12 @@ export type DashboardPageProps = {
         finalReports: number;
       }
     | undefined;
+  /**
+   * Managers only: every death/life-threatening report still somewhere on the assessment/decision
+   * path, and how many of those are overdue on their current assignment. See the route's own
+   * comment for exactly what "still on the path" and "overdue" mean here.
+   */
+  seriousSummary?: { total: number; overdue: number } | undefined;
   /** Administrators only; undefined for anyone else, who is not shown the staff figure. */
   activeStaff?: number | undefined;
   /**
@@ -55,6 +61,7 @@ export function DashboardPage({
   role,
   reportCount,
   managerSummary,
+  seriousSummary,
   activeStaff,
   received,
   recent,
@@ -118,6 +125,27 @@ export function DashboardPage({
               <span class="hint">approved F004 documents</span>
             </div>
           </>
+        )}
+
+        {/* The one card in the palette's red rather than the dashboard's usual green/orange: a
+            death or life-threatening report still on the assessment/decision path is the SOP's own
+            5-working-day case, and the card that surfaces it must not read as just another figure
+            beside "Not started" and "Decision". Linked to Workload, where a manager acts on it —
+            the same argument every other card on this page already makes for its own link. */}
+        {seriousSummary !== undefined && (
+          <a href="/workload" class="stat stat-serious">
+            <span class="eyebrow">Serious AEs/AIs</span>
+            <b>{seriousSummary.total}</b>
+            <span class="hint">
+              {seriousSummary.overdue > 0 ? (
+                <span class="stat-serious-overdue" safe>
+                  {`${seriousSummary.overdue} overdue`}
+                </span>
+              ) : (
+                "none overdue"
+              )}
+            </span>
+          </a>
         )}
 
         {activeStaff !== undefined && (

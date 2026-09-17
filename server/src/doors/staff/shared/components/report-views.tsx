@@ -163,10 +163,8 @@ export function ReportDocument({ report }: { report: ReportDetail }): JSX.Elemen
         </dl>
       </div>
 
-      <h2 class="report-heading">Submitted answers</h2>
-
       {sections.length === 0 ? (
-        <p class="hint">This report carries no submitted answers.</p>
+        <p class="hint">This report carries no answers to show.</p>
       ) : (
         sections.map((section) => (
           <div class="report-group">

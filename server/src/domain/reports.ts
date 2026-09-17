@@ -163,6 +163,20 @@ export function severityOf(eventTypes: readonly string[]): Severity {
   return "other";
 }
 
+/**
+ * Whether a report is a "serious" AE/AI under the SOP — death or life-threatening, and nothing
+ * else. Hospitalization is deliberately excluded: it is a bad outcome, but the SOP's 5-working-day
+ * assessment deadline (see `domain/assignment.ts`'s `computeWorkingDayDueAt`) applies only to the
+ * two worst outcomes.
+ *
+ * The one place this predicate is written, so every page that needs to know — workload rows,
+ * assessment queues, the manager dashboard's serious-case card — reads the same answer rather than
+ * each re-deriving it from `reports.severity` on its own.
+ */
+export function isSeriousCase(severity: string): boolean {
+  return severity === "death" || severity === "life_threatening";
+}
+
 /** The most reports a single financial year's three-digit serial can hold. */
 export const MAX_SERIAL = 999;
 

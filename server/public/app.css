@@ -31,6 +31,15 @@
   --orange-line: #f0cfb6;
   --flag: #a8341f;
   --flag-bg: #fbebe7;
+  /*
+   * True red — hue 0, deliberately further from `--orange`'s hue than `--flag` sits, so an overdue
+   * deadline and the Orange Report's own colour never read as the same alarm. Reserved for overdue
+   * deadlines and serious (death/life-threatening) case treatment; `--flag` stays what it always
+   * was, the register's own severity-tag alarm colour.
+   */
+  --red: #c81e1e;
+  --red-d: #7a1010;
+  --red-bg: #fdeaea;
 
   /*
    * The F004's colour pack, pointed at the staff portal's own palette.
@@ -1273,15 +1282,58 @@ textarea[aria-invalid="true"] {
   color: var(--orange-d);
 }
 
+/* Red, not orange — see the `--red` tokens' own comment. An overdue deadline must never be
+   confusable with the Orange Report's own colour, on an ordinary assessment or a serious one. */
 .countdown-overdue {
-  background: var(--flag-bg);
-  color: var(--flag);
+  background: var(--red-bg);
+  color: var(--red-d);
+  border: 1px solid var(--red);
 }
 
 .countdown-completed,
 .countdown-none {
   background: #ecefed;
   color: var(--ink-3);
+}
+
+/* ---------- serious case (death / life-threatening) ---------- */
+/*
+ * Applied wherever a serious AE/AI's own `Countdown` renders — see the `serious` prop on the
+ * component. On an overdue serious deadline this is the loudest thing on the page, on purpose: an
+ * assessment past the SOP's 5-working-day deadline on a death or life-threatening case is the one
+ * state this application must make impossible to miss.
+ */
+.countdown-serious {
+  font-weight: 800;
+}
+
+.countdown-serious.countdown-overdue {
+  background: var(--red);
+  color: #fff;
+  border-color: var(--red-d);
+  box-shadow: 0 0 0 2px var(--red-bg);
+}
+
+.countdown-serious.countdown-near,
+.countdown-serious.countdown-on-track {
+  box-shadow: inset 0 0 0 1px var(--red);
+}
+
+/* A serious row in any queue — the workload pipeline, the Officer's own assessment lists. A red
+   tint on the row itself, not only on its countdown pill, so a serious case is visible even in a
+   glance across a table nobody has scrolled to the deadline column of yet. */
+tr.wl-row-serious > td {
+  background: var(--red-bg);
+}
+
+tr.wl-row-serious > td:first-child {
+  border-left: 3px solid var(--red);
+}
+
+.tag.tag-serious {
+  background: var(--red);
+  color: #fff;
+  font-weight: 700;
 }
 
 /* ---------- the one-time password ---------- */
@@ -1972,6 +2024,26 @@ textarea[aria-invalid="true"] {
   letter-spacing: -0.02em;
   line-height: 1.15;
   margin: 4px 0 1px;
+}
+
+/* The Manager's "Serious AEs/AIs" card, the one `.stat` that is also a link (to Workload) and the
+   one drawn in the alarm red rather than the dashboard's usual palette — see the page's own
+   comment for why. */
+a.stat.stat-serious {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-color: var(--red);
+  background: var(--red-bg);
+}
+
+a.stat.stat-serious:hover {
+  border-color: var(--red-d);
+}
+
+.stat-serious-overdue {
+  color: var(--red-d);
+  font-weight: 700;
 }
 
 /* ---------- the workload pipeline ---------- */

@@ -11,7 +11,10 @@ import {
   STATUS_LABELS,
   secondaryAssessmentHref,
 } from "../../../../domain/report-detail.js";
+import { FORM_TITLE, isSeriousCase } from "../../../../domain/reports.js";
 import { Countdown } from "../../assessment/components/countdown.js";
+import { DocHeader } from "../../shared/components/doc-header.js";
+import { IconClose } from "../../shared/components/icons.js";
 import {
   F004Form,
   type PriorSecondaryReview,
@@ -57,12 +60,16 @@ function AssessmentHistory({
   assessor1Submitted,
   secondaryAssessments,
   mySecondaryOrdinal,
+  serious,
 }: {
   assessor1Name?: string | null;
   assessor1DueAt?: Date | null;
   assessor1Submitted?: boolean;
   secondaryAssessments: SecondaryAssignment[];
   mySecondaryOrdinal: number | null;
+  /** This report's own serious-case flag — see `isSeriousCase` — so the SOP's 5-working-day
+   *  deadline reads as loudly here, at every ordinal, as it does on Workload and My assessments. */
+  serious?: boolean;
 }): JSX.Element {
   return (
     <ol class="assessment-history">
@@ -73,7 +80,7 @@ function AssessmentHistory({
           <span class="a-hist-done">✓</span>
         )}
         {assessor1Name !== null && assessor1Name !== undefined && assessor1Submitted !== true && (
-          <Countdown dueAt={assessor1DueAt ?? null} completed={false} />
+          <Countdown dueAt={assessor1DueAt ?? null} completed={false} serious={serious} />
         )}
       </li>
       {secondaryAssessments.map((a) => (
@@ -84,7 +91,7 @@ function AssessmentHistory({
             <span class="a-hist-done">✓</span>
           ) : (
             <>
-              <Countdown dueAt={a.dueAt} completed={false} />
+              <Countdown dueAt={a.dueAt} completed={false} serious={serious} />
               {a.ordinal === mySecondaryOrdinal && <span class="a-hist-current">→ Current</span>}
             </>
           )}
@@ -146,6 +153,13 @@ export type CaseDetailPageProps = {
   workOfficerPicker?: AssessorOption[];
   decisions: DecisionEntry[];
   hasFinalDocument?: boolean;
+  /**
+   * Where Back goes, decided by where the reader actually came FROM — never a bare "Back to
+   * register" on a page reached from the Manager's Workload. `caseDetailRoutes`' `showCase` reads
+   * `?from=workload` and passes `/workload` here; every other entry (the Register's own list, a
+   * direct link) gets `/register`, which is this page's true home.
+   */
+  backHref: string;
 };
 
 /**
@@ -171,6 +185,7 @@ export function CaseDetailPage({
   workOfficerPicker,
   decisions,
   hasFinalDocument,
+  backHref,
 }: CaseDetailPageProps): JSX.Element {
   const submitted = secondaryAssessments.filter((a) => a.submitted);
   const latest = submitted[submitted.length - 1];
@@ -183,27 +198,39 @@ export function CaseDetailPage({
     review: a.answers,
   }));
 
+  // "Not started" — `received`, per `BUCKETS` in `workload/pages/workload.tsx` — is the one state
+  // with no F004 yet: A1 has not even been assigned, or has been assigned and not opened. The
+  // Orange Report is the only document there is, so it stays inline. Every later state opens it
+  // from the drawer instead, the same pattern every F004 surface already uses — see
+  // `Assessment1Page`/`SecondaryAssessmentPage`.
+  const notStarted = report.status === "received";
+  const serious = isSeriousCase(report.severity);
+  // The one countdown this title row has room for: Assessment 1's own, when it exists and is not
+  // yet submitted. Once A1 is submitted, `AssessmentHistory` below already carries every
+  // assessment's own countdown at its own ordinal, so this badge would only repeat the first of
+  // them at a smaller size.
+  const headerCountdown =
+    assessor1Name !== null &&
+    assessor1Name !== undefined &&
+    assessor1Submitted !== true ? (
+      <Countdown dueAt={assessor1DueAt ?? null} completed={false} serious={serious} />
+    ) : undefined;
+
   return (
     <StaffShell
       title={`${report.number} — AE Reports`}
-      pageTitle={report.number}
+      pageTitle={FORM_TITLE}
       role={viewerRole}
       fullName={viewerName}
       active="register"
       countdown
     >
-      <div class="staff-head">
-        <div class="sp">
-          <OrangeReportIdentity report={report} />
-          <AssessmentHistory
-            assessor1Name={assessor1Name}
-            assessor1DueAt={assessor1DueAt}
-            assessor1Submitted={assessor1Submitted}
-            secondaryAssessments={secondaryAssessments}
-            mySecondaryOrdinal={mySecondaryOrdinal}
-          />
-        </div>
-
+      <DocHeader backHref={backHref} backLabel="Back" title={FORM_TITLE} badge={headerCountdown}>
+        {!notStarted && (
+          <label for="a1-drawer" class="btn a1-open orange-action">
+            Orange Report
+          </label>
+        )}
         {hasFinalDocument === true && (
           <a href={`/reports/${report.id}/final-document`} class="btn">
             Final F004
@@ -219,9 +246,20 @@ export function CaseDetailPage({
             {`My assessment (A${mySecondaryOrdinal})`}
           </a>
         )}
-        <a href="/register" class="btn ghost">
-          ← Back to register
-        </a>
+      </DocHeader>
+
+      <div class="staff-head">
+        <div class="sp">
+          <OrangeReportIdentity report={report} compact />
+          <AssessmentHistory
+            assessor1Name={assessor1Name}
+            assessor1DueAt={assessor1DueAt}
+            assessor1Submitted={assessor1Submitted}
+            secondaryAssessments={secondaryAssessments}
+            mySecondaryOrdinal={mySecondaryOrdinal}
+            serious={serious}
+          />
+        </div>
       </div>
 
       {error && (
@@ -230,9 +268,35 @@ export function CaseDetailPage({
         </div>
       )}
 
-      <OrangeReportSurface report={report}>
-        <ReportDocument report={report} />
-      </OrangeReportSurface>
+      {notStarted ? (
+        <OrangeReportSurface report={report}>
+          <ReportDocument report={report} />
+        </OrangeReportSurface>
+      ) : (
+        // The drawer pattern every F004 surface already uses: a nameless checkbox outside any
+        // form, opened by the "Orange Report" label in `DocHeader` above, closed by the scrim or
+        // its own close control. The Orange Report is reference material once a document is being
+        // assessed or decided on, not the primary thing on screen.
+        <div class="a1-work">
+          <input type="checkbox" id="a1-drawer" class="a1-pick" data-a1-drawer />
+
+          <label for="a1-drawer" class="a1-scrim">
+            <span class="vh">Close the report</span>
+          </label>
+
+          <aside class="a1-drawer" aria-label="The report as filed">
+            <div class="a1-drawer-head">
+              <h3>The report as filed</h3>
+              <label for="a1-drawer" class="a1-drawer-close" aria-label="Close the report">
+                <IconClose />
+              </label>
+            </div>
+            <OrangeReportSurface report={report} withIdentity>
+              <ReportDocument report={report} />
+            </OrangeReportSurface>
+          </aside>
+        </div>
+      )}
 
       {assessment1Review && (
         <>

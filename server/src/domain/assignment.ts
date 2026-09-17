@@ -39,6 +39,37 @@ export function computeDueAt(now: Date, value: number, unit: DeadlineUnit): Date
 }
 
 /**
+ * The SOP's real deadline for assessing a serious AE/AI (death or life-threatening, see
+ * `domain/reports.ts`'s `isSeriousCase`): 5 WORKING days, not 5×24h. This is an assessment
+ * deadline, not a Manager-assignment SLA — it applies to whichever assignment is currently open on
+ * a serious case's assessment path (A1, A2, A3, …), and is written into that assignment's own
+ * `due_at`, the same column `computeDueAt` writes for everything else.
+ */
+export const SERIOUS_CASE_WORKING_DAYS = 5;
+
+/**
+ * Walks forward `days` weekdays from `now`, skipping Saturday and Sunday, and returns the point in
+ * time that lands on. No public-holiday calendar exists in this application today (nothing else in
+ * the codebase tracks one), so this deliberately counts only the two-day weekend — inventing a
+ * holiday table here would be a policy decision this function has no business making.
+ *
+ * Days are walked on the UTC calendar, the same clock `now` is read on everywhere else in this
+ * module, so a caller under test can pin `now` exactly as it already does for `computeDueAt`.
+ */
+export function computeWorkingDayDueAt(now: Date, days: number): Date {
+  const due = new Date(now.getTime());
+  let remaining = days;
+
+  while (remaining > 0) {
+    due.setUTCDate(due.getUTCDate() + 1);
+    const weekday = due.getUTCDay(); // 0 = Sunday, 6 = Saturday
+    if (weekday !== 0 && weekday !== 6) remaining -= 1;
+  }
+
+  return due;
+}
+
+/**
  * How close is close enough to warn about — one named constant rather than a threshold repeated,
  * or silently varied, wherever a countdown is drawn. Nothing in the codebase set a figure before
  * this; 24 hours is this feature's own choice, and the one place to change it if that turns out

@@ -134,6 +134,44 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         })()
       : undefined;
 
+    /*
+     * The serious AE/AI figure: death or life-threatening (`isSeriousCase`), still somewhere on the
+     * assessment/decision path — `assigned_for_work` and `closed` are excluded because the office's
+     * work on those is done, and a card meant to draw attention to what still needs it must not
+     * count what no longer does.
+     *
+     * The overdue figure reads the same "current assignment" a report is on that `workload.tsx`'s
+     * own lateral join reads — the latest `assessments` row for that report, whichever ordinal it
+     * is — so this card's overdue count can never disagree with what Workload itself would show
+     * filtered to the same reports.
+     */
+    const seriousRows = isManager
+      ? await app.db.execute(sql`
+          SELECT
+            count(*)::int AS total,
+            count(*) FILTER (
+              WHERE cur.due_at IS NOT NULL AND cur.submitted_at IS NULL AND cur.due_at < now()
+            )::int AS overdue
+            FROM reports r
+            LEFT JOIN LATERAL (
+              SELECT a.due_at, a.submitted_at
+                FROM assessments a
+               WHERE a.report_id = r.id
+               ORDER BY a.ordinal DESC
+               LIMIT 1
+            ) cur ON true
+           WHERE r.severity IN ('death', 'life_threatening')
+             AND r.status NOT IN ('assigned_for_work', 'closed')
+        `)
+      : [];
+
+    const seriousSummary = isManager
+      ? (() => {
+          const row = seriousRows[0] as { total: number; overdue: number };
+          return { total: row.total, overdue: row.overdue };
+        })()
+      : undefined;
+
     const received = isOfficer
       ? {
           // No rows is nothing waiting. The window count only exists on a row, so an empty result
@@ -149,6 +187,7 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
         role={session.role}
         reportCount={reportCount}
         managerSummary={managerSummary}
+        seriousSummary={seriousSummary}
         activeStaff={activeStaff}
         received={received}
         recent={recent}

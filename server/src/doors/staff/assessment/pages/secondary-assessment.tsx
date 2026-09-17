@@ -1,5 +1,6 @@
 import type { F004Answers, Issue, SecondaryReviewPayload } from "../../../../domain/f004.js";
 import type { ManagerReviewNote, ReportDetail } from "../../../../domain/report-detail.js";
+import { isSeriousCase } from "../../../../domain/reports.js";
 import { DocHeader } from "../../shared/components/doc-header.js";
 import { F004Form, type PriorSecondaryReview } from "../../shared/components/f004.js";
 import { IconClose } from "../../shared/components/icons.js";
@@ -82,7 +83,9 @@ export function SecondaryAssessmentPage({
         backHref="/assessments"
         backLabel="Back to my assessments"
         title={`Secondary assessment (A${ordinal})`}
-        badge={<Countdown dueAt={dueAt} completed={submitted} />}
+        badge={
+          <Countdown dueAt={dueAt} completed={submitted} serious={isSeriousCase(report.severity)} />
+        }
       >
         <label for="a1-drawer" class="btn a1-open orange-action">
           Orange Report

@@ -4,6 +4,7 @@ import {
   SEVERITY_LABELS,
   severityTone,
 } from "../../../../domain/report-detail.js";
+import { IconBack } from "../../shared/components/icons.js";
 import {
   OrangeReportIdentity,
   OrangeReportSurface,
@@ -205,8 +206,8 @@ export function MyWorkItemPage({
         <label for="a1-drawer" class="btn a1-open orange-action">
           Orange Report
         </label>
-        <a href="/my-work" class="btn ghost">
-          ← Back to my work
+        <a href="/my-work" class="f4-icon-btn" aria-label="Back to my work">
+          <IconBack />
         </a>
       </div>
 

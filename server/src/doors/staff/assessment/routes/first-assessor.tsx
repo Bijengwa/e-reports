@@ -3,13 +3,16 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import {
   computeDueAt,
+  computeWorkingDayDueAt,
   DEADLINE_UNITS,
   DEFAULT_DEADLINE,
   isDeadlineUnit,
   isDeadlineValue,
+  SERIOUS_CASE_WORKING_DAYS,
 } from "../../../../domain/assignment.js";
 import { F004_VERSION, FIRST_ASSESSMENT } from "../../../../domain/f004.js";
 import { loadReport } from "../../../../domain/report-detail.js";
+import { isSeriousCase } from "../../../../domain/reports.js";
 import { renderCaseDetail } from "../../register/routes/report-detail.js";
 import { currentSession } from "../../session-guard.js";
 import { ForbiddenPage } from "../../shared/forbidden.js";
@@ -86,7 +89,14 @@ export async function firstAssessorRoutes(app: FastifyInstance): Promise<void> {
     if (candidate.length === 0) return forbid(reply, session.role);
 
     const now = new Date();
-    const dueAt = computeDueAt(now, deadlineValue, deadlineUnit);
+    // A serious AE/AI (death or life-threatening) is assessed against the SOP's own 5-working-day
+    // deadline, not whatever the Manager picked here — see `computeWorkingDayDueAt`'s doc comment.
+    // The posted `deadlineValue`/`deadlineUnit` are still validated and stored as before, so the
+    // record of what was asked for is unchanged; only the assignment's actual `due_at` is
+    // overridden for a serious case.
+    const dueAt = isSeriousCase(found.report.severity)
+      ? computeWorkingDayDueAt(now, SERIOUS_CASE_WORKING_DAYS)
+      : computeDueAt(now, deadlineValue, deadlineUnit);
     // Postgres.js's raw parameter binding accepts a string or a Buffer, not a bare `Date` — every
     // timestamp interpolated into a template below is its ISO form for that reason alone.
     const nowIso = now.toISOString();

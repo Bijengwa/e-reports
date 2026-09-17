@@ -1,10 +1,16 @@
 import { sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
-import { computeDueAt, DEFAULT_DEADLINE } from "../../../../domain/assignment.js";
+import {
+  computeDueAt,
+  computeWorkingDayDueAt,
+  DEFAULT_DEADLINE,
+  SERIOUS_CASE_WORKING_DAYS,
+} from "../../../../domain/assignment.js";
 import { F004_VERSION } from "../../../../domain/f004.js";
 import { resolveFinalDocument } from "../../../../domain/final-document.js";
 import { loadReport } from "../../../../domain/report-detail.js";
+import { isSeriousCase } from "../../../../domain/reports.js";
 import { renderCaseDetail } from "../../register/routes/report-detail.js";
 import { currentSession } from "../../session-guard.js";
 import { ForbiddenPage } from "../../shared/forbidden.js";
@@ -87,7 +93,12 @@ export async function decisionRoutes(app: FastifyInstance): Promise<void> {
     if (candidate.length === 0) return forbid(reply, session.role);
 
     const now = new Date();
-    const dueAt = computeDueAt(now, DEFAULT_DEADLINE.value, DEFAULT_DEADLINE.unit);
+    // The SOP's 5-working-day deadline follows a serious AE/AI (death or life-threatening) through
+    // every secondary assessment on its path, not only A1 — see `computeWorkingDayDueAt`'s doc
+    // comment and `first-assessor.tsx`'s own use of it for A1.
+    const dueAt = isSeriousCase(found.report.severity)
+      ? computeWorkingDayDueAt(now, SERIOUS_CASE_WORKING_DAYS)
+      : computeDueAt(now, DEFAULT_DEADLINE.value, DEFAULT_DEADLINE.unit);
     // Postgres.js's raw parameter binding accepts a string or a Buffer, not a bare `Date` — every
     // timestamp interpolated into a template below is its ISO form for that reason alone.
     const nowIso = now.toISOString();

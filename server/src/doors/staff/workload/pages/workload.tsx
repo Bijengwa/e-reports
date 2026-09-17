@@ -1,4 +1,5 @@
 import { SEVERITY_LABELS, severityTone } from "../../../../domain/report-detail.js";
+import { isSeriousCase } from "../../../../domain/reports.js";
 import { Countdown } from "../../assessment/components/countdown.js";
 import { StaffShell } from "../../shared/shell.js";
 
@@ -313,68 +314,79 @@ export function WorkloadPage({
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <tr>
-                  <td>
-                    <a href={`/reports/${row.id}`} safe>
-                      {row.number}
-                    </a>
-                  </td>
-                  <td>{day(row.receivedAt)}</td>
-                  <td>
-                    <span class="cap" safe>
-                      {row.deviceName}
-                    </span>
-                  </td>
-                  <td>
-                    <span
-                      class={`tag ${severityTone(row.severity) === "caution" ? "warn" : ""}`}
-                      safe
-                    >
-                      {SEVERITY_LABELS[row.severity] ?? row.severity}
-                    </span>
-                  </td>
-                  {/* The ordinal, as data. This is where A1/A2/A3 lives now it is not a tab. */}
-                  <td safe>{`A${row.currentOrdinal}`}</td>
-                  {/* An unassigned report says so rather than printing an empty column: null here
-                      means intake found no active Officer to give it to, which is a state a
-                      manager needs to see, not a blank. */}
-                  <td>
-                    {row.currentAssessorName === null ? (
-                      <span class="hint">Unassigned</span>
-                    ) : (
-                      <span safe>{row.currentAssessorName}</span>
-                    )}
-                  </td>
-                  {/* Both blank together with the assessor: an unassigned report has neither an
-                      assignment date nor a deadline yet, and a dash says so without a stray
-                      "No deadline" reading as if someone had been named. */}
-                  <td>{row.currentAssignedAt === null ? "—" : day(row.currentAssignedAt)}</td>
-                  <td>
-                    {row.currentAssessorName === null ? (
-                      "—"
-                    ) : (
-                      <Countdown
-                        dueAt={row.currentDueAt}
-                        completed={row.currentSubmittedAt !== null}
-                      />
-                    )}
-                  </td>
-                  <td>
-                    <span class="tag muted" safe>
-                      {bucketOfStatus(row.status)?.state ?? row.status}
-                    </span>
-                  </td>
-                  {/* One way in, worded for what the reader will be doing when they get there. The
-                      decision itself is made on the report, where the rules about who may be named
-                      are enforced — not from here, which would have to repeat them. */}
-                  <td>
-                    <a href={`/reports/${row.id}`} safe>
-                      {actionOf(row.status)}
-                    </a>
-                  </td>
-                </tr>
-              ))}
+              {rows.map((row) => {
+                const serious = isSeriousCase(row.severity);
+                return (
+                  <tr class={serious ? "wl-row-serious" : ""}>
+                    <td>
+                      <a href={`/reports/${row.id}?from=workload`} safe>
+                        {row.number}
+                      </a>
+                    </td>
+                    <td>{day(row.receivedAt)}</td>
+                    <td>
+                      <span class="cap" safe>
+                        {row.deviceName}
+                      </span>
+                    </td>
+                    <td>
+                      <span
+                        class={`tag ${severityTone(row.severity) === "caution" ? "warn" : ""}`}
+                        safe
+                      >
+                        {SEVERITY_LABELS[row.severity] ?? row.severity}
+                      </span>
+                      {/* A prominent, separate marker for the SOP's serious-case path — not just
+                          the severity tag's own colour, which a reader can miss at a glance. */}
+                      {serious && (
+                        <span class="tag tag-serious" title="5 working-day SOP deadline">
+                          SERIOUS
+                        </span>
+                      )}
+                    </td>
+                    {/* The ordinal, as data. This is where A1/A2/A3 lives now it is not a tab. */}
+                    <td safe>{`A${row.currentOrdinal}`}</td>
+                    {/* An unassigned report says so rather than printing an empty column: null
+                        here means intake found no active Officer to give it to, which is a state
+                        a manager needs to see, not a blank. */}
+                    <td>
+                      {row.currentAssessorName === null ? (
+                        <span class="hint">Unassigned</span>
+                      ) : (
+                        <span safe>{row.currentAssessorName}</span>
+                      )}
+                    </td>
+                    {/* Both blank together with the assessor: an unassigned report has neither an
+                        assignment date nor a deadline yet, and a dash says so without a stray
+                        "No deadline" reading as if someone had been named. */}
+                    <td>{row.currentAssignedAt === null ? "—" : day(row.currentAssignedAt)}</td>
+                    <td>
+                      {row.currentAssessorName === null ? (
+                        "—"
+                      ) : (
+                        <Countdown
+                          dueAt={row.currentDueAt}
+                          completed={row.currentSubmittedAt !== null}
+                          serious={serious}
+                        />
+                      )}
+                    </td>
+                    <td>
+                      <span class="tag muted" safe>
+                        {bucketOfStatus(row.status)?.state ?? row.status}
+                      </span>
+                    </td>
+                    {/* One way in, worded for what the reader will be doing when they get there.
+                        The decision itself is made on the report, where the rules about who may
+                        be named are enforced — not from here, which would have to repeat them. */}
+                    <td>
+                      <a href={`/reports/${row.id}?from=workload`} safe>
+                        {actionOf(row.status)}
+                      </a>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

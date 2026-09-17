@@ -10,10 +10,17 @@ import { countdownLabel, type DeadlineState, deadlineStateOf } from "../../../..
 export function Countdown({
   dueAt,
   completed,
+  serious,
   now = new Date(),
 }: {
   dueAt: Date | null;
   completed: boolean;
+  /**
+   * This assignment belongs to a serious AE/AI (death or life-threatening) — see
+   * `domain/reports.ts`'s `isSeriousCase`. Purely a stronger visual treatment (see `.countdown-
+   * serious` in app.css): it changes no state and no label, only how loudly the pill reads.
+   */
+  serious?: boolean;
   /** Overridable only so a test can pin what "right now" means; a real caller never passes this. */
   now?: Date;
 }): JSX.Element {
@@ -22,7 +29,7 @@ export function Countdown({
 
   return (
     <span
-      class={`countdown countdown-${state}`}
+      class={`countdown countdown-${state}${serious === true ? " countdown-serious" : ""}`}
       data-countdown
       data-due-at={dueAt === null ? undefined : dueAt.toISOString()}
       data-completed={completed ? "true" : undefined}

@@ -98,6 +98,13 @@ export async function renderCaseDetail(
   const found = await loadReport(app, id);
   if (found === null) return reply.redirect("/register", 302);
 
+  // Where Back goes: the Manager's Workload names itself with `?from=workload` on every link into
+  // this page (`workload/pages/workload.tsx`), so a report opened from there goes back there —
+  // never to `/register`, which is not where this reader came from. Anything else — the Register's
+  // own list, a bookmarked or typed address — falls back to the Register, this page's true home.
+  const backHref =
+    (request.query as { from?: unknown }).from === "workload" ? "/workload" : "/register";
+
   const isManager = session.role === "manager";
 
   // The one status at which the manager's review of the first assessment is still a live piece of
@@ -211,6 +218,7 @@ export async function renderCaseDetail(
         decisions={found.decisions}
         hasFinalDocument={finalDocument.length > 0}
         canComment={isManager && found.assessment1 !== null && reviewIsActionable}
+        backHref={backHref}
       />,
     );
 }

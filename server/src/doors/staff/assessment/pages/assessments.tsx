@@ -5,6 +5,7 @@ import {
   secondaryAssessmentHref,
   severityTone,
 } from "../../../../domain/report-detail.js";
+import { isSeriousCase } from "../../../../domain/reports.js";
 import { Countdown } from "../../assessment/components/countdown.js";
 import { StaffShell } from "../../shared/shell.js";
 
@@ -148,54 +149,69 @@ function AssignmentRows({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr>
-              <td>
-                {row.reportOpen ? (
-                  <a href={`/reports/${row.reportId}`} safe>
-                    {row.number}
+          {rows.map((row) => {
+            const serious = isSeriousCase(row.severity);
+            return (
+              <tr class={serious ? "wl-row-serious" : ""}>
+                <td>
+                  {row.reportOpen ? (
+                    <a href={`/reports/${row.reportId}`} safe>
+                      {row.number}
+                    </a>
+                  ) : (
+                    <span safe>{row.number}</span>
+                  )}
+                </td>
+                <td>{day(row.receivedAt)}</td>
+                <td>
+                  <span class="cap" safe>
+                    {row.deviceName}
+                  </span>
+                </td>
+                <td>
+                  <span
+                    class={`tag ${severityTone(row.severity) === "caution" ? "warn" : ""}`}
+                    safe
+                  >
+                    {SEVERITY_LABELS[row.severity] ?? row.severity}
+                  </span>
+                  {serious && (
+                    <span class="tag tag-serious" title="5 working-day SOP deadline">
+                      SERIOUS
+                    </span>
+                  )}
+                </td>
+                <td safe>{`A${row.ordinal}`}</td>
+                {/* Always the reader, on a page built from one WHERE clause on their own id.
+                    Printed anyway: this table is read alongside the manager's, which names
+                    somebody else in the same column, and a column that vanishes between two
+                    views of the same work is harder to read than one that states the obvious. */}
+                <td safe>{assessorName}</td>
+                <td>
+                  <span class="tag muted" safe>
+                    {STATE_LABELS[row.state]}
+                  </span>
+                </td>
+                <td>{row.assignedAt === null ? "—" : day(row.assignedAt)}</td>
+                <td>
+                  {row.state === "submitted" && row.completedAt !== null ? (
+                    <span class="hint" safe>{`Completed: ${day(row.completedAt)}`}</span>
+                  ) : (
+                    <Countdown
+                      dueAt={row.dueAt}
+                      completed={row.state === "submitted"}
+                      serious={serious}
+                    />
+                  )}
+                </td>
+                <td>
+                  <a href={assignmentHref(row)} class="btn ghost btn-sm" safe>
+                    {ACTION_LABELS[row.state]}
                   </a>
-                ) : (
-                  <span safe>{row.number}</span>
-                )}
-              </td>
-              <td>{day(row.receivedAt)}</td>
-              <td>
-                <span class="cap" safe>
-                  {row.deviceName}
-                </span>
-              </td>
-              <td>
-                <span class={`tag ${severityTone(row.severity) === "caution" ? "warn" : ""}`} safe>
-                  {SEVERITY_LABELS[row.severity] ?? row.severity}
-                </span>
-              </td>
-              <td safe>{`A${row.ordinal}`}</td>
-              {/* Always the reader, on a page built from one WHERE clause on their own id. Printed
-                  anyway: this table is read alongside the manager's, which names somebody else in
-                  the same column, and a column that vanishes between two views of the same work is
-                  harder to read than one that states the obvious. */}
-              <td safe>{assessorName}</td>
-              <td>
-                <span class="tag muted" safe>
-                  {STATE_LABELS[row.state]}
-                </span>
-              </td>
-              <td>{row.assignedAt === null ? "—" : day(row.assignedAt)}</td>
-              <td>
-                {row.state === "submitted" && row.completedAt !== null ? (
-                  <span class="hint" safe>{`Completed: ${day(row.completedAt)}`}</span>
-                ) : (
-                  <Countdown dueAt={row.dueAt} completed={row.state === "submitted"} />
-                )}
-              </td>
-              <td>
-                <a href={assignmentHref(row)} class="btn ghost btn-sm" safe>
-                  {ACTION_LABELS[row.state]}
-                </a>
-              </td>
-            </tr>
-          ))}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
