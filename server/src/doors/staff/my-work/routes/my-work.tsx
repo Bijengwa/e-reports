@@ -1,10 +1,9 @@
 import { sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
-import { loadReport } from "../../../../domain/report-detail.js";
 import { currentSession } from "../../session-guard.js";
 import { ForbiddenPage } from "../../shared/forbidden.js";
-import { MyWorkItemPage, MyWorkPage, type WorkRow } from "../pages/my-work.js";
+import { MyWorkPage, type WorkRow } from "../pages/my-work.js";
 
 /** Same reason as every other page's: a uuid column compared against arbitrary text raises 22P02. */
 const ReportId = z.uuid();
@@ -124,18 +123,9 @@ export async function myWorkRoutes(app: FastifyInstance): Promise<void> {
     const assignment = await assignmentFor(app, target.data, session.userId);
     if (assignment === null) return forbid(reply, session.role);
 
-    const found = await loadReport(app, target.data);
-    if (found === null) return forbid(reply, session.role, 404);
-
-    return reply.html(
-      <MyWorkItemPage
-        report={found.report}
-        viewerRole={session.role}
-        viewerName={session.fullName}
-        assignedByName={assignment.assigned_by_name}
-        assignedAt={new Date(assignment.assigned_at).toISOString().slice(0, 10)}
-        instruction={assignment.comment}
-      />,
-    );
+    // The item page this used to render carried no work functionality of its own — it only
+    // pointed at the Final F004, which is the document the Officer actually needs. This route
+    // now exists to protect that redirect: the ownership check above, then straight through.
+    return reply.redirect(`/reports/${target.data}/final-document`);
   });
 }

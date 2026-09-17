@@ -1,15 +1,4 @@
-import {
-  day,
-  type ReportDetail,
-  SEVERITY_LABELS,
-  severityTone,
-} from "../../../../domain/report-detail.js";
-import { IconBack } from "../../shared/components/icons.js";
-import {
-  OrangeReportIdentity,
-  OrangeReportSurface,
-} from "../../shared/components/orange-report.js";
-import { ReportDocument } from "../../shared/components/report-views.js";
+import { day, SEVERITY_LABELS, severityTone } from "../../../../domain/report-detail.js";
 import { StaffShell } from "../../shared/shell.js";
 
 /**
@@ -106,7 +95,7 @@ export function MyWorkPage({ viewerRole, viewerName, rows }: MyWorkPageProps): J
                   {/* To the work item, not to the register's copy of the report. The work item is
                       the reader's own page and is refused to anyone the assignment does not name. */}
                   <td>
-                    <a href={`/my-work/${row.reportId}`} safe>
+                    <a href={`/reports/${row.reportId}/final-document`} safe>
                       {row.number}
                     </a>
                   </td>
@@ -132,7 +121,7 @@ export function MyWorkPage({ viewerRole, viewerName, rows }: MyWorkPageProps): J
                     </span>
                   </td>
                   <td>
-                    <a href={`/my-work/${row.reportId}`} class="btn ghost btn-sm">
+                    <a href={`/reports/${row.reportId}/final-document`} class="btn ghost btn-sm">
                       Open
                     </a>
                   </td>
@@ -142,138 +131,6 @@ export function MyWorkPage({ viewerRole, viewerName, rows }: MyWorkPageProps): J
           </table>
         </div>
       )}
-    </StaffShell>
-  );
-}
-
-/**
- * What the Officer carrying out the work is given, and it is deliberately short.
- *
- * The report as filed, the assignment, and the Final F004. Nothing about the assessments and
- * nothing about the decisions — this page used to carry both, naming every assessor and printing
- * the manager's whole decision history, which handed one Officer the internal record of how the
- * office argued its way to a position and who was overruled getting there. That record belongs to
- * the manager and to the audit trail.
- *
- * The Officer is not being kept in the dark about their own task: the Final F004 IS the office's
- * position, in full, on the form it belongs on, and it is the thing they have been asked to carry
- * out. What they no longer see is the working out.
- */
-export type MyWorkItemPageProps = {
-  report: ReportDetail;
-  viewerRole: string;
-  viewerName: string;
-  /** The manager who approved it, and when. */
-  assignedByName: string;
-  assignedAt: string;
-  /** The manager's instruction on the assignment itself, where they wrote one. */
-  instruction: string | null;
-};
-
-/**
- * One assigned report, as the Officer who has to act on it needs to read it.
- *
- * Who assigned it and why, the approved F004 they are carrying out, and the report as the reporter
- * filed it. That is the whole page, and the order is the order the reader needs it in: the
- * instruction first, because it is why they are here, then the document, then the source.
- *
- * Nothing here is a control. There is no Start and no Complete, because the MVP has no work
- * lifecycle — see the note at the top of this file.
- */
-export function MyWorkItemPage({
-  report,
-  viewerRole,
-  viewerName,
-  assignedByName,
-  assignedAt,
-  instruction,
-}: MyWorkItemPageProps): JSX.Element {
-  return (
-    <StaffShell
-      title={`${report.number} — my work`}
-      pageTitle="My work"
-      role={viewerRole}
-      fullName={viewerName}
-      active="my-work"
-    >
-      <div class="staff-head">
-        <div class="sp">
-          {/* The report this work is about, wearing the identity it wears on every other page. */}
-          <OrangeReportIdentity report={report} />
-        </div>
-        {/* A label, not a link: it drives the drawer's checkbox, exactly as on the two assessment
-            pages. The Orange Report is reached the same way from every page that has one. */}
-        <label for="a1-drawer" class="btn a1-open orange-action">
-          Orange Report
-        </label>
-        <a href="/my-work" class="f4-icon-btn" aria-label="Back to my work">
-          <IconBack />
-        </a>
-      </div>
-
-      {/* Who handed it over and when, said once at the top. The reader arrived here because
-          somebody named them, and the first thing they need is who, and why. */}
-      <div class="review manager-instruction">
-        <p class="hint">
-          Assigned to you by <span safe>{assignedByName}</span> on <span safe>{assignedAt}</span>
-        </p>
-        {instruction === null ? (
-          <p class="hint">No further instruction was left with the assignment.</p>
-        ) : (
-          <p class="review-text" safe>
-            {instruction}
-          </p>
-        )}
-      </div>
-
-      {/*
-        The approved outcome, first and at full weight.
-
-        This page used to print the Orange Report in full under a heading and offer the Final F004
-        as a line of hint text above it, which told the Officer that the thing they were here to
-        read was the report a member of the public filed. It is not. They have been handed the
-        office's position and asked to carry it out; the Final F004 IS that position, and the
-        report is the source it was reached from.
-
-        So the order is the order of the reader's task: what was decided, then what it was decided
-        about. Always present — a report only reaches this page through the approval that writes
-        the final document.
-      */}
-      <div class="mw-final">
-        <a href={`/reports/${report.id}/final-document`} class="btn">
-          Open the Final F004
-        </a>
-        <p class="hint">
-          The assessment of this report, as approved. This is the work to carry out.
-        </p>
-      </div>
-
-      {/* The source, in the drawer every other page keeps it in. Available in one click from the
-          header, and not competing with the document above for the first thing read. */}
-      <input type="checkbox" id="a1-drawer" class="a1-pick" data-a1-drawer />
-      <label for="a1-drawer" class="a1-scrim">
-        <span class="vh">Close the Orange Report</span>
-      </label>
-      <aside class="a1-drawer" aria-label="The report as filed">
-        <div class="a1-drawer-head">
-          <h3>The report as filed</h3>
-          <label for="a1-drawer" class="a1-drawer-close">
-            Close
-          </label>
-        </div>
-        <OrangeReportSurface report={report} withIdentity>
-          <ReportDocument report={report} />
-        </OrangeReportSurface>
-      </aside>
-
-      {/* Nothing follows.
-
-          "How it was assessed" and the decision history used to, and both are gone: the first
-          named every assessor on the report and the second printed the manager's whole record of
-          what was decided and why, to a reader whose business is carrying out the conclusion. The
-          way to the general report page went with them — `/reports/:id` is the assessment
-          workflow, and an Officer whose report has reached `assigned_for_work` is refused it by
-          `caseDetailRoutes` regardless, so a link to it here would be a dead end drawn on purpose. */}
     </StaffShell>
   );
 }
