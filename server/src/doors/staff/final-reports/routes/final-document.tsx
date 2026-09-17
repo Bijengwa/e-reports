@@ -233,14 +233,12 @@ export async function finalDocumentRoutes(app: FastifyInstance): Promise<void> {
         approvedByName={resolved.approvedByName}
         approvedOn={resolved.approvedOn}
         workOfficerName={resolved.workOfficerName}
-        // The manager may walk from the concluded document back to the Orange Report it was
-        // assessed from — that page is theirs. An Officer may not: `/reports/:id` is the general
-        // workflow, carrying every assessment and the manager's whole decision history, and this
-        // page must not be the door into it. Their way back is their own work item.
-        backHref={
-          resolved.officer ? `/my-work/${resolved.report.id}` : `/reports/${resolved.report.id}`
-        }
-        backLabel={resolved.officer ? "Back to my work" : "Open Orange Report"}
+        // Back goes to where this reader actually came FROM to open the document, not to the
+        // Orange Report's own case-detail page (`/reports/:id`, under the register). A manager
+        // opens a Final F004 from the Final Reports register they hold; an Officer opens it from
+        // My Work. Neither reader arrived here by way of Register, so neither goes back to it.
+        backHref={resolved.officer ? "/my-work" : "/final-reports"}
+        backLabel={resolved.officer ? "Back to My Work" : "Back to Final Reports"}
         type={type}
         typeHrefs={canViewHistory ? { clean: base, history: `${base}?type=history` } : null}
         downloadHref={`${base}/download${type === "history" ? "?type=history" : ""}`}
