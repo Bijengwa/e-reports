@@ -2639,7 +2639,18 @@ textarea[aria-invalid="true"] {
 .f4-v { font-weight: 600; color: var(--f4-ink); }
 .f4-muted, .f4-muted .f4-v { color: var(--f4-ink-3); font-weight: 400; }
 
-.f4-section { border: 1px solid var(--f4-line); border-radius: var(--r); overflow: hidden; margin-bottom: 18px; break-inside: avoid; }
+/*
+ * `break-inside` is deliberately NOT set here. A section is a list of many rows/blocks/cards —
+ * often taller than a single printed page (section 1's nineteen device rows, section 3's IMDRF
+ * grids) — and forcing the whole thing to avoid splitting only pushes it, wholesale, onto the
+ * next page whenever it does not fit in what is left of the current one, leaving everything above
+ * it blank. The smaller units inside a section (`.f4-row`, `.f4-block`, `.f4-card`) keep their own
+ * `break-inside: avoid` below, which is where the readability argument actually applies: nobody
+ * wants ONE row split mid-way, but a whole section flowing across a page boundary is normal for a
+ * document this long. See the `@media print` rule further down for the section bar's own
+ * break-after, which is what keeps a header from printing alone at the bottom of a page.
+ */
+.f4-section { border: 1px solid var(--f4-line); border-radius: var(--r); overflow: hidden; margin-bottom: 18px; }
 /* Clears both sticky layers — the 56px staff title bar and the jump bar under it — so a jumped-to
    green section title lands below them instead of behind them. */
 .f4-section { scroll-margin-top: 116px; }
@@ -2959,7 +2970,48 @@ ul.f4-card-c li { margin-bottom: 3px; }
 @media print {
   .rail, .top, .f4-buttons, .f4-jump, .a1-open,
   .f4-toolbar, .a1-drawer, .a1-scrim { display: none !important; }
-  .f4-section, .f4-row, .f4-block, .f4-card { break-inside: avoid; }
+  /* `.f4-section` deliberately excluded — see its own rule above for why forcing the whole
+     section to avoid splitting is what caused the large blank areas. */
+  .f4-row, .f4-block, .f4-card { break-inside: avoid; }
+  /* A section's bar printed alone at the bottom of a page, with every one of its rows starting
+     the next, is the one awkward split worth spending a rule on — everything else about a
+     section is left to flow naturally. */
+  .f4-bar { break-after: avoid; }
+
+  /*
+   * "Previous assessments (N)" — a static line in the printed/downloaded document, with every
+   * entry visible, never a collapsed control. The screen keeps its own collapsed-by-default
+   * `<details>`; nothing here touches that, or depends on whether a reader ever opened it.
+   *
+   * A closed `<details>`'s body is hidden by the browser's own user-agent stylesheet, and
+   * verified against this exact Chromium build (the one `app.pdf.render` launches) that means
+   * overriding `::details-content` — the UA-generated wrapper the non-`<summary>` children are
+   * rendered into — not `display` on those children directly, which this version of Chromium no
+   * longer gates visibility through. `*:not(summary)` is kept alongside it for any engine that
+   * still uses the older, plain-`display:none` model, since an unsupported pseudo-element is
+   * simply ignored rather than an error. Overriding either is what makes every entry print
+   * regardless of the element's actual `open` state, so the PDF is complete without the server
+   * ever needing to render a second, "already expanded" copy of the same markup.
+   */
+  .a2-history { break-inside: avoid; }
+  .a2-history > summary {
+    cursor: default;
+    pointer-events: none;
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .a2-history > summary::before,
+  .a2-history[open] > summary::before {
+    content: "";
+  }
+  .a2-history > *:not(summary) {
+    display: block !important;
+  }
+  .a2-history:not([open])::details-content {
+    block-size: auto !important;
+    content-visibility: visible !important;
+    overflow: visible !important;
+  }
 }
 
 /*
