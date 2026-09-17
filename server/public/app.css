@@ -3076,6 +3076,33 @@ ul.f4-card-c li { margin-bottom: 3px; }
   color: #fff;
 }
 
+/*
+ * Final F004's title-bar row, rendered inside `.top` itself via `StaffShell`'s `topContent` — not
+ * a second `.f4-toolbar` underneath it. See `FinalF004TopContent`'s own doc comment.
+ */
+.final-f004-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.final-f004-top h1 {
+  margin: 0;
+  white-space: nowrap;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.final-f004-top .f4-type-switch {
+  margin-left: auto;
+}
+
+.final-f004-top .f4-icon-btn {
+  flex: 0 0 auto;
+}
+
 @media (max-width: 640px) {
   .f4-toolbar-title { width: 100%; order: -1; margin-right: 0; }
 }

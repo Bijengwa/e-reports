@@ -25,6 +25,13 @@ export type StaffShellProps = {
    */
   titleExtra?: JSX.Element;
   /**
+   * Replaces `pageTitle`/`titleExtra` entirely in the title bar, for a page whose own row of
+   * controls (back, title, type switch, download, print, Orange Report) belongs in the ONE `.top`
+   * bar rather than a second row underneath it — Final F004's own header. The hamburger and the
+   * signed-in name/role stay exactly where they are; only the middle of the bar is replaced.
+   */
+  topContent?: JSX.Element;
+  /**
    * The reader's role, which decides what the rail offers.
    *
    * Optional because the 403 page renders through this shell, and the one branch that answers 403
@@ -274,6 +281,7 @@ export function StaffShell({
   title,
   pageTitle,
   titleExtra,
+  topContent,
   role,
   fullName,
   active,
@@ -497,9 +505,12 @@ export function StaffShell({
               <IconMenu />
             </button>
 
-            <h1 safe>{pageTitle}</h1>
-
-            {titleExtra}
+            {topContent ?? (
+              <>
+                <h1 safe>{pageTitle}</h1>
+                {titleExtra}
+              </>
+            )}
 
             {fullName && (
               <span class="top-user">

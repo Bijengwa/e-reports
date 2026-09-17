@@ -2,9 +2,8 @@ import type { F004Answers } from "../../../../domain/f004.js";
 import type { FinalDocument } from "../../../../domain/final-document.js";
 import type { ReportDetail } from "../../../../domain/report-detail.js";
 import { Layout } from "../../../../views/shared/layout.js";
-import { DocHeader } from "../../shared/components/doc-header.js";
 import { F004Form, type PriorSecondaryReview } from "../../shared/components/f004.js";
-import { IconClose, IconDownload, IconPrint } from "../../shared/components/icons.js";
+import { IconBack, IconClose, IconDownload, IconPrint } from "../../shared/components/icons.js";
 import {
   OrangeReportIdentity,
   OrangeReportSurface,
@@ -132,6 +131,49 @@ function TypeSwitch({
   );
 }
 
+/**
+ * Final F004's whole title-bar row, rendered in place of `pageTitle`/`titleExtra` via `StaffShell`'s
+ * `topContent` — one `.top` bar, not a second `.f4-toolbar` row underneath it. The hamburger and the
+ * signed-in name/role are `StaffShell`'s own and stay put; this is everything between them.
+ */
+function FinalF004TopContent({
+  backHref,
+  backLabel,
+  type,
+  typeHrefs,
+  downloadHref,
+}: {
+  backHref: string;
+  backLabel: string;
+  type: FinalDocumentType;
+  typeHrefs: Record<FinalDocumentType, string> | null;
+  downloadHref: string;
+}): JSX.Element {
+  return (
+    <div class="final-f004-top">
+      <a href={backHref} class="f4-icon-btn" aria-label={backLabel}>
+        <IconBack />
+      </a>
+
+      <h1>Final F004</h1>
+
+      {typeHrefs !== null && <TypeSwitch type={type} typeHrefs={typeHrefs} />}
+
+      <a href={downloadHref} class="f4-icon-btn" aria-label="Download this Final F004" download="">
+        <IconDownload />
+      </a>
+
+      <button type="button" class="f4-icon-btn" data-f4-print aria-label="Print this Final F004">
+        <IconPrint />
+      </button>
+
+      <label for="a1-drawer" class="btn orange-action">
+        Orange Report
+      </label>
+    </div>
+  );
+}
+
 export function FinalDocumentPage({
   report,
   viewerRole,
@@ -142,7 +184,6 @@ export function FinalDocumentPage({
   event,
   approvedByName,
   approvedOn,
-  workOfficerName,
   backHref,
   backLabel,
   type,
@@ -150,6 +191,10 @@ export function FinalDocumentPage({
   downloadHref,
   priorReviews,
 }: FinalDocumentPageProps): JSX.Element {
+  // `workOfficerName` is still part of `FinalDocumentPageProps` and still passed by the route —
+  // the approval card that used to print it on screen is gone per this round's instruction, but
+  // nobody has decided yet how (or whether) it belongs somewhere else on the screen page, so it
+  // is left off this destructure rather than rendered again by guesswork.
   return (
     <StaffShell
       title={`Final F004 — ${report.number}`}
@@ -159,59 +204,22 @@ export function FinalDocumentPage({
       active={active}
       f4Find
       f4Print
+      // One `.top` bar, not a second `.f4-toolbar` row underneath it — see `FinalF004TopContent`'s
+      // own doc comment.
+      topContent={
+        <FinalF004TopContent
+          backHref={backHref}
+          backLabel={backLabel}
+          type={type}
+          typeHrefs={typeHrefs}
+          downloadHref={downloadHref}
+        />
+      }
     >
-      {/* The old top area — a second "Final F004" heading, the Orange Report identity card as a
-          standalone block, and the download/back buttons on their own row — is gone. `DocHeader`
-          carries the back control, the title, the type switch and the two document-output
-          controls in one row; the official F004 masthead follows immediately after it. The Orange
-          Report is reached from here too, now as a drawer rather than a card printed above the
-          document. */}
-      <DocHeader backHref={backHref} backLabel={backLabel} title="Final F004">
-        {typeHrefs !== null && <TypeSwitch type={type} typeHrefs={typeHrefs} />}
-        <a
-          href={downloadHref}
-          class="f4-icon-btn"
-          aria-label="Download this Final F004"
-          download=""
-        >
-          <IconDownload />
-        </a>
-        <button type="button" class="f4-icon-btn" data-f4-print aria-label="Print this Final F004">
-          <IconPrint />
-        </button>
-        <label for="a1-drawer" class="btn a1-open orange-action">
-          Orange Report
-        </label>
-      </DocHeader>
-
       <div class="a1-work">
         <input type="checkbox" id="a1-drawer" class="a1-pick" data-a1-drawer />
 
         <div>
-          {/* The approval, and who is carrying it out. Metadata about the document, outside the
-              document — how far the assessment chain ran is a fact about the working record and is
-              printed on the Final Reports register, which is the manager's index over it. It has
-              no place on the concluded F004, where it would be the one line still describing the
-              argument. */}
-          <div class="card card-b fd-approval">
-            <dl>
-              <dt>Approved by</dt>
-              <dd safe>{approvedByName}</dd>
-
-              <dt>Approved on</dt>
-              <dd safe>{approvedOn}</dd>
-
-              {workOfficerName === null ? (
-                <></>
-              ) : (
-                <>
-                  <dt>Assigned for work to</dt>
-                  <dd safe>{workOfficerName}</dd>
-                </>
-              )}
-            </dl>
-          </div>
-
           <F004Form
             reportId={report.id}
             answers={document.answers as F004Answers}
