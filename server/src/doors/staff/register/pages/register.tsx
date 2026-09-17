@@ -373,6 +373,11 @@ export function RegisterPage({ rows, viewerRole, viewerName }: RegisterPageProps
               id="search-register"
               aria-label="Search the register"
             />
+            {/* Icon-only: the label stays for anyone who cannot see the icon — a screen reader, or
+                `register.js`'s own loading/error text swap — but is visually hidden with `.vh`
+                rather than removed, so the accessible name and the loading/error announcements are
+                unchanged. `aria-label`/`title` repeat the same words for a reader whose assistive
+                tech does not compose the accessible name from hidden text. */}
             <a
               class="btn register-download"
               href="/register/download/xlsx"
@@ -380,6 +385,8 @@ export function RegisterPage({ rows, viewerRole, viewerName }: RegisterPageProps
               data-default-label="Download Register"
               data-loading-label="Downloading…"
               data-error-label="Download failed — try again"
+              aria-label="Download Register"
+              title="Download Register"
             >
               <svg
                 class="register-download-icon"
@@ -399,7 +406,7 @@ export function RegisterPage({ rows, viewerRole, viewerName }: RegisterPageProps
               >
                 <circle cx="12" cy="12" r="9" />
               </svg>
-              <span class="register-download-label" safe>
+              <span class="register-download-label vh" safe>
                 Download Register
               </span>
             </a>

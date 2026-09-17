@@ -1,4 +1,8 @@
-import { countdownLabel, type DeadlineState, deadlineStateOf } from "../../../../domain/assignment.js";
+import {
+  countdownLabel,
+  type DeadlineState,
+  deadlineStateOf,
+} from "../../../../domain/assignment.js";
 
 /**
  * One assignment's deadline, wherever it is shown — the Manager's assignment history, the
@@ -39,4 +43,3 @@ export function Countdown({
     </span>
   );
 }
-

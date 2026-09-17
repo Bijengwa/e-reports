@@ -1543,18 +1543,35 @@ tr.wl-row-serious > td:first-child {
   }
 
   .register-page .register-toolbar {
-    flex-direction: column;
-    align-items: stretch;
+    flex-direction: row;
+    align-items: center;
   }
 
   .register-search {
-    flex: none;
+    flex: 1 1 auto;
     width: 100%;
     max-width: none;
   }
 
+  /* Compact and icon-only at this width already (see `.register-download` below) — it sits beside
+     the now full-width search rather than stacking under it. */
   .register-download {
+    flex: none;
     justify-content: center;
+  }
+
+  /* The official register identity is long prose, not a page heading, and at this width it was
+     wrapping to several lines and dominating the screen before the count or the toolbar were even
+     visible. Smaller and tighter here; the text itself is unchanged. */
+  .register-title {
+    font-size: 12px;
+    line-height: 1.3;
+  }
+}
+
+@media (max-width: 400px) {
+  .register-title {
+    font-size: 11px;
   }
 }
 
@@ -1600,7 +1617,13 @@ tr.wl-row-serious > td:first-child {
 .register-download {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
+  /* Icon-only now that `.register-download-label` is visually hidden — tighter than `.btn`'s own
+     text padding, so the button reads as a square icon control rather than a wide bar with nothing
+     printed on it. */
+  padding: 8px 10px;
+  flex: none;
 }
 
 .register-download-icon,
@@ -1717,6 +1740,11 @@ tr.wl-row-serious > td:first-child {
      rather than widening its column. `.rg-text` clamps the result to a preview. */
   word-break: normal;
   overflow-wrap: break-word;
+  /* Body prose sets `line-height: 1.55` for reading a paragraph; a dense 12.5px data cell does not
+     need that much air, and a row's height is the tallest cell in it — so every other cell in a row
+     that has one long narrative neighbour inherited that generous spacing as blank space under its
+     own short value. Tightened here, on the cell alone, rather than shrinking the table's font. */
+  line-height: 1.35;
 }
 
 .register-table th:last-child,
@@ -3203,16 +3231,24 @@ ul.f4-card-c li { margin-bottom: 3px; }
 /*
  * Final F004's title-bar row, rendered inside `.top` itself via `StaffShell`'s `topContent` — not
  * a second `.f4-toolbar` underneath it. See `FinalF004TopContent`'s own doc comment.
+ *
+ * `.case-top` shares every rule here: it is the same "one `.top` bar, not a second toolbar" pattern
+ * for the working F004/report page (`CaseDetailTopContent` in `report-detail.tsx`) — back, the
+ * dynamic title, the countdown, and the Orange Report trigger, all inside `topContent` rather than
+ * a second row underneath it.
  */
-.final-f004-top {
+.final-f004-top,
+.case-top {
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
   flex: 1;
+  flex-wrap: wrap;
 }
 
-.final-f004-top h1 {
+.final-f004-top h1,
+.case-top h1 {
   margin: 0;
   white-space: nowrap;
   font-size: 1.15rem;
@@ -3223,8 +3259,13 @@ ul.f4-card-c li { margin-bottom: 3px; }
   margin-left: auto;
 }
 
-.final-f004-top .f4-icon-btn {
+.final-f004-top .f4-icon-btn,
+.case-top .f4-icon-btn {
   flex: 0 0 auto;
+}
+
+.case-top .f4-toolbar-actions {
+  margin-left: auto;
 }
 
 @media (max-width: 640px) {

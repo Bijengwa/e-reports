@@ -96,9 +96,32 @@ export async function decisionRoutes(app: FastifyInstance): Promise<void> {
     // The SOP's 5-working-day deadline follows a serious AE/AI (death or life-threatening) through
     // every secondary assessment on its path, not only A1 — see `computeWorkingDayDueAt`'s doc
     // comment and `first-assessor.tsx`'s own use of it for A1.
-    const dueAt = isSeriousCase(found.report.severity)
-      ? computeWorkingDayDueAt(now, SERIOUS_CASE_WORKING_DAYS)
-      : computeDueAt(now, DEFAULT_DEADLINE.value, DEFAULT_DEADLINE.unit);
+    //
+    // It is ONE deadline, set once at A1's own assignment, and must not reset every time the report
+    // moves to a new assessor. Calling `computeWorkingDayDueAt(now, …)` again here — as this used to
+    // — hands A2 a fresh 5-working-day countdown from whenever the manager happens to act, which is
+    // wrong: A1 assigned Monday is due Friday, and A2, assigned Wednesday because A1 finished early,
+    // must still be due that same Friday, not the following Wednesday.
+    //
+    // So for a serious case this reads A1's own `due_at` — ordinal 1 always carries one, written at
+    // assignment by `first-assessor.tsx` — and reuses it verbatim rather than computing a new one.
+    // Only A1 itself (assigned on that route, never on this one) actually calls
+    // `computeWorkingDayDueAt`; every later ordinal on the same report copies its answer forward.
+    // The `computeWorkingDayDueAt` fallback below is defensive only, for the data shape that should
+    // not occur — a serious report reaching this route with no A1 `due_at` on record.
+    let dueAt: Date;
+    if (isSeriousCase(found.report.severity)) {
+      const original = await app.db.execute(sql`
+        SELECT due_at FROM assessments WHERE report_id = ${found.report.id} AND ordinal = 1
+      `);
+      const originalDueAt = (original[0] as { due_at: Date | null } | undefined)?.due_at ?? null;
+      dueAt =
+        originalDueAt !== null
+          ? new Date(originalDueAt)
+          : computeWorkingDayDueAt(now, SERIOUS_CASE_WORKING_DAYS);
+    } else {
+      dueAt = computeDueAt(now, DEFAULT_DEADLINE.value, DEFAULT_DEADLINE.unit);
+    }
     // Postgres.js's raw parameter binding accepts a string or a Buffer, not a bare `Date` — every
     // timestamp interpolated into a template below is its ISO form for that reason alone.
     const nowIso = now.toISOString();

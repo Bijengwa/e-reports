@@ -11,15 +11,14 @@ import {
   STATUS_LABELS,
   secondaryAssessmentHref,
 } from "../../../../domain/report-detail.js";
-import { FORM_TITLE, isSeriousCase } from "../../../../domain/reports.js";
+import { FORM_SHORT_TITLE, isSeriousCase } from "../../../../domain/reports.js";
 import { Countdown } from "../../assessment/components/countdown.js";
-import { DocHeader } from "../../shared/components/doc-header.js";
-import { IconClose } from "../../shared/components/icons.js";
 import {
   F004Form,
   type PriorSecondaryReview,
   type SectionComment,
 } from "../../shared/components/f004.js";
+import { IconBack, IconClose } from "../../shared/components/icons.js";
 import {
   OrangeReportIdentity,
   OrangeReportSurface,
@@ -135,6 +134,91 @@ export function DecisionHistory({ decisions }: { decisions: DecisionEntry[] }): 
   );
 }
 
+/**
+ * Which rail entry this case-detail page belongs under — decided by the ROUTE, from where the
+ * reader actually came FROM, never hardcoded and never inferred by the page from an arbitrary URL
+ * shape. `caseDetailRoutes`' `showCase`/`renderCaseDetail` resolve this from `?from=` and pass it
+ * down; the page only reads the resolved value.
+ */
+export type CaseDetailActive = "workload" | "my-work" | "register";
+
+const CASE_DETAIL_BACK_LABEL: Record<CaseDetailActive, string> = {
+  workload: "Back to Workload",
+  "my-work": "Back to My work",
+  register: "Back to Register",
+};
+
+/**
+ * The working F004/report page's whole title-bar row, rendered in place of `pageTitle`/`titleExtra`
+ * via `StaffShell`'s `topContent` — ONE `.top` bar, not a second toolbar row underneath it. Modelled
+ * directly on `FinalF004TopContent` in `final-reports/pages/final-document.tsx`, the already-correct
+ * reference for this exact pattern. The hamburger and the signed-in name/role are `StaffShell`'s own
+ * and stay put; this is everything between them.
+ *
+ * The title is "F004" once an F004 exists (in progress), or the short "F001 — Adverse Event /
+ * Incident Report" while it does not (Not Started) — never the long `FORM_TITLE`, and never the
+ * AEMD number, which stays inside `OrangeReportIdentity` below.
+ */
+function CaseDetailTopContent({
+  backHref,
+  backLabel,
+  title,
+  countdown,
+  showOrangeReportTrigger,
+  showFinalDocument,
+  reportId,
+  canAssess,
+  mySecondaryOrdinal,
+}: {
+  backHref: string;
+  backLabel: string;
+  title: string;
+  countdown?: JSX.Element;
+  /** The drawer trigger — only once an F004 exists; Not Started keeps the Orange Report inline. */
+  showOrangeReportTrigger: boolean;
+  /** Section 5: never shown when the reader arrived from Workload, whatever `hasFinalDocument` is —
+   *  the route has already folded that condition in before this prop is set. */
+  showFinalDocument: boolean;
+  reportId: string;
+  canAssess: boolean;
+  mySecondaryOrdinal: number | null;
+}): JSX.Element {
+  return (
+    <div class="case-top">
+      <a href={backHref} class="f4-icon-btn" aria-label={backLabel}>
+        <IconBack />
+      </a>
+
+      <h1 safe>{title}</h1>
+
+      {countdown}
+
+      <div class="f4-toolbar-actions">
+        {showOrangeReportTrigger && (
+          <label for="a1-drawer" class="btn a1-open orange-action" safe>
+            {FORM_SHORT_TITLE}
+          </label>
+        )}
+        {showFinalDocument && (
+          <a href={`/reports/${reportId}/final-document`} class="btn">
+            Final F004
+          </a>
+        )}
+        {canAssess && (
+          <a href={assessment1Href(reportId)} class="btn">
+            Assessment 1
+          </a>
+        )}
+        {mySecondaryOrdinal !== null && (
+          <a href={secondaryAssessmentHref(reportId)} class="btn">
+            {`My assessment (A${mySecondaryOrdinal})`}
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export type CaseDetailPageProps = {
   report: ReportDetail;
   viewerRole: string;
@@ -160,6 +244,8 @@ export type CaseDetailPageProps = {
    * direct link) gets `/register`, which is this page's true home.
    */
   backHref: string;
+  /** Which rail entry this page belongs under — see `CaseDetailActive`. */
+  active: CaseDetailActive;
 };
 
 /**
@@ -186,6 +272,7 @@ export function CaseDetailPage({
   decisions,
   hasFinalDocument,
   backHref,
+  active,
 }: CaseDetailPageProps): JSX.Element {
   const submitted = secondaryAssessments.filter((a) => a.submitted);
   const latest = submitted[submitted.length - 1];
@@ -210,44 +297,46 @@ export function CaseDetailPage({
   // assessment's own countdown at its own ordinal, so this badge would only repeat the first of
   // them at a smaller size.
   const headerCountdown =
-    assessor1Name !== null &&
-    assessor1Name !== undefined &&
-    assessor1Submitted !== true ? (
+    assessor1Name !== null && assessor1Name !== undefined && assessor1Submitted !== true ? (
       <Countdown dueAt={assessor1DueAt ?? null} completed={false} serious={serious} />
     ) : undefined;
+
+  // "F004" once the F004 exists (in progress); the short Orange Report name while it does not
+  // (Not Started) — never the long `FORM_TITLE`, and never the AEMD number, which stays inside
+  // `OrangeReportIdentity` below. See `CaseDetailTopContent`'s own doc comment.
+  const topTitle = notStarted ? FORM_SHORT_TITLE : "F004";
+
+  // The Workload workflow is for active assessment/decision work, and Final F004 belongs under
+  // Final Reports (Manager) and the Officer's My work — never repeated here when the reader arrived
+  // from Workload, whatever `hasFinalDocument` says. Register and any other context keep showing it
+  // exactly as before.
+  const showFinalDocument = hasFinalDocument === true && active !== "workload";
 
   return (
     <StaffShell
       title={`${report.number} — AE Reports`}
-      pageTitle={FORM_TITLE}
+      // Unused once `topContent` is given — `StaffShell` renders `topContent` in its place — but
+      // still required by `StaffShellProps`, exactly as `FinalDocumentPage` also passes one. Kept
+      // in step with the bar's own title rather than the long `FORM_TITLE`.
+      pageTitle={topTitle}
       role={viewerRole}
       fullName={viewerName}
-      active="register"
+      active={active}
       countdown
+      topContent={
+        <CaseDetailTopContent
+          backHref={backHref}
+          backLabel={CASE_DETAIL_BACK_LABEL[active]}
+          title={topTitle}
+          countdown={headerCountdown}
+          showOrangeReportTrigger={!notStarted}
+          showFinalDocument={showFinalDocument}
+          reportId={report.id}
+          canAssess={canAssess}
+          mySecondaryOrdinal={mySecondaryOrdinal}
+        />
+      }
     >
-      <DocHeader backHref={backHref} backLabel="Back" title={FORM_TITLE} badge={headerCountdown}>
-        {!notStarted && (
-          <label for="a1-drawer" class="btn a1-open orange-action">
-            Orange Report
-          </label>
-        )}
-        {hasFinalDocument === true && (
-          <a href={`/reports/${report.id}/final-document`} class="btn">
-            Final F004
-          </a>
-        )}
-        {canAssess && (
-          <a href={assessment1Href(report.id)} class="btn">
-            Assessment 1
-          </a>
-        )}
-        {mySecondaryOrdinal !== null && (
-          <a href={secondaryAssessmentHref(report.id)} class="btn">
-            {`My assessment (A${mySecondaryOrdinal})`}
-          </a>
-        )}
-      </DocHeader>
-
       <div class="staff-head">
         <div class="sp">
           <OrangeReportIdentity report={report} compact />
@@ -274,9 +363,9 @@ export function CaseDetailPage({
         </OrangeReportSurface>
       ) : (
         // The drawer pattern every F004 surface already uses: a nameless checkbox outside any
-        // form, opened by the "Orange Report" label in `DocHeader` above, closed by the scrim or
-        // its own close control. The Orange Report is reference material once a document is being
-        // assessed or decided on, not the primary thing on screen.
+        // form, opened by the drawer trigger in `CaseDetailTopContent` above, closed by the scrim
+        // or its own close control. The Orange Report is reference material once a document is
+        // being assessed or decided on, not the primary thing on screen.
         <div class="a1-work">
           <input type="checkbox" id="a1-drawer" class="a1-pick" data-a1-drawer />
 

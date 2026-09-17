@@ -19,6 +19,17 @@ export const FORM_VERSION = "TMDA/DMD/MDV/F/001 Rev 06";
 export const FORM_TITLE =
   "Medical Devices and In Vitro Diagnostics Adverse Event/Incident Reporting Form for Consumers and Healthcare Facilities";
 
+/**
+ * The Orange Report's own name, as short application navigation — a drawer trigger, a Not Started
+ * state's heading — says it.
+ *
+ * `FORM_TITLE` is the official document title and stays inside the actual Orange Report/document
+ * only. A button or a heading is not the document, and printing the whole of `FORM_TITLE` there
+ * (seventeen words) is what this constant replaces it with — the form's number and the short name
+ * the office already calls it by.
+ */
+export const FORM_SHORT_TITLE = "F001 — Adverse Event / Incident Report";
+
 export type { Answers };
 
 /** One attachment already written to object storage, waiting to be tied to a report. */

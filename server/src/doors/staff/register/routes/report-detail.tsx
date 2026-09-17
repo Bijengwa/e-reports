@@ -6,7 +6,30 @@ import { type AssessorOption, loadReport } from "../../../../domain/report-detai
 import { currentSession } from "../../session-guard.js";
 import type { SectionComment } from "../../shared/components/f004.js";
 import { ForbiddenPage } from "../../shared/forbidden.js";
-import { CaseDetailPage } from "../pages/report-detail.js";
+import { CaseDetailPage, type CaseDetailActive } from "../pages/report-detail.js";
+
+/**
+ * Which rail entry this case belongs under, and where Back goes — resolved once, from the ROUTE,
+ * never hardcoded on the page and never re-derived there from an arbitrary URL shape.
+ *
+ * `?from=workload` is the Manager's Workload naming itself on every link into this page
+ * (`workload/pages/workload.tsx`); `?from=my-work` is the same mechanism, ready for an Officer
+ * surface that links into this page from My work. Neither exists today for My work — see the
+ * route's own comment below — so this falls through to `register`, this page's true home, for that
+ * case exactly as it always did.
+ */
+function resolveActiveContext(request: FastifyRequest): CaseDetailActive {
+  const from = (request.query as { from?: unknown }).from;
+  if (from === "workload") return "workload";
+  if (from === "my-work") return "my-work";
+  return "register";
+}
+
+const BACK_HREF: Record<CaseDetailActive, string> = {
+  workload: "/workload",
+  "my-work": "/my-work",
+  register: "/register",
+};
 
 const ReportId = z.uuid();
 
@@ -98,12 +121,8 @@ export async function renderCaseDetail(
   const found = await loadReport(app, id);
   if (found === null) return reply.redirect("/register", 302);
 
-  // Where Back goes: the Manager's Workload names itself with `?from=workload` on every link into
-  // this page (`workload/pages/workload.tsx`), so a report opened from there goes back there —
-  // never to `/register`, which is not where this reader came from. Anything else — the Register's
-  // own list, a bookmarked or typed address — falls back to the Register, this page's true home.
-  const backHref =
-    (request.query as { from?: unknown }).from === "workload" ? "/workload" : "/register";
+  const active = resolveActiveContext(request);
+  const backHref = BACK_HREF[active];
 
   const isManager = session.role === "manager";
 
@@ -219,6 +238,7 @@ export async function renderCaseDetail(
         hasFinalDocument={finalDocument.length > 0}
         canComment={isManager && found.assessment1 !== null && reviewIsActionable}
         backHref={backHref}
+        active={active}
       />,
     );
 }
