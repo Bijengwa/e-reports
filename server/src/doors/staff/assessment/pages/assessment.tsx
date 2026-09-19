@@ -64,6 +64,7 @@ export function Assessment1Page({
   return (
     <StaffShell
       title={`Assessment 1 — F004 — ${report.number}`}
+      pageCss="caseCss"
       // The compact `DocHeader` below is now the page's own title row — an F004's identity, its
       // countdown and its way back all live there, in one line, directly above the document. The
       // shell's own title bar keeps a short label for the tab/a11y landmark and nothing that would

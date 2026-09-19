@@ -1,0 +1,402 @@
+/*
+ * The Orange Form's own visual language — checks, steps, the confirmation screen — rendered
+ * standalone by the public door and, `embedded`, inside the staff door's "log a report" page.
+ * Both callers ask `Layout` for this file.
+ */
+
+/* ---------- fields (the orange form's own: .checks/.chk/.drop) ---------- */
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.chk {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r);
+  padding: 7px 11px;
+  cursor: pointer;
+  background: #fff;
+  font-size: 13px;
+}
+
+.chk input {
+  margin-top: 3px;
+  width: auto;
+}
+
+.chk:has(input:checked) {
+  border-color: var(--green);
+  background: var(--green-bg);
+  color: var(--green-d);
+}
+
+.drop {
+  border: 1.5px dashed var(--rule-2);
+  border-radius: var(--r);
+  padding: 22px;
+  text-align: center;
+  color: var(--ink-3);
+  font-size: 13px;
+}
+
+/* ---------- steps ---------- */
+/*
+ * The step strip is an ordered list of submit buttons: `<ol>` tells assistive tech this is 5
+ * ordered stages with one of them current, and each tab is a real button so a reporter can jump
+ * back to a section directly. Jumping ahead over an unfinished step is refused by the server,
+ * not by making the tab unclickable — the reporter gets told why.
+ */
+.steps {
+  display: flex;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #f0cfb6;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  list-style: none;
+}
+
+.steps li {
+  border-bottom: 2px solid transparent;
+  color: var(--ink-3);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/*
+ * Each tab is a submit button, so a reporter can jump straight back to a section rather than
+ * clicking Back four times. The browser's button chrome is stripped: it has to read as a tab,
+ * not as a control, while staying a real focusable, keyboard-operable button.
+ */
+.steps li button {
+  appearance: none;
+  background: none;
+  border: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  padding: 9px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.steps li button:hover {
+  color: var(--ink);
+}
+
+.steps li button:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: -2px;
+}
+
+.steps li.on {
+  color: var(--ink);
+  border-bottom-color: var(--orange);
+  font-weight: 500;
+}
+
+.steps li .num {
+  font-family: var(--mono);
+  font-size: 11px;
+  border: 1px solid var(--rule-2);
+  border-radius: 3px;
+  width: 19px;
+  height: 19px;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.steps li.on .num {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #fff;
+}
+
+/* ---------- public orange page ---------- */
+.orange-page {
+  background: #fbf3ec;
+  min-height: 100vh;
+}
+
+/* The same form, embedded in the staff main pane instead of standing as a page.
+   Everything that makes it the orange form is kept -- the warm paper, the banners, the step tabs,
+   the field styling -- because an Officer transcribing a report should be reading the document the
+   reporter filled in. What goes is only what belongs to a page: the full viewport height, and the
+   centring of a body that now sits inside one that is already centred. */
+.orange-page.is-embedded {
+  min-height: 0;
+  border: 1px solid #f0cfb6;
+  border-radius: var(--r);
+  overflow: hidden;
+}
+
+.orange-page.is-embedded .obody {
+  padding: 18px;
+  margin: 0;
+  max-width: none;
+}
+
+.orange-page .otop {
+  background: var(--orange);
+  color: #fff;
+  padding: 0 22px;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+
+.orange-page .otop h1 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.orange-page .obody {
+  padding: 22px;
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+.orange-page .card {
+  border-color: #f0cfb6;
+}
+
+.orange-page .obanner {
+  background: #fff;
+  border: 1px solid #f0cfb6;
+  border-left: 5px solid var(--orange);
+  border-radius: 0 var(--r) var(--r) 0;
+  padding: 13px 15px;
+  font-size: 13px;
+  margin-bottom: 18px;
+}
+
+.orange-page .btn.ghost {
+  border-color: #e3b694;
+}
+
+/* Says something went wrong, or did not happen. Must not read as ordinary guidance. */
+.orange-page .obanner.notice {
+  border-left-color: var(--flag);
+  background: var(--flag-bg);
+  color: var(--flag);
+  font-weight: 500;
+}
+
+.orange-page .chk:has(input:checked) {
+  border-color: var(--orange);
+  background: var(--orange-bg);
+  color: var(--orange-d);
+}
+
+.lang {
+  display: flex;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r);
+  overflow: hidden;
+  flex: none;
+}
+
+.lang button {
+  background: none;
+  border: 0;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.lang button.on {
+  background: var(--green);
+  color: #fff;
+}
+
+.orange-page .lang {
+  border-color: #ef9e63;
+}
+
+.orange-page .lang button {
+  color: #fbd9c4;
+}
+
+.orange-page .lang button.on {
+  background: #fff;
+  color: var(--orange-d);
+}
+
+/* Lead-in sentence above a step's fields. */
+.step-lead {
+  margin-bottom: 16px;
+}
+
+/* The Back / Continue row under the card. */
+.bar.nav {
+  margin-top: 20px;
+}
+
+/* ---------- submission confirmation ---------- */
+.card.confirm {
+  text-align: center;
+  padding: 40px 24px;
+}
+
+.card.confirm .eyebrow {
+  margin-bottom: 8px;
+}
+
+.confirm-num {
+  font-family: var(--mono);
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--orange-d);
+  letter-spacing: -0.01em;
+}
+
+.confirm-lead {
+  margin: 16px 0 8px;
+  font-size: 15px;
+}
+
+.confirm-act {
+  margin-top: 28px;
+}
+
+@media (max-width: 900px) {
+  .orange-page .obody {
+    padding: 16px;
+  }
+
+  .orange-page .otop {
+    padding: 0 14px;
+  }
+}
+/* ---------------------------------------------------------------------------
+ * Conditional fields, validation feedback, phone affix and the page footer.
+ * ------------------------------------------------------------------------- */
+
+/*
+ * A field whose question has not been answered yet — "the date you informed the supplier" before
+ * anyone has said whether they did. Dulled rather than hidden, so the reporter can see what the
+ * form will ask for next instead of watching controls appear and disappear.
+ */
+.dependent {
+  transition: opacity 120ms ease-in-out;
+}
+
+.dependent.is-off {
+  opacity: 0.45;
+}
+
+.dependent.is-off input,
+.dependent.is-off textarea,
+.dependent.is-off select {
+  background: var(--paper-2, #f7f3ee);
+  cursor: not-allowed;
+}
+
+.field-error {
+  margin: 6px 0 0;
+  color: #a4232a;
+  font-size: 12.5px;
+}
+
+/* A field the reporter still has to fix is outlined, not merely described. */
+input[aria-invalid="true"],
+textarea[aria-invalid="true"] {
+  border-color: #a4232a;
+}
+
+/*
+ * +255 is fixed furniture beside the box: the reporter types the nine national digits and cannot
+ * enter the number in five different shapes.
+ */
+.phone-row {
+  display: flex;
+  align-items: stretch;
+}
+
+.phone-cc {
+  display: grid;
+  place-items: center;
+  padding: 0 10px;
+  border: 1px solid var(--rule-2);
+  border-right: 0;
+  border-radius: 3px 0 0 3px;
+  background: var(--paper-2, #f7f3ee);
+  color: var(--ink-2, #5b5048);
+  font-family: var(--mono);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.phone-row input {
+  border-radius: 0 3px 3px 0;
+  font-family: var(--mono);
+  letter-spacing: 0.04em;
+}
+
+.attached {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--ink-2, #5b5048);
+}
+
+.attached .attached-head {
+  list-style: none;
+  margin-left: -18px;
+  font-weight: 500;
+  color: var(--ink-3);
+}
+
+/*
+ * Document-control metadata and the privacy note. Both matter — one to an auditor, one to the
+ * reporter — but neither is the first thing someone filing a device failure needs to read.
+ */
+.ofoot {
+  margin-top: 28px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule-2);
+}
+
+.ofoot .sub {
+  margin: 4px 0;
+}
+
+/* ---------- the mark on the orange page ---------- */
+/*
+ * The public form is the one surface where the folder reads white on orange rather than green on
+ * paper. Same paths, a third palette — the reason the mark is one component.
+ */
+.orange-page .logo .body {
+  fill: #fff;
+}
+
+.orange-page .logo .cross {
+  fill: var(--orange-deep);
+}
+
+.orange-page .logo .doc {
+  stroke: #fbd9c4;
+}
+
+.orange-page .logo .tab {
+  fill: #fbd9c4;
+}
+
+.orange-page .otop .brand-text b {
+  color: #fff;
+}
+
+.orange-page .otop .brand-text > span {
+  color: #fbd9c4;
+}
+

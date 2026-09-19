@@ -1,1653 +1,87 @@
 /*
- * Design tokens and components carried over from the ae-reports_3.html prototype.
- *
- * Fonts are self-hosted; nothing here may reference a third-party origin.
- *
- * The Content-Security-Policy in src/server.ts sets `style-src 'self'`, which also governs
- * inline `style=""` attributes (style-src-attr falls back to style-src). Every rule a view
- * needs therefore has to live in this file — a view must never reach for an inline style.
+ * The F004 and the report display it shares across every page that reaches
+ * `doors/staff/shared/components` — the assessment form, the manager's review, the drawer, the
+ * secondary-assessment chain, and the Final F004 — plus the deadline countdown and the `.wl-*`/
+ * `.mya-*` tab bar, which the workload pipeline and My assessments carry for the same reason. The
+ * two `@media print` blocks further down are the Final F004's: harmless everywhere else, since
+ * print media only applies while printing, and read directly off disk by `pdf/index.ts` for the
+ * PDF path.
  */
-:root {
-  --ink: #101913;
-  --ink-2: #45534a;
-  --ink-3: #75837a;
-  --paper: #f5f8f5;
-  --card: #fff;
-  --rule: #dfe7e0;
-  --rule-2: #c3cfc6;
-  --green: #166534;
-  --green-d: #0c3b1e;
-  --green-h: #1b7a40;
-  --green-bg: #e7f2ea;
-  --leaf: #7cb518;
-  --leaf-d: #4a6d0c;
-  --leaf-bg: #f0f7e2;
-  --orange: #e1611f;
-  --orange-d: #8c3a0f;
-  --orange-bg: #fdf0e8;
-  --orange-deep: #c24e12;
-  /* The rule the orange door already draws round its own cards, named so the staff side can
-     borrow it when it shows something the reporter filled in. */
-  --orange-line: #f0cfb6;
-  --flag: #a8341f;
-  --flag-bg: #fbebe7;
 
-  /*
-   * The F004's colour pack, pointed at the staff portal's own palette.
-   *
-   * It used to be navy and gold, and that was the mistake: an assessment opened inside the staff
-   * portal read as a second product sitting in the first, a document skin arguing with the green
-   * chrome all round it. The names stay — every F004 rule still reaches for a token rather than a
-   * hex of its own — but the values are the staff pack's now. Bars stay dark enough to read as a
-   * form; nothing else asks to be looked at twice.
-   *
-   * The one borrowed hue is the orange door's, and only where a value on this page genuinely came
-   * off the orange form. That is the page saying which half of it the reporter wrote.
-   */
-  --f4-bar: var(--green-d);
-  --f4-badge: var(--leaf);
-  --f4-ink: var(--ink);
-  --f4-ink-2: var(--ink-2);
-  --f4-accent-ink: var(--green-d);
-  --f4-ink-3: var(--ink-3);
-  --f4-note-ink: var(--ink-2);
-  --f4-line: var(--rule);
-  --f4-line-2: var(--rule);
-  --f4-tint: var(--green-bg);
-  --f4-tint-2: var(--paper);
-  --f4-tint-3: var(--green-bg);
-  --f4-field-bg: var(--card);
-  --f4-field-border: var(--rule-2);
-  --f4-pill-border: var(--rule);
-  --f4-guide-accent: var(--green);
-  --f4-assessors-bg: var(--paper);
-  --f4-assessors-border: var(--rule);
-  --f4-divider: var(--rule-2);
-  --f4-tick-bg: var(--paper);
-  --f4-tick-on-bg: var(--green-bg);
-  --f4-tick-locked-bg: var(--paper);
-  --f4-card-on-bg: var(--green-bg);
-  --f4-locked-bg: var(--paper);
-  --f4-locked-border: var(--rule-2);
-  /* A value the reporter supplied, wearing the surface it wore on the orange form. */
-  --f4-value-bg: var(--orange-bg);
-  --f4-value-ink: var(--orange-d);
-  --f4-value-border: var(--orange-line);
-  /* Severity, not theme: these four say how bad the event was and do not follow the portal. */
-  --f4-risk-critical: #a02020;
-  --f4-risk-high: #c95a1a;
-  --f4-risk-medium: #d4a11e;
-  --f4-risk-low: #3f7e5a;
-  --r: 5px;
-  --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
-}
-
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html {
-  -webkit-text-size-adjust: 100%;
-}
-
-body {
-  font-family: var(--sans);
-  background: var(--paper);
-  color: var(--ink);
-  font-size: 14px;
-  line-height: 1.55;
-  -webkit-font-smoothing: antialiased;
-}
-
-button,
-input,
-select,
-textarea {
-  font: inherit;
-  color: inherit;
-  max-width: 100%;
-}
-
-a {
-  color: var(--green);
-}
-
-/* ---------- primitives ---------- */
-.sp {
-  flex: 1;
-  min-width: 0;
-}
-
-.eyebrow {
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  font-weight: 500;
-}
-
-.hint {
-  font-size: 12.5px;
-  color: var(--ink-3);
-}
-
-.card {
-  background: var(--card);
-  border: 1px solid var(--rule);
-  border-radius: var(--r);
-}
-
-.card-b {
-  padding: 16px;
-}
-
-.grid2 {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 14px;
-}
-
-.bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.btn {
-  background: var(--green);
-  color: #fff;
-  border: 1px solid var(--green);
-  padding: 8px 15px;
-  border-radius: var(--r);
-  cursor: pointer;
-  font-weight: 500;
-  font-size: 13.5px;
-  white-space: nowrap;
-  text-decoration: none;
+/* ---------- deadline countdown ---------- */
+/*
+ * A pill the same shape as `.tag`, but monospace: the digits change every second and a
+ * proportional font would make the whole label visibly shift width as it ticks.
+ */
+.countdown {
   display: inline-block;
-}
-
-.btn:hover {
-  background: var(--green-h);
-}
-
-.btn.ghost {
-  background: transparent;
-  color: var(--ink);
-  border-color: var(--rule-2);
-}
-
-.btn.ghost:hover {
-  background: #ecf2ed;
-}
-
-/*
- * The destructive variant.
- *
- * `--flag` is already the palette's alarm colour — it is what a life-threatening severity tag is
- * painted in — so a red button borrows it rather than introducing a second red for the same
- * meaning. Used where a click ends something: signing out is the only one today.
- */
-.btn.danger {
-  background: var(--flag);
-  border-color: var(--flag);
-  color: #fff;
-}
-
-.btn.danger:hover {
-  background: #8c2b19;
-  border-color: #8c2b19;
-}
-
-.btn.orange {
-  background: var(--orange);
-  border-color: var(--orange);
-  color: #fff;
-}
-
-.btn.orange:hover {
-  background: var(--orange-deep);
-}
-
-.btn:focus-visible,
-a:focus-visible,
-button:focus-visible,
-select:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
-.chk:focus-within {
-  outline: 2px solid var(--orange);
-  outline-offset: 2px;
-}
-
-/* ---------- fields ---------- */
-/* `.f` sits on a <div> for single controls and on a <fieldset> for a group of choices. */
-.f {
-  margin-bottom: 14px;
-  border: 0;
-  min-width: 0;
-}
-
-.f label,
-.f legend,
-.f .label {
-  display: block;
-  font-size: 12.5px;
-  font-weight: 500;
-  margin-bottom: 5px;
-  padding: 0;
-}
-
-.f label i,
-.f legend i {
-  color: var(--flag);
-  font-style: normal;
-}
-
-/* A choice inside a group carries its own label styling, not the group heading's. */
-.f .chk {
-  font-weight: 400;
-  margin-bottom: 0;
-}
-
-.f input,
-.f select,
-.f textarea {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid var(--rule-2);
-  border-radius: var(--r);
-  background: #fff;
-}
-
-.f textarea {
-  min-height: 70px;
-  resize: vertical;
-}
-
-/* Two textarea heights the form needs. Replaces inline style="min-height:…". */
-.f textarea.short {
-  min-height: 62px;
-}
-
-.f textarea.tall {
-  min-height: 130px;
-}
-
-/* A follow-up input sitting directly under a group of choices. */
-.f .also {
-  margin-top: 8px;
-}
-
-.f .sub {
-  font-size: 11.5px;
-  color: var(--ink-3);
-  margin-top: 4px;
-}
-
-.checks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-}
-
-.chk {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  border: 1px solid var(--rule-2);
-  border-radius: var(--r);
-  padding: 7px 11px;
-  cursor: pointer;
-  background: #fff;
-  font-size: 13px;
-}
-
-.chk input {
-  margin-top: 3px;
-  width: auto;
-}
-
-.chk:has(input:checked) {
-  border-color: var(--green);
-  background: var(--green-bg);
-  color: var(--green-d);
-}
-
-.drop {
-  border: 1.5px dashed var(--rule-2);
-  border-radius: var(--r);
-  padding: 22px;
-  text-align: center;
-  color: var(--ink-3);
-  font-size: 13px;
-}
-
-/* ---------- steps ---------- */
-/*
- * The step strip is an ordered list of submit buttons: `<ol>` tells assistive tech this is 5
- * ordered stages with one of them current, and each tab is a real button so a reporter can jump
- * back to a section directly. Jumping ahead over an unfinished step is refused by the server,
- * not by making the tab unclickable — the reporter gets told why.
- */
-.steps {
-  display: flex;
-  margin-bottom: 20px;
-  border-bottom: 1px solid #f0cfb6;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  list-style: none;
-}
-
-.steps li {
-  border-bottom: 2px solid transparent;
-  color: var(--ink-3);
-  font-size: 13px;
-  white-space: nowrap;
-}
-
-/*
- * Each tab is a submit button, so a reporter can jump straight back to a section rather than
- * clicking Back four times. The browser's button chrome is stripped: it has to read as a tab,
- * not as a control, while staying a real focusable, keyboard-operable button.
- */
-.steps li button {
-  appearance: none;
-  background: none;
-  border: 0;
-  margin: 0;
-  font: inherit;
-  color: inherit;
-  padding: 9px 14px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-}
-
-.steps li button:hover {
-  color: var(--ink);
-}
-
-.steps li button:focus-visible {
-  outline: 2px solid var(--orange);
-  outline-offset: -2px;
-}
-
-.steps li.on {
-  color: var(--ink);
-  border-bottom-color: var(--orange);
-  font-weight: 500;
-}
-
-.steps li .num {
-  font-family: var(--mono);
-  font-size: 11px;
-  border: 1px solid var(--rule-2);
-  border-radius: 3px;
-  width: 19px;
-  height: 19px;
-  display: grid;
-  place-items: center;
-  flex: none;
-}
-
-.steps li.on .num {
-  background: var(--orange);
-  border-color: var(--orange);
-  color: #fff;
-}
-
-/* ---------- public orange page ---------- */
-.orange-page {
-  background: #fbf3ec;
-  min-height: 100vh;
-}
-
-/* The same form, embedded in the staff main pane instead of standing as a page.
-   Everything that makes it the orange form is kept -- the warm paper, the banners, the step tabs,
-   the field styling -- because an Officer transcribing a report should be reading the document the
-   reporter filled in. What goes is only what belongs to a page: the full viewport height, and the
-   centring of a body that now sits inside one that is already centred. */
-.orange-page.is-embedded {
-  min-height: 0;
-  border: 1px solid #f0cfb6;
-  border-radius: var(--r);
-  overflow: hidden;
-}
-
-.orange-page.is-embedded .obody {
-  padding: 18px;
-  margin: 0;
-  max-width: none;
-}
-
-.orange-page .otop {
-  background: var(--orange);
-  color: #fff;
-  padding: 0 22px;
-  min-height: 58px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  position: sticky;
-  top: 0;
-  z-index: 30;
-}
-
-.orange-page .otop h1 {
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.orange-page .obody {
-  padding: 22px;
-  max-width: 880px;
-  margin: 0 auto;
-}
-
-.orange-page .card {
-  border-color: #f0cfb6;
-}
-
-.orange-page .obanner {
-  background: #fff;
-  border: 1px solid #f0cfb6;
-  border-left: 5px solid var(--orange);
-  border-radius: 0 var(--r) var(--r) 0;
-  padding: 13px 15px;
-  font-size: 13px;
-  margin-bottom: 18px;
-}
-
-.orange-page .btn.ghost {
-  border-color: #e3b694;
-}
-
-/* Says something went wrong, or did not happen. Must not read as ordinary guidance. */
-.orange-page .obanner.notice {
-  border-left-color: var(--flag);
-  background: var(--flag-bg);
-  color: var(--flag);
-  font-weight: 500;
-}
-
-.orange-page .chk:has(input:checked) {
-  border-color: var(--orange);
-  background: var(--orange-bg);
-  color: var(--orange-d);
-}
-
-.lang {
-  display: flex;
-  border: 1px solid var(--rule-2);
-  border-radius: var(--r);
-  overflow: hidden;
-  flex: none;
-}
-
-.lang button {
-  background: none;
-  border: 0;
-  padding: 4px 10px;
-  font-size: 12px;
-  color: var(--ink-2);
-}
-
-.lang button.on {
-  background: var(--green);
-  color: #fff;
-}
-
-.orange-page .lang {
-  border-color: #ef9e63;
-}
-
-.orange-page .lang button {
-  color: #fbd9c4;
-}
-
-.orange-page .lang button.on {
-  background: #fff;
-  color: var(--orange-d);
-}
-
-/* Lead-in sentence above a step's fields. */
-.step-lead {
-  margin-bottom: 16px;
-}
-
-/* The Back / Continue row under the card. */
-.bar.nav {
-  margin-top: 20px;
-}
-
-/* ---------- submission confirmation ---------- */
-.card.confirm {
-  text-align: center;
-  padding: 40px 24px;
-}
-
-.card.confirm .eyebrow {
-  margin-bottom: 8px;
-}
-
-.confirm-num {
-  font-family: var(--mono);
-  font-size: 24px;
-  font-weight: 500;
-  color: var(--orange-d);
-  letter-spacing: -0.01em;
-}
-
-.confirm-lead {
-  margin: 16px 0 8px;
-  font-size: 15px;
-}
-
-.confirm-act {
-  margin-top: 28px;
-}
-
-/* ---------- staff login ---------- */
-.staff-login {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  background: var(--green-d);
-}
-
-.login-card {
-  width: 100%;
-  max-width: 396px;
-  background: var(--card);
-  border-radius: 7px;
-  overflow: hidden;
-  border-top: 5px solid var(--leaf);
-  padding: 28px 26px;
-}
-
-.login-header {
-  margin-bottom: 20px;
-}
-
-.login-header h1 {
-  font-size: 19px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.login-header p {
-  font-size: 11.5px;
-  color: var(--ink-3);
-  margin-top: 2px;
-}
-
-.alert {
-  border-left: 3px solid var(--orange);
-  background: var(--orange-bg);
-  padding: 11px 13px;
-  border-radius: 0 var(--r) var(--r) 0;
-  font-size: 13px;
-  margin-bottom: 16px;
-}
-
-.alert-error {
-  border-color: var(--flag);
-  background: var(--flag-bg);
-  color: var(--flag);
-}
-
-.login-form .field {
-  margin-bottom: 14px;
-}
-
-.login-form label {
-  display: block;
-  font-size: 12.5px;
-  font-weight: 500;
-  margin-bottom: 5px;
-}
-
-.login-form input {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid var(--rule-2);
-  border-radius: var(--r);
-  background: #fff;
-}
-
-.btn-primary {
-  width: 100%;
-  margin-top: 4px;
-  text-align: center;
-}
-
-.login-footer {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid var(--rule);
-  text-align: center;
-}
-
-.link-orange {
-  color: var(--orange-d);
-  font-size: 13px;
-  font-weight: 500;
-  text-decoration: none;
-}
-
-.link-orange:hover {
-  text-decoration: underline;
-}
-
-/* ================= RESPONSIVE ================= */
-@media (max-width: 900px) {
-  .orange-page .obody {
-    padding: 16px;
-  }
-
-  .orange-page .otop {
-    padding: 0 14px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  * {
-    transition: none !important;
-    animation: none !important;
-  }
-}
-
-/* ---------------------------------------------------------------------------
- * Conditional fields, validation feedback, phone affix and the page footer.
- * ------------------------------------------------------------------------- */
-
-/*
- * A field whose question has not been answered yet — "the date you informed the supplier" before
- * anyone has said whether they did. Dulled rather than hidden, so the reporter can see what the
- * form will ask for next instead of watching controls appear and disappear.
- */
-.dependent {
-  transition: opacity 120ms ease-in-out;
-}
-
-.dependent.is-off {
-  opacity: 0.45;
-}
-
-.dependent.is-off input,
-.dependent.is-off textarea,
-.dependent.is-off select {
-  background: var(--paper-2, #f7f3ee);
-  cursor: not-allowed;
-}
-
-.field-error {
-  margin: 6px 0 0;
-  color: #a4232a;
-  font-size: 12.5px;
-}
-
-/* A field the reporter still has to fix is outlined, not merely described. */
-input[aria-invalid="true"],
-textarea[aria-invalid="true"] {
-  border-color: #a4232a;
-}
-
-/*
- * +255 is fixed furniture beside the box: the reporter types the nine national digits and cannot
- * enter the number in five different shapes.
- */
-.phone-row {
-  display: flex;
-  align-items: stretch;
-}
-
-.phone-cc {
-  display: grid;
-  place-items: center;
-  padding: 0 10px;
-  border: 1px solid var(--rule-2);
-  border-right: 0;
-  border-radius: 3px 0 0 3px;
-  background: var(--paper-2, #f7f3ee);
-  color: var(--ink-2, #5b5048);
-  font-family: var(--mono);
-  font-size: 13px;
-  white-space: nowrap;
-}
-
-.phone-row input {
-  border-radius: 0 3px 3px 0;
-  font-family: var(--mono);
-  letter-spacing: 0.04em;
-}
-
-.attached {
-  margin: 10px 0 0;
-  padding-left: 18px;
-  font-size: 13px;
-  color: var(--ink-2, #5b5048);
-}
-
-.attached .attached-head {
-  list-style: none;
-  margin-left: -18px;
-  font-weight: 500;
-  color: var(--ink-3);
-}
-
-/*
- * Document-control metadata and the privacy note. Both matter — one to an auditor, one to the
- * reporter — but neither is the first thing someone filing a device failure needs to read.
- */
-.ofoot {
-  margin-top: 28px;
-  padding-top: 14px;
-  border-top: 1px solid var(--rule-2);
-}
-
-.ofoot .sub {
-  margin: 4px 0;
-}
-
-/* ---------- staff shell ---------- */
-/*
- * The signed-in pages. The orange form's own primitives — .card, .f, .btn, .bar — are reused as
- * they stand; only what the prototype had no equivalent for is defined here.
- */
-.staff {
-  background: var(--paper);
-}
-
-/*
- * A row, not a stack. The rail is a column beside the page at every width — below 900px it slides
- * over the page as a drawer rather than becoming a strip above it, because a horizontal bar of
- * links is a different component that happens to fit, not a smaller sidebar.
- */
-.shell {
-  display: flex;
-  min-height: 100vh;
-}
-
-/*
- * Sticky at full viewport height, so the rail stays put while the page scrolls. Its own nav is
- * the part that scrolls if the list ever outgrows the screen.
- */
-.rail {
-  width: 238px;
-  flex: none;
-  background: var(--green-d);
-  color: #c9dace;
-  display: flex;
-  flex-direction: column;
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  z-index: 60;
-}
-
-.rail .brand {
-  padding: 15px 16px 14px;
-  border-bottom: 1px solid #1b5231;
-  overflow: hidden;
-}
-
-.rail-nav {
-  padding: 11px;
-  flex: 1;
-  overflow: auto;
-}
-
-.rail-nav a {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 11px;
-  margin-bottom: 2px;
-  border-radius: var(--r);
-  color: #a9c4b1;
-  text-decoration: none;
-  font-size: 13.5px;
-  white-space: nowrap;
-}
-
-.rail-nav a:hover {
-  background: #14522b;
-  color: #fff;
-}
-
-.rail-nav a.on {
-  background: #1e6b39;
-  color: #fff;
-  font-weight: 500;
-}
-
-.rail-foot {
-  padding: 11px;
-  border-top: 1px solid #1b5231;
-}
-
-.rail-signout {
-  display: flex;
-  text-decoration: none;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 8px 11px;
-  border: 0;
-  border-radius: var(--r);
-  background: transparent;
-  color: #a9c4b1;
-  font-size: 13.5px;
-  font-weight: 500;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.rail-signout:hover {
-  background: #14522b;
-  color: #fff;
-}
-
-.rail-collapse {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  margin-top: 2px;
-  padding: 8px 11px;
-  border: 0;
-  border-radius: var(--r);
-  background: transparent;
-  color: #7fa48b;
-  font-size: 13px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.rail-collapse:hover {
-  background: #14522b;
-  color: #fff;
-}
-
-/* Expanded is the default, so the arrow that means "collapse" is the one on show. */
-.rail-collapse .when-collapsed {
-  display: none;
-}
-
-/* One rule for every icon in the rail and the title bar. */
-.rail-nav svg,
-.rail-signout svg,
-.rail-collapse svg,
-.top-burger svg {
-  width: 17px;
-  height: 17px;
-  flex: none;
-  fill: none;
-  stroke: currentcolor;
-  stroke-width: 1.7;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-/*
- * Exactly 56px, and `flex: none` is the half that enforces it. A min-height would let the bar
- * grow the moment anything inside it wrapped, which is why the bar carries the page title alone.
- */
-.top {
-  height: 56px;
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 0 18px;
-  background: var(--card);
-  border-bottom: 1px solid var(--rule);
-  position: sticky;
-  top: 0;
-  z-index: 30;
-}
-
-.top h1 {
-  flex: 1;
-  min-width: 0;
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/*
- * The title bar's only control, and the drawer's. Hidden above 900px, where the rail is always
- * on screen and there is nothing for it to open. Collapsing is a separate job with its own
- * control, on the rail.
- */
-.top-burger {
-  display: none;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  flex: none;
-  padding: 0;
-  border: 0;
-  border-radius: var(--r);
-  background: transparent;
-  color: var(--ink-3);
-  cursor: pointer;
-}
-
-.top-burger:hover {
-  background: #eef2ee;
-  color: var(--ink);
-}
-
-.staff-main {
-  max-width: 1100px;
-  padding: 24px 22px 52px;
-}
-
-.staff-narrow {
-  max-width: 560px;
-}
-
-/* Covers the page while the drawer is open; `hidden` on the element keeps it inert until then. */
-.scrim {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgb(12 59 30 / 50%);
-  z-index: 50;
-}
-
-/* ---------- the collapsed rail ---------- */
-/*
- * Only meaningful while the rail is a column. Below 900px it is a drawer, and a 64px drawer would
- * be a worse version of the thing the drawer exists to replace — so these rules are scoped away
- * from that width entirely rather than undone one by one.
- */
-@media (min-width: 901px) {
-  :root.rail-collapsed .rail {
-    width: 64px;
-  }
-
-  :root.rail-collapsed .rail-label,
-  :root.rail-collapsed .brand-text {
-    display: none;
-  }
-
-  :root.rail-collapsed .rail-nav a,
-  :root.rail-collapsed .rail-signout,
-  :root.rail-collapsed .rail-collapse,
-  :root.rail-collapsed .brand-mark {
-    justify-content: center;
-    gap: 0;
-  }
-
-  :root.rail-collapsed .rail-collapse .when-open {
-    display: none;
-  }
-
-  :root.rail-collapsed .rail-collapse .when-collapsed {
-    display: block;
-  }
-
-  :root.rail-collapsed .rail .brand {
-    padding-left: 0;
-    padding-right: 0;
-  }
-}
-
-/* ---------- the rail as a drawer ---------- */
-@media (max-width: 900px) {
-  .rail {
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    height: 100%;
-    transform: translateX(-100%);
-    transition: transform 0.18s ease;
-  }
-
-  :root.rail-open .rail {
-    transform: none;
-  }
-
-  :root.rail-open .scrim {
-    display: block;
-  }
-
-  .top-burger {
-    display: grid;
-  }
-
-  /* Collapsing has no meaning once the rail is off-canvas: the drawer is already hidden. */
-  .rail-collapse {
-    display: none;
-  }
-
-  .staff-main {
-    padding: 20px 16px 44px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .rail {
-    transition: none;
-  }
-}
-
-/*
- * The block at the top of a page: what this page is about, and its one action.
- *
- * Restored here after the rail rewrite dropped it -- without these rules the row was not a flex
- * row at all, so a page's action button fell underneath its subtitle instead of sitting opposite.
- * The h1 now lives in the title bar, so the heading styled here is the h2 a page uses for the
- * thing it is showing.
- */
-.staff-head {
-  display: flex;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-bottom: 20px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid var(--rule);
-}
-
-.staff-head h2 {
-  font-size: 19px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.staff-head .hint {
-  margin-top: 3px;
-}
-
-.staff-foot {
-  margin-top: 20px;
-}
-
-/* ---------- who is signed in ---------- */
-/*
- * Sits at the right of the title bar, which is why it must not wrap: the bar is a fixed 56px and
- * a second line would be clipped. The role is a caption from ROLE_LABELS, never the enum value.
- */
-.top-user {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: none;
-  min-width: 0;
-  text-align: right;
-}
-
-.top-user .top-name {
-  display: block;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 30ch;
-}
-
-.top-user .top-role {
-  display: block;
-  font-size: 11px;
-  color: var(--ink-3);
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-@media (max-width: 560px) {
-  /* On a phone the title has the better claim on the bar. */
-  .top-user {
-    display: none;
-  }
-}
-
-/* ---------- staff account list ---------- */
-/*
- * No `overflow: hidden` here, deliberately. It would clip the rounded corners neatly and also
- * make `position: sticky` on the header inert — an overflow other than `visible` on an ancestor
- * turns it into the sticky element's scroll container. The corners are rounded on the cells
- * instead.
- */
-.utable {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  background: var(--card);
-  border: 1px solid var(--rule);
-  border-radius: var(--r);
-  font-size: 13px;
-}
-
-.utable th {
-  text-align: left;
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  font-weight: 500;
-  padding: 9px 12px;
-  background: var(--green-bg);
-  border-bottom: 1px solid var(--rule);
-  /* The header alone. Freezing a first data row as well would hide a real record behind a
-     heading and make the count on the page disagree with what is readable. */
-  position: sticky;
-  /* Zero, not 56px. Every `.utable` sits in a `.tscroll` box now, and that box is what the header
-     sticks to — so it freezes against the top of the table rather than against the title bar, and
-     an offset meant for the viewport would leave a 56px gap inside the box instead. */
-  top: 0;
-  z-index: 1;
-  /* Its own compositor layer. Without this, some Chromium builds (seen in Opera) occasionally
-     paint the sticky header a frame behind the row scrolling under it, so the two show at once. */
-  will-change: transform;
-}
-
-.utable thead th:first-child {
-  border-top-left-radius: var(--r);
-}
-
-.utable thead th:last-child {
-  border-top-right-radius: var(--r);
-}
-
-.utable td {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--rule);
-  vertical-align: top;
-}
-
-.utable tr:last-child td {
-  border-bottom: 0;
-}
-
-.tag {
-  display: inline-block;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   font-size: 10.5px;
-  font-weight: 500;
+  font-weight: 600;
   padding: 2px 8px;
   border-radius: 999px;
+  white-space: nowrap;
   background: var(--leaf-bg);
   color: var(--leaf-d);
-  white-space: nowrap;
 }
 
-.tag + .tag,
-.utable td > span + .tag {
-  margin-left: 5px;
+.countdown-near {
+  background: var(--orange-bg);
+  color: var(--orange-d);
 }
 
-/* Each action is its own POST form, so they need laying out as a row rather than stacking. */
-.row-actions {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+/* Red, not orange — see the `--red` tokens' own comment. An overdue deadline must never be
+   confusable with the Orange Report's own colour, on an ordinary assessment or a serious one. */
+.countdown-overdue {
+  background: var(--red-bg);
+  color: var(--red-d);
+  border: 1px solid var(--red);
 }
 
-.btn-sm {
-  padding: 4px 9px;
-  font-size: 12px;
-}
-
-/* A second line under a name in a table cell: the address it belongs to, quieter than the name. */
-.hint.block {
-  display: block;
-  font-size: 11.5px;
-}
-
-.tag.muted {
+.countdown-completed,
+.countdown-none {
   background: #ecefed;
   color: var(--ink-3);
 }
 
-.tag.warn {
-  background: var(--orange-bg);
-  color: var(--orange-d);
-}
-
-/* ---------- the one-time password ---------- */
+/* ---------- serious case (death / life-threatening) ---------- */
 /*
- * Deliberately loud. This is the only time the credential is ever on screen, so the page has to
- * make it obvious that it is the thing to copy before leaving.
+ * Applied wherever a serious AE/AI's own `Countdown` renders — see the `serious` prop on the
+ * component. On an overdue serious deadline this is the loudest thing on the page, on purpose: an
+ * assessment past the SOP's 5-working-day deadline on a death or life-threatening case is the one
+ * state this application must make impossible to miss.
  */
-.temp-password {
-  background: var(--card);
-  border: 1px solid var(--rule);
-  border-left: 4px solid var(--leaf);
-  border-radius: var(--r);
-  padding: 16px 18px;
-  margin-bottom: 20px;
+.countdown-serious {
+  font-weight: 800;
 }
 
-.temp-password code {
-  display: block;
-  font-family: var(--mono);
-  font-size: 19px;
-  letter-spacing: 0.09em;
-  word-break: break-all;
-  color: var(--ink);
-  margin: 8px 0 10px;
-}
-
-/* ---------- wide tables ---------- */
-/*
- * Every wide table scrolls inside its own box, at every width, so the page itself never scrolls
- * sideways. This replaces a `display: block` on `.utable` below 620px, which only helped a phone
- * and broke the table's own column layout to do it.
- *
- * `overflow` rather than `overflow-x`, with a `max-height` beside it, because the two axes cannot
- * be separated: a box that scrolls on one has no `visible` left on the other, so a bare
- * `overflow-x: auto` wrapper would quietly become the scroll container for `.utable th`'s
- * `position: sticky` and leave the header inert. Bounding the height instead keeps the header
- * frozen — against the top of this box, which is why the `top` above is 0.
- */
-.tscroll {
-  overflow: auto;
-  max-height: calc(100vh - 210px);
-  /* A sideways flick inside the table does not drag the page behind it once the box hits its end. */
-  overscroll-behavior-x: contain;
-}
-
-/*
- * Nothing wraps mid-cell, at any width — and this is what makes the box above actually scroll.
- *
- * `.utable` is `width: 100%`, so a table left to wrap does not overflow its box: it squeezes,
- * every column narrows, and a device name folds onto three lines while the scrollbar never
- * appears. That was true at every width between 620px and the table’s own natural width, which is
- * most of the widths this application is read at.
- *
- * Holding the columns to their content instead means the table is as wide as it needs to be and
- * the box scrolls when that exceeds it, which is the behaviour the rule was written for. It was
- * scoped to a phone before, where the squeeze was merely most obvious.
- */
-.tscroll .utable {
-  white-space: nowrap;
-}
-
-@media (max-width: 620px) {
-  /* Less chrome to clear on a phone, so the box may be taller before it starts scrolling. */
-  .tscroll {
-    max-height: calc(100vh - 150px);
-  }
-}
-
-/* ---------- register ---------- */
-/*
- * The register is `.tscroll` again — same box, same reason: a table this wide must scroll inside
- * itself rather than push the page sideways. Only the offset changes, because the header above it
- * is taller than a plain `.staff-head` line.
- *
- * The ordinary staff column is 1100px, which leaves most of the workspace empty next to a
- * fifty-column sheet. On this page the main pane takes 90% of the workspace beside the rail.
- */
-.staff-main:has(.register-page) {
-  max-width: 90%;
-}
-
-.register-scroll {
-  max-height: calc(100vh - 232px);
-}
-
-@media (max-width: 620px) {
-  .register-scroll {
-    max-height: calc(100vh - 210px);
-  }
-}
-
-.register-title {
-  margin: 0 0 2px;
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.register-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.register-search {
-  width: 280px;
-  max-width: 100%;
-  padding: 7px 11px;
-  border: 1px solid var(--rule-2);
-  border-radius: var(--r);
-  background: var(--card);
-}
-
-.register-search:focus-visible {
-  outline: 2px solid var(--green);
-  outline-offset: 1px;
-}
-
-/*
- * `.utable` holds every column to its own content width, which is right for a handful of columns
- * and wrong for fifty: a couple of long ones would swallow the row and the rest would starve.
- * `table-layout: fixed` plus an explicit width per `<col>` gives every column a deliberate size
- * instead, and — unlike `.utable`'s `white-space: nowrap` — lets both headers and long values wrap
- * inside the width they are given rather than forcing the row onto one endless line.
- *
- * `width: max-content` is what makes the table exactly as wide as the sum of its columns: a plain
- * block element sized `auto` would just fill `.register-scroll`, and there would be nothing left
- * for that box to scroll. `min-width: 100%` is the fallback for the case a live register ever has
- * so few columns that the sum is narrower than the screen.
- */
-.register-table {
-  width: max-content;
-  min-width: 100%;
-  table-layout: fixed;
-  border-collapse: separate;
-  border-spacing: 0;
-  background: var(--card);
-  border: 1px solid var(--rule);
-  border-radius: var(--r);
-  font-size: 12.5px;
-}
-
-.register-table th {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  vertical-align: bottom;
-  padding: 8px 10px;
-  background: var(--green-bg);
-  border-bottom: 1px solid var(--rule);
-  border-right: 1px solid var(--rule);
-  text-align: left;
-  text-transform: uppercase;
-  font-size: 10px;
-  font-weight: 500;
-  line-height: 1.35;
-  letter-spacing: 0.05em;
-  color: var(--ink-3);
-  white-space: normal;
-  word-break: break-word;
-}
-
-.register-table thead tr:first-child th:first-child {
-  border-top-left-radius: var(--r);
-}
-
-.register-table thead tr:first-child th:last-child {
-  border-top-right-radius: var(--r);
-}
-
-.register-table td {
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--rule);
-  border-right: 1px solid var(--rule);
-  vertical-align: top;
-  white-space: normal;
-  word-break: break-word;
-}
-
-.register-table th:last-child,
-.register-table td:last-child {
-  border-right: 0;
-}
-
-.register-table tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-.register-table tbody tr:nth-child(even) {
-  background: var(--green-bg);
-}
-
-.register-table tbody tr:hover td {
-  background: #eaf1ec;
-}
-
-/* A field the workflow has not populated yet, so a blank cell reads as "not recorded" rather than
-   as a rendering fault. */
-.register-table .rg-empty {
-  color: var(--ink-3);
-}
-
-/*
- * Only S/N stays in view. TMDA report number, date received, and every later column scroll
- * together under it. Sticky cells need their own opaque background or the scrolling columns
- * behind them would show through; the header corner needs a higher `z-index` than both the
- * plain sticky header row and the plain sticky body column so it sits above whichever the
- * reader scrolls past first. The edge shadow marks the freeze line.
- */
-.register-table .rg-c1 {
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  background: var(--card);
-  box-shadow: 2px 0 4px -2px rgba(16, 25, 19, 0.18);
-}
-
-.register-table th.rg-c1 {
-  z-index: 3;
-  background: var(--green-bg);
-}
-
-.register-table tbody tr:nth-child(even) td.rg-c1 {
-  background: var(--green-bg);
-}
-
-.register-table tbody tr:hover td.rg-c1 {
-  background: #eaf1ec;
-}
-
-/* ---------- the application mark ---------- */
-/*
- * Geometry from the prototype's <template id="logo">; only the fills change between surfaces.
- * The staff rail carries `on-dark`, which inverts the folder and cross so the mark reads against
- * the deep green. The sign-in card leaves them as they are.
- */
-.logo {
-  width: 26px;
-  height: 26px;
-  flex: none;
-}
-
-.logo .doc {
-  fill: none;
-  stroke: var(--leaf);
-  stroke-width: 42;
-  stroke-linecap: round;
-}
-
-.logo .tab {
-  fill: var(--leaf);
-}
-
-.logo .body {
-  fill: var(--green);
-}
-
-.logo .cross {
-  fill: #fff;
-}
-
-.on-dark .logo .body {
-  fill: #fff;
-}
-
-.on-dark .logo .cross {
-  fill: var(--green-d);
-}
-
-/*
- * The brand block: mark, name, and the line under it. One component renders this in the rail and
- * on both auth cards, so the only thing that differs between them is the palette `on-dark` picks.
- */
-.brand-mark {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.brand-text b {
-  display: block;
-  font-weight: 600;
-  font-size: 15px;
-  line-height: 1.2;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-}
-
-.brand-text > span {
-  display: block;
-  font-size: 11px;
-  color: var(--ink-3);
-  margin-top: 1px;
-  white-space: nowrap;
-}
-
-.on-dark .brand-text b {
+.countdown-serious.countdown-overdue {
+  background: var(--red);
   color: #fff;
+  border-color: var(--red-d);
+  box-shadow: 0 0 0 2px var(--red-bg);
 }
 
-.on-dark .brand-text > span {
-  color: #7fa48b;
+.countdown-serious.countdown-near,
+.countdown-serious.countdown-on-track {
+  box-shadow: inset 0 0 0 1px var(--red);
 }
 
-.login-header .brand-mark {
-  margin-bottom: 16px;
+/* A serious row in any queue — the workload pipeline, the Officer's own assessment lists. A red
+   tint on the row itself, not only on its countdown pill, so a serious case is visible even in a
+   glance across a table nobody has scrolled to the deadline column of yet. */
+tr.wl-row-serious > td {
+  background: var(--red-bg);
 }
 
-.login-header .logo {
-  width: 32px;
-  height: 32px;
+tr.wl-row-serious > td:first-child {
+  border-left: 3px solid var(--red);
 }
 
-/* ---------- show / hide a password ---------- */
-/*
- * The wrapper and the button are built by password-toggle.js, so none of this applies until the
- * enhancement has run. Without it the field is a plain input and these rules match nothing.
- */
-.pw-wrap {
-  position: relative;
-  display: block;
-}
-
-.pw-wrap input {
-  /* Room for the button, so a long password never slides under it. */
-  padding-right: 38px;
-}
-
-.pw-toggle {
-  position: absolute;
-  top: 50%;
-  right: 4px;
-  transform: translateY(-50%);
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--r);
-  background: transparent;
-  color: var(--ink-3);
-  cursor: pointer;
-}
-
-.pw-toggle:hover {
-  color: var(--ink);
-  background: #eef2ee;
-}
-
-.pw-toggle svg {
-  width: 17px;
-  height: 17px;
-  fill: none;
-  stroke: currentcolor;
-  stroke-width: 1.7;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-/* ---------- activity row tones ---------- */
-/*
- * Two tones, set by the action alone. `caution` marks the two actions that take an account away
- * from its owner; it does not mean anything went wrong, only that somebody should be able to
- * account for it. There is no third, alarming tone, because audit_log holds actions that
- * succeeded — a refused sign-in and a 403 are never written to it.
- */
-.utable tr.tone-safe td {
-  background: #f6fbf7;
-}
-
-.utable tr.tone-caution td {
-  background: var(--orange-bg);
-}
-
-/* ---------- dashboard ---------- */
-.stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 14px;
-  margin-bottom: 18px;
-}
-
-.stat {
-  background: var(--card);
-  border: 1px solid var(--rule);
-  border-radius: var(--r);
-  padding: 14px 16px;
-}
-
-.stat b {
-  display: block;
-  font-size: 27px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.15;
-  margin: 4px 0 1px;
-}
-
-/* ---------- the workload pipeline ---------- */
-/*
- * The four states are one flat bar, not four tiles: they are a filter over the list below, and a
- * filter reads as a row of tabs. The rules live with `.mya-tabs` further down, which is the same
- * bar the Officer's own page draws — one set of declarations, two names, so the two cannot drift.
- *
- * Still links rather than buttons: each is a GET of this page filtered to one state, which is
- * what lets a filtered pipeline be bookmarked and reloaded.
- */
-
-.dash-note {
-  margin-bottom: 18px;
-}
-
-.dash-recent,
-.dash-queue {
-  margin-top: 26px;
-}
-
-.dash-recent h2,
-.dash-queue h2 {
-  font-size: 15px;
-  font-weight: 600;
+.tag.tag-serious {
+  background: var(--red);
+  color: #fff;
+  font-weight: 700;
 }
 
 /* ---------- one report ---------- */
@@ -1693,35 +127,6 @@ textarea[aria-invalid="true"] {
 
 .review-form {
   margin-bottom: 22px;
-}
-
-/* ---------- the mark on the orange page ---------- */
-/*
- * The public form is the one surface where the folder reads white on orange rather than green on
- * paper. Same paths, a third palette — the reason the mark is one component.
- */
-.orange-page .logo .body {
-  fill: #fff;
-}
-
-.orange-page .logo .cross {
-  fill: var(--orange-deep);
-}
-
-.orange-page .logo .doc {
-  stroke: #fbd9c4;
-}
-
-.orange-page .logo .tab {
-  fill: #fbd9c4;
-}
-
-.orange-page .otop .brand-text b {
-  color: #fff;
-}
-
-.orange-page .otop .brand-text > span {
-  color: #fbd9c4;
 }
 
 /* ---------- one report, by section ---------- */
@@ -1780,60 +185,6 @@ textarea[aria-invalid="true"] {
   }
 }
 
-/* ---------- a confirmation on the page ---------- */
-/*
- * Opened with showModal(), which is what gives the backdrop, the focus trap and Escape-to-close
- * without writing any of them. Closed is the element's own default, so nothing here has to hide
- * it and no page flashes the dialog before the script runs.
- */
-.modal {
-  /* Centred in the viewport, said outright rather than left to the user agent. `dialog:modal`
-     centres itself in every current browser, but the box has a width and a max-width of its own
-     and the auto margins are what turn those into a centred box — writing them down is cheaper
-     than depending on a default that differs across engines. `fixed` keeps it centred on the
-     viewport rather than on a page that may be several F004s long. */
-  position: fixed;
-  inset: 0;
-  margin: auto;
-  height: fit-content;
-  border: 1px solid var(--rule);
-  border-radius: 10px;
-  /* No padding here: see the note in the shell. It belongs to .modal-body so that a click whose
-     target is the dialog means the backdrop and nothing else. */
-  padding: 0;
-  max-width: 420px;
-  width: calc(100% - 32px);
-  background: var(--card);
-  color: var(--ink);
-  box-shadow: 0 18px 48px rgb(12 59 30 / 22%);
-}
-
-/* Dark enough to actually cover the page behind it. At 45% the report showed through clearly
-   enough that the question read as an overlay on work still in progress rather than as a stop. */
-.modal::backdrop {
-  background: rgb(12 59 30 / 62%);
-}
-
-.modal-body {
-  padding: 24px 26px;
-}
-
-.modal h2 {
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.modal .hint {
-  margin-top: 7px;
-  line-height: 1.5;
-}
-
-.modal-actions {
-  margin-top: 22px;
-  justify-content: flex-end;
-}
-
 
 /* ---------- F004 assessment template ---------- */
 .f4 { font-size: 13px; }
@@ -1860,42 +211,6 @@ textarea[aria-invalid="true"] {
  * it never redraws A1's choices, because it does not replace them. Disagree is full red, redraws
  * the choices, and asks for words too.
  */
-.a2-intro {
-  border-left: 4px solid var(--green);
-  padding: 2px 0 2px 14px;
-  margin-bottom: 18px;
-}
-
-.a2-intro h2 {
-  font-size: 17px;
-  font-weight: 600;
-  margin-bottom: 4px;
-}
-
-.a2-intro p {
-  color: var(--ink-2);
-  max-width: 78ch;
-}
-
-.a2-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.a2-legend span {
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 999px;
-  padding: 3px 10px;
-  color: #fff;
-}
-
-.a2-legend .k-agree { background: #16803c; }
-.a2-legend .k-clarification { background: #7f173a; }
-.a2-legend .k-disagree { background: #c20f0f; }
-
 .a2-summary {
   display: grid;
   gap: 12px;
@@ -2011,6 +326,11 @@ textarea[aria-invalid="true"] {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin-top: 11px;
+}
+
+/* Agree/Disagree only — no clarification radio to make room for. */
+.a2-degrees-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .a2-degree {
@@ -2147,8 +467,13 @@ textarea[aria-invalid="true"] {
 }
 
 /* `> .a2-inline` (a direct child) is what keeps this from also matching the IMDRF group's outer
-   `.f4-block`, which holds several `.f4-imdrf-item`s and several `.a2-inline`s, not one. */
-.f4-block:has(> .a2-inline .a2-disagree input:checked) .a2-opt,
+   `.f4-block`, which holds several `.f4-imdrf-item`s and several `.a2-inline`s, not one.
+
+   `.f4-assessed` is section 1's own four rows, which hold a review block the same way a block
+   does without being one — they are rows of the section's numbered run, not panels. Named in the
+   same `:is()` rather than given a parallel set of rules, so A2's tinting and inline options
+   cannot drift between the two places a review is read. */
+:is(.f4-block, .f4-assessed):has(> .a2-inline .a2-disagree input:checked) .a2-opt,
 .f4-imdrf-item:has(.a2-inline .a2-disagree input:checked) .a2-opt {
   display: flex;
 }
@@ -2159,17 +484,17 @@ textarea[aria-invalid="true"] {
  * without reading the box itself. A1's own controls (`.f4-filled`, `.f4-card.on`, `.f4-tick.on`)
  * keep their own explicit backgrounds regardless, since none of them inherit this one.
  */
-.f4-block:has(> .a2-inline .a2-agree input:checked),
+:is(.f4-block, .f4-assessed):has(> .a2-inline .a2-agree input:checked),
 .f4-imdrf-item:has(.a2-inline .a2-agree input:checked) {
   background: #f2faf4;
 }
 
-.f4-block:has(> .a2-inline .a2-clarification input:checked),
+:is(.f4-block, .f4-assessed):has(> .a2-inline .a2-clarification input:checked),
 .f4-imdrf-item:has(.a2-inline .a2-clarification input:checked) {
   background: #fff3f6;
 }
 
-.f4-block:has(> .a2-inline .a2-disagree input:checked),
+:is(.f4-block, .f4-assessed):has(> .a2-inline .a2-disagree input:checked),
 .f4-imdrf-item:has(.a2-inline .a2-disagree input:checked) {
   background: #fff1f1;
 }
@@ -2316,7 +641,18 @@ textarea[aria-invalid="true"] {
 .f4-v { font-weight: 600; color: var(--f4-ink); }
 .f4-muted, .f4-muted .f4-v { color: var(--f4-ink-3); font-weight: 400; }
 
-.f4-section { border: 1px solid var(--f4-line); border-radius: var(--r); overflow: hidden; margin-bottom: 18px; break-inside: avoid; }
+/*
+ * `break-inside` is deliberately NOT set here. A section is a list of many rows/blocks/cards —
+ * often taller than a single printed page (section 1's nineteen device rows, section 3's IMDRF
+ * grids) — and forcing the whole thing to avoid splitting only pushes it, wholesale, onto the
+ * next page whenever it does not fit in what is left of the current one, leaving everything above
+ * it blank. The smaller units inside a section (`.f4-row`, `.f4-block`, `.f4-card`) keep their own
+ * `break-inside: avoid` below, which is where the readability argument actually applies: nobody
+ * wants ONE row split mid-way, but a whole section flowing across a page boundary is normal for a
+ * document this long. See the `@media print` rule further down for the section bar's own
+ * break-after, which is what keeps a header from printing alone at the bottom of a page.
+ */
+.f4-section { border: 1px solid var(--f4-line); border-radius: var(--r); overflow: hidden; margin-bottom: 18px; }
 /* Clears both sticky layers — the 56px staff title bar and the jump bar under it — so a jumped-to
    green section title lands below them instead of behind them. */
 .f4-section { scroll-margin-top: 116px; }
@@ -2448,6 +784,55 @@ textarea[aria-invalid="true"] {
 .f4-imdrf-h { font-weight: 600; color: var(--f4-ink); font-size: 12.5px; margin-bottom: 3px; }
 .f4-letter { color: var(--f4-accent-ink); font-weight: 700; }
 
+/*
+ * The controlled IMDRF term picker inside a Level 1/2/3/Coding grid (`f4-imdrf-pick`) — a small
+ * "Choose term…" button that opens a search box and result list beneath the existing fields.
+ * Deliberately not touching `.f4-grid`/`.f4-field` above: those are the boxes themselves, unchanged.
+ */
+.f4-imdrf-pick { grid-column: 1 / -1; }
+.imdrf-pick-panel {
+  margin-top: 6px;
+  border: 1px solid var(--f4-field-border);
+  border-radius: var(--r);
+  background: var(--f4-field-bg);
+  padding: 8px 10px 10px;
+}
+.imdrf-pick-search {
+  width: 100%;
+  border: 1px solid var(--f4-field-border);
+  border-radius: var(--r);
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 13px;
+  background: var(--card);
+}
+.imdrf-pick-results { margin-top: 8px; max-height: 240px; overflow-y: auto; }
+.imdrf-pick-results .hint { margin: 4px 2px; }
+.imdrf-pick-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.imdrf-pick-row + .imdrf-pick-row { margin-top: 1px; }
+.imdrf-pick-row:hover { background: var(--f4-tint-2); }
+.imdrf-pick-row:focus-visible { outline: 2px solid var(--orange); outline-offset: -2px; }
+.imdrf-pick-row[disabled] { cursor: not-allowed; color: var(--f4-ink-3); opacity: 0.75; }
+.imdrf-pick-row code {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--f4-accent-ink);
+  margin-right: 8px;
+}
+.imdrf-pick-row .hint { font-size: 11px; }
+
 .f4-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; }
 .f4-card {
   border: 1px solid var(--f4-pill-border); border-radius: var(--r); padding: 12px 14px; cursor: pointer;
@@ -2463,8 +848,8 @@ textarea[aria-invalid="true"] {
  * is the one thing Disagree is saying it is not. Only Disagree earns this: Need Clarification
  * never replaces A1's answer, so A1's own highlight is still true then.
  */
-.f4-block:has(> .a2-inline .a2-disagree input:checked) .f4-card.on,
-.f4-block:has(> .a2-inline .a2-disagree input:checked) .f4-tick.on {
+:is(.f4-block, .f4-assessed):has(> .a2-inline .a2-disagree input:checked) .f4-card.on,
+:is(.f4-block, .f4-assessed):has(> .a2-inline .a2-disagree input:checked) .f4-tick.on {
   background: var(--f4-field-bg);
   border-color: var(--f4-pill-border);
   box-shadow: none;
@@ -2585,8 +970,208 @@ ul.f4-card-c li { margin-bottom: 3px; }
   .f4-cards.f4-risk { grid-template-columns: 1fr; }
 }
 @media print {
-  .rail, .top, .f4-buttons, .f4-jump, .a1-open { display: none !important; }
-  .f4-section, .f4-row, .f4-block, .f4-card { break-inside: avoid; }
+  .rail, .top, .f4-buttons, .f4-jump, .a1-open,
+  .f4-toolbar, .a1-drawer, .a1-scrim { display: none !important; }
+  /* `.f4-section` deliberately excluded — see its own rule above for why forcing the whole
+     section to avoid splitting is what caused the large blank areas. */
+  .f4-row, .f4-block, .f4-card { break-inside: avoid; }
+  /* A section's bar printed alone at the bottom of a page, with every one of its rows starting
+     the next, is the one awkward split worth spending a rule on — everything else about a
+     section is left to flow naturally. */
+  .f4-bar { break-after: avoid; }
+
+  /*
+   * "Previous assessments (N)" — a static line in the printed/downloaded document, with every
+   * entry visible, never a collapsed control. The screen keeps its own collapsed-by-default
+   * `<details>`; nothing here touches that, or depends on whether a reader ever opened it.
+   *
+   * A closed `<details>`'s body is hidden by the browser's own user-agent stylesheet, and
+   * verified against this exact Chromium build (the one `app.pdf.render` launches) that means
+   * overriding `::details-content` — the UA-generated wrapper the non-`<summary>` children are
+   * rendered into — not `display` on those children directly, which this version of Chromium no
+   * longer gates visibility through. `*:not(summary)` is kept alongside it for any engine that
+   * still uses the older, plain-`display:none` model, since an unsupported pseudo-element is
+   * simply ignored rather than an error. Overriding either is what makes every entry print
+   * regardless of the element's actual `open` state, so the PDF is complete without the server
+   * ever needing to render a second, "already expanded" copy of the same markup.
+   */
+  .a2-history { break-inside: avoid; }
+  .a2-history > summary {
+    cursor: default;
+    pointer-events: none;
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .a2-history > summary::before,
+  .a2-history[open] > summary::before {
+    content: "";
+  }
+  .a2-history > *:not(summary) {
+    display: block !important;
+  }
+  .a2-history:not([open])::details-content {
+    block-size: auto !important;
+    content-visibility: visible !important;
+    overflow: visible !important;
+  }
+}
+
+/*
+ * The compact document toolbar: back, the dynamic F004 title, an optional badge (the
+ * `Countdown`), and the surface's own actions (Orange Report / the Final F004 type selector /
+ * download / print), all on one row, immediately above the F004's own masthead.
+ *
+ * Replaces `.staff-head` on every F004 surface — see `DocHeader`. Icon-only controls (back,
+ * download, print, close) share `.f4-icon-btn`, a square button the same shape as `.pw-toggle`
+ * elsewhere in the app, so an icon-only control always looks like one thing across the portal.
+ */
+.f4-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.f4-toolbar-title {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-right: auto;
+}
+
+.f4-toolbar-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.f4-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r);
+  background: var(--card);
+  color: var(--ink-2);
+  cursor: pointer;
+  flex: none;
+}
+
+.f4-icon-btn:hover {
+  background: var(--green-bg);
+  border-color: var(--green);
+  color: var(--ink);
+}
+
+.f4-icon-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.a1-drawer-close svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/*
+ * The Final F004 presentation switch: two plain links styled as a segmented control, one
+ * `aria-current="page"` for whichever the query string already selected.
+ *
+ * Not a <select> with an onchange script — the CSP carries no 'unsafe-inline', so nothing here may
+ * depend on a script running, and a link the reader can already see the destination of degrades to
+ * nothing worse than itself.
+ */
+.f4-type-switch {
+  display: flex;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r);
+  overflow: hidden;
+  height: 34px;
+}
+
+.f4-type-switch a {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-2);
+  text-decoration: none;
+  background: var(--card);
+}
+
+.f4-type-switch a + a {
+  border-left: 1px solid var(--rule-2);
+}
+
+.f4-type-switch a:hover {
+  background: var(--green-bg);
+}
+
+.f4-type-switch a[aria-current="page"] {
+  background: var(--green);
+  color: #fff;
+}
+
+/*
+ * Final F004's title-bar row, rendered inside `.top` itself via `StaffShell`'s `topContent` — not
+ * a second `.f4-toolbar` underneath it. See `FinalF004TopContent`'s own doc comment.
+ *
+ * `.case-top` shares every rule here: it is the same "one `.top` bar, not a second toolbar" pattern
+ * for the working F004/report page (`CaseDetailTopContent` in `report-detail.tsx`) — back, the
+ * dynamic title, the countdown, and the Orange Report trigger, all inside `topContent` rather than
+ * a second row underneath it.
+ */
+.final-f004-top,
+.case-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.final-f004-top h1,
+.case-top h1 {
+  margin: 0;
+  white-space: nowrap;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.final-f004-top .f4-type-switch {
+  margin-left: auto;
+}
+
+.final-f004-top .f4-icon-btn,
+.case-top .f4-icon-btn {
+  flex: 0 0 auto;
+}
+
+.case-top .f4-toolbar-actions {
+  margin-left: auto;
+}
+
+@media (max-width: 640px) {
+  .f4-toolbar-title { width: 100%; order: -1; margin-right: 0; }
 }
 
 /* ---------- assessment workspace: the F004 in full, the report in a drawer ---------- */
@@ -2640,31 +1225,59 @@ ul.f4-card-c li { margin-bottom: 3px; }
   .a1-drawer, .a1-scrim { transition: none; }
 }
 
-/* ---------- section 1: number | requirement | value ---------- */
-.f4-fact {
-  display: grid;
-  grid-template-columns: 46px minmax(150px, 1fr) minmax(0, 1.4fr);
-  gap: 10px 12px; padding: 9px 16px 5px; align-items: start; break-inside: avoid;
+/*
+ * Wide screens: a reference panel, not a modal.
+ *
+ * The Orange Report is what the assessment is ABOUT, and the question an assessor opens it to
+ * answer is always "does the form in front of me match the report" — which is a comparison, and a
+ * comparison needs both documents legible at once. The scrim dims the F004 and swallows the first
+ * click back into it, so on a screen with room for both it is the one thing making a reference
+ * document behave like an interruption. Removed above 1100px; the panel stays, the close control
+ * in its head stays, and Escape still closes it.
+ *
+ * Below that the dimming is doing real work: the panel covers most of the viewport, the form
+ * behind it is not readable anyway, and tapping the page to dismiss is what a sheet is for.
+ */
+@media (min-width: 1100px) {
+  #a1-drawer:checked ~ .a1-scrim { opacity: 0; visibility: hidden; pointer-events: none; }
 }
-/* The same orange surface `.f4-filled` wears in section 2, for the same reason: this line came
-   off the reporter's form, and the assessor's own note sits under it as a plain staff input.
-   !important for the same reason as `.f4-filled`: this is a real `<input readonly>`, contesting
-   specificity against the shared `.f4 input:not(...)` reset rather than a span it cannot touch. */
-.f4-fact .f4-value {
-  font-weight: 500 !important; word-break: break-word; cursor: default;
-  background: var(--f4-value-bg) !important; color: var(--f4-value-ink) !important;
-  border: 1px solid var(--f4-value-border) !important; border-radius: var(--r); padding: 5px 9px !important;
-}
-.f4-fact .f4-blank { font-style: italic; color: var(--f4-ink-3); font-size: 12px; }
-.f4-note-line { padding: 0 16px 10px 74px; border-bottom: 1px solid var(--f4-line-2); }
-.f4-note-line label { font-size: 11px; color: var(--f4-ink-3); }
-.f4-note-line input { font-size: 12px; padding: 5px 10px; }
 
-@media (max-width: 900px) {
-  .f4-fact { grid-template-columns: 30px 1fr; }
-  .f4-fact .f4-value, .f4-fact .f4-blank { grid-column: 1 / -1; margin-top: 2px; }
-  .f4-note-line { padding-left: 18px; }
+/* Narrow screens: the full width, because 92vw leaves an 8% strip of dimmed form that is not
+   enough to read and is enough to look like the sheet failed to open. */
+@media (max-width: 640px) {
+  .a1-drawer { width: 100vw; border-left: 0; padding: 14px 14px 32px; }
 }
+
+/*
+ * The Officer's work item: the approved document, then the source.
+ *
+ * A row, not a card. The page has one thing to offer and the button is it; a panel around a
+ * button and its one line of explanation would be furniture.
+ */
+.mw-final {
+  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  margin: 14px 0 22px;
+}
+
+/*
+ * Section 1's four assessor-answered rows (1.3, 1.10, 1.11, 1.19).
+ *
+ * Wraps the same `.f4-row`/`.f4-req` shape every read-only row in sections 1 and 2 uses — number,
+ * then the label stacked above its value — so section 1 reads as the same document as section 2
+ * rather than a layout of its own. What differs from a plain `RequirementRow` is what sits under
+ * the label: a live control here instead of the orange form's own transcribed text, and a review
+ * block that can follow it.
+ */
+.f4-assessed { break-inside: avoid; }
+.f4-answer { min-width: 0; margin-top: 4px; }
+/* A one-line answer fills the value column rather than sitting at a width the browser picked. */
+.f4-answer > input { width: 100%; }
+/* Two or three options stacked under the label, not a form section: the group's own outer margins
+   are the row's padding here, so it does not add a second set. */
+.f4-answer .f4-radio-group { margin: 0; gap: 5px; }
+/* Aligned to the row's own side padding, the same inset every other secondary-assessment block
+   under a `.f4-block` question already sits at. */
+.f4-assessed > .a2-inline { margin: 0 16px 14px; }
 
 /*
  * My assessments: three filter tabs over one group at a time.
@@ -2995,6 +1608,62 @@ ul.f4-card-c li { margin-bottom: 3px; }
 }
 
 /*
+ * The downloadable presentation: `FinalDocumentDownloadPage`, built on `Layout` rather than
+ * `StaffShell`, so there is no rail and no title bar for this to sit beside — the page itself is
+ * the whole document. `.fd-print-page` gives it the shape a document has anyway: a sheet, floating
+ * on the portal's own background at a width close to A4, rather than the bare left-aligned text a
+ * page with no `.staff-main` padding around it would otherwise be.
+ *
+ * On screen this is a reading width. Under `@media print` below it becomes the page itself — the
+ * project's existing print architecture (see the `.rail, .top, .f4-buttons, .f4-jump` rule further
+ * up) extended to a page that has none of those elements to hide in the first place.
+ */
+.fd-print-page {
+  max-width: 850px;
+  margin: 28px auto;
+  padding: 30px 36px 60px;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+}
+
+.fd-print-page .eyebrow {
+  margin-bottom: 10px;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm 12mm;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .fd-print-page {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  /* Backgrounds are what a browser drops first when printing to save ink, and the resolved
+     answer's green surface is the one colour this document must keep — without it a reader loses
+     the whole point of `.f4-final-answer` the moment the page leaves the screen. */
+  .f4-document .f4-card.on,
+  .f4-document .f4-tick.on,
+  .f4-document .f4-radio-row,
+  .f4-document .f4-final-answer,
+  .f4-document .f4-assessed .f4-answer input,
+  .f4-document .f4-grid input {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
+
+/*
  * Section 8 on the concluded F004: the manager's approval, where the assessors' signatures sit on
  * a working assessment.
  *
@@ -3211,3 +1880,64 @@ ul.f4-card-c li { margin-bottom: 3px; }
   color: var(--f4-ink);
   white-space: pre-wrap;
 }
+
+/*
+ * The resolved answer, on the surface `.f4-card.on` and `.f4-tick.on` already use for a chosen
+ * card or tick — extended here to the plain single-line answers and the free-text fields whose own
+ * prose IS the answer (4.3, 7.1's conclusion), so every kind of resolved answer on the document
+ * reads as the same green surface and a comment underneath one is never mistaken for it.
+ *
+ * The same tokens throughout — `--f4-card-on-bg`/`--f4-bar`, which are the staff palette's own
+ * green, not a colour invented for this — and scoped to `.f4-document`, which only the Final F004
+ * ever sets. `.f4-final-answer` and `.f4-radio-row` carry no rule outside this scope, so the
+ * working assessment form is untouched by any of it.
+ */
+.f4-document .f4-radio-row {
+  background: var(--f4-card-on-bg);
+  border: 1px solid var(--f4-bar);
+  border-radius: var(--r);
+  padding: 7px 12px;
+  margin: 2px 0;
+}
+
+/* The assessor's own section-1 entries (1.10, 1.11) and the IMDRF grid's chosen levels/coding —
+   typed or picked by the assessor, not transcribed from the Orange Report, so they read as
+   findings rather than as the reporter's own facts `.f4-filled` already marks out. */
+.f4-document .f4-assessed .f4-answer input,
+.f4-document .f4-grid input {
+  background: var(--f4-card-on-bg) !important;
+  border: 1px solid var(--f4-bar) !important;
+  border-radius: var(--r);
+  color: var(--f4-ink) !important;
+  padding: 6px 9px !important;
+}
+
+.f4-document .f4-final-answer {
+  background: var(--f4-card-on-bg);
+  border: 1px solid var(--f4-bar);
+  border-radius: var(--r);
+  padding: 8px 12px;
+}
+
+/* The box already carries the surface; the textarea inside it drops the plain document's own
+   underline so the answer reads as filling the surface rather than sitting boxed within a box. */
+.f4-document .f4-final-answer textarea {
+  border-bottom: 0;
+}
+
+/*
+ * The comment beside a resolved answer — a Basis, a Justification, the discussion under a radio
+ * choice — kept visually subordinate to it: indented and set off by a rule, never boxed or
+ * coloured, so it never reads as a second answer. The same treatment `.f4-resolved-note` already
+ * carries for a clarification with nowhere else to print; this just reaches every other comment on
+ * the document, not only that one.
+ *
+ * Scoped to `.f4-document`: `Comment` renders this class on the working assessment form too — it
+ * is the component's own default — and there it must stay exactly as plain as `.f4-field` already
+ * makes it, per `variant` in `f004.tsx`.
+ */
+.f4-document .f4-final-comment {
+  padding-left: 16px;
+  border-left: 1px dashed var(--f4-divider);
+}
+

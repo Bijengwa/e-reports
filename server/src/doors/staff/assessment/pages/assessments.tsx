@@ -292,6 +292,7 @@ export function MyAssessmentsPage({
     <StaffShell
       title="My assessments — AE Reports"
       pageTitle="My assessments"
+      pageCss="caseCss"
       role={viewerRole}
       fullName={viewerName}
       active="assessments"

@@ -1,0 +1,584 @@
+/*
+ * Design tokens and the primitives every page reaches for — buttons, cards, fields, the shared
+ * data table, the reduced-motion rule. `Layout` (`views/shared/layout.tsx`) links this file
+ * unconditionally, on every page of both doors; everything a specific page or feature needs
+ * beyond this lives in its own file under this directory and is opted into from there.
+ *
+ * Carried over from the ae-reports_3.html prototype. Fonts are self-hosted; nothing here may
+ * reference a third-party origin.
+ *
+ * The Content-Security-Policy in src/server.ts sets `style-src 'self'`, which also governs
+ * inline `style=""` attributes (style-src-attr falls back to style-src) — a view must never
+ * reach for an inline style, only for a same-origin stylesheet such as this one.
+ */
+:root {
+  --ink: #101913;
+  --ink-2: #45534a;
+  --ink-3: #75837a;
+  --paper: #f5f8f5;
+  --card: #fff;
+  --rule: #dfe7e0;
+  --rule-2: #c3cfc6;
+  --green: #166534;
+  --green-d: #0c3b1e;
+  --green-h: #1b7a40;
+  --green-bg: #e7f2ea;
+  --leaf: #7cb518;
+  --leaf-d: #4a6d0c;
+  --leaf-bg: #f0f7e2;
+  --orange: #e1611f;
+  --orange-d: #8c3a0f;
+  --orange-bg: #fdf0e8;
+  --orange-deep: #c24e12;
+  /* The rule the orange door already draws round its own cards, named so the staff side can
+     borrow it when it shows something the reporter filled in. */
+  --orange-line: #f0cfb6;
+  --flag: #a8341f;
+  --flag-bg: #fbebe7;
+  /*
+   * True red — hue 0, deliberately further from `--orange`'s hue than `--flag` sits, so an overdue
+   * deadline and the Orange Report's own colour never read as the same alarm. Reserved for overdue
+   * deadlines and serious (death/life-threatening) case treatment; `--flag` stays what it always
+   * was, the register's own severity-tag alarm colour.
+   */
+  --red: #c81e1e;
+  --red-d: #7a1010;
+  --red-bg: #fdeaea;
+
+  /*
+   * The F004's colour pack, pointed at the staff portal's own palette.
+   *
+   * It used to be navy and gold, and that was the mistake: an assessment opened inside the staff
+   * portal read as a second product sitting in the first, a document skin arguing with the green
+   * chrome all round it. The names stay — every F004 rule still reaches for a token rather than a
+   * hex of its own — but the values are the staff pack's now. Bars stay dark enough to read as a
+   * form; nothing else asks to be looked at twice.
+   *
+   * The one borrowed hue is the orange door's, and only where a value on this page genuinely came
+   * off the orange form. That is the page saying which half of it the reporter wrote.
+   */
+  --f4-bar: var(--green-d);
+  --f4-badge: var(--leaf);
+  --f4-ink: var(--ink);
+  --f4-ink-2: var(--ink-2);
+  --f4-accent-ink: var(--green-d);
+  --f4-ink-3: var(--ink-3);
+  --f4-note-ink: var(--ink-2);
+  --f4-line: var(--rule);
+  --f4-line-2: var(--rule);
+  --f4-tint: var(--green-bg);
+  --f4-tint-2: var(--paper);
+  --f4-tint-3: var(--green-bg);
+  --f4-field-bg: var(--card);
+  --f4-field-border: var(--rule-2);
+  --f4-pill-border: var(--rule);
+  --f4-guide-accent: var(--green);
+  --f4-assessors-bg: var(--paper);
+  --f4-assessors-border: var(--rule);
+  --f4-divider: var(--rule-2);
+  --f4-tick-bg: var(--paper);
+  --f4-tick-on-bg: var(--green-bg);
+  --f4-tick-locked-bg: var(--paper);
+  --f4-card-on-bg: var(--green-bg);
+  --f4-locked-bg: var(--paper);
+  --f4-locked-border: var(--rule-2);
+  /* A value the reporter supplied, wearing the surface it wore on the orange form. */
+  --f4-value-bg: var(--orange-bg);
+  --f4-value-ink: var(--orange-d);
+  --f4-value-border: var(--orange-line);
+  /* Severity, not theme: these four say how bad the event was and do not follow the portal. */
+  --f4-risk-critical: #a02020;
+  --f4-risk-high: #c95a1a;
+  --f4-risk-medium: #d4a11e;
+  --f4-risk-low: #3f7e5a;
+  --r: 5px;
+  --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--sans);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+  max-width: 100%;
+}
+
+a {
+  color: var(--green);
+}
+
+/* ---------- primitives ---------- */
+.sp {
+  flex: 1;
+  min-width: 0;
+}
+
+.eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 500;
+}
+
+.hint {
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+}
+
+.card-b {
+  padding: 16px;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  background: var(--green);
+  color: #fff;
+  border: 1px solid var(--green);
+  padding: 8px 15px;
+  border-radius: var(--r);
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 13.5px;
+  white-space: nowrap;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.btn:hover {
+  background: var(--green-h);
+}
+
+.btn.ghost {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--rule-2);
+}
+
+.btn.ghost:hover {
+  background: #ecf2ed;
+}
+
+/*
+ * The destructive variant.
+ *
+ * `--flag` is already the palette's alarm colour — it is what a life-threatening severity tag is
+ * painted in — so a red button borrows it rather than introducing a second red for the same
+ * meaning. Used where a click ends something: signing out is the only one today.
+ */
+.btn.danger {
+  background: var(--flag);
+  border-color: var(--flag);
+  color: #fff;
+}
+
+.btn.danger:hover {
+  background: #8c2b19;
+  border-color: #8c2b19;
+}
+
+.btn.orange {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #fff;
+}
+
+.btn.orange:hover {
+  background: var(--orange-deep);
+}
+
+.btn:focus-visible,
+a:focus-visible,
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+.chk:focus-within {
+  outline: 2px solid var(--orange);
+  outline-offset: 2px;
+}
+
+/* ---------- fields ---------- */
+/* `.f` sits on a <div> for single controls and on a <fieldset> for a group of choices. */
+.f {
+  margin-bottom: 14px;
+  border: 0;
+  min-width: 0;
+}
+
+.f label,
+.f legend,
+.f .label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 500;
+  margin-bottom: 5px;
+  padding: 0;
+}
+
+.f label i,
+.f legend i {
+  color: var(--flag);
+  font-style: normal;
+}
+
+/* A choice inside a group carries its own label styling, not the group heading's. */
+.f .chk {
+  font-weight: 400;
+  margin-bottom: 0;
+}
+
+.f input,
+.f select,
+.f textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r);
+  background: #fff;
+}
+
+.f textarea {
+  min-height: 70px;
+  resize: vertical;
+}
+
+/* Two textarea heights the form needs. Replaces inline style="min-height:…". */
+.f textarea.short {
+  min-height: 62px;
+}
+
+.f textarea.tall {
+  min-height: 130px;
+}
+
+/* A follow-up input sitting directly under a group of choices. */
+.f .also {
+  margin-top: 8px;
+}
+
+.f .sub {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  margin-top: 4px;
+}
+
+.alert {
+  border-left: 3px solid var(--orange);
+  background: var(--orange-bg);
+  padding: 11px 13px;
+  border-radius: 0 var(--r) var(--r) 0;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.alert-error {
+  border-color: var(--flag);
+  background: var(--flag-bg);
+  color: var(--flag);
+}
+
+.alert-ok {
+  border-color: var(--green);
+  background: var(--green-bg);
+  color: var(--green-d);
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+/* ---------- staff account list ---------- */
+/*
+ * No `overflow: hidden` here, deliberately. It would clip the rounded corners neatly and also
+ * make `position: sticky` on the header inert — an overflow other than `visible` on an ancestor
+ * turns it into the sticky element's scroll container. The corners are rounded on the cells
+ * instead.
+ */
+.utable {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  font-size: 13px;
+}
+
+.utable th {
+  text-align: left;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 500;
+  padding: 9px 12px;
+  background: var(--green-bg);
+  border-bottom: 1px solid var(--rule);
+  /* The header alone. Freezing a first data row as well would hide a real record behind a
+     heading and make the count on the page disagree with what is readable. */
+  position: sticky;
+  /* Zero, not 56px. Every `.utable` sits in a `.tscroll` box now, and that box is what the header
+     sticks to — so it freezes against the top of the table rather than against the title bar, and
+     an offset meant for the viewport would leave a 56px gap inside the box instead. */
+  top: 0;
+  z-index: 1;
+  /* Its own compositor layer. Without this, some Chromium builds (seen in Opera) occasionally
+     paint the sticky header a frame behind the row scrolling under it, so the two show at once. */
+  will-change: transform;
+}
+
+.utable thead th:first-child {
+  border-top-left-radius: var(--r);
+}
+
+.utable thead th:last-child {
+  border-top-right-radius: var(--r);
+}
+
+.utable td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+
+.utable tr:last-child td {
+  border-bottom: 0;
+}
+
+.tag {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--leaf-bg);
+  color: var(--leaf-d);
+  white-space: nowrap;
+}
+
+.tag + .tag,
+.utable td > span + .tag {
+  margin-left: 5px;
+}
+
+/* Each action is its own POST form, so they need laying out as a row rather than stacking. */
+.row-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.btn-sm {
+  padding: 4px 9px;
+  font-size: 12px;
+}
+
+/* A second line under a name in a table cell: the address it belongs to, quieter than the name. */
+.hint.block {
+  display: block;
+  font-size: 11.5px;
+}
+
+.tag.muted {
+  background: #ecefed;
+  color: var(--ink-3);
+}
+
+.tag.warn {
+  background: var(--orange-bg);
+  color: var(--orange-d);
+}
+
+/* ---------- wide tables ---------- */
+/*
+ * Every wide table scrolls inside its own box, at every width, so the page itself never scrolls
+ * sideways. This replaces a `display: block` on `.utable` below 620px, which only helped a phone
+ * and broke the table's own column layout to do it.
+ *
+ * `overflow` rather than `overflow-x`, with a `max-height` beside it, because the two axes cannot
+ * be separated: a box that scrolls on one has no `visible` left on the other, so a bare
+ * `overflow-x: auto` wrapper would quietly become the scroll container for `.utable th`'s
+ * `position: sticky` and leave the header inert. Bounding the height instead keeps the header
+ * frozen — against the top of this box, which is why the `top` above is 0.
+ */
+.tscroll {
+  overflow: auto;
+  max-height: calc(100vh - 210px);
+  /* A sideways flick inside the table does not drag the page behind it once the box hits its end. */
+  overscroll-behavior-x: contain;
+}
+
+/*
+ * Nothing wraps mid-cell, at any width — and this is what makes the box above actually scroll.
+ *
+ * `.utable` is `width: 100%`, so a table left to wrap does not overflow its box: it squeezes,
+ * every column narrows, and a device name folds onto three lines while the scrollbar never
+ * appears. That was true at every width between 620px and the table’s own natural width, which is
+ * most of the widths this application is read at.
+ *
+ * Holding the columns to their content instead means the table is as wide as it needs to be and
+ * the box scrolls when that exceeds it, which is the behaviour the rule was written for. It was
+ * scoped to a phone before, where the squeeze was merely most obvious.
+ */
+.tscroll .utable {
+  white-space: nowrap;
+}
+
+/*
+ * A cell whose value a reporter typed, held to a readable width.
+ *
+ * Every column in a `.utable` is content-sized and `nowrap`, which is right for a number, a date or
+ * a role and wrong for a free-text device name or facility: one 400-character value makes one
+ * column wider than the screen and pushes every other column out of reach, so the density of the
+ * whole list is decided by the worst value in it. This bounds those columns and marks the clip with
+ * an ellipsis. Nothing is truncated in the document — the value is whole in the markup, and the
+ * row's number already opens the report that shows it in full, which is where a reader goes for the
+ * rest of it.
+ *
+ * Applied to those cells only, not to `.utable td` at large: a number, a status or a date must
+ * never be clipped.
+ */
+.utable .cap {
+  display: inline-block;
+  max-width: 34ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+
+@media (max-width: 620px) {
+  /* Less chrome to clear on a phone, so the box may be taller before it starts scrolling. */
+  .tscroll {
+    max-height: calc(100vh - 150px);
+  }
+
+  .utable .cap {
+    max-width: 22ch;
+  }
+}
+
+/* ---------- the application mark ---------- */
+/*
+ * Geometry from the prototype's <template id="logo">; only the fills change between surfaces.
+ * The staff rail carries `on-dark`, which inverts the folder and cross so the mark reads against
+ * the deep green. The sign-in card leaves them as they are.
+ */
+.logo {
+  width: 26px;
+  height: 26px;
+  flex: none;
+}
+
+.logo .doc {
+  fill: none;
+  stroke: var(--leaf);
+  stroke-width: 42;
+  stroke-linecap: round;
+}
+
+.logo .tab {
+  fill: var(--leaf);
+}
+
+.logo .body {
+  fill: var(--green);
+}
+
+.logo .cross {
+  fill: #fff;
+}
+
+.on-dark .logo .body {
+  fill: #fff;
+}
+
+.on-dark .logo .cross {
+  fill: var(--green-d);
+}
+
+/*
+ * The brand block: mark, name, and the line under it. One component renders this in the rail and
+ * on both auth cards, so the only thing that differs between them is the palette `on-dark` picks.
+ */
+.brand-mark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.brand-text b {
+  display: block;
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.brand-text > span {
+  display: block;
+  font-size: 11px;
+  color: var(--ink-3);
+  margin-top: 1px;
+  white-space: nowrap;
+}
+
+.on-dark .brand-text b {
+  color: #fff;
+}
+
+.on-dark .brand-text > span {
+  color: #7fa48b;
+}
+
+.login-header .brand-mark {
+  margin-bottom: 16px;
+}
+
+.login-header .logo {
+  width: 32px;
+  height: 32px;
+}
+

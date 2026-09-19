@@ -5,7 +5,7 @@ import { type Browser, chromium } from "playwright";
 /**
  * The Final F004's PDF, produced from the same HTML and the same print stylesheet the browser's
  * own Ctrl+P already turns into a document — see `.fd-print-page` and the `@media print` rules in
- * app.css, and `FinalDocumentPrintPage` in `doors/staff/final-reports/pages/final-document.tsx`.
+ * css/case.css, and `FinalDocumentPrintPage` in `doors/staff/final-reports/pages/final-document.tsx`.
  *
  * A headless Chromium is the only way to get a real, forced-attachment PDF out of a server that
  * renders its documents as HTML+CSS rather than through a PDF-construction library: there is no
@@ -55,11 +55,15 @@ export function createPdfRenderer(config: PdfRendererConfig = {}): PdfRenderer {
       const page = await (await getBrowser()).newPage();
       try {
         await page.setContent(html, { waitUntil: "load" });
-        // The stylesheet is read straight off disk rather than fetched over HTTP: the page was
+        // The stylesheets are read straight off disk rather than fetched over HTTP: the page was
         // never navigated to a URL, so there is no origin for a relative <link> to resolve
         // against, and there is no reason to round-trip through the app's own HTTP server to read
-        // a file already sitting beside this process.
-        await page.addStyleTag({ path: assetsPath("app.css") });
+        // files already sitting beside this process. Two files, not one — `base.css` for the
+        // tokens and primitives every `.f4-*`/`.fd-*` rule in `case.css` builds on, `case.css` for
+        // the F004/Final-document rules themselves — mirroring exactly what `FinalDocumentPrintPage`
+        // asks `Layout` to load when a browser reaches it directly.
+        await page.addStyleTag({ path: assetsPath("css/base.css") });
+        await page.addStyleTag({ path: assetsPath("css/case.css") });
         await page.emulateMedia({ media: "print" });
         const pdf = await page.pdf({ printBackground: true, preferCSSPageSize: true });
         return Buffer.from(pdf);

@@ -350,6 +350,7 @@ export function RegisterPage({ rows, viewerRole, viewerName }: RegisterPageProps
     <StaffShell
       title="Register | e-Reports"
       pageTitle="Register"
+      pageCss="register"
       role={viewerRole}
       fullName={viewerName}
       active="register"

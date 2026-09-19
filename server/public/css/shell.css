@@ -1,0 +1,435 @@
+/*
+ * The rail, the title bar and the sign-out dialog — `doors/staff/shared/shell.tsx`'s own markup.
+ * `StaffShell` always asks `Layout` for this file, so every signed-in page beyond sign-in and the
+ * forced password change carries it.
+ */
+
+/* ---------- staff shell ---------- */
+/*
+ * The signed-in pages. The orange form's own primitives — .card, .f, .btn, .bar — are reused as
+ * they stand; only what the prototype had no equivalent for is defined here.
+ */
+.staff {
+  background: var(--paper);
+}
+
+/*
+ * A row, not a stack. The rail is a column beside the page at every width — below 900px it slides
+ * over the page as a drawer rather than becoming a strip above it, because a horizontal bar of
+ * links is a different component that happens to fit, not a smaller sidebar.
+ */
+.shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+/*
+ * Sticky at full viewport height, so the rail stays put while the page scrolls. Its own nav is
+ * the part that scrolls if the list ever outgrows the screen.
+ */
+.rail {
+  width: 238px;
+  flex: none;
+  background: var(--green-d);
+  color: #c9dace;
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  z-index: 60;
+}
+
+.rail .brand {
+  padding: 15px 16px 14px;
+  border-bottom: 1px solid #1b5231;
+  overflow: hidden;
+}
+
+.rail-nav {
+  padding: 11px;
+  flex: 1;
+  overflow: auto;
+}
+
+.rail-nav a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 11px;
+  margin-bottom: 2px;
+  border-radius: var(--r);
+  color: #a9c4b1;
+  text-decoration: none;
+  font-size: 13.5px;
+  white-space: nowrap;
+}
+
+.rail-nav a:hover {
+  background: #14522b;
+  color: #fff;
+}
+
+.rail-nav a.on {
+  background: #1e6b39;
+  color: #fff;
+  font-weight: 500;
+}
+
+.rail-foot {
+  padding: 11px;
+  border-top: 1px solid #1b5231;
+}
+
+.rail-signout {
+  display: flex;
+  text-decoration: none;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 11px;
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: #a9c4b1;
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.rail-signout:hover {
+  background: #14522b;
+  color: #fff;
+}
+
+.rail-collapse {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 2px;
+  padding: 8px 11px;
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: #7fa48b;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.rail-collapse:hover {
+  background: #14522b;
+  color: #fff;
+}
+
+/* Expanded is the default, so the arrow that means "collapse" is the one on show. */
+.rail-collapse .when-collapsed {
+  display: none;
+}
+
+/* One rule for every icon in the rail and the title bar. */
+.rail-nav svg,
+.rail-signout svg,
+.rail-collapse svg,
+.top-burger svg {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+ * Exactly 56px, and `flex: none` is the half that enforces it. A min-height would let the bar
+ * grow the moment anything inside it wrapped, which is why the bar carries the page title alone.
+ */
+.top {
+  height: 56px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 18px;
+  background: var(--card);
+  border-bottom: 1px solid var(--rule);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+
+.top h1 {
+  flex: 1;
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The title bar's one optional badge — the F004 header's own `Countdown` today. `flex: none` so
+   it never shrinks or wraps; `h1`'s ellipsis gives way to it first, on the same fixed-height bar. */
+.top > .countdown {
+  flex: none;
+}
+
+/*
+ * The title bar's only control, and the drawer's. Hidden above 900px, where the rail is always
+ * on screen and there is nothing for it to open. Collapsing is a separate job with its own
+ * control, on the rail.
+ */
+.top-burger {
+  display: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+
+.top-burger:hover {
+  background: #eef2ee;
+  color: var(--ink);
+}
+
+.staff-main {
+  width: 100%;
+  max-width: none;
+  padding: 24px 22px 52px;
+}
+
+.staff-narrow {
+  max-width: 560px;
+}
+
+/* Covers the page while the drawer is open; `hidden` on the element keeps it inert until then. */
+.scrim {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgb(12 59 30 / 50%);
+  z-index: 50;
+}
+
+/* ---------- the collapsed rail ---------- */
+/*
+ * Only meaningful while the rail is a column. Below 900px it is a drawer, and a 64px drawer would
+ * be a worse version of the thing the drawer exists to replace — so these rules are scoped away
+ * from that width entirely rather than undone one by one.
+ */
+@media (min-width: 901px) {
+  :root.rail-collapsed .rail {
+    width: 64px;
+  }
+
+  :root.rail-collapsed .rail-label,
+  :root.rail-collapsed .brand-text {
+    display: none;
+  }
+
+  :root.rail-collapsed .rail-nav a,
+  :root.rail-collapsed .rail-signout,
+  :root.rail-collapsed .rail-collapse,
+  :root.rail-collapsed .brand-mark {
+    justify-content: center;
+    gap: 0;
+  }
+
+  :root.rail-collapsed .rail-collapse .when-open {
+    display: none;
+  }
+
+  :root.rail-collapsed .rail-collapse .when-collapsed {
+    display: block;
+  }
+
+  :root.rail-collapsed .rail .brand {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
+/* ---------- the rail as a drawer ---------- */
+@media (max-width: 900px) {
+  .rail {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    height: 100%;
+    transform: translateX(-100%);
+    transition: transform 0.18s ease;
+  }
+
+  :root.rail-open .rail {
+    transform: none;
+  }
+
+  :root.rail-open .scrim {
+    display: block;
+  }
+
+  .top-burger {
+    display: grid;
+  }
+
+  /* Collapsing has no meaning once the rail is off-canvas: the drawer is already hidden. */
+  .rail-collapse {
+    display: none;
+  }
+
+  .staff-main {
+    padding: 20px 16px 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail {
+    transition: none;
+  }
+}
+
+/*
+ * The block at the top of a page: what this page is about, and its one action.
+ *
+ * Restored here after the rail rewrite dropped it -- without these rules the row was not a flex
+ * row at all, so a page's action button fell underneath its subtitle instead of sitting opposite.
+ * The h1 now lives in the title bar, so the heading styled here is the h2 a page uses for the
+ * thing it is showing.
+ */
+.staff-head {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.staff-head h2 {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.staff-head .hint {
+  margin-top: 3px;
+}
+
+.staff-foot {
+  margin-top: 20px;
+}
+
+/* ---------- who is signed in ---------- */
+/*
+ * Sits at the right of the title bar, which is why it must not wrap: the bar is a fixed 56px and
+ * a second line would be clipped. The role is a caption from ROLE_LABELS, never the enum value.
+ */
+.top-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  min-width: 0;
+  text-align: right;
+}
+
+.top-user .top-name {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 30ch;
+}
+
+.top-user .top-role {
+  display: block;
+  font-size: 11px;
+  color: var(--ink-3);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  /* On a phone the title has the better claim on the bar. */
+  .top-user {
+    display: none;
+  }
+}
+
+/* ---------- a confirmation on the page ---------- */
+/*
+ * Opened with showModal(), which is what gives the backdrop, the focus trap and Escape-to-close
+ * without writing any of them. Closed is the element's own default, so nothing here has to hide
+ * it and no page flashes the dialog before the script runs.
+ */
+.modal {
+  /* Centred in the viewport, said outright rather than left to the user agent. `dialog:modal`
+     centres itself in every current browser, but the box has a width and a max-width of its own
+     and the auto margins are what turn those into a centred box — writing them down is cheaper
+     than depending on a default that differs across engines. `fixed` keeps it centred on the
+     viewport rather than on a page that may be several F004s long. */
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  height: fit-content;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  /* No padding here: see the note in the shell. It belongs to .modal-body so that a click whose
+     target is the dialog means the backdrop and nothing else. */
+  padding: 0;
+  max-width: 420px;
+  width: calc(100% - 32px);
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 18px 48px rgb(12 59 30 / 22%);
+}
+
+/* Dark enough to actually cover the page behind it. At 45% the report showed through clearly
+   enough that the question read as an overlay on work still in progress rather than as a stop. */
+.modal::backdrop {
+  background: rgb(12 59 30 / 62%);
+}
+
+.modal-body {
+  padding: 24px 26px;
+}
+
+.modal h2 {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.modal .hint {
+  margin-top: 7px;
+  line-height: 1.5;
+}
+
+.modal-actions {
+  margin-top: 22px;
+  justify-content: flex-end;
+}
+

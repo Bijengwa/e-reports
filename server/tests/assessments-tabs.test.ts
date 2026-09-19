@@ -3,10 +3,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const css = readFileSync(
-  path.join(path.dirname(fileURLToPath(import.meta.url)), "../public/app.css"),
-  "utf8",
-);
+const cssDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "../public/css");
+// `.mya-*` lives in case.css (shared with the workload pipeline's own tab bar); `.tscroll`/
+// `.utable` are base.css primitives every table-bearing page carries.
+const css =
+  readFileSync(path.join(cssDir, "base.css"), "utf8") +
+  readFileSync(path.join(cssDir, "case.css"), "utf8");
 
 /**
  * The three tabs on /assessments are hash links plus `:target`. The default group (Not started)

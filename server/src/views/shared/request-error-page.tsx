@@ -17,7 +17,7 @@ export function RequestErrorPage({
   title = DEFAULT_TITLE,
 }: RequestErrorPageProps): JSX.Element {
   return (
-    <Layout title={title} locale="en" bodyClass="staff-login">
+    <Layout title={title} locale="en" bodyClass="staff-login" auth>
       <div class="login-card">
         <div class="login-header">
           <BrandMark />

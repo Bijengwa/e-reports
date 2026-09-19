@@ -18,7 +18,7 @@ export type StaffShellProps = {
    * A small, fixed-width badge shown beside `pageTitle` in the title bar — the F004 assessment
    * header's own `Countdown`, and nothing else today.
    *
-   * The bar's height is fixed (see `.top` in app.css) on the argument that nothing beside the
+   * The bar's height is fixed (see `.top` in css/shell.css) on the argument that nothing beside the
    * title may wrap or grow it. A `Countdown` pill is one line, `white-space: nowrap`, and never
    * grows with content the way a count or an action label could — which is why it, alone, gets a
    * slot here rather than joining the page body's own header the way every other addition does.
@@ -94,6 +94,13 @@ export type StaffShellProps = {
    * must not be made to fetch a script that would find nothing to attach to.
    */
   f4Print?: boolean;
+  /**
+   * Which page-specific stylesheet the page inside this shell needs, beyond the shell's own —
+   * `Layout` always gets `shell` from here, so a page sets at most one of these besides.
+   * `undefined` for a page built entirely from base primitives and the shell (My work, the Final
+   * Reports index, the 403 page).
+   */
+  pageCss?: "register" | "dashboard" | "users" | "activity" | "imdrf" | "orangeForm" | "caseCss";
   children?: Children;
 };
 
@@ -290,6 +297,7 @@ export function StaffShell({
   registerDownload,
   imdrfPicker,
   f4Print,
+  pageCss,
   children,
 }: StaffShellProps): JSX.Element {
   const isAdministrator = role === "administrator";
@@ -303,11 +311,19 @@ export function StaffShell({
       locale="en"
       bodyClass="staff"
       railScript
+      shell
       f4Find={f4Find}
       countdown={countdown}
       registerDownload={registerDownload}
       imdrfPicker={imdrfPicker}
       f4Print={f4Print}
+      register={pageCss === "register"}
+      dashboard={pageCss === "dashboard"}
+      users={pageCss === "users"}
+      activity={pageCss === "activity"}
+      imdrf={pageCss === "imdrf"}
+      orangeForm={pageCss === "orangeForm"}
+      caseCss={pageCss === "caseCss"}
     >
       <div class="shell">
         {/* `on-dark` is what recolours the mark for the rail: white folder, green cross. The

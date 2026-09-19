@@ -6,7 +6,7 @@ import { type AssessorOption, loadReport } from "../../../../domain/report-detai
 import { currentSession } from "../../session-guard.js";
 import type { SectionComment } from "../../shared/components/f004.js";
 import { ForbiddenPage } from "../../shared/forbidden.js";
-import { CaseDetailPage, type CaseDetailActive } from "../pages/report-detail.js";
+import { type CaseDetailActive, CaseDetailPage } from "../pages/report-detail.js";
 
 /**
  * Which rail entry this case belongs under, and where Back goes — resolved once, from the ROUTE,

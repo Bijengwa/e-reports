@@ -16,7 +16,7 @@ export type ChangePasswordPageProps = {
  */
 export function ChangePasswordPage({ error, isForced }: ChangePasswordPageProps): JSX.Element {
   return (
-    <Layout title="Change Password — AE Reports" locale="en" bodyClass="staff-login" passwordToggle>
+    <Layout title="Change Password — AE Reports" locale="en" bodyClass="staff-login" passwordToggle auth>
       <div class="login-card">
         <div class="login-header">
           <BrandMark />

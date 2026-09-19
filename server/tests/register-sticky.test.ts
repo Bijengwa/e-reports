@@ -5,7 +5,10 @@ import { describe, expect, it } from "vitest";
 import { COLUMNS, cellOverflows } from "../src/doors/staff/register/pages/register.js";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
-const css = readFileSync(path.join(root, "public/app.css"), "utf8");
+// `.register-*`/`.rg-*` live in register.css; `.utable .cap` is a base.css primitive.
+const css =
+  readFileSync(path.join(root, "public/css/base.css"), "utf8") +
+  readFileSync(path.join(root, "public/css/register.css"), "utf8");
 const view = readFileSync(path.join(root, "src/doors/staff/register/pages/register.tsx"), "utf8");
 const script = readFileSync(path.join(root, "public/register.js"), "utf8");
 

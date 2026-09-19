@@ -153,6 +153,7 @@ export function ActivityPage({ entries, viewerRole, viewerName }: ActivityPagePr
     <StaffShell
       title="Activity — AE Reports"
       pageTitle="Activity"
+      pageCss="activity"
       role={viewerRole}
       fullName={viewerName}
       active="activity"

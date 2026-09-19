@@ -20,7 +20,7 @@ export type LoginPageProps = {
  */
 export function LoginPage({ error, publicFormUrl }: LoginPageProps): JSX.Element {
   return (
-    <Layout title="Staff sign in — AE Reports" locale="en" bodyClass="staff-login" passwordToggle>
+    <Layout title="Staff sign in — AE Reports" locale="en" bodyClass="staff-login" passwordToggle auth>
       <div class="login-card">
         <div class="login-header">
           <BrandMark />

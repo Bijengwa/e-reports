@@ -63,6 +63,7 @@ export function SecondaryAssessmentPage({
   return (
     <StaffShell
       title={`Secondary assessment — ${report.number}`}
+      pageCss="caseCss"
       // The compact `DocHeader` below is now the page's own title row — see the same note on
       // `Assessment1Page`.
       pageTitle={`Secondary assessment (A${ordinal})`}

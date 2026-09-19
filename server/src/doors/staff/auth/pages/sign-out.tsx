@@ -16,7 +16,7 @@ import { Layout } from "../../../../views/shared/layout.js";
  */
 export function SignOutPage(): JSX.Element {
   return (
-    <Layout title="Sign out — AE Reports" locale="en" bodyClass="staff-login">
+    <Layout title="Sign out — AE Reports" locale="en" bodyClass="staff-login" auth>
       <div class="login-card">
         <div class="login-header">
           <BrandMark />

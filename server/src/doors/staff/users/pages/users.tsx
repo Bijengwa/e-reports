@@ -21,15 +21,6 @@ export type StaffUser = {
   mustChangePassword: boolean;
   createdAt: Date;
   lastSignInAt: Date | null;
-  /**
-   * Whether this row is the administrator reading the page.
-   *
-   * Decided in the route by comparing against the session, not by matching on role. Both
-   * questions are asked of this table, and they are not the same one: the row that is an
-   * administrator is refused because of what it can do, and the row that is me is refused
-   * because nobody should be able to lock themselves out — which stays true for a manager the
-   * day this list is shown to one.
-   */
   isSelf: boolean;
 };
 
@@ -40,33 +31,18 @@ function day(value: Date | null): string {
 
 export type UsersPageProps = {
   users: StaffUser[];
-  /** A refused action, re-rendered over the list it was refused on. */
   error?: string;
-  /**
-   * The reader's own role, for the rail.
-   *
-   * Named apart from the `role` on a row and on the create form, which mean the account's role.
-   * Threaded from the session rather than written as "administrator" here: the guard on this
-   * scope is what makes that true, and restating it in the view would be a second place for it
-   * to stop being true.
-   */
+
   viewerRole: string;
-  /** The signed-in person, for the title bar. */
   viewerName: string;
 };
 
-/**
- * Every staff account.
- *
- * The temp password issued at creation is deliberately not here. It exists in one response body,
- * once, and is unrecoverable afterwards — a list that could show it again would make it a
- * standing credential rather than a handover.
- */
 export function UsersPage({ users, error, viewerRole, viewerName }: UsersPageProps): JSX.Element {
   return (
     <StaffShell
       title="Staff accounts — AE Reports"
       pageTitle="Staff accounts"
+      pageCss="users"
       role={viewerRole}
       fullName={viewerName}
       active="users"
@@ -88,9 +64,6 @@ export function UsersPage({ users, error, viewerRole, viewerName }: UsersPagePro
         </div>
       )}
 
-      {/* Wider than a narrow window, so it scrolls inside its own box rather than pushing the
-          page sideways. See `.tscroll` in the stylesheet. A JSX comment, not a `//` one: this
-          is a children position, where `//` is text the reader would see. */}
       <div class="tscroll">
         <table class="utable">
           <thead>
@@ -124,10 +97,6 @@ export function UsersPage({ users, error, viewerRole, viewerName }: UsersPagePro
                 <td>{day(user.createdAt)}</td>
                 <td>{day(user.lastSignInAt)}</td>
                 <td>
-                  {/* Nothing at all on your own row, and nothing on any administrator's. Neither
-                      may be reset or deactivated from here, and the surest way to render that is to
-                      render no control — though the routes check both again, because a missing
-                      button is not a control. */}
                   {user.isSelf || user.role === "administrator" ? (
                     <span class="hint">—</span>
                   ) : (
@@ -164,18 +133,7 @@ export function UsersPage({ users, error, viewerRole, viewerName }: UsersPagePro
 
 export type NewUserPageProps = {
   error?: string;
-  /**
-   * Echoed back so a refused submission does not make the administrator retype it.
-   *
-   * These are the only place raw submitted text reaches an attribute rather than a text node, so
-   * `safe` — which governs children — does not cover them. It does not need to: the runtime
-   * escapes `"` and `'` in every attribute it writes, and the attributes below are double-quoted,
-   * so the value cannot be closed. A `<` surviving inside the value looks alarming in the source
-   * and is inert; an entity such as `&#34;` decodes into the value's data, because the tokenizer
-   * fixes the delimiters before it resolves any entity. Neither can start a new attribute. What
-   * it does cost is a round trip: a name typed with a literal `&#34;` redisplays as `"`, which is
-   * a wrong echo on a refused form and not a way in.
-   */
+ 
   email?: string;
   name?: string;
   role?: AssignableRole | undefined;
@@ -185,14 +143,6 @@ export type NewUserPageProps = {
   viewerName: string;
 };
 
-/**
- * The form for creating a staff account.
- *
- * The role control offers exactly the two assignable roles, and the route parses against the same
- * list — the select is a convenience, never the check. There is no password field: the account's
- * first password is generated server-side, so an administrator cannot choose one and therefore
- * cannot know one that outlives the handover.
- */
 export function NewUserPage({
   error,
   email,
@@ -205,6 +155,7 @@ export function NewUserPage({
     <StaffShell
       title="Add a staff account — AE Reports"
       pageTitle="Add a staff account"
+      pageCss="users"
       role={viewerRole}
       fullName={viewerName}
       active="users"
@@ -313,6 +264,7 @@ export function UserCreatedPage({
     <StaffShell
       title="Account created — AE Reports"
       pageTitle="Account created"
+      pageCss="users"
       role={viewerRole}
       fullName={viewerName}
       active="users"
@@ -379,6 +331,7 @@ export function PasswordResetPage({
     <StaffShell
       title="Password reset — AE Reports"
       pageTitle="Password reset"
+      pageCss="users"
       role={viewerRole}
       fullName={viewerName}
       active="users"

@@ -980,7 +980,7 @@ export function OrangeFormPage(props: OrangeFormPageProps): JSX.Element {
 
   if (props.reportNumber) {
     return (
-      <Layout title={t("app.confirmTitle")} locale={locale}>
+      <Layout title={t("app.confirmTitle")} locale={locale} orangeForm>
         <div class="orange-page">
           <header class="otop">
             {/* The same mark the staff door renders, in the orange page's palette. */}
@@ -1019,7 +1019,7 @@ export function OrangeFormPage(props: OrangeFormPageProps): JSX.Element {
   }
 
   return (
-    <Layout title={t("app.formTitle")} locale={locale}>
+    <Layout title={t("app.formTitle")} locale={locale} orangeForm>
       <OrangeForm {...props} />
     </Layout>
   );

@@ -577,7 +577,7 @@ function Comment({
    * 4.3 and 7.1's conclusion, where this textarea IS the finding. On the Final F004 the two must
    * not read alike: an answer earns the document's green surface (`.f4-final-answer`), a comment
    * stays the quieter, subordinate text beside it (`.f4-final-comment`) — see `.f4-document` in
-   * app.css. Both classes carry no rule outside that scope, so the working assessment form —
+   * css/case.css. Both classes carry no rule outside that scope, so the working assessment form —
    * which renders every `Comment` at its default variant too — is unaffected by this prop existing.
    */
   variant?: "answer" | "comment";

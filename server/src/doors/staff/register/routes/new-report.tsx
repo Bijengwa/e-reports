@@ -43,6 +43,7 @@ function NewReportPage({
     <StaffShell
       title="New report — AE Reports"
       pageTitle="New report"
+      pageCss="orangeForm"
       role={session.role}
       fullName={session.fullName}
       active="new-report"

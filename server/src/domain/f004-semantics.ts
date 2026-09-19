@@ -1,58 +1,8 @@
-/**
- * What kind of thing each F004 item IS, and therefore what a later assessor may do about it.
- *
- * The form already lives as data in `f004.ts`. What did not live anywhere was the semantic fact
- * behind each item: whether the value in front of a second assessor is the reporter's claim, the
- * first assessor's finding, or something the application worked out for itself. Without that fact
- * written down, the only way to render a review control was to render the same three everywhere
- * and then hand-correct the ones that read wrong — which is how `clarifiable: false` ended up
- * repeated on four section-1 rows and seven IMDRF rows, and how a Comment box ended up over empty
- * space on rows that never had anything to comment.
- *
- * So: one declaration per numbered item, and every review control derived from it. A new item
- * cannot be added without saying what it is, and the page cannot offer a position the item's own
- * nature does not support, because the page no longer decides.
- *
- * This table states the form's semantics. It does not state policy: nothing here decides who wins
- * a disagreement, or what a manager may override. Those are regulatory questions and they are not
- * answered in a rendering module.
- */
-
 import type { A2Degree } from "./f004.js";
 
-/**
- * Where an item's value came from, which is a different question from what it means.
- *
- * - `reporter` — filed on the orange form, displayed by the F004, typed by nobody here.
- * - `assessor` — the first assessor's own finding, whether it is a choice or a paragraph.
- * - `system` — the application resolved it: a timestamp it recorded, a level it read out of the
- *   IMDRF hierarchy, a release it bound the assessment to.
- * - `attestation` — a signature and the date beside it. Its own author's, and nobody else's.
- */
 export const ITEM_ORIGINS = ["reporter", "assessor", "system", "attestation"] as const;
 export type ItemOrigin = (typeof ITEM_ORIGINS)[number];
 
-/**
- * What a second assessor can honestly do about the item — the classification the controls come
- * from. `origin` says where the value is from; this says how it may be argued with.
- *
- * - `transcribed` — a reporter's fact. There is no finding to agree with. If it is wrong it is
- *   wrong against the Orange Report, so the only honest action is to say so: `flag_discrepancy`.
- * - `structured` — a closed-list finding whose grounds are visible in the record. Right, or wrong
- *   and here is the correct value. Nothing to elaborate, so no clarification.
- * - `reasoned` — a closed-list finding that encodes a judgement. "On what basis" is a real
- *   question here even though the answer is a radio button, which is why these three classes are
- *   not one: clarifiability follows the visibility of the reasoning, not the shape of the control.
- * - `narrative` — the answer IS the prose. Argued with in the same three ways, and a second
- *   assessor who agrees may say why.
- * - `terminology` — a controlled IMDRF selection. Reviewed at the level of the selected term:
- *   either it is the right published term or another published term is. A closed vocabulary has
- *   no third position, so no clarification.
- * - `derived` — the application resolved it. Not independently reviewable: the input it came from
- *   is the thing to review, and reviewing the consequence would record a position on a value no
- *   human chose.
- * - `attestation` — signed, not reviewed.
- */
 export const REVIEW_CLASSES = [
   "transcribed",
   "structured",
@@ -64,18 +14,6 @@ export const REVIEW_CLASSES = [
 ] as const;
 export type ReviewClass = (typeof REVIEW_CLASSES)[number];
 
-/**
- * What the prose beside an answer actually is, where an item carries any.
- *
- * The paper's second column is headed "Comments", and rendering that word over every paragraph in
- * the document is what makes a final F004 read as a database dump: a basis for a causality
- * finding, a justification of a risk level and a recommended regulatory action are three
- * different regulatory statements, and calling all three "Comment" tells the reader nothing about
- * which they are reading. The stored field names do not change; only what the document calls them.
- *
- * `none` means the item carries no prose of its own — either because it has none, or because the
- * item's own answer already IS the prose (4.3, 7.1's conclusion).
- */
 export const REASON_ROLES = [
   "none",
   "basis",
@@ -85,7 +23,6 @@ export const REASON_ROLES = [
 ] as const;
 export type ReasonRole = (typeof REASON_ROLES)[number];
 
-/** The caption a reason carries in the document, written once so no two views name it apart. */
 export const REASON_ROLE_LABELS: Record<Exclude<ReasonRole, "none">, string> = {
   basis: "Basis",
   justification: "Justification",
@@ -93,13 +30,6 @@ export const REASON_ROLE_LABELS: Record<Exclude<ReasonRole, "none">, string> = {
   evidence: "Evidence",
 };
 
-/**
- * One control a second assessor may be offered.
- *
- * The first four are the degrees the review payload already records (`A2Degree`). The fifth is
- * not a position on a finding and never becomes one: a discrepancy is raised against the Orange
- * Report, on a row the first assessor did not author.
- */
 export const REVIEW_CONTROLS = [
   "agree",
   "disagree",
@@ -110,37 +40,18 @@ export const REVIEW_CONTROLS = [
 export type ReviewControl = (typeof REVIEW_CONTROLS)[number];
 
 export type F004ItemSemantics = {
-  /** The item's number as the paper prints it, and the key the review payload uses. */
   no: string;
-  /** Which of the eight sections it belongs to — `F004_SECTION_KEYS`. */
   section: string;
-  /** The stored field(s) this item's own answer lives in. */
   fields: readonly string[];
   origin: ItemOrigin;
   reviewClass: ReviewClass;
   reasonRole: ReasonRole;
-  /** The field the reason lives in, where `reasonRole` is not `none`. */
   reasonField?: string;
-  /**
-   * Fields the application resolves from this item's own answer — the IMDRF levels and code
-   * behind a selected term. Listed so a view can render them as consequences and a test can
-   * assert that nothing offers a control against them.
-   */
+
   derivedFields?: readonly string[];
-  /** "(If applicable)" on the paper: the first assessor may leave it alone entirely. */
   optional?: boolean;
 };
 
-/**
- * Sections 1, 2 and 3 as one flat declaration each.
- *
- * Written out rather than generated from `DEVICE_ROWS`/`EVENT_ROWS`/`IMDRF_GROUPS`, deliberately:
- * this module is a leaf that `f004.ts` itself reads, so importing those tables back out of it at
- * module scope would be a cycle whose initialisation order decides whether the application starts.
- * The agreement between the two is not left to inspection — `f004-semantics.test.ts` asserts that
- * every row of the form's own tables has exactly one entry here and that no entry here is unknown
- * to the form.
- */
 function transcribed(no: string, section: string, field: string): F004ItemSemantics {
   return {
     no,
@@ -164,7 +75,6 @@ function structured(no: string, field: string, optional?: boolean): F004ItemSema
   };
 }
 
-/** One IMDRF terminology: the term the assessor chose, and the levels/code resolved beneath it. */
 function terminology(no: string, key: string, optional?: boolean): F004ItemSemantics {
   return {
     no,
@@ -178,19 +88,9 @@ function terminology(no: string, key: string, optional?: boolean): F004ItemSeman
   };
 }
 
-/**
- * Every numbered item of the F004, once, with what it is.
- *
- * Ordered as the document is, 1.1 to 8, so this reads against the paper. Every row of the form's
- * own tables has exactly one entry, and `f004-semantics.test.ts` fails if that stops being true —
- * a row added to the F004 without a declaration of what it is does not silently inherit whatever
- * controls the last item happened to offer.
- */
 export const F004_ITEM_SEMANTICS: readonly F004ItemSemantics[] = [
   transcribed("1.1", "1", "brand_name"),
   transcribed("1.2", "1", "common_name"),
-  // MD or IVD. A closed pair, and the record shows which the device is — right, or wrong and
-  // here is the correct one. There is no third thing to say about it.
   structured("1.3", "device_type"),
   transcribed("1.4", "1", "size"),
   transcribed("1.5", "1", "batch_serial"),
@@ -198,11 +98,7 @@ export const F004_ITEM_SEMANTICS: readonly F004ItemSemantics[] = [
   transcribed("1.7", "1", "expiry_date"),
   transcribed("1.8", "1", "manufacturer"),
   transcribed("1.9", "1", "supplier"),
-  // "(If applicable)" on the paper, so it may be blank. A fact about the register, checkable,
-  // carrying no reasoning of its own.
   structured("1.10", "registration_number", true),
-  // Determined from the device's own classification rules. A finding, and a checkable one; the
-  // paper does not mark it "(If applicable)", so every submitted assessment owes it.
   structured("1.11", "device_class"),
   transcribed("1.12", "1", "device_status"),
   transcribed("1.13", "1", "duration"),

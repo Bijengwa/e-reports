@@ -70,6 +70,7 @@ export function DashboardPage({
     <StaffShell
       title="AE Reports — Staff"
       pageTitle="Dashboard"
+      pageCss="dashboard"
       role={role}
       fullName={fullName}
       active="dashboard"

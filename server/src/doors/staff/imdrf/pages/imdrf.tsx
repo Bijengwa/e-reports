@@ -197,6 +197,7 @@ export function ImdrfBrowserPage({
     <StaffShell
       title="IMDRF terminology — AE Reports"
       pageTitle="IMDRF terminology"
+      pageCss="imdrf"
       role={viewerRole}
       fullName={viewerName}
       active="imdrf"

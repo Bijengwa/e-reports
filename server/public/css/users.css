@@ -1,0 +1,26 @@
+/* The Staff Accounts page's own stylesheet — `doors/staff/users/pages/users.tsx` alone. */
+
+/* ---------- the one-time password ---------- */
+/*
+ * Deliberately loud. This is the only time the credential is ever on screen, so the page has to
+ * make it obvious that it is the thing to copy before leaving.
+ */
+.temp-password {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--leaf);
+  border-radius: var(--r);
+  padding: 16px 18px;
+  margin-bottom: 20px;
+}
+
+.temp-password code {
+  display: block;
+  font-family: var(--mono);
+  font-size: 19px;
+  letter-spacing: 0.09em;
+  word-break: break-all;
+  color: var(--ink);
+  margin: 8px 0 10px;
+}
+

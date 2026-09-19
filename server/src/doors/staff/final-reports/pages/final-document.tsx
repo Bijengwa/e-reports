@@ -199,6 +199,7 @@ export function FinalDocumentPage({
     <StaffShell
       title={`Final F004 — ${report.number}`}
       pageTitle="Final F004"
+      pageCss="caseCss"
       role={viewerRole}
       fullName={viewerName}
       active={active}
@@ -296,8 +297,8 @@ export type FinalDocumentPrintPageProps = {
  * see `FinalDocumentPage`'s module doc comment.
  *
  * `.fd-print-page` is what makes it read as a document rather than a bare page: an A4-ish sheet on
- * screen, and — under `@media print` in app.css — the shape both the browser's own Print/Save-as-
- * PDF and this module's headless-Chromium render turn it into.
+ * screen, and — under `@media print` in css/case.css — the shape both the browser's own
+ * Print/Save-as-PDF and this module's headless-Chromium render turn it into.
  */
 export function FinalDocumentPrintPage({
   report,
@@ -311,7 +312,7 @@ export function FinalDocumentPrintPage({
   priorReviews,
 }: FinalDocumentPrintPageProps): JSX.Element {
   return (
-    <Layout title={`Final F004 — ${report.number}`} locale="en" bodyClass="staff">
+    <Layout title={`Final F004 — ${report.number}`} locale="en" bodyClass="staff" caseCss>
       <div class="fd-print-page">
         <p class="eyebrow">
           {type === "history"

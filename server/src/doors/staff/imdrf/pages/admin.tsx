@@ -58,6 +58,7 @@ export function ImdrfLibraryPage({
     <StaffShell
       title="Manage IMDRF — AE Reports"
       pageTitle="Manage IMDRF"
+      pageCss="imdrf"
       role={viewerRole}
       fullName={viewerName}
       active="imdrf-manage"
@@ -193,6 +194,7 @@ export function ImdrfImportPage({
     <StaffShell
       title="Import IMDRF release — AE Reports"
       pageTitle="Import IMDRF release"
+      pageCss="imdrf"
       role={viewerRole}
       fullName={viewerName}
       active="imdrf-manage"
@@ -318,6 +320,7 @@ export function ImdrfImportPreviewPage({
     <StaffShell
       title="Preview import — AE Reports"
       pageTitle="Preview import"
+      pageCss="imdrf"
       role={viewerRole}
       fullName={viewerName}
       active="imdrf-manage"

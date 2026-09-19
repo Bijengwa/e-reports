@@ -22,7 +22,7 @@ export function Countdown({
   /**
    * This assignment belongs to a serious AE/AI (death or life-threatening) — see
    * `domain/reports.ts`'s `isSeriousCase`. Purely a stronger visual treatment (see `.countdown-
-   * serious` in app.css): it changes no state and no label, only how loudly the pill reads.
+   * serious` in css/case.css): it changes no state and no label, only how loudly the pill reads.
    */
   serious?: boolean;
   /** Overridable only so a test can pin what "right now" means; a real caller never passes this. */

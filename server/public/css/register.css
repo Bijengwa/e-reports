@@ -1,0 +1,458 @@
+/* The Register list page's own stylesheet — `doors/staff/register/pages/register.tsx` alone. */
+
+/* ---------- register ---------- */
+/*
+ * The register is a workspace, not a table on a page: the sheet's viewport takes the width beside
+ * the rail and the height under the toolbar, and both scrollbars belong to that viewport.
+ *
+ * This replaces two rules that fought the layout instead of describing it — a `max-width: 90%`,
+ * which left a tenth of the desk empty next to a 56-column sheet, and a `max-height:
+ * calc(100vh - 232px)`, which guessed at the height of everything above the table and left the
+ * rest of the screen blank whenever the guess was low. The chain below is the same one the IMDRF
+ * reader already uses, so the staff portal has one way of building a full-height workspace rather
+ * than two: bound the shell to the viewport, let every ancestor give up its height (`min-height:
+ * 0`), and let the scroll box take what is left with `flex: 1`.
+ *
+ * Only the register's own ancestors are touched, `:has()`-scoped, so no other staff page inherits
+ * a viewport-bounded shell.
+ */
+.shell:has(.register-page) {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.main:has(.register-page) {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.staff-main:has(.register-page) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  /* Without this a flex item refuses to shrink below its content, and a 56-column table's content
+     is very tall — which is how the scroll box ends up pushing the page instead of scrolling. */
+  min-height: 0;
+  min-width: 0;
+  max-width: none;
+  padding-bottom: 22px;
+}
+
+.register-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* The title, the count and the toolbar keep their own height; the sheet gets the rest. */
+.register-page .staff-head {
+  flex: none;
+}
+
+/*
+ * The sheet's viewport. `flex: 1` is what makes it grow into the space under the toolbar, so there
+ * is no unexplained gap below the table on a tall screen; `min-height: 0` is what lets it be
+ * shorter than the table inside it, which is what makes it scroll at all. `overflow: auto` on both
+ * axes is deliberate — see the note on `.tscroll`: a box that scrolls on one axis has no `visible`
+ * left on the other, and the sticky header needs this box to be its scroll container.
+ */
+.register-scroll {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
+.register-title {
+  margin: 0 0 2px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Wraps rather than overflows: the search box and the download button are the two things on this
+   bar, and at a width where they no longer sit side by side the honest answer is a second line. */
+.register-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+
+.register-search {
+  /* Grows into the bar and shrinks with it, rather than holding a desktop 280px on a phone and
+     pushing the page sideways. */
+  flex: 1 1 220px;
+  width: auto;
+  min-width: 0;
+  max-width: 320px;
+  padding: 7px 11px;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r);
+  background: var(--card);
+}
+
+.register-search:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 1px;
+}
+
+/*
+ * The header squeeze this fixes: `.staff-head`'s title side (`.sp`) carries `min-width: 0` so it
+ * can shrink for the search box's fixed 280px beside it, but on a narrow phone shrinking is not
+ * enough room left over — the browser keeps both on one row rather than wrapping the whole bar,
+ * and a heading that long wraps one word per line inside what is left. Below the breakpoint the
+ * title, the metadata and the toolbar stack instead, each free to use the full width on its own
+ * line. Scoped to `.register-page` alone: no other page's `.staff-head` carries a toolbar this
+ * wide, and none should inherit a rule written for one that does.
+ */
+@media (max-width: 620px) {
+  .register-page .staff-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .register-page .register-toolbar {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .register-search {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: none;
+  }
+
+  /* Compact and icon-only at this width already (see `.register-download` below) — it sits beside
+     the now full-width search rather than stacking under it. */
+  .register-download {
+    flex: none;
+    justify-content: center;
+  }
+
+  /* The official register identity is long prose, not a page heading, and at this width it was
+     wrapping to several lines and dominating the screen before the count or the toolbar were even
+     visible. Smaller and tighter here; the text itself is unchanged. */
+  .register-title {
+    font-size: 12px;
+    line-height: 1.3;
+  }
+}
+
+@media (max-width: 400px) {
+  .register-title {
+    font-size: 11px;
+  }
+}
+
+/*
+ * Below 900px the rail is a drawer over the page, the title area is two or three lines tall, and a
+ * viewport-bounded shell would leave the sheet a few rows high under it. So the page scrolls the
+ * ordinary way again and the sheet's viewport takes a fixed slice of the screen instead — still
+ * tall enough to read a run of records, still the box that owns both scrollbars, so the page itself
+ * never acquires a horizontal scrollbar from the 56 columns. The same concession the IMDRF reader
+ * makes at its own breakpoint.
+ */
+@media (max-width: 900px) {
+  .shell:has(.register-page),
+  .main:has(.register-page) {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .staff-main:has(.register-page) {
+    display: block;
+    flex: none;
+    padding-bottom: 44px;
+  }
+
+  .register-page {
+    display: block;
+    flex: none;
+  }
+
+  .register-scroll {
+    flex: none;
+    max-height: 70vh;
+  }
+}
+
+/*
+ * A compact icon button, not a second visual language: same `.btn` green, sized and weighted the
+ * same as every other button on the page. The two SVGs share the slot the label wraps around —
+ * only one is ever visible, toggled by `.is-downloading` in `register.js` — so the button never
+ * changes width when it starts or stops spinning.
+ */
+.register-download {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  /* Icon-only now that `.register-download-label` is visually hidden — tighter than `.btn`'s own
+     text padding, so the button reads as a square icon control rather than a wide bar with nothing
+     printed on it. */
+  padding: 8px 10px;
+  flex: none;
+}
+
+.register-download-icon,
+.register-download-spinner {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.register-download-spinner {
+  display: none;
+  stroke-dasharray: 42;
+  stroke-dashoffset: 30;
+  animation: register-spin 0.8s linear infinite;
+}
+
+.register-download.is-downloading {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.register-download.is-downloading .register-download-icon {
+  display: none;
+}
+
+.register-download.is-downloading .register-download-spinner {
+  display: block;
+}
+
+.register-download.is-error {
+  background: var(--flag);
+  border-color: var(--flag);
+}
+
+@keyframes register-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .register-download-spinner {
+    animation: none;
+  }
+}
+
+/*
+ * `.utable` holds every column to its own content width, which is right for a handful of columns
+ * and wrong for fifty: a couple of long ones would swallow the row and the rest would starve.
+ * `table-layout: fixed` plus an explicit width per `<col>` gives every column a deliberate size
+ * instead, and — unlike `.utable`'s `white-space: nowrap` — lets both headers and long values wrap
+ * inside the width they are given rather than forcing the row onto one endless line.
+ *
+ * `width: max-content` is what makes the table exactly as wide as the sum of its columns: a plain
+ * block element sized `auto` would just fill `.register-scroll`, and there would be nothing left
+ * for that box to scroll. `min-width: 100%` is the fallback for the case a live register ever has
+ * so few columns that the sum is narrower than the screen.
+ */
+.register-table {
+  width: max-content;
+  min-width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  font-size: 12.5px;
+}
+
+.register-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  vertical-align: bottom;
+  padding: 8px 10px;
+  background: var(--green-bg);
+  border-bottom: 1px solid var(--rule);
+  border-right: 1px solid var(--rule);
+  text-align: left;
+  text-transform: uppercase;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: 0.05em;
+  color: var(--ink-3);
+  white-space: normal;
+  /* Break inside a word only when the word alone cannot fit. The legacy `break-word` value behaves
+     like `overflow-wrap: anywhere` here and split headings mid-word ("MANUFACTURIN / G DATE"). */
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+.register-table thead tr:first-child th:first-child {
+  border-top-left-radius: var(--r);
+}
+
+.register-table thead tr:first-child th:last-child {
+  border-top-right-radius: var(--r);
+}
+
+.register-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--rule);
+  border-right: 1px solid var(--rule);
+  vertical-align: top;
+  white-space: normal;
+  /* Values wrap between words; a token with no spaces in it (a batch number, a code) still breaks
+     rather than widening its column. `.rg-text` clamps the result to a preview. */
+  word-break: normal;
+  overflow-wrap: break-word;
+  /* Body prose sets `line-height: 1.55` for reading a paragraph; a dense 12.5px data cell does not
+     need that much air, and a row's height is the tallest cell in it — so every other cell in a row
+     that has one long narrative neighbour inherited that generous spacing as blank space under its
+     own short value. Tightened here, on the cell alone, rather than shrinking the table's font. */
+  line-height: 1.35;
+}
+
+.register-table th:last-child,
+.register-table td:last-child {
+  border-right: 0;
+}
+
+.register-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.register-table tbody tr:nth-child(even) {
+  background: var(--green-bg);
+}
+
+.register-table tbody tr:hover td {
+  background: #eaf1ec;
+}
+
+/* A field the workflow has not populated yet, so a blank cell reads as "not recorded" rather than
+   as a rendering fault. */
+.register-table .rg-empty {
+  color: var(--ink-3);
+}
+
+/* ---- a cell is a preview, the record is whole ----
+ *
+ * Row height is controlled here and nowhere else, and nothing is cut from the document to do it:
+ * every value is rendered in full and clipped to a few lines by the box below. That is what lets
+ * the search on the page, the Excel export and a screen reader all see the whole value while a
+ * three-paragraph incident narrative still occupies one register row rather than half a screen.
+ *
+ * The clamp is the only mechanism — there is deliberately no `max-height` on the row and no
+ * server-side truncation of the value.
+ */
+.register-table .rg-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  /* Prose breaks between words; a batch number or a code hierarchy with no spaces in it still has
+     to break somewhere rather than widen its column. */
+  overflow-wrap: anywhere;
+}
+
+/* One more line for the free-form columns — `narrative: true` in the COLUMNS array. Kept in step
+   with `NARRATIVE_PREVIEW_LINES` in the register view, which decides which cells get the control
+   below. */
+.register-table .rg-narrative {
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+}
+
+/*
+ * The control that opens the rest, on the cells whose value does not fit — a real `<button>`, so it
+ * is in the tab order, works from the keyboard, and needs no hover, which a phone cannot give. It
+ * is styled as the cell it replaces rather than as a button: a register of buttons would read as a
+ * form.
+ */
+.register-table .rg-open {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Says "there is more of this", so a clipped value never reads as the whole value. Quiet enough
+   that fifty of them down a column do not become the loudest thing on the sheet. */
+.register-table .rg-more {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--green);
+}
+
+.register-table .rg-open:hover .rg-more,
+.register-table .rg-open:focus-visible .rg-more {
+  text-decoration: underline;
+}
+
+.register-table .rg-open:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
+/* Wider than the shell's confirmation dialog, because what it holds is a paragraph rather than a
+   question, and the value scrolls inside it rather than growing the dialog past the screen. */
+.rg-modal {
+  max-width: 560px;
+}
+
+.rg-modal .rg-modal-value {
+  margin-top: 10px;
+  max-height: 52vh;
+  overflow: auto;
+  font-size: 13.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * Only S/N stays in view. TMDA report number, date received, and every later column scroll
+ * together under it. Sticky cells need their own opaque background or the scrolling columns
+ * behind them would show through; the header corner needs a higher `z-index` than both the
+ * plain sticky header row and the plain sticky body column so it sits above whichever the
+ * reader scrolls past first. The edge shadow marks the freeze line.
+ */
+.register-table .rg-c1 {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--card);
+  box-shadow: 2px 0 4px -2px rgba(16, 25, 19, 0.18);
+}
+
+.register-table th.rg-c1 {
+  z-index: 3;
+  background: var(--green-bg);
+}
+
+.register-table tbody tr:nth-child(even) td.rg-c1 {
+  background: var(--green-bg);
+}
+
+.register-table tbody tr:hover td.rg-c1 {
+  background: #eaf1ec;
+}
+

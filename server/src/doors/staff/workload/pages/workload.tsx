@@ -234,6 +234,7 @@ export function WorkloadPage({
     <StaffShell
       title="Workload — AE Reports"
       pageTitle="Workload"
+      pageCss="caseCss"
       role={viewerRole}
       fullName={viewerName}
       active="workload"

@@ -547,15 +547,7 @@ export const imdrfTerms = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    // The same code can recur in a later release (a 2027 workbook reusing "G02002" is expected,
-    // not a collision) — uniqueness is scoped to the release, never global.
-    //
-    // `code` alone is not unique within one release: IMDRF's own Annex E cross-lists roughly 200
-    // terms under more than one category branch, reusing the same code at each hierarchy position
-    // (e.g. E0104 "Cerebral Hyperperfusion Syndrome" appears at both E01|E0104, under Nervous
-    // System, and E05|E0104, under Vascular System — the same term, deliberately shown in two
-    // places). `code_hierarchy` is what is actually unique: two rows may share a code, but never
-    // both a code and the exact position in the tree that code was reused at.
+
     uniqueIndex("imdrf_terms_release_code_hierarchy_uq").on(t.releaseId, t.code, t.codeHierarchy),
     // Serves both "list an annex's terms in source order" and the annex-count summary.
     index("imdrf_terms_release_annex_sort_idx").on(t.releaseId, t.annex, t.sortOrder),
@@ -566,32 +558,12 @@ export const imdrfTerms = pgTable(
   ],
 );
 
-/** Raw binary storage — the uploaded workbook's own bytes, held only while a staging row lives. */
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
   dataType() {
     return "bytea";
   },
 });
 
-/**
- * The hold between an administrator's "preview" and "confirm" clicks — not terminology data, and
- * deliberately not the tables above: this is one uploaded workbook's bytes and metadata, kept just
- * long enough to be re-validated and imported, or to expire unused.
- *
- * A row here exists in-memory in earlier deployments; it moved to Postgres because that hold has
- * to survive the request landing on a different application instance than the one that served the
- * preview. Render load-balances across instances when scaled, and an in-memory map on one process
- * is invisible to the others — a persistent disk would fix that only for a single instance and
- * block horizontal scaling entirely, where the database this office already runs does not.
- *
- * `token_hash` is a SHA-256 of the actual token, the same discipline `sessions.token_hash` already
- * keeps: the raw token is a bearer credential (whoever holds it may complete this import) and is
- * never written anywhere, including here — only its hash is, so a database dump holds nothing
- * usable. `created_by_user_id` is audit metadata, not a workflow coupling: it says who started an
- * import, the same way `audit_log.actor_user_id` says who did anything else, and carries no
- * foreign key from `reports`, `assessments`, F004 or the Register into IMDRF — see the comment on
- * `imdrfReleases` above for why that boundary matters.
- */
 export const imdrfImportStaging = pgTable(
   "imdrf_import_staging",
   {

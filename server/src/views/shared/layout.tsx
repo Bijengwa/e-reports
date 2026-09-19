@@ -58,6 +58,35 @@ export type LayoutProps = {
    * not be made to fetch a script that would find nothing to attach to.
    */
   f4Print?: boolean;
+  /**
+   * Load the staff shell's own stylesheet: the rail, the title bar, and the sign-out dialog every
+   * `StaffShell` page renders. `StaffShell` always sets this; a page reached before it — sign-in,
+   * the forced password change — does not.
+   */
+  shell?: boolean;
+  /** Load the sign-in / change-password card styles, shared with the 403 page's own centred card. */
+  auth?: boolean;
+  /**
+   * Load the orange form's own stylesheet — the public submission page, and the same component
+   * embedded in the staff door's "log a report" page.
+   */
+  orangeForm?: boolean;
+  /** Load the register list page's own stylesheet. */
+  register?: boolean;
+  /** Load the dashboard's own stylesheet. */
+  dashboard?: boolean;
+  /** Load the staff accounts page's own stylesheet (the one-time password panel). */
+  users?: boolean;
+  /** Load the activity log's own stylesheet (the two row tones). */
+  activity?: boolean;
+  /** Load the IMDRF terminology browser and admin pages' shared stylesheet. */
+  imdrf?: boolean;
+  /**
+   * Load the F004/case-display stylesheet: the assessment form, the manager's review of it, the
+   * Final F004, and the report drawer — everything built from `doors/staff/shared/components`,
+   * wherever one of those components is reached from.
+   */
+  caseCss?: boolean;
   children?: Children;
 };
 
@@ -79,6 +108,15 @@ export function Layout({
   registerDownload,
   imdrfPicker,
   f4Print,
+  shell,
+  auth,
+  orangeForm,
+  register,
+  dashboard,
+  users,
+  activity,
+  imdrf,
+  caseCss,
   children,
 }: LayoutProps): JSX.Element {
   return (
@@ -88,7 +126,20 @@ export function Layout({
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="referrer" content="same-origin" />
         <title>{title}</title>
-        <link rel="stylesheet" href="/assets/app.css" />
+        {/* Design tokens, resets and the primitives (buttons, cards, fields, tables) every page —
+            both doors — reaches for. Everything past this one is a page's own opt-in, the same
+            shape as the scripts below: a page that does not render a rail must not be made to fetch
+            the rail's stylesheet, and so on for the rest. */}
+        <link rel="stylesheet" href="/assets/css/base.css" />
+        {shell && <link rel="stylesheet" href="/assets/css/shell.css" />}
+        {auth && <link rel="stylesheet" href="/assets/css/auth.css" />}
+        {orangeForm && <link rel="stylesheet" href="/assets/css/orange-form.css" />}
+        {register && <link rel="stylesheet" href="/assets/css/register.css" />}
+        {dashboard && <link rel="stylesheet" href="/assets/css/dashboard.css" />}
+        {users && <link rel="stylesheet" href="/assets/css/users.css" />}
+        {activity && <link rel="stylesheet" href="/assets/css/activity.css" />}
+        {imdrf && <link rel="stylesheet" href="/assets/css/imdrf.css" />}
+        {caseCss && <link rel="stylesheet" href="/assets/css/case.css" />}
         {/* Deliberately not deferred — it has to run before the rail is painted. It is a few
             hundred bytes and sets one class on <html>. */}
         {railScript && <script src="/assets/rail.js"></script>}

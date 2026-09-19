@@ -315,6 +315,7 @@ export function CaseDetailPage({
   return (
     <StaffShell
       title={`${report.number} — AE Reports`}
+      pageCss="caseCss"
       // Unused once `topContent` is given — `StaffShell` renders `topContent` in its place — but
       // still required by `StaffShellProps`, exactly as `FinalDocumentPage` also passes one. Kept
       // in step with the bar's own title rather than the long `FORM_TITLE`.

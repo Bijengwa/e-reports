@@ -1,0 +1,71 @@
+/* The Dashboard's own stylesheet — `doors/staff/dashboard/pages/dashboard.tsx` alone. */
+
+/* ---------- dashboard ---------- */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.stat {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  padding: 14px 16px;
+}
+
+.stat b {
+  display: block;
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin: 4px 0 1px;
+}
+
+/* The Manager's "Serious AEs/AIs" card, the one `.stat` that is also a link (to Workload) and the
+   one drawn in the alarm red rather than the dashboard's usual palette — see the page's own
+   comment for why. */
+a.stat.stat-serious {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-color: var(--red);
+  background: var(--red-bg);
+}
+
+a.stat.stat-serious:hover {
+  border-color: var(--red-d);
+}
+
+.stat-serious-overdue {
+  color: var(--red-d);
+  font-weight: 700;
+}
+
+/* ---------- the workload pipeline ---------- */
+/*
+ * The four states are one flat bar, not four tiles: they are a filter over the list below, and a
+ * filter reads as a row of tabs. The rules live with `.mya-tabs` further down, which is the same
+ * bar the Officer's own page draws — one set of declarations, two names, so the two cannot drift.
+ *
+ * Still links rather than buttons: each is a GET of this page filtered to one state, which is
+ * what lets a filtered pipeline be bookmarked and reloaded.
+ */
+
+.dash-note {
+  margin-bottom: 18px;
+}
+
+.dash-recent,
+.dash-queue {
+  margin-top: 26px;
+}
+
+.dash-recent h2,
+.dash-queue h2 {
+  font-size: 15px;
+  font-weight: 600;
+}
+
