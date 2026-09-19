@@ -11,10 +11,10 @@ import { StaffShell } from "../../shared/shell.js";
  * list, and it is only a list; the documents, the approval, and the decision that produced them
  * are untouched.
  *
- * Every row says which Orange Report it came from, in words rather than by leaving a number to be
- * recognised. That relationship is the one thing a reader of a final F004 most needs and the one a
- * number alone does not give them: `MD-AE/2026/0008` beside `A3` beside a date is three facts with
- * nothing joining them, and naming the source is what joins them.
+ * One destination per row — the Final F004 itself — so the row is the link rather than a strip of
+ * buttons that all led there anyway. `.row-link` (`base.css`) stretches the number's own `<a>` over
+ * the whole `<tr>`; there is still exactly one real link in the row's markup, just reachable from
+ * anywhere in it.
  */
 
 /** One approved F004, as the list prints it. */
@@ -78,7 +78,6 @@ export function FinalReportsPage({
             <thead>
               <tr>
                 <th>Final F004</th>
-                <th>Source</th>
                 <th>Device</th>
                 <th>Severity</th>
                 <th>Approved</th>
@@ -86,25 +85,22 @@ export function FinalReportsPage({
                 <th>Assessment</th>
                 <th>Assigned officer</th>
                 <th>Status</th>
-                <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr>
+                // The row's one destination, everywhere on it — see `.row-link` in `base.css`. The
+                // number below is still the only real `<a>` in the markup; the class just stretches it.
+                <tr class="row-link">
                   {/* The number names the document, so it leads to the document. */}
                   <td>
-                    <a href={`/reports/${row.reportId}/final-document`} safe>
+                    <a
+                      href={`/reports/${row.reportId}/final-document`}
+                      class="row-link-target"
+                      safe
+                    >
                       {row.number}
                     </a>
-                  </td>
-
-                  {/* The relationship, said rather than implied. The link goes to the report page,
-                      where the Orange Report is shown on its own orange surface. The received date
-                      under it is the report's own and is never an assessment date. */}
-                  <td>
-                    <a href={`/reports/${row.reportId}`}>Orange Report</a>
-                    <span class="hint block" safe>{`Received ${receivedDay(row.receivedAt)}`}</span>
                   </td>
 
                   <td>
@@ -144,10 +140,6 @@ export function FinalReportsPage({
                       closing workflow in this MVP and no Closed to show. */}
                   <td>
                     <span class="tag muted">Assigned for work</span>
-                  </td>
-
-                  <td>
-                    <a href={`/reports/${row.reportId}/final-document`}>Open Final F004</a>
                   </td>
                 </tr>
               ))}

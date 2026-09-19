@@ -556,7 +556,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("what a row shows", () => {
     const body = (await get("/workload", manager.cookie)).body;
 
     expect(body).toContain("MD-AE/2026/9080");
-    expect(body).toContain(`href="/reports/${id}"`);
+    expect(body).toContain(`href="/reports/${id}?from=workload"`);
     // `19 Aug 2026`, the written form this page uses rather than the register's ISO date.
     expect(body).toContain("19 Aug 2026");
     expect(body).toContain("Philips IntelliVue MX450");
@@ -622,25 +622,30 @@ describe.skipIf(!INTEGRATION_ENABLED)("what a row shows", () => {
     expect((await get("/workload", manager.cookie)).body).toContain("Unassigned");
   });
 
-  it("names the row's way in after the move being asked for", async () => {
+  it("gives every row one way in, whatever bucket it is in", async () => {
     const manager = await signedInAs("manager", "Grace Mollel");
 
-    // Decide, for both ways a report reaches the manager. The row does not try to say WHICH
-    // decision: that depends on rules the report page owns, and a bar that guessed at them would
-    // be a second, quieter copy of those rules waiting to fall out of step.
-    await seedReport({ number: "MD-AE/2026/9094", status: "awaiting_decision" });
-    await seedReport({ number: "MD-AE/2026/9096", status: "awaiting_second_assessor" });
-    const deciding = (await get("/workload?stage=decision", manager.cookie)).body;
-    expect(rowCount(deciding)).toBe(2);
-    expect(deciding).toContain(">Decide</a>");
-    expect(deciding).not.toContain(">Open</a>");
-    expect(deciding).not.toContain(">Assign</a>");
+    // No per-status verb any more, and no second link: the row itself is the only way in, and
+    // `.row-link` stretches the number's own `<a>` over it — see `.row-link` in `base.css`. Two
+    // different buckets, same shape, because the decision itself is made on the report page, not
+    // guessed at here.
+    const decidingId = await seedReport({ number: "MD-AE/2026/9094", status: "awaiting_decision" });
+    const restingId = await seedReport({ number: "MD-AE/2026/9095", status: "received" });
 
-    await seedReport({ number: "MD-AE/2026/9095", status: "received" });
-    const resting = (await get("/workload?stage=not-started", manager.cookie)).body;
-    expect(resting).toContain(">Open</a>");
-    expect(resting).not.toContain(">Decide</a>");
-    expect(resting).not.toContain(">Assign</a>");
+    const decidingBody = (await get("/workload?stage=decision", manager.cookie)).body;
+    expect(rowCount(decidingBody)).toBe(1);
+    expect(decidingBody).toContain('class="row-link"');
+    expect(decidingBody).toContain(
+      `<a href="/reports/${decidingId}?from=workload" class="row-link-target">`,
+    );
+    expect(decidingBody).not.toContain("<th>Action</th>");
+
+    const restingBody = (await get("/workload?stage=not-started", manager.cookie)).body;
+    expect(restingBody).toContain('class="row-link"');
+    expect(restingBody).toContain(
+      `<a href="/reports/${restingId}?from=workload" class="row-link-target">`,
+    );
+    expect(restingBody).not.toContain("<th>Action</th>");
   });
 
   it("escapes a hostile device name rather than rendering it", async () => {
@@ -819,8 +824,8 @@ describe.skipIf(!INTEGRATION_ENABLED)("what each state holds", () => {
 
     // Both rows lead into the report, where the decision is actually made. The bar carries no
     // decision control of its own — it would have to repeat rules that live on that page.
-    expect(decision).toContain(`href="/reports/${afterFirst}"`);
-    expect(decision).toContain(`href="/reports/${afterSecond}"`);
+    expect(decision).toContain(`href="/reports/${afterFirst}?from=workload"`);
+    expect(decision).toContain(`href="/reports/${afterSecond}?from=workload"`);
     expect(decision).not.toContain("/assign-next-assessor");
     expect(decision).not.toContain("/assign-work-officer");
   });

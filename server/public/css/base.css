@@ -386,6 +386,30 @@ textarea:focus-visible,
   border-bottom: 0;
 }
 
+/*
+ * A row whose one real link — `.row-link-target`, wherever it sits in the row — is stretched over
+ * the whole `<tr>`, so a click anywhere on the row opens it rather than only the linked text. This
+ * is one real `<a>`, not a row of invisible ones: keyboard focus, screen readers and "open in new
+ * tab" all stay exactly what a single link's already are.
+ *
+ * `position: relative` goes on the row rather than the cell, because the target's `::after` is
+ * absolutely positioned and must cover every cell in the row, not just its own.
+ */
+.utable tr.row-link {
+  position: relative;
+  cursor: pointer;
+}
+
+.utable tr.row-link:hover td {
+  background: var(--green-bg);
+}
+
+.utable tr.row-link .row-link-target::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
 .tag {
   display: inline-block;
   font-size: 10.5px;

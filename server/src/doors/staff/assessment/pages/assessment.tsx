@@ -65,10 +65,9 @@ export function Assessment1Page({
     <StaffShell
       title={`Assessment 1 — F004 — ${report.number}`}
       pageCss="caseCss"
-      // The compact `DocHeader` below is now the page's own title row — an F004's identity, its
-      // countdown and its way back all live there, in one line, directly above the document. The
-      // shell's own title bar keeps a short label for the tab/a11y landmark and nothing that would
-      // print the same fact twice.
+      // Unused once `topContent` is given below — `StaffShell` renders `topContent` in its place —
+      // but still required by `StaffShellProps`, exactly as `CaseDetailPage`/`FinalDocumentPage`
+      // also pass one. Kept in step with the bar's own title.
       pageTitle="Assessment 1 — F004"
       role={viewerRole}
       fullName={viewerName}
@@ -76,27 +75,35 @@ export function Assessment1Page({
       f4Find
       countdown
       imdrfPicker
+      // One `.top` bar, not a second row underneath it — see `DocHeader`'s own doc comment. Back,
+      // the title, the countdown and Orange Report all live here now, beside the shell's own
+      // hamburger and signed-in name/role, rather than repeated a second time below them.
+      topContent={
+        <DocHeader
+          backHref="/assessments"
+          backLabel="Back to my assessments"
+          title="Assessment 1 — F004"
+          badge={
+            <Countdown
+              dueAt={dueAt}
+              completed={submitted}
+              serious={isSeriousCase(report.severity)}
+            />
+          }
+        >
+          {/* A label, not a button: it drives the checkbox below, so it opens the drawer with or
+              without a script running. Text, not an icon — the Orange Report control is named,
+              not just symbolised, the same way it always has been. */}
+          <label for="a1-drawer" class="btn a1-open orange-action">
+            Orange Report
+          </label>
+        </DocHeader>
+      }
     >
       {/* Everything that used to sit here — the Orange Report identity card, a standalone back
-          button, the divider under them — is gone. `DocHeader` is the one row the page opens
-          with; the official F004 masthead (`.f4-doc-head`, inside `F004Form`) follows immediately
-          after it. */}
-      <DocHeader
-        backHref="/assessments"
-        backLabel="Back to my assessments"
-        title="Assessment 1 — F004"
-        badge={
-          <Countdown dueAt={dueAt} completed={submitted} serious={isSeriousCase(report.severity)} />
-        }
-      >
-        {/* A label, not a button: it drives the checkbox below, so it opens the drawer with or
-            without a script running. Text, not an icon — the Orange Report control is named, not
-            just symbolised, the same way it always has been. */}
-        <label for="a1-drawer" class="btn a1-open orange-action">
-          Orange Report
-        </label>
-      </DocHeader>
-
+          button, the divider under them — is gone. `DocHeader` is now the shell's own title bar
+          (`topContent`, above); the official F004 masthead (`.f4-doc-head`, inside `F004Form`)
+          is the first thing the page body itself shows. */}
       <div class="a1-work">
         {/* No name, so it is never posted; outside the F004's form, so it is not its business. */}
         <input type="checkbox" id="a1-drawer" class="a1-pick" data-a1-drawer />

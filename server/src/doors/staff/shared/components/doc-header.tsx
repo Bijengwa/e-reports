@@ -15,16 +15,18 @@ export type DocHeaderProps = {
 };
 
 /**
- * The one-row toolbar every F004 surface opens with, immediately above the official document.
+ * An F004 working surface's whole title-bar row, rendered in place of `pageTitle` via `StaffShell`'s
+ * `topContent` — ONE `.top` bar, not a second row underneath it. The hamburger and the signed-in
+ * name/role are `StaffShell`'s own and stay put; this is everything between them.
  *
- * Replaces the old `.staff-head` block — an Orange Report summary card, a standalone back button,
- * and (on secondary assessment) an explanatory heading and legend — that used to sit between the
- * application chrome and the F004's own masthead. A reader opening any F004 now sees this one row
- * and then the document itself; nothing of the application repeats what the form already says
- * about itself in `.f4-doc-head`.
+ * The same "one `.top` bar" pattern `CaseDetailTopContent` (`register/pages/report-detail.tsx`) and
+ * `FinalF004TopContent` (`final-reports/pages/final-document.tsx`) already use, shared here because
+ * Assessment 1 and Secondary assessment need exactly the same row and nothing surface-specific:
+ * back, the dynamic title, an optional badge (the `Countdown`), and the surface's own actions
+ * (Orange Report today).
  *
  * `back` is icon-only by design — see the F004 refactor's own rule that back/download/print/close
- * are SVG, not text buttons, on a toolbar that otherwise stays out of the document's way.
+ * are SVG, not text buttons, on a bar that otherwise stays out of the document's way.
  */
 export function DocHeader({
   backHref,
@@ -34,13 +36,11 @@ export function DocHeader({
   children,
 }: DocHeaderProps): JSX.Element {
   return (
-    <div class="f4-toolbar">
-      <a href={backHref} class="f4-icon-btn f4-toolbar-back" aria-label={backLabel}>
+    <div class="f4-surface-top">
+      <a href={backHref} class="f4-icon-btn" aria-label={backLabel}>
         <IconBack />
       </a>
-      <h2 class="f4-toolbar-title" safe>
-        {title}
-      </h2>
+      <h1 safe>{title}</h1>
       {badge}
       <div class="f4-toolbar-actions">{children}</div>
     </div>

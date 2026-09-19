@@ -860,10 +860,8 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
     const listed = await get("/final-reports", manager.cookie);
     expect(listed.statusCode).toBe(200);
     expect(listed.body).toContain(report.number);
-    // Both ways in: the document itself, and the Orange Report it was assessed from.
+    // One destination, the document itself — the row is a `.row-link` over this one `<a>`.
     expect(listed.body).toContain(`href="/reports/${report.id}/final-document"`);
-    expect(listed.body).toContain(`href="/reports/${report.id}"`);
-    expect(listed.body).toContain("Orange Report");
     // Who approved it, who is carrying it out, and how far the chain ran.
     expect(listed.body).toContain("Grace Mollel");
     expect(listed.body).toContain(worker.name);
@@ -879,12 +877,15 @@ describe.skipIf(!INTEGRATION_ENABLED)("the final document", () => {
     const { manager, first } = await afterFirstAssessment();
 
     // A manager's dashboard renders for them now instead of redirecting to the workload, and the
-    // rail carries both — the summary and the queue answer different questions.
+    // rail carries both — the summary and the queue answer different questions. `/reports` is not
+    // among them: that was the dashboard's own dead link to a page that no longer exists, not a
+    // rail entry, and the dashboard's action buttons now go only to Workload and Final Reports.
     const dashboard = await get("/dashboard", manager.cookie);
     expect(dashboard.statusCode).toBe(200);
-    for (const href of ["/dashboard", "/workload", "/reports", "/final-reports"]) {
+    for (const href of ["/dashboard", "/workload", "/final-reports"]) {
       expect(dashboard.body, href).toContain(`href="${href}"`);
     }
+    expect(dashboard.body).not.toContain('href="/reports"');
     // The four states, under the words the workload page already uses for them, and never a
     // database status.
     for (const label of ["Not started", "In progress", "Decision", "Assigned for work"]) {

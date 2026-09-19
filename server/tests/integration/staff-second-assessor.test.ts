@@ -571,10 +571,10 @@ describe.skipIf(!INTEGRATION_ENABLED)("what the assignment hands over", () => {
   it("offers the manager the way in from the state that is waiting on them", async () => {
     const { manager, other, report } = await waiting();
 
-    // The row's own link, matched as the anchor rather than as bare words. It says Decide — the
-    // move this state asks for — and which decision, and who may be named, is settled on the
-    // report, where those rules are enforced.
-    const rowLink = `<a href="/reports/${report.id}">Decide</a>`;
+    // The row's own link — the whole row, per `.row-link` in `base.css` — matched as the anchor
+    // rather than as bare words. There is no per-status verb any more: which decision, and who may
+    // be named, is settled on the report the link points at, not guessed at from the row.
+    const rowLink = `<a href="/reports/${report.id}?from=workload" class="row-link-target">`;
 
     const waitingState = (await get(`/workload?stage=${ASSIGN_NEXT_STAGE}`, manager.cookie)).body;
     expect(waitingState).toContain(rowLink);
@@ -590,12 +590,12 @@ describe.skipIf(!INTEGRATION_ENABLED)("what the assignment hands over", () => {
     await assign(report, manager.cookie, other.id);
 
     // Once named, the row says which assessment the report is on and who has it, rather than
-    // offering a way in again.
+    // offering a way in again. It is still the same one link — the number's own — since the
+    // duplicate Action column that used to say "Open" is gone.
     const working = (await get("/workload?stage=in-progress", manager.cookie)).body;
     expect(working).toContain("<td>A2</td>");
     expect(working).toContain(`<td><span>${other.name}</span></td>`);
-    expect(working).toContain(`<a href="/reports/${report.id}">Open</a>`);
-    expect(working).not.toContain(rowLink);
+    expect(working).toContain(rowLink);
   });
 });
 

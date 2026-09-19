@@ -160,12 +160,14 @@ export function DashboardPage({
 
       <p class="dash-note">
         {/* The pipeline first for a manager: the figures above say how much, and the workload is
-            where they act on it. The register is beside it, not replaced by it.
+            where they act on it.
 
             An Officer gets their own two lists instead. The register is not theirs — it lists
             every report in the office, and `caseDetailRoutes` refuses it to them — so a button
             offering it here would be a button that answers 403. `received` is the flag, because
-            it is defined for exactly one role and this page already reads it that way. */}
+            it is defined for exactly one role and this page already reads it that way.
+
+            An Administrator gets neither — just the figures above and the activity trail below. */}
         {received !== undefined ? (
           <>
             <a href="/assessments" class="btn">
@@ -175,23 +177,16 @@ export function DashboardPage({
               My work
             </a>
           </>
-        ) : managerSummary === undefined ? (
-          <a href="/reports" class="btn">
-            Open the reports list
-          </a>
-        ) : (
+        ) : managerSummary !== undefined ? (
           <>
             <a href="/workload" class="btn">
               Open workload
             </a>{" "}
             <a href="/final-reports" class="btn ghost">
               Final reports
-            </a>{" "}
-            <a href="/reports" class="btn ghost">
-              Open the reports list
             </a>
           </>
-        )}
+        ) : null}
       </p>
 
       {received !== undefined && (

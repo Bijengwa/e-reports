@@ -64,8 +64,8 @@ export function SecondaryAssessmentPage({
     <StaffShell
       title={`Secondary assessment — ${report.number}`}
       pageCss="caseCss"
-      // The compact `DocHeader` below is now the page's own title row — see the same note on
-      // `Assessment1Page`.
+      // Unused once `topContent` is given below — `StaffShell` renders `topContent` in its place —
+      // but still required by `StaffShellProps`. Kept in step with the bar's own title.
       pageTitle={`Secondary assessment (A${ordinal})`}
       role={viewerRole}
       fullName={viewerName}
@@ -73,26 +73,35 @@ export function SecondaryAssessmentPage({
       f4Find
       countdown
       imdrfPicker
+      // One `.top` bar, not a second row underneath it — see `DocHeader`'s own doc comment and the
+      // same note on `Assessment1Page`. Back, the title, the countdown and Orange Report all live
+      // here now, beside the shell's own hamburger and signed-in name/role.
+      topContent={
+        <DocHeader
+          backHref="/assessments"
+          backLabel="Back to my assessments"
+          title={`Secondary assessment (A${ordinal})`}
+          badge={
+            <Countdown
+              dueAt={dueAt}
+              completed={submitted}
+              serious={isSeriousCase(report.severity)}
+            />
+          }
+        >
+          <label for="a1-drawer" class="btn a1-open orange-action">
+            Orange Report
+          </label>
+        </DocHeader>
+      }
     >
       {/* Everything that used to sit here — the Orange Report identity card, a standalone back
           button, the "Secondary assessment" heading and explanatory paragraph, and the
           Agree/Clarification/Disagree legend — is gone. What each of those colours means is
           already carried by the inline review controls themselves (`A2InlineDecision`'s own
-          labelled radios), so the legend was restating, not teaching. `DocHeader` is the one row
-          the page opens with; the official F004 masthead follows immediately after it. */}
-      <DocHeader
-        backHref="/assessments"
-        backLabel="Back to my assessments"
-        title={`Secondary assessment (A${ordinal})`}
-        badge={
-          <Countdown dueAt={dueAt} completed={submitted} serious={isSeriousCase(report.severity)} />
-        }
-      >
-        <label for="a1-drawer" class="btn a1-open orange-action">
-          Orange Report
-        </label>
-      </DocHeader>
-
+          labelled radios), so the legend was restating, not teaching. `DocHeader` is now the
+          shell's own title bar (`topContent`, above); the official F004 masthead follows
+          immediately as the page body's first content. */}
       <div class="a1-work">
         <input type="checkbox" id="a1-drawer" class="a1-pick" data-a1-drawer />
 

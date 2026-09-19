@@ -77,8 +77,6 @@ export type Bucket = {
   state: string;
   /** The sentence under the heading: what this state means, in words a manager already uses. */
   hint: string;
-  /** What a row's way in is called — the difference between "name someone" and "decide". */
-  action: string;
   statuses: readonly string[];
   Icon: () => JSX.Element;
 };
@@ -93,7 +91,6 @@ export type Bucket = {
  * Four captions rather than one, because a tab, a heading, a cell and a link are read differently.
  * `label` is what fits in the bar. `heading` is what the page says once a state is chosen, where
  * there is room to name who is being waited on. `state` is what one row says about itself.
- * `action` is what the reader will be doing when they follow the row.
  *
  * Two states fold several statuses together, and both folds are deliberate. "In progress" holds
  * `first_assessment` and `second_assessment` because they are one fact — an Officer is writing an
@@ -113,7 +110,6 @@ export const BUCKETS: readonly Bucket[] = [
     heading: "Not started",
     state: "Not started",
     hint: "Received. Assessment work has not begun.",
-    action: "Open",
     statuses: ["received"],
     Icon: IconNotStarted,
   },
@@ -123,7 +119,6 @@ export const BUCKETS: readonly Bucket[] = [
     heading: "In progress",
     state: "In progress",
     hint: "An Officer is writing an assessment. The Assessment column says which one.",
-    action: "Open",
     statuses: ["first_assessment", "second_assessment"],
     Icon: IconInProgress,
   },
@@ -133,7 +128,6 @@ export const BUCKETS: readonly Bucket[] = [
     heading: "Waiting on you — decision",
     state: "Decision",
     hint: "An assessment is in. Open the report to assign the next assessor, or approve it and assign the work.",
-    action: "Decide",
     statuses: ["awaiting_second_assessor", "awaiting_decision"],
     Icon: IconDecision,
   },
@@ -143,7 +137,6 @@ export const BUCKETS: readonly Bucket[] = [
     heading: "Assigned for work",
     state: "Assigned for work",
     hint: "Approved, with a final document and an Officer to carry it out.",
-    action: "Open",
     statuses: ["assigned_for_work"],
     Icon: IconAssignedForWork,
   },
@@ -155,18 +148,6 @@ export const BUCKETED_STATUSES: readonly string[] = BUCKETS.flatMap((bucket) => 
 /** Which state a stored status reads as, or undefined for one no bucket claims. */
 export function bucketOfStatus(status: string): Bucket | undefined {
   return BUCKETS.find((bucket) => bucket.statuses.includes(status));
-}
-
-/**
- * What the way into one row is called, read from the row's own state.
- *
- * Two words across four states, and which one a row gets is the shortest honest answer to "what
- * will I be doing when I get there": naming the next assessor, deciding, or simply reading. Taken
- * from the bucket rather than from a condition here, so a state added to the table above arrives
- * with its own verb instead of silently falling back to "Open".
- */
-function actionOf(status: string): string {
-  return bucketOfStatus(status)?.action ?? "Open";
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -311,16 +292,15 @@ export function WorkloadPage({
                 <th>Assigned</th>
                 <th>Deadline</th>
                 <th>Status</th>
-                <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => {
                 const serious = isSeriousCase(row.severity);
                 return (
-                  <tr class={serious ? "wl-row-serious" : ""}>
+                  <tr class={serious ? "row-link wl-row-serious" : "row-link"}>
                     <td>
-                      <a href={`/reports/${row.id}?from=workload`} safe>
+                      <a href={`/reports/${row.id}?from=workload`} class="row-link-target" safe>
                         {row.number}
                       </a>
                     </td>
@@ -376,14 +356,6 @@ export function WorkloadPage({
                       <span class="tag muted" safe>
                         {bucketOfStatus(row.status)?.state ?? row.status}
                       </span>
-                    </td>
-                    {/* One way in, worded for what the reader will be doing when they get there.
-                        The decision itself is made on the report, where the rules about who may
-                        be named are enforced — not from here, which would have to repeat them. */}
-                    <td>
-                      <a href={`/reports/${row.id}?from=workload`} safe>
-                        {actionOf(row.status)}
-                      </a>
                     </td>
                   </tr>
                 );

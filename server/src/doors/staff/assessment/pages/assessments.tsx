@@ -75,16 +75,6 @@ export type AssignmentRow = {
   assignedAt: Date | null;
   /** When this assignment was submitted, or null while it is still outstanding. */
   completedAt: Date | null;
-  /**
-   * Whether this Officer may still open the report page behind the number.
-   *
-   * False once the manager has approved and assigned the work: at that point the report page is
-   * the settled record of an argument that is over, carrying every assessor's document and the
-   * manager's whole decision history, and `caseDetailRoutes` refuses it to an Officer. The number
-   * stays on the row and stops being a link, which is the honest rendering of "this is no longer
-   * yours to open" — a link that answers 403 would be worse.
-   */
-  reportOpen: boolean;
 };
 
 /** What one row says about itself. The same three words at every ordinal — that is the point. */
@@ -92,13 +82,6 @@ const STATE_LABELS: Record<AssignmentState, string> = {
   "not-started": "Not started",
   "in-progress": "In progress",
   submitted: "Submitted",
-};
-
-/** What the way in is called, which is the one thing that does differ between the three. */
-const ACTION_LABELS: Record<AssignmentState, string> = {
-  "not-started": "Start",
-  "in-progress": "Continue",
-  submitted: "View",
 };
 
 /**
@@ -145,22 +128,17 @@ function AssignmentRows({
             <th>Status</th>
             <th>Assigned</th>
             <th>Deadline</th>
-            <th>Action</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => {
             const serious = isSeriousCase(row.severity);
             return (
-              <tr class={serious ? "wl-row-serious" : ""}>
+              <tr class={serious ? "row-link wl-row-serious" : "row-link"}>
                 <td>
-                  {row.reportOpen ? (
-                    <a href={`/reports/${row.reportId}`} safe>
-                      {row.number}
-                    </a>
-                  ) : (
-                    <span safe>{row.number}</span>
-                  )}
+                  <a href={assignmentHref(row)} class="row-link-target" safe>
+                    {row.number}
+                  </a>
                 </td>
                 <td>{day(row.receivedAt)}</td>
                 <td>
@@ -203,11 +181,6 @@ function AssignmentRows({
                       serious={serious}
                     />
                   )}
-                </td>
-                <td>
-                  <a href={assignmentHref(row)} class="btn ghost btn-sm" safe>
-                    {ACTION_LABELS[row.state]}
-                  </a>
                 </td>
               </tr>
             );

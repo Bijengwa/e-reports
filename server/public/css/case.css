@@ -78,6 +78,13 @@ tr.wl-row-serious > td:first-child {
   border-left: 3px solid var(--red);
 }
 
+/* Same specificity as `.utable tr.row-link:hover td` in base.css, and after it in the cascade, so
+   a serious row stays red under the cursor rather than the row-link hover's green painting over
+   the one tint that says this row is urgent. */
+tr.wl-row-serious.row-link:hover > td {
+  background: var(--red-bg);
+}
+
 .tag.tag-serious {
   background: var(--red);
   color: #fff;
@@ -971,7 +978,7 @@ ul.f4-card-c li { margin-bottom: 3px; }
 }
 @media print {
   .rail, .top, .f4-buttons, .f4-jump, .a1-open,
-  .f4-toolbar, .a1-drawer, .a1-scrim { display: none !important; }
+  .a1-drawer, .a1-scrim { display: none !important; }
   /* `.f4-section` deliberately excluded — see its own rule above for why forcing the whole
      section to avoid splitting is what caused the large blank areas. */
   .f4-row, .f4-block, .f4-card { break-inside: avoid; }
@@ -1017,31 +1024,11 @@ ul.f4-card-c li { margin-bottom: 3px; }
 }
 
 /*
- * The compact document toolbar: back, the dynamic F004 title, an optional badge (the
- * `Countdown`), and the surface's own actions (Orange Report / the Final F004 type selector /
- * download / print), all on one row, immediately above the F004's own masthead.
- *
- * Replaces `.staff-head` on every F004 surface — see `DocHeader`. Icon-only controls (back,
- * download, print, close) share `.f4-icon-btn`, a square button the same shape as `.pw-toggle`
- * elsewhere in the app, so an icon-only control always looks like one thing across the portal.
+ * Icon-only controls (back, download, print, close) shared by every F004 surface's title-bar row —
+ * `.f4-surface-top`, `.case-top` and `.final-f004-top` all reach for this. Square, the same shape
+ * as `.pw-toggle` elsewhere in the app, so an icon-only control always looks like one thing across
+ * the portal.
  */
-.f4-toolbar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 20px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid var(--rule);
-}
-
-.f4-toolbar-title {
-  font-size: 17px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  margin-right: auto;
-}
-
 .f4-toolbar-actions {
   display: flex;
   align-items: center;
@@ -1132,15 +1119,17 @@ ul.f4-card-c li { margin-bottom: 3px; }
 
 /*
  * Final F004's title-bar row, rendered inside `.top` itself via `StaffShell`'s `topContent` — not
- * a second `.f4-toolbar` underneath it. See `FinalF004TopContent`'s own doc comment.
+ * a second row underneath it. See `FinalF004TopContent`'s own doc comment.
  *
- * `.case-top` shares every rule here: it is the same "one `.top` bar, not a second toolbar" pattern
- * for the working F004/report page (`CaseDetailTopContent` in `report-detail.tsx`) — back, the
- * dynamic title, the countdown, and the Orange Report trigger, all inside `topContent` rather than
- * a second row underneath it.
+ * `.case-top` and `.f4-surface-top` share every rule here: the same "one `.top` bar, not a second
+ * row" pattern, for the working F004/report page (`CaseDetailTopContent` in `report-detail.tsx`)
+ * and for Assessment 1 / Secondary assessment (`DocHeader`) respectively — back, the dynamic title,
+ * the countdown, and the Orange Report trigger, all inside `topContent` rather than a second row
+ * underneath it.
  */
 .final-f004-top,
-.case-top {
+.case-top,
+.f4-surface-top {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1150,7 +1139,8 @@ ul.f4-card-c li { margin-bottom: 3px; }
 }
 
 .final-f004-top h1,
-.case-top h1 {
+.case-top h1,
+.f4-surface-top h1 {
   margin: 0;
   white-space: nowrap;
   font-size: 1.15rem;
@@ -1162,16 +1152,14 @@ ul.f4-card-c li { margin-bottom: 3px; }
 }
 
 .final-f004-top .f4-icon-btn,
-.case-top .f4-icon-btn {
+.case-top .f4-icon-btn,
+.f4-surface-top .f4-icon-btn {
   flex: 0 0 auto;
 }
 
-.case-top .f4-toolbar-actions {
+.case-top .f4-toolbar-actions,
+.f4-surface-top .f4-toolbar-actions {
   margin-left: auto;
-}
-
-@media (max-width: 640px) {
-  .f4-toolbar-title { width: 100%; order: -1; margin-right: 0; }
 }
 
 /* ---------- assessment workspace: the F004 in full, the report in a drawer ---------- */

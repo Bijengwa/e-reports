@@ -86,16 +86,15 @@ export function MyWorkPage({ viewerRole, viewerName, rows }: MyWorkPageProps): J
                 <th>Assigned by</th>
                 <th>Assigned</th>
                 <th>Status</th>
-                <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr>
+                <tr class="row-link">
                   {/* To the work item, not to the register's copy of the report. The work item is
                       the reader's own page and is refused to anyone the assignment does not name. */}
                   <td>
-                    <a href={`/reports/${row.reportId}/final-document`} safe>
+                    <a href={`/reports/${row.reportId}/final-document`} class="row-link-target" safe>
                       {row.number}
                     </a>
                   </td>
@@ -119,11 +118,6 @@ export function MyWorkPage({ viewerRole, viewerName, rows }: MyWorkPageProps): J
                     <span class="tag muted" safe>
                       {STATUS_LABELS[row.status] ?? row.status}
                     </span>
-                  </td>
-                  <td>
-                    <a href={`/reports/${row.reportId}/final-document`} class="btn ghost btn-sm">
-                      Open
-                    </a>
                   </td>
                 </tr>
               ))}
