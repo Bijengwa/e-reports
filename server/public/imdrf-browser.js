@@ -697,6 +697,250 @@
       });
     }
 
+    /* ---- the section strip ------------------------------------------------------ */
+    /*
+     * The seven coding items across the top, for the whole length of the page.
+     *
+     * The strip itself is server-rendered (`SectionStrip` in pages/imdrf.tsx) and stays under the
+     * title bar for the whole scroll — the same thing F004's `.f4-jump` row is, and the same
+     * argument: a way around a document several screens long must not scroll away after the first
+     * screen. It scrolls sideways rather than wrapping, because seven coding references wrap to
+     * three lines on a phone and three pinned lines of navigation is most of a phone.
+     *
+     * This file owns all of it: which item is marked, bringing that item into the strip's own
+     * view, fading whichever end has more past it, the arrow keys, and what pressing one does.
+     * `rail.js` stands its own transient tools strip down wherever `[data-nav-strip]` is present,
+     * so there is one navigation across the top of this page and never two.
+     *
+     * Marking is by reading position, not by which sections happen to be open. A reader may open
+     * three of the seven; the one they are LOOKING at is the one whose heading has most recently
+     * passed under the bar.
+     */
+    (function sectionStrip() {
+      var strip = document.querySelector("[data-nav-strip]");
+      if (!strip) return;
+
+      var track = strip.querySelector("[data-imdrf-nav-track]") || strip;
+      var buttons = Array.prototype.slice.call(strip.querySelectorAll("[data-imdrf-jump]"));
+      if (!buttons.length) return;
+
+      var topBar = document.querySelector(".top");
+
+      /** Everything pinned to the top of the viewport: the title bar and this strip. */
+      function chrome() {
+        return (topBar ? topBar.offsetHeight : 0) + strip.offsetHeight;
+      }
+
+      /*
+       * Fade whichever end still has items past it, and neither when all seven already fit.
+       *
+       * Measured rather than assumed: seven coding references are one comfortable line at 1200px
+       * and rather more than one at 360px.
+       */
+      function edges() {
+        var slack = track.scrollWidth - track.clientWidth;
+        if (slack <= 1) {
+          strip.removeAttribute("data-edge");
+          return;
+        }
+        var atStart = track.scrollLeft <= 1;
+        var atEnd = track.scrollLeft >= slack - 1;
+        strip.setAttribute("data-edge", atStart ? "end" : atEnd ? "start" : "both");
+      }
+
+      /*
+       * Bring the marked item into the strip's own view.
+       *
+       * `scrollLeft` on the track, never `scrollIntoView`: the latter walks up the ancestors and
+       * scrolls the document too, so asking for an item 40px off the right edge would also jump
+       * the page the reader is in the middle of.
+       */
+      function reveal() {
+        var on = track.querySelector(".on");
+        if (!on) return;
+        track.scrollLeft = Math.max(0, on.offsetLeft - (track.clientWidth - on.offsetWidth) / 2);
+        edges();
+      }
+
+      function mark(annex) {
+        var changed = false;
+        buttons.forEach(function (button) {
+          var on = button.getAttribute("data-imdrf-jump") === annex;
+          if (on === button.classList.contains("on")) return;
+          changed = true;
+          button.classList.toggle("on", on);
+          if (on) button.setAttribute("aria-current", "true");
+          else button.removeAttribute("aria-current");
+        });
+        /*
+         * Only when the mark actually moved, which is also the whole rule for when this strip is
+         * allowed to move itself. A reader who has scrolled it sideways to look at 3.3.3 is left
+         * where they put it for as long as they stay in the same coding item; the strip catches
+         * up the moment they scroll the page into the next one.
+         */
+        if (changed) reveal();
+      }
+
+      /**
+       * Which coding item is being read: whichever has the most of itself on screen.
+       *
+       * The same rule `f4-find.js` marks the F004 jump row with, and for the same reasons. The
+       * obvious alternative — the last heading to pass under the chrome — is wrong at both ends
+       * of a page like this one. At the foot of the document the last two or three headings are
+       * all on screen at once and none of them can pass anything, so it marks an item the reader
+       * scrolled past several screens ago. With every section shut the page does not scroll at
+       * all, so it never passes anything either. Area answers both without a special case: a
+       * section standing open fills the viewport and wins, a shut one is a single row and does
+       * not.
+       *
+       * Measured from below the chrome, because the band above it is covered by the title bar and
+       * this strip and is not being read by anyone.
+       */
+      function current() {
+        var top = chrome();
+        var bottom = window.innerHeight;
+        var best = sections[0];
+        var mostSeen = -1;
+
+        sections.forEach(function (section) {
+          var box = section.getBoundingClientRect();
+          var seen = Math.min(box.bottom, bottom) - Math.max(box.top, top);
+          // Strictly greater, so a tie between two shut sections keeps the earlier one.
+          if (seen > mostSeen) {
+            mostSeen = seen;
+            best = section;
+          }
+        });
+
+        return best;
+      }
+
+      function sync() {
+        var section = current();
+        if (section) mark(section.getAttribute("data-imdrf-section"));
+      }
+
+      /*
+       * Put a section's heading directly under the chrome.
+       *
+       * The chrome is subtracted so the heading lands under the strip rather than behind it —
+       * `scrollIntoView` would put it at the very top of the viewport, where both the title bar
+       * and this strip cover it.
+       *
+       * Instant, not smoothed. This is a reference document's section navigation: the reader
+       * asked to be at 3.3.1 and the strip already says they are, so animating a thousand pixels
+       * of terminology past them adds nothing to look at and a second to wait. It also behaves
+       * the same for a reader who has asked for reduced motion as for one who has not, rather
+       * than through a branch that has to be kept true.
+       */
+      function goTo(section) {
+        window.scrollTo(
+          0,
+          Math.max(0, window.scrollY + section.getBoundingClientRect().top - chrome() - 8),
+        );
+      }
+
+      buttons.forEach(function (button) {
+        button.addEventListener("click", function () {
+          var annex = button.getAttribute("data-imdrf-jump");
+          var section = root.querySelector('[data-imdrf-section="' + annex + '"]');
+          if (!section) return;
+
+          // Marked before the section is asked for, not after it arrives: the reader pressed it,
+          // so the strip should say so while the first page of terms is still in flight.
+          mark(annex);
+
+          /*
+           * Opened once, and its promise kept: a second `openSection` for the same section sees
+           * `data-loaded="true"` and resolves at once, which would put the landing back exactly
+           * where this is trying to move it away from.
+           */
+          var opening = openSection(section);
+
+          /*
+           * Scrolled twice, and the second one is the one that lands.
+           *
+           * A section's terms are fetched when it opens, so at the moment of the press the
+           * document is as short as it was with that section closed — and the browser clamps a
+           * scroll to the height it has. Pressing the last coding item on a page with everything
+           * else shut would move nothing at all. The first call goes as far as it can now, so
+           * something happens under the reader's finger; the second runs once the section has
+           * settled and the page has its real height, whether the terms arrived or the request
+           * failed and left a message in their place.
+           */
+          function land() {
+            goTo(section);
+          }
+
+          land();
+          opening.then(land, land);
+        });
+      });
+
+      /*
+       * Left and right walk the strip, Home and End reach its ends.
+       *
+       * Tab still steps through every item in document order — nothing here takes one out of the
+       * tab sequence. This is the extra a horizontally scrolling row earns: the reader can see
+       * the row is a row, and expects the arrows to follow it.
+       */
+      strip.addEventListener("keydown", function (event) {
+        var step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+
+        if (event.key === "Home" || event.key === "End") {
+          event.preventDefault();
+          buttons[event.key === "Home" ? 0 : buttons.length - 1].focus();
+          return;
+        }
+        if (!step) return;
+
+        var at = buttons.indexOf(document.activeElement);
+        if (at === -1) return;
+        event.preventDefault();
+        buttons[(at + step + buttons.length) % buttons.length].focus();
+      });
+
+      track.addEventListener("scroll", edges, { passive: true });
+
+      window.addEventListener("resize", edges);
+
+      /*
+       * Ten reads a second at most, and always one more after the scrolling stops.
+       *
+       * Seven `getBoundingClientRect` calls is nothing, but running them on every scroll event of
+       * a trackpad flick is still work nobody asked for. The trailing call is the important half:
+       * without it the last event of a burst is the one dropped, and the strip would be left
+       * marking the coding item the reader passed through rather than the one they stopped in.
+       *
+       * A clock rather than `requestAnimationFrame`, which does not run while the tab is not
+       * being painted.
+       */
+      var last = 0;
+      var trailing = null;
+
+      window.addEventListener(
+        "scroll",
+        function () {
+          var wait = 100 - (Date.now() - last);
+          if (wait <= 0) {
+            last = Date.now();
+            sync();
+            return;
+          }
+          if (trailing) return;
+          trailing = setTimeout(function () {
+            trailing = null;
+            last = Date.now();
+            sync();
+          }, wait);
+        },
+        { passive: true },
+      );
+
+      sync();
+      edges();
+    })();
+
     /* ---- the opening load ------------------------------------------------------ */
 
     function dismissBoot() {

@@ -16,12 +16,16 @@ export type StaffShellProps = {
   pageTitle: string;
   /**
    * A small, fixed-width badge shown beside `pageTitle` in the title bar — the F004 assessment
-   * header's own `Countdown`, and nothing else today.
+   * header's own `Countdown`, and the IMDRF page's release badge.
    *
    * The bar's height is fixed (see `.top` in css/shell.css) on the argument that nothing beside the
-   * title may wrap or grow it. A `Countdown` pill is one line, `white-space: nowrap`, and never
-   * grows with content the way a count or an action label could — which is why it, alone, gets a
-   * slot here rather than joining the page body's own header the way every other addition does.
+   * title may wrap or grow it. Both of these are one line, `white-space: nowrap`, and never grow
+   * with content the way a count or an action label could — which is the test for this slot.
+   * Anything that can wrap belongs in the page body instead.
+   *
+   * The IMDRF badge is also a chooser when more than one release is published. That still passes
+   * the test: the control itself is one line, and the menu it opens is absolutely positioned out
+   * of the bar rather than laid out inside it.
    */
   titleExtra?: JSX.Element;
   /**
@@ -326,6 +330,13 @@ export function StaffShell({
       caseCss={pageCss === "caseCss"}
     >
       <div class="shell">
+        {/* The first tab stop on every staff page. Off-screen until focused, at which point it
+            comes to the top-left corner — a keyboard reader reaching a long Register or a
+            thousand-row terminology page should not have to walk the rail to get past it. */}
+        <a href="#staff-main" class="skip-link">
+          Skip to main content
+        </a>
+
         {/* `on-dark` is what recolours the mark for the rail: white folder, green cross. The
             paths are the same ones the sign-in card renders. */}
         <aside class="rail on-dark" id="rail">
@@ -445,6 +456,14 @@ export function StaffShell({
 
             {isAdministrator && (
               <>
+                {/* The rail's one grouping, and the only one the list earns: an administrator's
+                    entries answer a different question from everyone else's — who may sign in and
+                    what the portal is configured with, rather than what is in the register.
+
+                    A caption carrying its own rule rather than a wrapper with a role: the links
+                    below it are still one flat list of links in one nav, which is what they are,
+                    and the collapsed rail keeps the rule and drops the words. */}
+                <p class="rail-group">Administration</p>
                 <a
                   href="/users"
                   class={active === "users" ? "on" : ""}
@@ -501,7 +520,12 @@ export function StaffShell({
             >
               <IconCollapse />
               <IconExpand />
-              <span class="rail-label">Collapse</span>
+              {/* Both words, like both arrows, and for the same reason: the collapsed rail floats
+                  `.rail-label` out beside the icon as its tooltip, so a single static "Collapse"
+                  would sit next to an expand arrow telling the reader the opposite of what the
+                  button does. `when-open`/`when-collapsed` already decide which one is shown. */}
+              <span class="rail-label when-open">Collapse</span>
+              <span class="rail-label when-collapsed">Expand</span>
             </button>
           </div>
         </aside>
@@ -544,12 +568,17 @@ export function StaffShell({
             )}
           </header>
 
-          <main class="staff-main">{children}</main>
+          {/* `tabindex={-1}` is what makes the skip link work: without it the fragment jump moves
+              the scroll position but leaves focus at the top of the document, so the next Tab goes
+              back into the rail the reader just skipped. */}
+          <main class="staff-main" id="staff-main" tabindex={-1}>
+            {children}
+          </main>
         </div>
 
         {/* Hidden until the drawer opens. `hidden` rather than a class, so it is inert to
             assistive tech as well as invisible. */}
-        <div class="scrim" data-rail-scrim hidden></div>
+        <div class="scrim" data-rail-scrim aria-hidden="true" hidden></div>
 
         {/*
           Closed until the script opens it with showModal(), which is what buys the backdrop, the

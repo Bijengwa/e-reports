@@ -2,6 +2,12 @@
  * The rail, the title bar and the sign-out dialog — `doors/staff/shared/shell.tsx`'s own markup.
  * `StaffShell` always asks `Layout` for this file, so every signed-in page beyond sign-in and the
  * forced password change carries it.
+ *
+ * This file owns the application chrome and nothing else. A page's own heading, its actions and
+ * its content are the page's — see `.staff-head` at the foot of this file, which is the one
+ * handshake between the two. The distinction matters: the bar at the top of the window says which
+ * TOOL is open, and the block at the top of the document says what that tool is SHOWING. Neither
+ * restates the other, and no page renders a second copy of either.
  */
 
 /* ---------- staff shell ---------- */
@@ -23,11 +29,49 @@
   min-height: 100vh;
 }
 
+/* ---------- skipping the chrome ---------- */
+/*
+ * The first tab stop on every staff page, and invisible until it is the focused one. Its position
+ * is fixed rather than absolute so it lands in the same corner whether the reader tabbed at the
+ * top of a page or half way down a thousand-row terminology tree.
+ */
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  padding: 9px 14px;
+  border-radius: var(--r);
+  background: var(--card);
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 8px 24px rgb(12 59 30 / 26%);
+  transform: translateY(-160%);
+  transition: transform 0.14s ease;
+}
+
+.skip-link:focus-visible {
+  transform: none;
+}
+
+/* ---------- the rail ---------- */
 /*
  * Sticky at full viewport height, so the rail stays put while the page scrolls. Its own nav is
  * the part that scrolls if the list ever outgrows the screen.
+ *
+ * The colours are named here rather than repeated as literals down the file. The rail is the one
+ * dark surface in the portal, so it carries its own small pack instead of borrowing tokens that
+ * every light surface also reads.
  */
 .rail {
+  --rail-line: #1b5231;
+  --rail-ink: #a9c4b1;
+  --rail-ink-2: #7fa48b;
+  --rail-hover: #14522b;
+  --rail-on: #1e6b39;
+
   width: 238px;
   flex: none;
   background: var(--green-d);
@@ -42,89 +86,125 @@
 
 .rail .brand {
   padding: 15px 16px 14px;
-  border-bottom: 1px solid #1b5231;
+  border-bottom: 1px solid var(--rail-line);
   overflow: hidden;
 }
 
 .rail-nav {
-  padding: 11px;
+  padding: 10px 11px 14px;
   flex: 1;
-  overflow: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .rail-nav a {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 11px;
+  gap: 11px;
+  padding: 9px 11px;
   margin-bottom: 2px;
-  border-radius: var(--r);
-  color: #a9c4b1;
+  border-radius: 6px;
+  color: var(--rail-ink);
   text-decoration: none;
   font-size: 13.5px;
+  line-height: 1.25;
   white-space: nowrap;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
 }
 
 .rail-nav a:hover {
-  background: #14522b;
+  background: var(--rail-hover);
   color: #fff;
 }
 
+/*
+ * The tool being read. The tint says it, the weight says it again, and the bar down the leading
+ * edge says it a third time — so the answer never rests on one green being told from another.
+ */
 .rail-nav a.on {
-  background: #1e6b39;
+  background: var(--rail-on);
   color: #fff;
   font-weight: 500;
+  box-shadow: inset 3px 0 0 var(--leaf);
+}
+
+/* ---- grouping ---- */
+/*
+ * The rail's one grouping: the administrator's entries, which answer a different question from
+ * everyone else's. The caption carries its own rule, so the grouping is one element rather than a
+ * wrapper round the links — and the collapsed rail can drop the words and keep the rule.
+ */
+.rail-group {
+  margin-top: 12px;
+  padding: 12px 11px 7px;
+  border-top: 1px solid var(--rail-line);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rail-ink-2);
 }
 
 .rail-foot {
   padding: 11px;
-  border-top: 1px solid #1b5231;
+  border-top: 1px solid var(--rail-line);
 }
 
 .rail-signout {
+  position: relative;
   display: flex;
   text-decoration: none;
   align-items: center;
-  gap: 10px;
+  gap: 11px;
   width: 100%;
-  padding: 8px 11px;
+  padding: 9px 11px;
   border: 0;
-  border-radius: var(--r);
+  border-radius: 6px;
   background: transparent;
-  color: #a9c4b1;
+  color: var(--rail-ink);
   font-size: 13.5px;
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
 }
 
 .rail-signout:hover {
-  background: #14522b;
+  background: var(--rail-hover);
   color: #fff;
 }
 
 .rail-collapse {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 11px;
   width: 100%;
   margin-top: 2px;
-  padding: 8px 11px;
+  padding: 9px 11px;
   border: 0;
-  border-radius: var(--r);
+  border-radius: 6px;
   background: transparent;
-  color: #7fa48b;
+  color: var(--rail-ink-2);
   font-size: 13px;
   cursor: pointer;
   white-space: nowrap;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
 }
 
 .rail-collapse:hover {
-  background: #14522b;
+  background: var(--rail-hover);
   color: #fff;
 }
 
-/* Expanded is the default, so the arrow that means "collapse" is the one on show. */
+/* Expanded is the default, so the arrow and the word that mean "collapse" are the ones on show. */
 .rail-collapse .when-collapsed {
   display: none;
 }
@@ -134,8 +214,8 @@
 .rail-signout svg,
 .rail-collapse svg,
 .top-burger svg {
-  width: 17px;
-  height: 17px;
+  width: 18px;
+  height: 18px;
   flex: none;
   fill: none;
   stroke: currentcolor;
@@ -151,9 +231,13 @@
   flex-direction: column;
 }
 
+/* ---------- the title bar ---------- */
 /*
  * Exactly 56px, and `flex: none` is the half that enforces it. A min-height would let the bar
  * grow the moment anything inside it wrapped, which is why the bar carries the page title alone.
+ *
+ * It says which tool is open. It never says what the tool is showing — that is the page's own
+ * heading, underneath, and the two are deliberately different sentences.
  */
 .top {
   height: 56px;
@@ -167,6 +251,16 @@
   position: sticky;
   top: 0;
   z-index: 30;
+  transition: box-shadow 0.16s ease;
+}
+
+/*
+ * A shadow only once the document has actually moved under the bar. At rest the hairline is the
+ * whole treatment; the shadow exists to say "there is more above", and saying that on an
+ * unscrolled page would be saying it falsely. `rail.js` sets the class.
+ */
+:root.page-scrolled .top {
+  box-shadow: 0 6px 16px -12px rgb(12 59 30 / 55%);
 }
 
 .top h1 {
@@ -174,16 +268,82 @@
   min-width: 0;
   font-size: 16px;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.012em;
+  color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* The title bar's one optional badge — the F004 header's own `Countdown` today. `flex: none` so
-   it never shrinks or wraps; `h1`'s ellipsis gives way to it first, on the same fixed-height bar. */
-.top > .countdown {
+/* The title bar's optional badges — the F004 header's `Countdown`, the IMDRF page's release.
+   `flex: none` so neither shrinks or wraps; `h1`'s ellipsis gives way to them first, on the same
+   fixed-height bar. */
+.top > .countdown,
+.top > .top-release {
   flex: none;
+}
+
+/*
+ * Which release of a reference document is open: a fact about the whole page, so it sits with the
+ * page's name and the signed-in name rather than in the body among the thing it describes.
+ *
+ * `position: relative` because with more than one published release this element is a `<details>`
+ * and the menu it opens is positioned against it. The bar makes no stacking context of its own
+ * beyond its own `z-index: 30`, so that menu paints over the page.
+ */
+.top-release {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* As a chooser it is a `<details>`, and the pill is its `summary`. */
+details.top-release {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+details.top-release > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink-2);
+  cursor: pointer;
+  list-style: none;
+  white-space: nowrap;
+  transition:
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+
+details.top-release > summary::-webkit-details-marker {
+  display: none;
+}
+
+details.top-release > summary:hover,
+details.top-release[open] > summary {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.top-release-word {
+  color: var(--ink-3);
+  font-weight: 500;
 }
 
 /*
@@ -194,26 +354,39 @@
 .top-burger {
   display: none;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   flex: none;
+  margin-left: -6px;
   padding: 0;
   border: 0;
-  border-radius: var(--r);
+  border-radius: 6px;
   background: transparent;
-  color: var(--ink-3);
+  color: var(--ink-2);
   cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
 }
 
 .top-burger:hover {
-  background: #eef2ee;
-  color: var(--ink);
+  background: var(--green-bg);
+  color: var(--green);
+}
+
+.top-burger:active {
+  background: var(--rule);
 }
 
 .staff-main {
   width: 100%;
   max-width: none;
   padding: 24px 22px 52px;
+}
+
+/* The skip link's landing place must not draw a ring round the entire page when it is used. */
+.staff-main:focus {
+  outline: none;
 }
 
 .staff-narrow {
@@ -227,40 +400,102 @@
   inset: 0;
   background: rgb(12 59 30 / 50%);
   z-index: 50;
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
 /* ---------- the tool strip ---------- */
 /*
  * Below 900px the rail is off-canvas, so a reader part way down a long page has nothing on
  * screen saying which tool they are in. `rail.js` clones the rail's own links into this strip
- * while the page is being scrolled and removes the class a few seconds after it stops; above
+ * while the page is being scrolled and takes the class off a few seconds after it stops; above
  * 900px the rail itself answers the question and the strip is never built.
  *
- * It is the one thing in the shell that may scroll sideways, and it scrolls sideways so that the
- * document never has to: `overflow-x: auto` here, and nothing wider than the viewport anywhere
- * else.
+ * It is `position: fixed`, not a band in the flow, and that is the point: appearing and
+ * disappearing must not change the height of the document underneath it. A strip that took 42px
+ * of flow every time the reader scrolled would move the paragraph they were reading, twice.
+ *
+ * It is also the one thing in the shell that may scroll sideways, and it scrolls sideways so that
+ * the document never has to: `overflow-x: auto` here, and nothing wider than the viewport
+ * anywhere else.
+ *
+ * A page that carries a permanent navigation of its own across the top — `[data-nav-strip]`, which
+ * today is the IMDRF terminology page's row of coding items — does not get this one as well:
+ * `rail.js` stands down there, so there is one strip across the top of a page and never two. The
+ * drawer is `visibility: hidden` while shut so that it is not a third.
  */
 .top-tools {
   display: none;
 }
 
 @media (max-width: 900px) {
-  :root.tools-on .top-tools {
+  .top-tools {
     display: flex;
-    gap: 4px;
-    position: sticky;
+    position: fixed;
     top: 56px;
+    left: 0;
+    right: 0;
     z-index: 29;
-    padding: 6px 10px;
+    gap: 4px;
+    /* 7px, not 6: a 2px focus ring at 2px offset has to fit inside a box that clips its own
+       overflow, or the ring round the first tabbed item is sliced off. */
+    padding: 7px 10px;
     background: var(--card);
     border-bottom: 1px solid var(--rule);
+    box-shadow: 0 10px 20px -16px rgb(12 59 30 / 65%);
     overflow-x: auto;
     overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scroll-padding-inline: 14px;
     scrollbar-width: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px);
+    transition:
+      opacity 0.16s ease,
+      transform 0.16s ease,
+      visibility 0.16s;
   }
 
   .top-tools::-webkit-scrollbar {
     display: none;
+  }
+
+  :root.tools-on .top-tools {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+  }
+
+  /* The drawer is the whole navigation, opened deliberately. The transient copy of it steps
+     aside rather than sitting behind the scrim arguing with it. */
+  :root.rail-open .top-tools {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px);
+  }
+
+  /*
+   * A fade at whichever end still has links past it. `rail.js` measures the strip and sets
+   * `data-edge`; nothing is faded when everything already fits, so a strip of three entries never
+   * has its first and last labels dimmed for no reason.
+   */
+  .top-tools[data-edge="end"] {
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+  }
+
+  .top-tools[data-edge="start"] {
+    mask-image: linear-gradient(to right, transparent 0, #000 28px);
+  }
+
+  .top-tools[data-edge="both"] {
+    mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 28px,
+      #000 calc(100% - 28px),
+      transparent 100%
+    );
   }
 
   .top-tools a {
@@ -268,12 +503,21 @@
     flex: none;
     align-items: center;
     gap: 6px;
-    padding: 5px 9px;
-    border-radius: var(--r);
+    padding: 6px 10px;
+    border-radius: 999px;
     color: var(--ink-2);
     text-decoration: none;
     font-size: 12.5px;
+    line-height: 1.2;
     white-space: nowrap;
+    transition:
+      background-color 0.12s ease,
+      color 0.12s ease;
+  }
+
+  .top-tools a:hover {
+    background: var(--paper);
+    color: var(--ink);
   }
 
   .top-tools a svg {
@@ -287,13 +531,13 @@
     stroke-linejoin: round;
   }
 
-  /* The tool being read. The underline carries it as well as the tint, so the answer does not
-     rest on colour alone. */
+  /* The tool being read. The ring carries it as well as the tint, so the answer does not rest on
+     colour alone. */
   .top-tools a.on {
     background: var(--green-bg);
     color: var(--green);
     font-weight: 600;
-    box-shadow: inset 0 -2px 0 var(--green);
+    box-shadow: inset 0 0 0 1px var(--green);
   }
 }
 
@@ -308,7 +552,6 @@
     width: 64px;
   }
 
-  :root.rail-collapsed .rail-label,
   :root.rail-collapsed .brand-text {
     display: none;
   }
@@ -333,6 +576,87 @@
     padding-left: 0;
     padding-right: 0;
   }
+
+  /*
+   * The words go; the rule stays and carries the grouping alone.
+   *
+   * Collapsed to nothing rather than `display: none`, so the caption is still read out in order
+   * by a screen reader — a rule on its own says nothing, and at 64px there is no room to say it
+   * twice.
+   */
+  :root.rail-collapsed .rail-group {
+    height: 0;
+    margin: 12px 0 10px;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  /*
+   * The collapsed rail's labels, floated.
+   *
+   * The name is not deleted and re-invented as a tooltip — it is the same `.rail-label` the wide
+   * rail prints, moved out beside the icon and revealed on hover or focus. That is what keeps one
+   * source for an entry's name, and what makes the tooltip work for a keyboard as well as a
+   * pointer: `:focus-visible` on the link is a state the link already has. Nothing is added to
+   * the DOM, nothing re-flows, and the rail does not widen.
+   *
+   * It costs the nav its own scrolling: a box that clips on one axis clips on both, so an
+   * absolutely positioned label inside a scrolling nav would be cut off at the rail's edge. At
+   * most six entries are ever rendered for a role, which is about 230px of list under a 50px
+   * brand and above a 90px foot — it fits any viewport tall enough to be worth collapsing on.
+   */
+  :root.rail-collapsed .rail-nav {
+    overflow: visible;
+  }
+
+  :root.rail-collapsed .rail-label {
+    position: absolute;
+    left: calc(100% + 12px);
+    top: 50%;
+    z-index: 70;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: #072a14;
+    color: #fff;
+    font-size: 12.5px;
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: 0;
+    white-space: nowrap;
+    box-shadow: 0 10px 26px rgb(4 20 10 / 45%);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(-50%) translateX(-4px);
+    transition:
+      opacity 0.12s ease,
+      transform 0.12s ease,
+      visibility 0.12s;
+  }
+
+  /* The notch that ties the label to the icon it belongs to. */
+  :root.rail-collapsed .rail-label::before {
+    content: "";
+    position: absolute;
+    left: -3px;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    border-radius: 1px;
+    background: inherit;
+    transform: translateY(-50%) rotate(45deg);
+  }
+
+  :root.rail-collapsed .rail-nav a:hover .rail-label,
+  :root.rail-collapsed .rail-nav a:focus-visible .rail-label,
+  :root.rail-collapsed .rail-signout:hover .rail-label,
+  :root.rail-collapsed .rail-signout:focus-visible .rail-label,
+  :root.rail-collapsed .rail-collapse:hover .rail-label,
+  :root.rail-collapsed .rail-collapse:focus-visible .rail-label {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(-50%);
+  }
 }
 
 /* ---------- the rail as a drawer ---------- */
@@ -342,17 +666,30 @@
     top: 0;
     left: 0;
     bottom: 0;
+    width: min(288px, 84vw);
     height: 100%;
     transform: translateX(-100%);
-    transition: transform 0.18s ease;
+    /*
+     * `visibility` is doing real work here, not decoration. A drawer parked off-canvas with
+     * `transform` alone is still in the tab order and still read out — so a reader on a phone
+     * would meet the whole navigation twice, once in the strip above and once in a panel they
+     * cannot see. Hidden while shut, there is exactly one navigation on screen and in the tree.
+     */
+    visibility: hidden;
+    box-shadow: 0 0 40px rgb(6 26 14 / 45%);
+    transition:
+      transform 0.2s ease,
+      visibility 0.2s;
   }
 
   :root.rail-open .rail {
     transform: none;
+    visibility: visible;
   }
 
   :root.rail-open .scrim {
     display: block;
+    opacity: 1;
   }
 
   .top-burger {
@@ -375,13 +712,13 @@
   }
 }
 
+/* ---------- the page's own header ---------- */
 /*
  * The block at the top of a page: what this page is about, and its one action.
  *
- * Restored here after the rail rewrite dropped it -- without these rules the row was not a flex
- * row at all, so a page's action button fell underneath its subtitle instead of sitting opposite.
- * The h1 now lives in the title bar, so the heading styled here is the h2 a page uses for the
- * thing it is showing.
+ * This is the PAGE header, and the bar above it is the APPLICATION header. The h1 belongs to the
+ * bar — it names the tool — so the heading styled here is the h2 a page uses for the thing it is
+ * showing. A page that restated the bar's words here would be rendering the same header twice.
  */
 .staff-head {
   display: flex;
@@ -396,7 +733,7 @@
 .staff-head h2 {
   font-size: 19px;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.012em;
 }
 
 .staff-head .hint {
@@ -418,6 +755,8 @@
   gap: 8px;
   flex: none;
   min-width: 0;
+  padding-left: 16px;
+  border-left: 1px solid var(--rule);
   text-align: right;
 }
 
@@ -425,7 +764,7 @@
   display: block;
   font-size: 13px;
   font-weight: 500;
-  line-height: 1.2;
+  line-height: 1.25;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -436,7 +775,8 @@
   display: block;
   font-size: 11px;
   color: var(--ink-3);
-  line-height: 1.2;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
   white-space: nowrap;
 }
 
@@ -444,6 +784,17 @@
   /* On a phone the title has the better claim on the bar. */
   .top-user {
     display: none;
+  }
+
+  /* The release stays — it says which edition every code on the page came from, which is not
+     something to make a reader open a menu for. Only the word "Release" goes; the year alone in
+     a pill beside the page name is not ambiguous. */
+  .top-release-word {
+    display: none;
+  }
+
+  .top {
+    padding: 0 14px;
   }
 }
 
@@ -500,4 +851,3 @@
   margin-top: 22px;
   justify-content: flex-end;
 }
-

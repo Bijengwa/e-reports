@@ -408,7 +408,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the read-only IMDRF terminology sidebar",
     expect(first.rows.length + second.rows.length).toBe(60);
   });
 
-  it("renders a documentation reader with the same title bar as every other staff page, and no inline styles", async () => {
+  it("renders one staff title bar, the release beside it, the coding-item strip and no inline styles", async () => {
     const releaseId = await seedRelease(2026);
     await seedTerm(releaseId, {
       annex: "A",
@@ -425,7 +425,22 @@ describe.skipIf(!INTEGRATION_ENABLED)("the read-only IMDRF terminology sidebar",
     expect(page.body).toContain(">IMDRF terminology<");
     expect(page.body).toContain("data-imdrf-browser");
     expect(page.body).toContain("imdrf-reader");
-    expect(page.body).toContain("staff-head");
+
+    // Exactly one application header, and it is `StaffShell`'s. The page renders its content
+    // inside that shell and never a second copy of it.
+    expect(page.body.match(/<header/g)).toHaveLength(1);
+    expect(page.body.match(/class="shell"/g)).toHaveLength(1);
+    expect(page.body.match(/<h1/g)).toHaveLength(1);
+
+    // The release is a fact about the whole page, so it sits in the title bar beside the page's
+    // name and the signed-in name — not in a block of metadata at the head of the body.
+    expect(page.body).toContain("top-release");
+    expect(page.body).toContain("2026");
+
+    // The coding-item strip, server-rendered: seven items, one per F004 coding item.
+    expect(page.body).toContain("data-nav-strip");
+    expect(page.body.match(/data-imdrf-jump=/g)).toHaveLength(7);
+
     expect(page.body).not.toContain('style="');
   });
 });

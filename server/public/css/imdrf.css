@@ -27,72 +27,179 @@
  * Everything below borrows the portal's own vocabulary: `--rule` for a line, `--green` for the
  * open/selected state, `.btn.ghost`/`.btn-sm` for an action, `.tag` for a status. There is no
  * card, no shadow and no gradient on this page; sections are separated by the same hairline the
- * register and the dashboard use.
+ * register and the dashboard use, and depth is carried by indent and one guide rule rather than
+ * by nesting boxes inside boxes.
  *
  * Indent in the hierarchy is `data-depth`, never an inline style — `style-src 'self'` would drop
  * a `padding-left` written from the script.
  */
 
 .imdrf-page {
-  max-width: 940px;
+  /* A measure, not a width. Definitions are prose and prose has a comfortable line length; the
+     hierarchy sits inside the same column so a term and its meaning share one left edge. */
+  max-width: 980px;
 }
 
-/* ---- the page header ---- */
-
-.imdrf-head {
-  align-items: baseline;
+/* ---- the page navigation bar ---- */
+/*
+ * The seven F004 coding items, across the top, for the whole length of the page.
+ *
+ * The same pattern F004's own `.f4-jump` row is — sticky under the staff title bar, pills, the
+ * item being read filled solid, kept in step with the scroll — and sticky for the same reason:
+ * the terminology below runs to thousands of rows, and a way around it that scrolled off after
+ * the first screen would be no way around it.
+ *
+ * Two differences, both deliberate. It scrolls sideways instead of wrapping: seven coding
+ * references are one line on a desktop and three wrapped lines on a phone, and three pinned lines
+ * of navigation over a reference document is most of the phone. And it is a flat bar with one
+ * rule under it rather than a bordered card, because it runs the full width of the page and a
+ * card that wide reads as a panel in the document rather than as the page's own chrome.
+ *
+ * `top: 56px` is the staff title bar's height — the two stack rather than one hiding under the
+ * other. `.top` is sticky at z-index 30, so this sits at 20: above the sections, which are in
+ * normal flow, and below the bar, which stays the topmost thing on every page. The rail drawer
+ * and its scrim are higher again (50/60), so opening the drawer still covers this.
+ *
+ * The negative margins are what make it full-bleed: it is a child of `.staff-main`, which has
+ * padding, and it pushes back out through that padding to the edges of the main region. The
+ * matching positive padding puts its contents back where the page's own left edge is.
+ */
+.imdrf-nav {
+  position: sticky;
+  top: 56px;
+  z-index: 20;
+  margin: -24px -22px 22px;
+  padding: 0 22px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--card);
 }
 
-.imdrf-title {
-  font-size: 19px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+/*
+ * The scrolling box is inside the bar, not the bar itself.
+ *
+ * Two things fall out of that. The rule underneath stays put while the items move above it, which
+ * is what makes it read as a bar rather than as a runaway row. And the `mask` that fades the ends
+ * is applied to the track, so it fades the items and leaves the rule — a mask on the bar itself
+ * would fade its own border away at both ends.
+ */
+.imdrf-nav-track {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-padding-inline: 22px;
+  scrollbar-width: none;
 }
 
-/* The full title and the short one are both rendered; CSS shows whichever fits. */
-.imdrf-title-short,
-.imdrf-sub-short {
+.imdrf-nav-track::-webkit-scrollbar {
   display: none;
 }
 
-.imdrf-sub {
-  margin-top: 3px;
+/* A fade at whichever end still has items past it, set by imdrf-browser.js from a measurement —
+   nothing is dimmed when all seven already fit. */
+.imdrf-nav[data-edge="end"] .imdrf-nav-track {
+  mask-image: linear-gradient(to right, #000 calc(100% - 26px), transparent 100%);
 }
 
-/* ---- release chip ---- */
+.imdrf-nav[data-edge="start"] .imdrf-nav-track {
+  mask-image: linear-gradient(to right, transparent 0, #000 26px);
+}
+
+.imdrf-nav[data-edge="both"] .imdrf-nav-track {
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 26px,
+    #000 calc(100% - 26px),
+    transparent 100%
+  );
+}
+
 /*
- * Present only when a second release has been published. It is a secondary fact — which edition
- * am I reading — so it sits at the end of the header row rather than taking a band of its own.
+ * A tab, not a button: no fill, no border, and the state carried on the edge it sits against.
+ *
+ * `position: relative` is load-bearing. The annex name inside each item is a `.vh` span, and an
+ * absolutely positioned box whose containing block is outside the scrolling track is not clipped
+ * by that track — with the bar sticky (and therefore positioned) the seventh item's hidden label
+ * sat 600px to the right of the viewport and gave the whole document a horizontal scrollbar,
+ * which is the one thing this page is not allowed to have.
  */
-.imdrf-release {
+.imdrf-nav-item {
   position: relative;
   flex: none;
-}
-
-.imdrf-release > summary {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 5px 10px;
-  border: 1px solid var(--rule);
-  border-radius: var(--r);
-  background: var(--card);
-  color: var(--ink-2);
-  font-size: 12.5px;
-  cursor: pointer;
-  list-style: none;
+  padding: 12px 13px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--ink-3);
+  font: inherit;
   white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color 0.12s ease,
+    border-color 0.12s ease,
+    background-color 0.12s ease;
 }
 
-.imdrf-release > summary::-webkit-details-marker {
-  display: none;
-}
-
-.imdrf-release > summary:hover {
-  border-color: var(--rule-2);
+.imdrf-nav-item:hover {
+  background: var(--paper);
   color: var(--ink);
 }
 
+/* Inside the bar rather than around it: the bar clips its own overflow, so a ring drawn outside
+   an item at either end would be sliced off. */
+.imdrf-nav-item:focus-visible {
+  outline: none;
+  background: var(--green-bg);
+  color: var(--green);
+  box-shadow: inset 0 0 0 2px var(--orange);
+}
+
+/* The workbook's own reference for the section — set the way the workbook sets it. */
+.imdrf-nav-no {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+/*
+ * The coding item being read. Weight, colour and the rule under it all say so, so the answer
+ * never rests on one green being told from another — and none of the three is loud.
+ */
+.imdrf-nav-item.on {
+  border-bottom-color: var(--green);
+  color: var(--green);
+  background: transparent;
+}
+
+.imdrf-nav-item.on .imdrf-nav-no {
+  font-weight: 600;
+}
+
+/* ---- the page heading ---- */
+/*
+ * One line, and nothing under it. Which release is open is in the title bar beside the reader's
+ * name; the document code, the term counts and the publication date that used to stand here were
+ * four facts between the reader and the terminology they came for.
+ */
+.imdrf-title {
+  margin-bottom: 16px;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  color: var(--ink);
+}
+
+/* ---- the release menu ---- */
+/*
+ * The menu behind the release badge in `StaffShell`'s title bar — `.top-release` in shell.css is
+ * the pill; this is what it opens when more than one release is published.
+ *
+ * Here rather than in shell.css because the badge is this page's: no other page renders one, and
+ * no other page loads this file. The bar itself owns nothing but the pill.
+ */
 .imdrf-release-caret {
   width: 0;
   height: 0;
@@ -101,28 +208,24 @@
   border-top: 5px solid currentcolor;
 }
 
-.imdrf-release[open] > summary {
-  border-color: var(--rule-2);
-  color: var(--ink);
-}
-
 .imdrf-release-menu {
   position: absolute;
   right: 0;
-  top: calc(100% + 5px);
+  top: calc(100% + 8px);
   z-index: 20;
-  min-width: 220px;
+  min-width: 232px;
   padding: 6px;
   border: 1px solid var(--rule);
-  border-radius: var(--r);
+  border-radius: 8px;
   background: var(--card);
+  box-shadow: 0 14px 34px -18px rgb(12 59 30 / 45%);
 }
 
 .imdrf-release-menu-h {
   padding: 5px 8px 6px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink-3);
 }
@@ -152,7 +255,8 @@
 }
 
 .imdrf-release-code {
-  font-size: 11.5px;
+  font-family: var(--mono);
+  font-size: 11px;
   color: var(--ink-3);
 }
 
@@ -161,21 +265,41 @@
 }
 
 /* ---- the search box ---- */
+/*
+ * A reference search, and nothing more: it asks the database for codes, terms and definitions in
+ * this release and shows what comes back. There is no suggestion list, no ranking explained back
+ * to the reader and nothing offered that was not typed.
+ */
+
+.imdrf-searchzone {
+  /* Said outright: `<search>` is newer than some of the browsers this portal is opened in, and an
+     engine that does not know the element lays it out inline. */
+  display: block;
+  margin-bottom: 20px;
+}
 
 .imdrf-searchbar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  max-width: 460px;
-  margin-bottom: 6px;
-  padding: 0 11px;
+  gap: 9px;
+  max-width: 520px;
+  padding: 0 13px;
   border: 1px solid var(--rule-2);
-  border-radius: var(--r);
+  border-radius: 8px;
   background: var(--card);
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
 }
 
+/*
+ * The whole box takes the focus state, not the input inside it — the input has no border of its
+ * own, so a ring on it would be drawn in the middle of the control. `:focus-within` is what makes
+ * the affordance the reader sees and the element the browser focuses the same thing.
+ */
 .imdrf-searchbar:focus-within {
   border-color: var(--green);
+  box-shadow: 0 0 0 3px var(--green-bg);
 }
 
 /* A magnifier drawn from two borders, so the box needs no icon font and no extra request. */
@@ -199,17 +323,26 @@
   transform: rotate(45deg);
 }
 
+.imdrf-searchbar:focus-within .imdrf-searchicon {
+  border-color: var(--green);
+}
+
+.imdrf-searchbar:focus-within .imdrf-searchicon::after {
+  background: var(--green);
+}
+
 .imdrf-search {
   flex: 1;
   min-width: 0;
-  padding: 9px 0;
+  padding: 11px 0;
   border: 0;
   background: transparent;
   color: var(--ink);
   font: inherit;
-  font-size: 13.5px;
+  font-size: 14px;
 }
 
+/* The ring is on the bar; a second one inside it would be two rings for one control. */
 .imdrf-search:focus-visible {
   outline: none;
 }
@@ -218,30 +351,38 @@
   cursor: pointer;
 }
 
+.imdrf-search-scope,
 .imdrf-search-note {
-  margin-bottom: 10px;
+  margin-top: 8px;
+  max-width: 520px;
   font-size: 12px;
+  line-height: 1.45;
   color: var(--ink-3);
 }
 
 /* ---- search results ---- */
 
 .imdrf-results {
-  margin-top: 10px;
+  margin-top: 14px;
   border-top: 1px solid var(--rule);
 }
 
+/* The empty answer, and the failed one. Given room rather than tucked under the rule as a line
+   of small grey text — "nothing matches" is an answer, and an answer the reader has to look for
+   twice reads as the page having broken. */
 .imdrf-results > .hint {
-  padding: 16px 2px;
+  padding: 26px 8px;
+  font-size: 13px;
+  text-align: center;
 }
 
 .imdrf-result {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 14px;
+  gap: 16px;
   width: 100%;
-  padding: 9px 8px;
+  padding: 11px 8px;
   border: 0;
   border-bottom: 1px solid var(--rule);
   border-radius: 0;
@@ -250,6 +391,7 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background-color 0.1s ease;
 }
 
 .imdrf-result:hover {
@@ -259,17 +401,24 @@
 .imdrf-result-main {
   display: flex;
   align-items: baseline;
-  gap: 9px;
+  gap: 11px;
   min-width: 0;
   font-size: 13.5px;
 }
 
+/*
+ * A code is an identifier and is set as one: monospaced, in the portal's green, on its own
+ * column. `min-width` is what makes it a column — codes run from four characters to six, and a
+ * ragged left edge on the names beside them is what turns a list into a wall.
+ */
 .imdrf-result-main code,
 .imdrf-term code {
   flex: none;
-  font-family:
-    ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  min-width: 6ch;
+  font-family: var(--mono);
   font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
   color: var(--green);
 }
 
@@ -281,10 +430,16 @@
 }
 
 /* ---- the hierarchy ---- */
+/*
+ * Seven sections, each an F004 coding item bound to one annex. The section heading is the only
+ * place on this page that carries weight; everything under it is set quieter, so the shape of
+ * the document is legible before a single word of it is read.
+ */
 
 .imdrf-reader {
   position: relative;
   margin-top: 4px;
+  border-top: 1px solid var(--rule);
 }
 
 .imdrf-section {
@@ -299,45 +454,64 @@
 .imdrf-section-btn {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
-  padding: 13px 8px;
+  padding: 15px 10px;
   border: 0;
   background: transparent;
   color: var(--ink);
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background-color 0.1s ease;
 }
 
 .imdrf-section-btn:hover {
   background: var(--paper);
 }
 
+/* The F004 item number and its annex letter: the workbook's own reference for this section. */
 .imdrf-section-no {
   flex: none;
-  font-size: 13px;
-  font-weight: 600;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
   color: var(--green);
 }
 
 .imdrf-section-name {
   flex: 1;
   min-width: 0;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.012em;
 }
 
 .imdrf-section-count {
   flex: none;
   font-size: 11.5px;
   color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
+/* An open section keeps a quiet tint on its heading, so scrolling back up says which of the
+   seven is the one standing open without the reader counting carets. */
+.imdrf-section[data-open="true"] > .imdrf-section-h .imdrf-section-name {
+  color: var(--green-d);
+}
+
+/*
+ * The body of an open section, with one guide rule down its left edge.
+ *
+ * The rule is the whole treatment for depth at this level — no box, no tint, no card. It is what
+ * a technical document does: a line saying "this belongs to the heading above", and nothing else
+ * competing with the terms for attention.
+ */
 .imdrf-section-body {
-  padding: 0 0 12px 8px;
+  margin-left: 10px;
+  padding: 2px 0 14px 10px;
+  border-left: 1px solid var(--rule);
 }
 
 /*
@@ -361,6 +535,7 @@
 .imdrf-section[data-open="true"] > .imdrf-section-h .imdrf-caret,
 .imdrf-row[data-open="true"] > .imdrf-term .imdrf-caret {
   transform: rotate(90deg);
+  border-left-color: var(--green);
 }
 
 /* A leaf has nothing to turn: the space is kept so its code still lines up with its siblings'. */
@@ -377,24 +552,26 @@
 }
 
 .imdrf-row[data-depth="0"] { --imdrf-pad: 8px; }
-.imdrf-row[data-depth="1"] { --imdrf-pad: 22px; }
-.imdrf-row[data-depth="2"] { --imdrf-pad: 36px; }
-.imdrf-row[data-depth="3"] { --imdrf-pad: 50px; }
-.imdrf-row[data-depth="4"] { --imdrf-pad: 64px; }
+.imdrf-row[data-depth="1"] { --imdrf-pad: 24px; }
+.imdrf-row[data-depth="2"] { --imdrf-pad: 40px; }
+.imdrf-row[data-depth="3"] { --imdrf-pad: 56px; }
+.imdrf-row[data-depth="4"] { --imdrf-pad: 72px; }
 
 .imdrf-term {
   display: flex;
   align-items: baseline;
-  gap: 9px;
+  gap: 11px;
   width: 100%;
-  padding: 8px 8px 8px var(--imdrf-pad, 8px);
+  padding: 9px 8px 9px var(--imdrf-pad, 8px);
   border: 0;
   background: transparent;
   color: var(--ink);
   font: inherit;
   font-size: 13.5px;
+  line-height: 1.45;
   text-align: left;
   cursor: pointer;
+  transition: background-color 0.1s ease;
 }
 
 .imdrf-term:hover {
@@ -416,28 +593,39 @@
   min-width: 0;
 }
 
+.imdrf-row[data-open="true"] > .imdrf-term .imdrf-term-name {
+  font-weight: 500;
+}
+
 /* ---- a term's own details ---- */
+/*
+ * What an officer came for: the code, what it means, and a way to take the code away. Set as
+ * prose, at a measure prose can be read at — this is the one place on the page where the reader
+ * stops scanning and starts reading.
+ */
 
 .imdrf-body {
   padding-left: var(--imdrf-pad, 8px);
 }
 
 .imdrf-detail {
-  margin-left: 8px;
-  padding: 2px 8px 14px 9px;
-  border-left: 1px solid var(--rule);
+  margin-left: 9px;
+  padding: 6px 8px 16px 12px;
+  border-left: 2px solid var(--green-bg);
 }
 
 .imdrf-path {
-  margin-bottom: 6px;
-  font-size: 11.5px;
+  margin-bottom: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
   color: var(--ink-3);
 }
 
 .imdrf-def {
   max-width: 68ch;
   font-size: 13.5px;
-  line-height: 1.55;
+  line-height: 1.62;
   color: var(--ink-2);
 }
 
@@ -448,24 +636,38 @@
 
 /* A code that must not be used on a new assessment, said before it can be copied. */
 .imdrf-warn {
-  margin-bottom: 8px;
-  padding: 7px 10px;
+  max-width: 68ch;
+  margin-bottom: 10px;
+  padding: 9px 12px;
   border-left: 3px solid var(--flag);
+  border-radius: 0 var(--r) var(--r) 0;
   background: var(--flag-bg);
   color: var(--flag);
   font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.imdrf-detail > .hint {
+  max-width: 68ch;
+  margin-top: 8px;
+  line-height: 1.5;
 }
 
 .imdrf-meta {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 6px 18px;
-  margin-top: 10px;
+  gap: 10px 22px;
+  max-width: 68ch;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
 }
 
 .imdrf-meta dt {
-  font-size: 11px;
-  letter-spacing: 0.03em;
+  margin-bottom: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink-3);
 }
@@ -476,27 +678,31 @@
 }
 
 .imdrf-actions {
-  margin-top: 12px;
+  margin-top: 14px;
 }
 
 /* ---- paging ---- */
 
 .imdrf-more {
   display: block;
-  margin: 8px 0 4px var(--imdrf-pad, 8px);
-  padding: 5px 10px;
-  border: 1px solid var(--rule);
+  margin: 10px 0 4px var(--imdrf-pad, 8px);
+  padding: 6px 12px;
+  border: 1px solid var(--rule-2);
   border-radius: var(--r);
   background: var(--card);
   color: var(--ink-2);
   font: inherit;
   font-size: 12.5px;
+  font-weight: 500;
   cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    color 0.12s ease;
 }
 
 .imdrf-more:hover:not(:disabled) {
-  border-color: var(--rule-2);
-  color: var(--ink);
+  border-color: var(--green);
+  color: var(--green);
 }
 
 .imdrf-more:disabled {
@@ -540,10 +746,11 @@
 /*
  * The opening veil: a dim over the hierarchy with one skeleton surface on it.
  *
- * Over the hierarchy alone, not the viewport — the title bar, the page heading and the search box
- * are already drawn and already true, and covering them would be the page claiming it knows less
- * than it does. It lies over the hierarchy rather than in front of it in the flow, so the page
- * already has its full height while the veil is up and nothing shifts when it comes down.
+ * Over the hierarchy alone, not the viewport — the title bar, the document masthead and the
+ * search box are already drawn and already true, and covering them would be the page claiming it
+ * knows less than it does. It lies over the hierarchy rather than in front of it in the flow, so
+ * the page already has its full height while the veil is up and nothing shifts when it comes
+ * down.
  */
 .imdrf-boot {
   position: absolute;
@@ -551,7 +758,7 @@
   z-index: 1;
   display: flex;
   justify-content: center;
-  padding: 14px 8px;
+  padding: 16px 8px;
   background: rgb(245 248 245 / 88%);
 }
 
@@ -561,13 +768,37 @@
   height: fit-content;
   padding: 16px 18px 10px;
   border: 1px solid var(--rule);
-  border-radius: var(--r);
+  border-radius: 8px;
   background: var(--card);
 }
 
 .imdrf-boot-h {
-  font-size: 12.5px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
   color: var(--ink-3);
+}
+
+/* ---- nothing published yet ---- */
+/*
+ * Not an error and not a card: a plain statement of the one fact, and what it means for the work
+ * the reader came to do.
+ */
+.imdrf-empty {
+  max-width: 52ch;
+  padding: 48px 0 24px;
+}
+
+.imdrf-empty-h {
+  margin-bottom: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.imdrf-empty .hint {
+  line-height: 1.6;
 }
 
 /* ---- the admin side of the same subsystem ---- */
@@ -619,57 +850,76 @@
   .imdrf-admin {
     grid-template-columns: 1fr;
   }
+
+  /* `.staff-main` changes its padding here, and the bar's full-bleed margins are that padding
+     negated — the two have to be read together or the bar stops reaching the edges. */
+  .imdrf-nav {
+    margin: -20px -16px 18px;
+    padding: 0 16px;
+  }
+
+  .imdrf-nav-track {
+    scroll-padding-inline: 16px;
+  }
 }
 
 /*
  * A phone. The hierarchy is the same hierarchy — it is not swapped for a different component —
- * but the title and release line shorten, the indent steps close up so a third-level term still
- * has room for its name, and the section count drops rather than push the heading into a wrap.
- * Nothing here scrolls sideways: the page's one scroll is vertical at every width.
+ * but the indent steps close up so a third-level term still has room for its name, and the
+ * section count drops rather than push the heading into a wrap. Nothing here scrolls sideways
+ * except the section strip: the document's own scroll is vertical at every width.
  */
 @media (max-width: 620px) {
-  .imdrf-title-full,
-  .imdrf-sub-full {
-    display: none;
+  .imdrf-nav {
+    margin-bottom: 14px;
   }
 
-  .imdrf-title-short,
-  .imdrf-sub-short {
-    display: inline;
+  .imdrf-nav-item {
+    padding: 11px;
+  }
+
+  .imdrf-title {
+    margin-bottom: 13px;
   }
 
   .imdrf-section-count {
     display: none;
   }
 
-  .imdrf-section-btn,
+  .imdrf-section-btn {
+    gap: 9px;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
   .imdrf-result {
     padding-left: 4px;
     padding-right: 4px;
   }
 
   .imdrf-section-body {
-    padding-left: 2px;
+    margin-left: 4px;
+    padding-left: 8px;
   }
 
   .imdrf-row[data-depth="0"] { --imdrf-pad: 4px; }
-  .imdrf-row[data-depth="1"] { --imdrf-pad: 14px; }
-  .imdrf-row[data-depth="2"] { --imdrf-pad: 24px; }
-  .imdrf-row[data-depth="3"] { --imdrf-pad: 34px; }
-  .imdrf-row[data-depth="4"] { --imdrf-pad: 44px; }
+  .imdrf-row[data-depth="1"] { --imdrf-pad: 16px; }
+  .imdrf-row[data-depth="2"] { --imdrf-pad: 28px; }
+  .imdrf-row[data-depth="3"] { --imdrf-pad: 40px; }
+  .imdrf-row[data-depth="4"] { --imdrf-pad: 52px; }
 
   /* Touch targets before density: a row a thumb can miss is a row that gets hit twice. */
   .imdrf-term,
   .imdrf-result,
   .imdrf-section-btn {
-    padding-top: 11px;
-    padding-bottom: 11px;
+    padding-top: 12px;
+    padding-bottom: 12px;
   }
 
   /* The section a result sits in stops competing with the result itself for one row. */
   .imdrf-result {
     flex-direction: column;
-    gap: 3px;
+    gap: 4px;
   }
 
   .imdrf-result-where {
@@ -679,6 +929,15 @@
   .imdrf-release-menu {
     right: auto;
     left: 0;
+  }
+}
+
+/* The narrowest supported screens: the code column gives up its reserved width rather than
+   push a long term name onto three lines. */
+@media (max-width: 400px) {
+  .imdrf-result-main code,
+  .imdrf-term code {
+    min-width: 0;
   }
 }
 

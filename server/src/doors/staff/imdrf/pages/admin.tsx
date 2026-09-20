@@ -1,18 +1,3 @@
-/**
- * The IMDRF terminology admin area: a full-width release library, a dedicated import page, and
- * the preview page between validate and confirm.
- *
- * Three pages, not one cramped two-column form: `/imdrf/manage` lists releases and their annex
- * coverage and links to `/imdrf/manage/import`, which carries nothing but the paste form. Both are
- * full width — a two-column 1.35fr/1fr grid squeezed a multi-thousand-line JSON textarea into
- * ~40% of the viewport, which is why the import form moved to its own page instead of living
- * beside the release list.
- *
- * Validating never writes; only a POST to `/imdrf/manage/import` on the preview page does, and
- * only when validation itself reported no errors ("VALIDATION PASSED" / "READY TO IMPORT"). A
- * failed validation renders "IMPORT BLOCKED" with the itemized errors instead — nothing is ever
- * partially imported.
- */
 
 import type { ImportPreview } from "../../../../domain/imdrf/import-service.js";
 import type { ReleaseSummary } from "../../../../domain/imdrf/query-service.js";

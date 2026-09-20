@@ -94,7 +94,11 @@ export function MyWorkPage({ viewerRole, viewerName, rows }: MyWorkPageProps): J
                   {/* To the work item, not to the register's copy of the report. The work item is
                       the reader's own page and is refused to anyone the assignment does not name. */}
                   <td>
-                    <a href={`/reports/${row.reportId}/final-document`} class="row-link-target" safe>
+                    <a
+                      href={`/reports/${row.reportId}/final-document`}
+                      class="row-link-target"
+                      safe
+                    >
                       {row.number}
                     </a>
                   </td>

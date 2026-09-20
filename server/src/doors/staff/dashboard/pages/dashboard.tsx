@@ -6,16 +6,9 @@ import { StaffShell } from "../../shared/shell.js";
 export type DashboardPageProps = {
   fullName: string;
   role: string;
-  /** Every report in the register. Shown to everyone, because everyone can open the list. */
+
   reportCount: number;
-  /**
-   * Managers only: the register folded into the four states the workload page is divided by, and
-   * how many reports have reached an approved F004.
-   *
-   * The same four meanings and the same words as the workload's own tabs, deliberately — a
-   * manager reading "Decision: 3" here and opening that tab must find those three. Undefined for
-   * every other role, whose dashboard does not run the query behind it.
-   */
+
   managerSummary?:
     | {
         notStarted: number;
@@ -25,37 +18,15 @@ export type DashboardPageProps = {
         finalReports: number;
       }
     | undefined;
-  /**
-   * Managers only: every death/life-threatening report still somewhere on the assessment/decision
-   * path, and how many of those are overdue on their current assignment. See the route's own
-   * comment for exactly what "still on the path" and "overdue" mean here.
-   */
+
   seriousSummary?: { total: number; overdue: number } | undefined;
-  /** Administrators only; undefined for anyone else, who is not shown the staff figure. */
   activeStaff?: number | undefined;
-  /**
-   * Officers only: everything that has arrived and not been assessed, and the newest few of them.
-   *
-   * `count` is the whole queue and `rows` the slice shown. The two differ once more has arrived
-   * than fits, which is exactly why the figure is worth printing beside the list. Undefined for
-   * every other role, whose dashboard does not run the query behind it.
-   */
+
   received?: { count: number; rows: ReceivedRow[] } | undefined;
-  /** Administrators only. Empty for anyone else, whose dashboard carries no trail. */
   recent: ActivityEntry[];
 };
 
-/**
- * Where a fully signed-in user lands.
- *
- * An administrator gets the two figures they are accountable for and the last few things that
- * happened. An Officer gets what is waiting — the size of the received queue and the newest of it,
- * which is the nearest thing to "your work" that is true before anything assigns it.
- *
- * A manager gets the shape of the register: how much is at each stage, and how much has been
- * approved. It is a summary and stays one — the rows behind every figure are a click away on the
- * workload page, and a second table of them here would be that page with a different heading.
- */
+
 export function DashboardPage({
   fullName,
   role,
@@ -90,10 +61,6 @@ export function DashboardPage({
           </div>
         )}
 
-        {/* The four states, in pipeline order, under the words the workload page already uses for
-            them. A status the database stores is never printed: `awaiting_second_assessor` is a
-            step of the machine, and what a manager needs to read is that three reports are
-            waiting on them. */}
         {managerSummary !== undefined && (
           <>
             <div class="stat">
@@ -128,11 +95,6 @@ export function DashboardPage({
           </>
         )}
 
-        {/* The one card in the palette's red rather than the dashboard's usual green/orange: a
-            death or life-threatening report still on the assessment/decision path is the SOP's own
-            5-working-day case, and the card that surfaces it must not read as just another figure
-            beside "Not started" and "Decision". Linked to Workload, where a manager acts on it —
-            the same argument every other card on this page already makes for its own link. */}
         {seriousSummary !== undefined && (
           <a href="/workload" class="stat stat-serious">
             <span class="eyebrow">Serious AEs/AIs</span>
@@ -159,16 +121,8 @@ export function DashboardPage({
       </div>
 
       <p class="dash-note">
-        {/* The pipeline first for a manager: the figures above say how much, and the workload is
-            where they act on it.
-
-            An Officer gets their own two lists instead. The register is not theirs — it lists
-            every report in the office, and `caseDetailRoutes` refuses it to them — so a button
-            offering it here would be a button that answers 403. `received` is the flag, because
-            it is defined for exactly one role and this page already reads it that way.
-
-            An Administrator gets neither — just the figures above and the activity trail below. */}
-        {received !== undefined ? (
+ 
+    {received !== undefined ? (
           <>
             <a href="/assessments" class="btn">
               My assessments
@@ -200,8 +154,6 @@ export function DashboardPage({
         <div class="dash-queue">
           <h2>Received reports</h2>
 
-          {/* No rows means the sentence and nothing else. A table header over an empty body reads
-              as a list that failed to load rather than a queue that is genuinely clear. */}
           {received.count === 0 ? (
             <p class="hint">Nothing is waiting to be assessed.</p>
           ) : (
