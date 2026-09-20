@@ -13,92 +13,75 @@
   overflow-x: auto;
   resize: vertical;
 }
+
 /* ---------- IMDRF terminology ---------- */
 /*
- * A lookup tool, not a second rail and not a document browser.
+ * A reference page, not an application inside the page.
  *
- * The page is four bands stacked: the document's own header (with the release chip pushed to the
- * right, where a secondary fact belongs), the F004 scope bar, one search row, and then the
- * reader, which takes every pixel that is left. The reader is two panes — term list left, term
- * document right — and both scroll inside themselves so the page never grows a scrollbar of its
- * own and the search box never leaves the screen.
+ * It scrolls the way every other staff page scrolls: one native page scroll under the shell's
+ * sticky title bar. The two-pane reader that used to live here is gone, and with it the
+ * `:has(.imdrf-page)` rules that locked `.shell` to the viewport so those panes could scroll
+ * inside themselves — nested scroll areas are what made the page read as a dashboard bolted into
+ * the portal rather than a part of it.
  *
- * What was removed matters as much as what is here. The release tab bar is gone: it spent a full
- * row restating one number. The annex list that used to sit above the tree is gone too — it was
- * a second navigation stacked on a first inside a 320px column, and the annex is now implied by
- * the scope the officer picked. The left column is one list again.
+ * Everything below borrows the portal's own vocabulary: `--rule` for a line, `--green` for the
+ * open/selected state, `.btn.ghost`/`.btn-sm` for an action, `.tag` for a status. There is no
+ * card, no shadow and no gradient on this page; sections are separated by the same hairline the
+ * register and the dashboard use.
  *
- * Indent in the tree is `data-depth`, never an inline style — `style-src 'self'` would drop a
- * `padding-left` written from the script.
+ * Indent in the hierarchy is `data-depth`, never an inline style — `style-src 'self'` would drop
+ * a `padding-left` written from the script.
  */
-
-/*
- * The handbook fills the pane under the title bar, so the two panes scroll inside themselves
- * rather than growing the page. `.main` is already a column; this is the extra stretch so
- * `.imdrf-reader` has a bounded height to scroll against.
- */
-.shell:has(.imdrf-page) {
-  height: 100vh;
-  overflow: hidden;
-}
-
-.main:has(.imdrf-page) {
-  min-height: 0;
-  overflow: hidden;
-}
-
-.staff-main:has(.imdrf-page) {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  padding-bottom: 22px;
-}
 
 .imdrf-page {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
+  max-width: 940px;
 }
+
+/* ---- the page header ---- */
 
 .imdrf-head {
-  flex: none;
-  align-items: center;
-  margin-bottom: 14px;
-  padding-bottom: 13px;
+  align-items: baseline;
 }
 
-.imdrf-head .sp {
-  flex: 1;
-  min-width: 260px;
+.imdrf-title {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* The full title and the short one are both rendered; CSS shows whichever fits. */
+.imdrf-title-short,
+.imdrf-sub-short {
+  display: none;
+}
+
+.imdrf-sub {
+  margin-top: 3px;
 }
 
 /* ---- release chip ---- */
-
-.imdrf-release-flat,
-.imdrf-release > summary {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 5px 11px;
-  border: 1px solid var(--rule);
-  border-radius: 999px;
-  background: var(--paper);
-  font-size: 11.5px;
-  font-weight: 500;
-  color: var(--ink-2);
-  white-space: nowrap;
-}
-
+/*
+ * Present only when a second release has been published. It is a secondary fact — which edition
+ * am I reading — so it sits at the end of the header row rather than taking a band of its own.
+ */
 .imdrf-release {
   position: relative;
   flex: none;
 }
 
 .imdrf-release > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  background: var(--card);
+  color: var(--ink-2);
+  font-size: 12.5px;
   cursor: pointer;
   list-style: none;
+  white-space: nowrap;
 }
 
 .imdrf-release > summary::-webkit-details-marker {
@@ -110,748 +93,480 @@
   color: var(--ink);
 }
 
-.imdrf-release > summary:focus-visible {
-  outline: 2px solid var(--green);
-  outline-offset: 1px;
-}
-
 .imdrf-release-caret {
-  display: block;
-  width: 5px;
-  height: 5px;
-  border-right: 1.5px solid currentcolor;
-  border-bottom: 1.5px solid currentcolor;
-  transform: rotate(45deg);
-  transform-origin: 60% 60%;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid currentcolor;
 }
 
 .imdrf-release[open] > summary {
-  background: var(--green-bg);
-  border-color: var(--green-bg);
-  color: var(--green-d);
+  border-color: var(--rule-2);
+  color: var(--ink);
 }
 
 .imdrf-release-menu {
   position: absolute;
-  top: calc(100% + 6px);
   right: 0;
+  top: calc(100% + 5px);
   z-index: 20;
-  min-width: 240px;
+  min-width: 220px;
   padding: 6px;
-  background: var(--card);
-  border: 1px solid var(--rule-2);
+  border: 1px solid var(--rule);
   border-radius: var(--r);
-  box-shadow: 0 8px 24px rgb(16 25 19 / 12%);
+  background: var(--card);
 }
 
 .imdrf-release-menu-h {
-  padding: 4px 8px 6px;
-  font-size: 10px;
-  letter-spacing: 0.1em;
+  padding: 5px 8px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ink-3);
-  font-weight: 500;
 }
 
 .imdrf-release-opt {
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 8px;
   padding: 7px 8px;
   border-radius: var(--r);
+  color: var(--ink);
   text-decoration: none;
-  color: var(--ink-2);
+  font-size: 13px;
 }
 
 .imdrf-release-opt:hover {
   background: var(--paper);
-  color: var(--ink);
 }
 
 .imdrf-release-opt.on {
   background: var(--green-bg);
-  color: var(--green-d);
+  color: var(--green);
 }
 
 .imdrf-release-year {
   font-weight: 600;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
 }
 
 .imdrf-release-code {
-  font-family: var(--mono);
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--ink-3);
 }
 
 .imdrf-release-opt.on .imdrf-release-code {
-  color: var(--green-d);
-  opacity: 0.8;
+  color: var(--green);
 }
 
-/* ---- the F004 scope bar ---- */
-/*
- * Seven buttons, in the form's own order, wrapping onto a second line rather than scrolling
- * sideways: an officer has to see all seven at once to pick between them, and a horizontal
- * scroller hides the ones at the end from the reader who most needs to compare.
- */
-.imdrf-scopes {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  flex: none;
-  margin: 0 0 12px;
-  padding: 0;
-  border: 0;
-  min-inline-size: 0;
-}
-
-/* A `<legend>` rather than a `<p>` because these seven buttons are one choice, and a fieldset is
-   what says so to a screen reader. `float` is the one reliable way to take a legend out of its
-   box's own layout and let it sit in the flex row with the buttons. */
-.imdrf-scopes-legend {
-  float: left;
-  padding: 0 10px 0 0;
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  font-weight: 500;
-  line-height: 30px;
-}
-
-.imdrf-scope {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 7px;
-  padding: 6px 10px;
-  border: 1px solid var(--rule);
-  border-radius: 999px;
-  background: var(--card);
-  color: var(--ink-2);
-  cursor: pointer;
-  text-align: left;
-}
-
-.imdrf-scope:hover {
-  border-color: var(--rule-2);
-  background: var(--paper);
-  color: var(--ink);
-}
-
-.imdrf-scope:focus-visible {
-  outline: 2px solid var(--green);
-  outline-offset: 1px;
-}
-
-.imdrf-scope.on {
-  background: var(--green);
-  border-color: var(--green);
-  color: #fff;
-}
-
-.imdrf-scope-no {
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--green-d);
-}
-
-.imdrf-scope.on .imdrf-scope-no {
-  color: #fff;
-}
-
-.imdrf-scope-name {
-  font-size: 12.5px;
-  font-weight: 500;
-  line-height: 1.3;
-}
-
-.imdrf-scope-annex {
-  font-family: var(--mono);
-  font-size: 10px;
-  font-weight: 600;
-  padding: 1px 5px;
-  border-radius: 999px;
-  background: var(--paper);
-  color: var(--ink-3);
-}
-
-.imdrf-scope.on .imdrf-scope-annex {
-  background: rgb(255 255 255 / 22%);
-  color: #fff;
-}
-
-/* ---- the search row ---- */
+/* ---- the search box ---- */
 
 .imdrf-searchbar {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 14px;
-  flex: none;
-  margin-bottom: 12px;
-}
-
-.imdrf-searchwrap {
-  position: relative;
-  flex: 1;
-  min-width: 260px;
+  gap: 8px;
   max-width: 460px;
+  margin-bottom: 6px;
+  padding: 0 11px;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r);
+  background: var(--card);
 }
 
+.imdrf-searchbar:focus-within {
+  border-color: var(--green);
+}
+
+/* A magnifier drawn from two borders, so the box needs no icon font and no extra request. */
 .imdrf-searchicon {
-  position: absolute;
-  top: 50%;
-  left: 12px;
-  width: 11px;
-  height: 11px;
-  margin-top: -7px;
+  position: relative;
+  width: 13px;
+  height: 13px;
+  flex: none;
   border: 1.6px solid var(--ink-3);
   border-radius: 50%;
-  pointer-events: none;
 }
 
 .imdrf-searchicon::after {
   content: "";
   position: absolute;
-  top: 9px;
-  left: 9px;
+  right: -4px;
+  bottom: -3px;
   width: 5px;
   height: 1.6px;
   background: var(--ink-3);
   transform: rotate(45deg);
-  transform-origin: left center;
 }
 
 .imdrf-search {
-  width: 100%;
-  padding: 9px 12px 9px 32px;
-  border: 1px solid var(--rule-2);
-  border-radius: var(--r);
-  background: var(--card);
+  flex: 1;
+  min-width: 0;
+  padding: 9px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
   font-size: 13.5px;
-}
-
-.imdrf-search::placeholder {
-  color: var(--ink-3);
 }
 
 .imdrf-search:focus-visible {
-  outline: 2px solid var(--green);
-  outline-offset: 1px;
-  border-color: var(--green);
+  outline: none;
 }
 
-/* The active scope restated as the question being answered — the one line that tells a reader
-   who has never coded a report what the box above is actually asking them for. */
-.imdrf-scope-hint {
-  font-size: 12.5px;
-  color: var(--ink-2);
-  min-width: 0;
-}
-
-/* ---- the reader ---- */
-
-.imdrf-reader {
-  display: grid;
-  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
-  flex: 1;
-  min-height: 0;
-  background: var(--card);
-  border: 1px solid var(--rule);
-  border-radius: var(--r);
-  overflow: hidden;
-}
-
-.imdrf-toc {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  border-right: 1px solid var(--rule);
-  background: var(--paper);
-}
-
-.imdrf-toc-h {
-  flex: none;
-  padding: 9px 14px;
-  border-bottom: 1px solid var(--rule);
-  background: var(--card);
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  font-weight: 500;
-}
-
-.imdrf-list {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 6px 0 10px;
-}
-
-.imdrf-list > .hint {
-  padding: 12px 14px;
-  text-wrap: pretty;
-}
-
-.imdrf-row {
-  display: grid;
-  grid-template-columns: var(--imdrf-pad, 6px) 26px minmax(0, 1fr);
-  align-items: start;
-}
-
-.imdrf-row[data-depth="0"] { --imdrf-pad: 6px; }
-.imdrf-row[data-depth="1"] { --imdrf-pad: 20px; }
-.imdrf-row[data-depth="2"] { --imdrf-pad: 34px; }
-.imdrf-row[data-depth="3"] { --imdrf-pad: 48px; }
-.imdrf-row[data-depth="4"] { --imdrf-pad: 62px; }
-.imdrf-row[data-depth="5"] { --imdrf-pad: 76px; }
-.imdrf-row[data-depth="6"] { --imdrf-pad: 90px; }
-.imdrf-row[data-depth="7"] { --imdrf-pad: 104px; }
-.imdrf-row[data-depth="8"] { --imdrf-pad: 118px; }
-
-.imdrf-toggle {
-  grid-column: 2;
-}
-
-.imdrf-term-btn {
-  grid-column: 3;
-}
-
-.imdrf-children {
-  grid-column: 1 / -1;
-}
-
-.imdrf-toggle,
-.imdrf-term-btn {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  text-align: left;
-}
-
-.imdrf-toggle {
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 34px;
-  padding: 0;
-  color: var(--ink-3);
-}
-
-.imdrf-row[data-has-children="false"] .imdrf-toggle {
-  visibility: hidden;
-  pointer-events: none;
-}
-
-.imdrf-toggle:hover {
-  color: var(--ink);
-}
-
-.imdrf-caret {
-  display: block;
-  width: 7px;
-  height: 7px;
-  border-right: 1.6px solid currentcolor;
-  border-bottom: 1.6px solid currentcolor;
-  transform: rotate(-45deg);
-  transform-origin: 60% 60%;
-}
-
-.imdrf-row[data-expanded="true"] .imdrf-caret {
-  transform: rotate(45deg);
-}
-
-/*
- * A term in the list is its code and its name on one line, code first and in a fixed column.
- * The code is what gets typed into F004, so it is the part the eye scans down; the name is what
- * confirms the pick, so it wraps rather than being truncated into ambiguity.
- */
-.imdrf-term-btn {
-  display: grid;
-  grid-template-columns: 62px minmax(0, 1fr);
-  gap: 8px;
-  align-items: baseline;
-  min-height: 34px;
-  padding: 7px 12px 7px 4px;
-  border-radius: var(--r);
-}
-
-.imdrf-term-btn:hover {
-  background: #eef2ee;
-}
-
-.imdrf-term-btn.on {
-  background: var(--green-bg);
-  color: var(--green-d);
-}
-
-.imdrf-term-btn:focus-visible,
-.imdrf-toggle:focus-visible {
-  outline: 2px solid var(--green);
-  outline-offset: -2px;
-}
-
-.imdrf-term-btn code {
-  font-family: var(--mono);
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--green-d);
-  overflow-wrap: anywhere;
-}
-
-.imdrf-term-btn span {
-  font-size: 13px;
-  line-height: 1.35;
-  text-wrap: pretty;
-}
-
-.imdrf-more {
-  display: block;
-  width: calc(100% - 20px);
-  margin: 6px 10px 2px;
-  padding: 7px;
-  border: 1px dashed var(--rule-2);
-  border-radius: var(--r);
-  background: transparent;
-  color: var(--ink-2);
-  font-size: 12px;
-  font-weight: 500;
+.imdrf-search::-webkit-search-cancel-button {
   cursor: pointer;
 }
 
-.imdrf-more:hover:not(:disabled) {
-  background: var(--card);
-  color: var(--ink);
-}
-
-.imdrf-more:disabled {
-  cursor: default;
-  color: var(--ink-3);
-}
-
-/* ---- the term document ---- */
-
-.imdrf-doc {
-  min-width: 0;
-  padding: 26px 32px 40px;
-  overflow: auto;
-}
-
-.imdrf-warn {
-  margin-bottom: 14px;
-  padding: 9px 12px;
-  border: 1px solid var(--orange-line);
-  border-radius: var(--r);
-  background: var(--orange-bg);
-  color: var(--orange-d);
-  font-size: 12.5px;
-  font-weight: 500;
-  text-wrap: pretty;
-}
-
-.imdrf-entry-term {
-  margin: 5px 0 0;
-  font-size: 21px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.25;
-  text-wrap: pretty;
-  max-width: 34ch;
-}
-
-.imdrf-entry-crumb {
-  margin: 8px 0 0;
+.imdrf-search-note {
+  margin-bottom: 10px;
   font-size: 12px;
   color: var(--ink-3);
-  text-wrap: pretty;
-  max-width: 62ch;
 }
 
-/*
- * The block the officer came for. It is a card rather than more prose because it is the one part
- * of this pane that gets acted on — everything above it is how you know you are in the right
- * place, and everything below it is why.
- */
-.imdrf-f4 {
-  margin: 18px 0 22px;
-  padding: 14px 16px 15px;
-  border: 1px solid var(--rule);
-  border-left: 3px solid var(--green);
-  border-radius: var(--r);
-  background: var(--paper);
-  max-width: 62ch;
-}
+/* ---- search results ---- */
 
-.imdrf-f4-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.imdrf-f4-h {
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--green-d);
-  font-weight: 600;
-}
-
-.imdrf-copy {
-  flex: none;
-  padding: 5px 11px;
-  border: 1px solid var(--green);
-  border-radius: var(--r);
-  background: var(--card);
-  color: var(--green-d);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.imdrf-copy:hover {
-  background: var(--green);
-  color: #fff;
-}
-
-.imdrf-copy:focus-visible {
-  outline: 2px solid var(--green);
-  outline-offset: 1px;
-}
-
-.imdrf-copy.ok {
-  background: var(--green);
-  border-color: var(--green);
-  color: #fff;
-}
-
-.imdrf-f4-code-big {
-  margin: 6px 0 12px;
-  font-size: 26px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  line-height: 1.1;
-  color: var(--ink);
-}
-
-.imdrf-f4-code-big code {
-  font-family: var(--mono);
-  overflow-wrap: anywhere;
-}
-
-.imdrf-f4-levels {
-  display: grid;
-  gap: 8px;
-  padding-top: 12px;
+.imdrf-results {
+  margin-top: 10px;
   border-top: 1px solid var(--rule);
 }
 
-.imdrf-f4-levels dt {
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  font-weight: 500;
+.imdrf-results > .hint {
+  padding: 16px 2px;
 }
 
-.imdrf-f4-levels dd {
-  margin-top: 1px;
-  font-size: 13.5px;
-  line-height: 1.4;
+.imdrf-result {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  padding: 9px 8px;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0;
+  background: transparent;
   color: var(--ink);
-  text-wrap: pretty;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
-.imdrf-f4-code {
-  font-family: var(--mono);
-  font-size: 11px;
+.imdrf-result:hover {
+  background: var(--paper);
+}
+
+.imdrf-result-main {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  min-width: 0;
+  font-size: 13.5px;
+}
+
+.imdrf-result-main code,
+.imdrf-term code {
+  flex: none;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  color: var(--green);
+}
+
+.imdrf-result-where {
+  flex: none;
+  font-size: 11.5px;
   color: var(--ink-3);
   white-space: nowrap;
 }
 
-.imdrf-f4-note {
-  margin-top: 12px;
-  padding-top: 11px;
-  border-top: 1px solid var(--rule);
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--ink-2);
-  text-wrap: pretty;
+/* ---- the hierarchy ---- */
+
+.imdrf-reader {
+  position: relative;
+  margin-top: 4px;
 }
 
-.imdrf-def-h {
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  font-weight: 500;
-  margin-bottom: 5px;
+.imdrf-section {
+  border-bottom: 1px solid var(--rule);
 }
 
-.imdrf-entry-def {
-  font-size: 14.5px;
-  line-height: 1.6;
-  color: var(--ink);
-  text-wrap: pretty;
-  max-width: 62ch;
+.imdrf-section-h {
+  font-size: inherit;
+  font-weight: inherit;
 }
 
-.imdrf-entry-meta {
-  display: grid;
+.imdrf-section-btn {
+  display: flex;
+  align-items: baseline;
   gap: 10px;
-  margin-top: 22px;
-  padding-top: 16px;
-  border-top: 1px solid var(--rule);
-  max-width: 62ch;
-}
-
-.imdrf-entry-meta dt {
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  font-weight: 500;
-}
-
-.imdrf-entry-meta dd {
-  font-size: 13.5px;
-  color: var(--ink-2);
-}
-
-/* ---- the start panel ---- */
-/*
- * What the right pane holds before a term is picked. This used to be one grey sentence in the
- * largest region of the page; it is the instructions now, because the officer most likely to be
- * looking at an empty pane is the one who does not yet know what to do with a full one.
- */
-.imdrf-start {
-  max-width: 68ch;
-}
-
-.imdrf-start-h {
-  margin: 5px 0 8px;
-  font-size: 19px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  line-height: 1.25;
-  text-wrap: pretty;
-}
-
-.imdrf-start-lede {
-  font-size: 13.5px;
-  line-height: 1.6;
-  color: var(--ink-2);
-  text-wrap: pretty;
-}
-
-.imdrf-steps {
-  display: grid;
-  gap: 11px;
-  margin: 18px 0 24px;
-  padding: 0;
-  list-style: none;
-}
-
-.imdrf-steps li {
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
-  gap: 10px;
-  align-items: start;
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--ink-2);
-  text-wrap: pretty;
-}
-
-.imdrf-step-n {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--green-bg);
-  color: var(--green-d);
-  font-size: 11.5px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.imdrf-start-h2 {
-  padding-top: 16px;
-  border-top: 1px solid var(--rule);
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  font-weight: 500;
-}
-
-.imdrf-qlist {
-  display: grid;
-  gap: 2px;
-  margin-top: 8px;
-  padding: 0;
-  list-style: none;
-}
-
-.imdrf-qbtn {
-  display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
-  gap: 10px;
-  align-items: start;
   width: 100%;
-  padding: 8px 10px;
+  padding: 13px 8px;
   border: 0;
-  border-radius: var(--r);
   background: transparent;
-  color: inherit;
+  color: var(--ink);
+  font: inherit;
   text-align: left;
   cursor: pointer;
 }
 
-.imdrf-qbtn:hover {
+.imdrf-section-btn:hover {
   background: var(--paper);
 }
 
-.imdrf-qbtn:focus-visible {
-  outline: 2px solid var(--green);
-  outline-offset: -2px;
-}
-
-.imdrf-qno {
-  font-family: var(--mono);
-  font-size: 11.5px;
+.imdrf-section-no {
+  flex: none;
+  font-size: 13px;
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--green-d);
-  line-height: 1.45;
+  color: var(--green);
 }
 
-.imdrf-qtext {
-  display: grid;
-  gap: 2px;
+.imdrf-section-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.imdrf-section-count {
+  flex: none;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.imdrf-section-body {
+  padding: 0 0 12px 8px;
+}
+
+/*
+ * The caret, and the only thing that moves on this page.
+ *
+ * A triangle rather than a chevron image: it is the same shape the release chip uses, it inherits
+ * `currentcolor`, and it costs no request. The rotation is stilled under `prefers-reduced-motion`
+ * at the end of this file — the movement is optional, the state it reports is not.
+ */
+.imdrf-caret {
+  width: 0;
+  height: 0;
+  flex: none;
+  align-self: center;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid var(--ink-3);
+  transition: transform 0.12s ease;
+}
+
+.imdrf-section[data-open="true"] > .imdrf-section-h .imdrf-caret,
+.imdrf-row[data-open="true"] > .imdrf-term .imdrf-caret {
+  transform: rotate(90deg);
+}
+
+/* A leaf has nothing to turn: the space is kept so its code still lines up with its siblings'. */
+.imdrf-row[data-has-children="false"] .imdrf-caret {
+  border-left-color: transparent;
+}
+
+.imdrf-row {
+  border-top: 1px solid var(--rule);
+}
+
+.imdrf-row:first-child {
+  border-top: 0;
+}
+
+.imdrf-row[data-depth="0"] { --imdrf-pad: 8px; }
+.imdrf-row[data-depth="1"] { --imdrf-pad: 22px; }
+.imdrf-row[data-depth="2"] { --imdrf-pad: 36px; }
+.imdrf-row[data-depth="3"] { --imdrf-pad: 50px; }
+.imdrf-row[data-depth="4"] { --imdrf-pad: 64px; }
+
+.imdrf-term {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 8px 8px var(--imdrf-pad, 8px);
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.imdrf-term:hover {
+  background: var(--paper);
+}
+
+/*
+ * The open/selected row. The left bar carries the state as much as the tint does, so it is not
+ * colour alone — which matters both for a reader who cannot separate the two greens and for one
+ * reading the page printed.
+ */
+.imdrf-term.on,
+.imdrf-row[data-open="true"] > .imdrf-term {
+  background: var(--green-bg);
+  box-shadow: inset 2px 0 0 var(--green);
+}
+
+.imdrf-term-name {
   min-width: 0;
 }
 
-.imdrf-qq {
-  font-size: 13.5px;
-  font-weight: 500;
-  line-height: 1.4;
-  color: var(--ink);
-  text-wrap: pretty;
+/* ---- a term's own details ---- */
+
+.imdrf-body {
+  padding-left: var(--imdrf-pad, 8px);
 }
 
-.imdrf-qmeta {
+.imdrf-detail {
+  margin-left: 8px;
+  padding: 2px 8px 14px 9px;
+  border-left: 1px solid var(--rule);
+}
+
+.imdrf-path {
+  margin-bottom: 6px;
   font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.imdrf-def {
+  max-width: 68ch;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+.imdrf-nodef {
+  color: var(--ink-3);
+  font-style: italic;
+}
+
+/* A code that must not be used on a new assessment, said before it can be copied. */
+.imdrf-warn {
+  margin-bottom: 8px;
+  padding: 7px 10px;
+  border-left: 3px solid var(--flag);
+  background: var(--flag-bg);
+  color: var(--flag);
+  font-size: 12.5px;
+}
+
+.imdrf-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 6px 18px;
+  margin-top: 10px;
+}
+
+.imdrf-meta dt {
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.imdrf-meta dd {
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+.imdrf-actions {
+  margin-top: 12px;
+}
+
+/* ---- paging ---- */
+
+.imdrf-more {
+  display: block;
+  margin: 8px 0 4px var(--imdrf-pad, 8px);
+  padding: 5px 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  background: var(--card);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.imdrf-more:hover:not(:disabled) {
+  border-color: var(--rule-2);
+  color: var(--ink);
+}
+
+.imdrf-more:disabled {
+  color: var(--ink-3);
+  cursor: default;
+}
+
+/* ---- loading ---- */
+/*
+ * One shape for every wait on this page: a few grey bars where the rows will be, pulsing slowly.
+ * No spinner anywhere — a spinner says "busy", and these say what is coming and roughly how much
+ * of it, which is what keeps the page from jumping when it arrives.
+ */
+.imdrf-skel {
+  padding: 8px 0;
+}
+
+.imdrf-skel-row {
+  height: 11px;
+  margin: 9px 0;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--rule) 0%, #eef2ee 50%, var(--rule) 100%);
+  background-size: 200% 100%;
+  animation: imdrf-shimmer 1.5s ease-in-out infinite;
+}
+
+.imdrf-skel-row[data-n="0"] { width: 62%; }
+.imdrf-skel-row[data-n="1"] { width: 84%; }
+.imdrf-skel-row[data-n="2"] { width: 71%; }
+
+@keyframes imdrf-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/*
+ * The opening veil: a dim over the hierarchy with one skeleton surface on it.
+ *
+ * Over the hierarchy alone, not the viewport — the title bar, the page heading and the search box
+ * are already drawn and already true, and covering them would be the page claiming it knows less
+ * than it does. It lies over the hierarchy rather than in front of it in the flow, so the page
+ * already has its full height while the veil is up and nothing shifts when it comes down.
+ */
+.imdrf-boot {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  padding: 14px 8px;
+  background: rgb(245 248 245 / 88%);
+}
+
+.imdrf-boot-card {
+  width: 100%;
+  max-width: 460px;
+  height: fit-content;
+  padding: 16px 18px 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  background: var(--card);
+}
+
+.imdrf-boot-h {
+  font-size: 12.5px;
   color: var(--ink-3);
 }
 
@@ -898,70 +613,82 @@
   max-height: min(420px, calc(100vh - 280px));
 }
 
-@media (max-width: 1100px) {
-  .imdrf-doc {
-    padding: 22px 22px 34px;
-  }
-}
+/* ---- narrower screens ---- */
 
 @media (max-width: 900px) {
   .imdrf-admin {
     grid-template-columns: 1fr;
   }
-
-  .imdrf-searchwrap {
-    max-width: 100%;
-  }
 }
 
 /*
- * Under 800px the two panes stop being two panes. Stacking them is the only honest layout at
- * that width — a 260px list beside a definition would leave neither readable — so the list takes
- * a bounded slice of the viewport and the document follows it down the page.
+ * A phone. The hierarchy is the same hierarchy — it is not swapped for a different component —
+ * but the title and release line shorten, the indent steps close up so a third-level term still
+ * has room for its name, and the section count drops rather than push the heading into a wrap.
+ * Nothing here scrolls sideways: the page's one scroll is vertical at every width.
  */
-@media (max-width: 800px) {
-  .shell:has(.imdrf-page),
-  .main:has(.imdrf-page) {
-    height: auto;
-    overflow: visible;
-    min-height: 0;
+@media (max-width: 620px) {
+  .imdrf-title-full,
+  .imdrf-sub-full {
+    display: none;
   }
 
-  .staff-main:has(.imdrf-page) {
-    display: block;
-    flex: none;
-    min-height: 0;
-    padding-bottom: 44px;
+  .imdrf-title-short,
+  .imdrf-sub-short {
+    display: inline;
   }
 
-  .imdrf-page {
-    display: block;
-    flex: none;
-    min-height: 0;
+  .imdrf-section-count {
+    display: none;
   }
 
-  .imdrf-reader {
-    display: grid;
-    grid-template-columns: 1fr;
-    flex: none;
-    min-height: 0;
-    overflow: hidden;
+  .imdrf-section-btn,
+  .imdrf-result {
+    padding-left: 4px;
+    padding-right: 4px;
   }
 
-  .imdrf-toc {
-    border-right: 0;
-    border-bottom: 1px solid var(--rule);
-    max-height: 48vh;
-    overflow: hidden;
+  .imdrf-section-body {
+    padding-left: 2px;
   }
 
-  .imdrf-doc {
-    padding: 20px 16px 32px;
-    min-height: 40vh;
+  .imdrf-row[data-depth="0"] { --imdrf-pad: 4px; }
+  .imdrf-row[data-depth="1"] { --imdrf-pad: 14px; }
+  .imdrf-row[data-depth="2"] { --imdrf-pad: 24px; }
+  .imdrf-row[data-depth="3"] { --imdrf-pad: 34px; }
+  .imdrf-row[data-depth="4"] { --imdrf-pad: 44px; }
+
+  /* Touch targets before density: a row a thumb can miss is a row that gets hit twice. */
+  .imdrf-term,
+  .imdrf-result,
+  .imdrf-section-btn {
+    padding-top: 11px;
+    padding-bottom: 11px;
+  }
+
+  /* The section a result sits in stops competing with the result itself for one row. */
+  .imdrf-result {
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .imdrf-result-where {
+    white-space: normal;
   }
 
   .imdrf-release-menu {
     right: auto;
     left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .imdrf-skel-row {
+    animation: none;
+    background: var(--rule);
+  }
+
+  .imdrf-caret {
+    transition: none;
   }
 }

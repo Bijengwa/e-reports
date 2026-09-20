@@ -1,28 +1,22 @@
 /**
- * The read-only IMDRF terminology handbook every signed-in role reads.
+ * The read-only IMDRF terminology reference every signed-in role reads.
  *
- * What this page is FOR decides its shape. Nobody opens it to browse IMDRF: they open it holding
- * a report, with F004 section 3 in front of them, needing the one code that goes in one coding
- * box. So the page is organised by that question — the seven F004 coding items, each bound to the
- * annex its code must come from — rather than by the workbook's own A–G filing order, which is a
- * fact about the source document and not about the work.
+ * It is an ordinary staff page: `StaffShell`'s title bar above it, `staff-head` at the top of the
+ * body, one native page scroll underneath. It used to be a two-pane reader that took the viewport
+ * and scrolled inside itself, with its own header restating the shell's, a seven-button scope bar
+ * and a column of instructions in the largest region on screen. All of that is gone. What is left
+ * is the terminology, in IMDRF's own structure, and one box to search it with.
  *
- * Two readers arrive. One knows the code, or most of it, and wants the box: they type into the
- * search, which ranks an exact code first (see `searchTerms`). One knows only what they saw and
- * not which of seven boxes it belongs in: they get the questions restated in plain language, an
- * annex tree to drill, and an opening panel that says what to do — which is why the right pane's
- * empty state is a short guide rather than the one grey sentence it used to be.
+ * The hierarchy is the page. Its outer level is F004's seven coding items, each bound to the one
+ * annex its code must come from — `3.1.1 (G) — Medical Device Component` — because that is both
+ * the workbook's structure and the question an officer arrives holding. Underneath a section sit
+ * that annex's own groups (`G01`, `G02`), and underneath those the terms. Nothing below a section
+ * heading is rendered until the section is opened, and nothing below a group until the group is.
  *
- * Release switching is a chip in the header, not a tab bar. A tab bar gave a second-order fact
- * ("which published year am I reading") a full row and equal weight with the annexes, and at two
- * releases it already read as the page's primary navigation. The current release is what an
- * officer wants in every case but one; the menu keeps that one case reachable without paying a
- * row for it.
+ * Only the seven headings and their counts are server-rendered, from one `annexSummary` query.
+ * Everything else arrives from `/imdrf/releases/:id/...` as it is asked for — see
+ * `/assets/imdrf-browser.js`. A release is thousands of rows; none of them are in this response.
  *
- * The page itself is server-rendered like every other staff page. The tree, the search results
- * and the term document are the one place this door fetches JSON client-side — expanding a branch
- * of a few-thousand-row hierarchy would otherwise be a full page load per twisty.
- * `/assets/imdrf-browser.js` renders those three panels; this file draws everything around them.
  * No inline styles anywhere: `style-src 'self'` drops them, which is how an earlier draft of this
  * page arrived with its layout missing.
  */
@@ -40,20 +34,13 @@ export type ImdrfBrowserPageProps = {
   viewerName: string;
 };
 
-/** The seven F004 coding items, flattened, each carrying the group heading it sits under. */
-const CODING_ITEMS = IMDRF_GROUPS.flatMap((group) =>
+/** The seven F004 coding items, flattened — the outer level of the hierarchy on this page. */
+const SECTIONS = IMDRF_GROUPS.flatMap((group) =>
   group.items.map((item) => ({
     no: `${group.no}.${item.letter}`,
-    groupTitle: group.title,
     annex: item.annexLetter,
-    question: item.question,
-    levels: item.levels,
   })),
 );
-
-function termTotal(summary: AnnexSummary[]): number {
-  return summary.reduce((sum, row) => sum + row.count, 0);
-}
 
 function countFor(summary: AnnexSummary[], annex: string): number {
   return summary.find((row) => row.annex === annex)?.count ?? 0;
@@ -62,9 +49,10 @@ function countFor(summary: AnnexSummary[], annex: string): number {
 /**
  * The release chip.
  *
- * A bare label when there is one published release, because a menu of one is a control that lies
- * about having a choice in it. A native `<details>` when there is more than one: it opens, closes
- * and is keyboard-reachable with the script blocked, which a div-and-JS dropdown would not be.
+ * Rendered only when there is more than one published release, because a menu of one is a control
+ * that lies about having a choice in it — with a single release the header line below already
+ * says which one is being read. A native `<details>`: it opens, closes and is keyboard-reachable
+ * with the script blocked, which a div-and-JS dropdown would not be.
  */
 function ReleaseChip({
   releases,
@@ -72,25 +60,13 @@ function ReleaseChip({
 }: {
   releases: ReleaseSummary[];
   selected: ReleaseSummary;
-}): JSX.Element {
-  const label = (
-    <>
-      Release {selected.releaseYear}
-      {selected.documentCode && (
-        <>
-          {" · "}
-          <span safe>{selected.documentCode}</span>
-        </>
-      )}
-    </>
-  );
-
-  if (releases.length < 2) return <p class="imdrf-release-flat">{label}</p>;
+}): JSX.Element | null {
+  if (releases.length < 2) return null;
 
   return (
     <details class="imdrf-release">
       <summary aria-label="Change release">
-        {label}
+        Release {selected.releaseYear}
         <span class="imdrf-release-caret" aria-hidden="true"></span>
       </summary>
       <div class="imdrf-release-menu">
@@ -116,70 +92,53 @@ function ReleaseChip({
 }
 
 /**
- * The right pane before a term is chosen.
+ * The release line under the page title, twice: the full reference and a short one.
  *
- * The old page spent this space on one grey sentence. It is the largest region on the screen and
- * the first thing an officer who has never coded a report sees, so it carries the instructions
- * instead: what the page is for, the seven questions with the F004 item each one answers, and the
- * one fact that changes how the form is filled — that only the coding box is typed, and the
- * preferred-terminology levels follow from it.
+ * Both are rendered and CSS shows one, rather than the script rewriting the line at a breakpoint.
+ * A phone gets `2026 · IMDRF/AE WG/N43` where a desktop gets `IMDRF/AE WG/N43 · 2026 Release` —
+ * the same two facts, ordered so the one that identifies the edition comes first in the space
+ * there is. Both read the release row; neither invents a code that is not stored.
  */
-function StartPanel({ summary }: { summary: AnnexSummary[] }): JSX.Element {
+function ReleaseLine({ release }: { release: ReleaseSummary }): JSX.Element {
+  const code = release.documentCode;
+
   return (
-    <div class="imdrf-start">
-      <p class="eyebrow">Start here</p>
-      <h3 class="imdrf-start-h">Find the code for an F004 section 3 field</h3>
-      <p class="imdrf-start-lede">
-        Pick the question you are answering above, then either type what you saw ("battery leaked",
-        "burn") or the code you already have. Choose a term and this pane shows its definition and
-        the exact value to enter.
-      </p>
+    <p class="hint imdrf-sub">
+      <span class="imdrf-sub-full">
+        {code && (
+          <>
+            <span safe>{code}</span>
+            {" · "}
+          </>
+        )}
+        {release.releaseYear} Release
+      </span>
+      <span class="imdrf-sub-short">
+        {release.releaseYear}
+        {code && (
+          <>
+            {" · "}
+            <span safe>{code}</span>
+          </>
+        )}
+      </span>
+    </p>
+  );
+}
 
-      <ol class="imdrf-steps">
-        <li>
-          <span class="imdrf-step-n">1</span>
-          <span>
-            Choose the F004 item you are filling. Each one draws from one annex, so the search is
-            narrowed to codes you are allowed to use there.
-          </span>
-        </li>
-        <li>
-          <span class="imdrf-step-n">2</span>
-          <span>
-            Search in plain words, or browse the tree from the broadest term down. Search also
-            matches definitions, so a word from the report often finds the term.
-          </span>
-        </li>
-        <li>
-          <span class="imdrf-step-n">3</span>
-          <span>
-            Read the definition before you take the code. Copy the code into the coding box in F004
-            — the preferred terminology levels are filled from it, not typed.
-          </span>
-        </li>
-      </ol>
-
-      <p class="imdrf-start-h2">The seven coding items</p>
-      <ul class="imdrf-qlist">
-        {CODING_ITEMS.map((item) => (
-          <li>
-            <button type="button" class="imdrf-qbtn" data-imdrf-scope={item.annex}>
-              <span class="imdrf-qno" safe>
-                {item.no}
-              </span>
-              <span class="imdrf-qtext">
-                <span class="imdrf-qq" safe>
-                  {item.question}
-                </span>
-                <span class="imdrf-qmeta">
-                  Annex {item.annex} · {ANNEX_DESCRIPTIONS[item.annex]} ·{" "}
-                  {countFor(summary, item.annex).toLocaleString("en")} terms
-                </span>
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
+/**
+ * The shape drawn in place of content that has been asked for and has not arrived.
+ *
+ * Markup rather than script-built nodes so the page's opening veil and a group's own loading rows
+ * are the same shape, and the shimmer has one rule governing it (`.imdrf-skel`, which
+ * `prefers-reduced-motion` stills).
+ */
+function Skeleton({ rows }: { rows: number }): JSX.Element {
+  return (
+    <div class="imdrf-skel" aria-hidden="true">
+      {Array.from({ length: rows }, (_unused, i) => (
+        <div class="imdrf-skel-row" data-n={String(i % 3)}></div>
+      ))}
     </div>
   );
 }
@@ -191,8 +150,6 @@ export function ImdrfBrowserPage({
   viewerRole,
   viewerName,
 }: ImdrfBrowserPageProps): JSX.Element {
-  const total = termTotal(summary);
-
   return (
     <StaffShell
       title="IMDRF terminology — AE Reports"
@@ -212,76 +169,90 @@ export function ImdrfBrowserPage({
         <div class="imdrf-page" data-imdrf-browser data-release-id={selected.id}>
           <div class="staff-head imdrf-head">
             <div class="sp">
-              <h2 safe>{selected.title ?? "IMDRF Adverse Event Terminology"}</h2>
-              <p class="hint">
-                The codes F004 section 3 asks for, with their definitions. Read-only.
-                {total > 0 && (
-                  <>
-                    {" "}
-                    {total.toLocaleString("en")} term{total === 1 ? "" : "s"} across{" "}
-                    {summary.length} annex{summary.length === 1 ? "" : "es"}.
-                  </>
-                )}
-              </p>
+              <h2 class="imdrf-title">
+                <span class="imdrf-title-full">IMDRF technical terminologies</span>
+                <span class="imdrf-title-short">IMDRF tech terminologies</span>
+              </h2>
+              <ReleaseLine release={selected} />
             </div>
             <ReleaseChip releases={releases} selected={selected} />
           </div>
 
-          {/*
-            The scope bar. These are F004's items, not the workbook's annexes, because "3.1.2 —
-            what went wrong with the device" is a question an officer can answer from the report
-            in front of them and "Annex A" is not. The annex still shows, small, since it is what
-            the paper cites.
-          */}
-          <fieldset class="imdrf-scopes">
-            <legend class="imdrf-scopes-legend">Which F004 field are you coding?</legend>
-            {CODING_ITEMS.map((item, i) => (
-              <button
-                type="button"
-                class={i === 0 ? "imdrf-scope on" : "imdrf-scope"}
-                data-imdrf-scope={item.annex}
-                data-imdrf-scope-no={item.no}
-                data-imdrf-scope-question={item.question}
-                aria-pressed={i === 0 ? "true" : "false"}
-              >
-                <span class="imdrf-scope-no" safe>
-                  {item.no}
-                </span>
-                <span class="imdrf-scope-name">{ANNEX_DESCRIPTIONS[item.annex]}</span>
-                <span class="imdrf-scope-annex" safe>
-                  {item.annex}
-                </span>
-              </button>
-            ))}
-          </fieldset>
-
           <div class="imdrf-searchbar">
-            <div class="imdrf-searchwrap">
-              <span class="imdrf-searchicon" aria-hidden="true"></span>
-              <input
-                type="search"
-                class="imdrf-search"
-                data-imdrf-search
-                placeholder="Search this annex — a code, a term, or what you saw…"
-                aria-label="Search terminology"
-                autocomplete="off"
-                spellcheck={false}
-              />
-            </div>
-            <p class="imdrf-scope-hint" data-imdrf-scope-hint></p>
+            <span class="imdrf-searchicon" aria-hidden="true"></span>
+            <input
+              type="search"
+              id="imdrf-search"
+              class="imdrf-search"
+              data-imdrf-search
+              placeholder="Search IMDRF terminology…"
+              aria-label="Search IMDRF terminology"
+              aria-describedby="imdrf-search-note"
+              autocomplete="off"
+              spellcheck={false}
+            />
           </div>
+          <p class="imdrf-search-note" id="imdrf-search-note" data-imdrf-search-note hidden></p>
 
-          <div class="imdrf-reader">
-            <aside class="imdrf-toc">
-              <p class="imdrf-toc-h" data-imdrf-toc-head>
-                Browse
-              </p>
-              <div class="imdrf-list" data-imdrf-tree></div>
-              <div class="imdrf-list" data-imdrf-results hidden></div>
-            </aside>
-            <article class="imdrf-doc" data-imdrf-detail>
-              <StartPanel summary={summary} />
-            </article>
+          {/* Search results replace the hierarchy rather than sitting beside it: one region of
+              the page answers "what am I looking at", and a result list that opened alongside
+              would leave the reader deciding which of two lists was the live one. */}
+          <div
+            class="imdrf-results"
+            data-imdrf-results
+            role="region"
+            aria-label="Search results"
+            aria-live="polite"
+            hidden
+          ></div>
+
+          <div class="imdrf-reader" data-imdrf-tree>
+            {SECTIONS.map((section) => {
+              const count = countFor(summary, section.annex);
+              return (
+                <section
+                  class="imdrf-section"
+                  data-imdrf-section={section.annex}
+                  data-loaded="false"
+                >
+                  <h3 class="imdrf-section-h">
+                    <button
+                      type="button"
+                      class="imdrf-section-btn"
+                      data-role="section-toggle"
+                      aria-expanded="false"
+                      aria-controls={`imdrf-section-${section.annex}`}
+                    >
+                      <span class="imdrf-caret" aria-hidden="true"></span>
+                      <span class="imdrf-section-no" safe>
+                        {section.no} ({section.annex})
+                      </span>
+                      <span class="imdrf-section-name">{ANNEX_DESCRIPTIONS[section.annex]}</span>
+                      <span class="imdrf-section-count">
+                        {count.toLocaleString("en")} term{count === 1 ? "" : "s"}
+                      </span>
+                    </button>
+                  </h3>
+                  <div
+                    class="imdrf-section-body"
+                    id={`imdrf-section-${section.annex}`}
+                    data-role="section-body"
+                    hidden
+                  ></div>
+                </section>
+              );
+            })}
+
+            {/* The first load, and only the first: a dim over the hierarchy with one skeleton
+                surface on it. Removed by the script once the opening section settles, whether or
+                not it arrived — a page that kept its veil after a failed fetch would be telling
+                the reader to keep waiting for something that is not coming. */}
+            <div class="imdrf-boot" data-imdrf-boot>
+              <div class="imdrf-boot-card">
+                <p class="imdrf-boot-h">Loading terminology…</p>
+                <Skeleton rows={6} />
+              </div>
+            </div>
           </div>
         </div>
       )}

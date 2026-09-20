@@ -39,6 +39,14 @@ export type TermRow = {
    * terms": this is preserved text, never reduced to a boolean.
    */
   status: string | null;
+  /**
+   * The pipe-separated chain of codes from the annex root down to this row, verbatim (e.g.
+   * `"G|G01|G01001"`). Carried on list/search rows so a release-wide search result can say which
+   * group it came out of — "G01001 — Absorber, in G01" — without a lineage round trip per row.
+   * Codes, not names: the names are what `getTermLineage` is for, and that is fetched once, for
+   * the one row the reader actually opens.
+   */
+  codeHierarchy: string;
 };
 
 export type TermDetail = ValidatedTerm & { id: string; hasChildren: boolean };
@@ -195,6 +203,7 @@ type TermQueryRow = {
   sort_order: number;
   has_children: boolean;
   status: string | null;
+  code_hierarchy: string;
 };
 
 function termRowOf(row: TermQueryRow): TermRow {
@@ -209,6 +218,7 @@ function termRowOf(row: TermQueryRow): TermRow {
     level: row.level,
     hasChildren: row.has_children,
     status: row.status,
+    codeHierarchy: row.code_hierarchy,
   };
 }
 
@@ -234,7 +244,7 @@ export async function listTerms(
   const rows = await db.execute<TermQueryRow>(
     opts.parentId === null
       ? sql`
-          SELECT t.id, t.annex, t.code, t.term, t.level, t.sort_order, t.status,
+          SELECT t.id, t.annex, t.code, t.term, t.level, t.sort_order, t.status, t.code_hierarchy,
                  EXISTS (SELECT 1 FROM imdrf_terms c WHERE c.parent_term_id = t.id) AS has_children
             FROM imdrf_terms t
            WHERE t.release_id = ${opts.releaseId}
@@ -249,7 +259,7 @@ export async function listTerms(
            LIMIT ${limit + 1}
         `
       : sql`
-          SELECT t.id, t.annex, t.code, t.term, t.level, t.sort_order, t.status,
+          SELECT t.id, t.annex, t.code, t.term, t.level, t.sort_order, t.status, t.code_hierarchy,
                  EXISTS (SELECT 1 FROM imdrf_terms c WHERE c.parent_term_id = t.id) AS has_children
             FROM imdrf_terms t
            WHERE t.release_id = ${opts.releaseId}
@@ -324,7 +334,7 @@ export async function searchTerms(
 
   const rows = await db.execute<TermQueryRow & { rank: number }>(sql`
     WITH scored AS (
-      SELECT t.id, t.annex, t.code, t.term, t.level, t.sort_order, t.status,
+      SELECT t.id, t.annex, t.code, t.term, t.level, t.sort_order, t.status, t.code_hierarchy,
              EXISTS (SELECT 1 FROM imdrf_terms c WHERE c.parent_term_id = t.id) AS has_children,
              CASE
                WHEN lower(t.code) = lower(${trimmed}) THEN 0
@@ -340,7 +350,7 @@ export async function searchTerms(
               OR t.term ILIKE ${pattern} ESCAPE '\\'
               OR t.definition ILIKE ${pattern} ESCAPE '\\')
     )
-    SELECT id, annex, code, term, level, sort_order, status, has_children, rank
+    SELECT id, annex, code, term, level, sort_order, status, code_hierarchy, has_children, rank
       FROM scored
      WHERE (
        ${afterId}::uuid IS NULL

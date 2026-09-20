@@ -229,6 +229,74 @@
   z-index: 50;
 }
 
+/* ---------- the tool strip ---------- */
+/*
+ * Below 900px the rail is off-canvas, so a reader part way down a long page has nothing on
+ * screen saying which tool they are in. `rail.js` clones the rail's own links into this strip
+ * while the page is being scrolled and removes the class a few seconds after it stops; above
+ * 900px the rail itself answers the question and the strip is never built.
+ *
+ * It is the one thing in the shell that may scroll sideways, and it scrolls sideways so that the
+ * document never has to: `overflow-x: auto` here, and nothing wider than the viewport anywhere
+ * else.
+ */
+.top-tools {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  :root.tools-on .top-tools {
+    display: flex;
+    gap: 4px;
+    position: sticky;
+    top: 56px;
+    z-index: 29;
+    padding: 6px 10px;
+    background: var(--card);
+    border-bottom: 1px solid var(--rule);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  .top-tools::-webkit-scrollbar {
+    display: none;
+  }
+
+  .top-tools a {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 9px;
+    border-radius: var(--r);
+    color: var(--ink-2);
+    text-decoration: none;
+    font-size: 12.5px;
+    white-space: nowrap;
+  }
+
+  .top-tools a svg {
+    width: 15px;
+    height: 15px;
+    flex: none;
+    fill: none;
+    stroke: currentcolor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* The tool being read. The underline carries it as well as the tint, so the answer does not
+     rest on colour alone. */
+  .top-tools a.on {
+    background: var(--green-bg);
+    color: var(--green);
+    font-weight: 600;
+    box-shadow: inset 0 -2px 0 var(--green);
+  }
+}
+
 /* ---------- the collapsed rail ---------- */
 /*
  * Only meaningful while the rail is a column. Below 900px it is a drawer, and a 64px drawer would

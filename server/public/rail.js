@@ -110,6 +110,70 @@
     });
 
     /*
+     * The tool strip: which tool am I in, and what else is there, while the page scrolls.
+     *
+     * Only below 900px, and only for a few seconds at a time. Above that width the rail is a
+     * column that is always on screen, so the active entry never leaves and there is nothing to
+     * restore; below it the rail is off-canvas and a reader half way down a long page has no
+     * answer to "where am I" but the title bar.
+     *
+     * The links are the rail's own, cloned — not a second list written out again, which would be
+     * two navigations to keep in step and one of them wrong the first time an entry is gated
+     * differently. It appears on scroll, holds for seven seconds after the reader stops, and then
+     * goes, leaving the shell exactly as it was. No transition: something sliding in and out of
+     * the top of the page every time you scroll is worse than the problem it solves.
+     */
+    var TOOLS_HOLD_MS = 7000;
+
+    (function toolStrip() {
+      var nav = document.querySelector(".rail-nav");
+      var top = document.querySelector(".top");
+      if (!nav || !top || !top.parentNode) return;
+
+      var narrow = window.matchMedia("(max-width: 900px)");
+      var strip = null;
+      var timer = null;
+
+      function build() {
+        if (strip) return;
+        strip = document.createElement("nav");
+        strip.className = "top-tools";
+        strip.setAttribute("aria-label", "Staff tools");
+        Array.prototype.forEach.call(nav.querySelectorAll("a"), function (link) {
+          strip.appendChild(link.cloneNode(true));
+        });
+        top.parentNode.insertBefore(strip, top.nextSibling);
+      }
+
+      function hide() {
+        root.classList.remove("tools-on");
+      }
+
+      function show() {
+        if (!narrow.matches) return;
+        build();
+        root.classList.add("tools-on");
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(hide, TOOLS_HOLD_MS);
+      }
+
+      function apply() {
+        if (narrow.matches) return;
+        if (timer) clearTimeout(timer);
+        hide();
+        if (strip) {
+          strip.remove();
+          strip = null;
+        }
+      }
+
+      if (narrow.addEventListener) narrow.addEventListener("change", apply);
+      else if (narrow.addListener) narrow.addListener(apply);
+
+      window.addEventListener("scroll", show, { passive: true });
+    })();
+
+    /*
      * Sign out asks first.
      *
      * The link already points at a page that asks, so this only upgrades the question to a dialog
