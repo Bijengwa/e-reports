@@ -20,8 +20,7 @@ export type LoginRoutesOptions = {
  * genuinely mistyped is no worse off — they retype either way.
  */
 const SIGN_IN_FAILED = "Email or password is incorrect.";
-const SIGN_IN_TEMPORARILY_UNAVAILABLE =
-  "Unable to sign you in right now. Please try again later.";
+const SIGN_IN_TEMPORARILY_UNAVAILABLE = "Unable to sign you in right now. Please try again later.";
 
 /**
  * The password is bounded before it is hashed.
@@ -97,10 +96,7 @@ export async function loginRoutes(app: FastifyInstance, opts: LoginRoutesOptions
       return reply
         .status(503)
         .html(
-          <LoginPage
-            publicFormUrl={opts.publicFormUrl}
-            error={SIGN_IN_TEMPORARILY_UNAVAILABLE}
-          />,
+          <LoginPage publicFormUrl={opts.publicFormUrl} error={SIGN_IN_TEMPORARILY_UNAVAILABLE} />,
         );
     }
 
@@ -155,5 +151,3 @@ export async function loginRoutes(app: FastifyInstance, opts: LoginRoutesOptions
   // below info — otherwise it would bury everything else. A failure still logs.
   app.get("/healthz", { logLevel: "warn" }, async () => ({ status: "ok", door: "staff" }));
 }
-
-
