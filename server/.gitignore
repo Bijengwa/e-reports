@@ -16,3 +16,6 @@ var/
 
 # Tooling caches
 *.tsbuildinfo
+
+# Throwaway local scripts (DB pokes, one-off checks) — keep them out of git
+tmp-*

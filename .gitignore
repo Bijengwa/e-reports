@@ -14,3 +14,6 @@ var/
 .ruff_cache/
 *.tsbuildinfo
 .DS_Store
+
+# Throwaway local scripts (DB pokes, one-off checks) — keep them out of git
+tmp-*
