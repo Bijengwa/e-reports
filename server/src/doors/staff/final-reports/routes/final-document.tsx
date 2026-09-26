@@ -12,7 +12,7 @@ import { loadReport } from "../../../../domain/report-detail.js";
 import { sanitizeFilename } from "../../../../storage/index.js";
 import { currentSession } from "../../session-guard.js";
 import type { PriorSecondaryReview } from "../../shared/components/f004.js";
-import { ForbiddenPage } from "../../shared/forbidden.js";
+import { refuse } from "../../shared/forbidden.js";
 import {
   FinalDocumentPage,
   FinalDocumentPrintPage,
@@ -107,7 +107,7 @@ async function resolveFinalDocument(
 ): Promise<ResolvedFinalDocument | null> {
   const session = currentSession(request);
   const forbid = (code: 403 | 404 = 403): null => {
-    reply.status(code).html(ForbiddenPage({ role: session.role }));
+    refuse(reply, session.role, code);
     return null;
   };
 

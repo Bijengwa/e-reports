@@ -5,7 +5,6 @@ import {
   SESSION_COOKIE_OPTIONS,
   type StaffSession,
 } from "../../auth/session.js";
-import { ForbiddenPage } from "./shared/forbidden.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -89,25 +88,25 @@ export function requirePasswordChanged(app: FastifyInstance): void {
  * carries the restriction with it, and there is no per-route check anyone can forget to write —
  * or write twice, differently.
  *
- * It answers 403 rather than redirecting. The other two guards redirect because there is somewhere
- * to send the user and following it is how they get in; there is no route out of "your role does
- * not include this", so a redirect would drop the request and read as a missing page. The session
- * is not cleared and the cookie is left alone: the user is who they say they are, which is exactly
- * why this is 403 and not 401.
+ * A role that does not include this area is sent to its own dashboard, and shown nothing on the
+ * way. The rail never links a role to an area it cannot use, so the only way here is a typed
+ * address or an old bookmark — and the answer to either is simply to be somewhere you can work,
+ * not a page describing the place you cannot. Nothing of the area is rendered or queried first:
+ * this hook runs before any route in the scope does.
+ *
+ * `/dashboard` is registered outside every role scope, so no role can be redirected in a loop.
+ * The session is not cleared and the cookie is left alone: the user is who they say they are.
+ *
+ * Refusals about one case rather than a whole area — not your assignment, or the case has moved
+ * on — are a different answer and stay a page: see `ForbiddenPage`.
  */
 export function requireRole(app: FastifyInstance, roles: readonly StaffSession["role"][]): void {
   app.addHook("onRequest", async (request, reply) => {
     // `requireSession` runs first and redirects when there is no session, so the null case here is
-    // a route registered in the wrong scope. Refusing is the safe reading of that mistake.
+    // a route registered in the wrong scope. Refusing is the safe reading of that mistake, and the
+    // dashboard's own guard sends a session-less request on to sign-in.
     if (!request.staffSession || !roles.includes(request.staffSession.role)) {
-      // The refusal is rendered with the reader's own role, so the rail on that page offers what
-      // they can reach rather than the entries they were just turned away from.
-      return reply.status(403).html(
-        ForbiddenPage({
-          role: request.staffSession?.role,
-          fullName: request.staffSession?.fullName,
-        }),
-      );
+      return reply.redirect("/dashboard", 302);
     }
   });
 }

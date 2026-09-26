@@ -24,7 +24,7 @@ import {
 import { loadReport } from "../../../../domain/report-detail.js";
 import { notifyAssessmentSubmitted } from "../../../../notifications/index.js";
 import { currentSession } from "../../session-guard.js";
-import { ForbiddenPage } from "../../shared/forbidden.js";
+import { refuse } from "../../shared/forbidden.js";
 import { Assessment1Page } from "../pages/assessment.js";
 import { SecondaryAssessmentPage } from "../pages/secondary-assessment.js";
 
@@ -128,7 +128,7 @@ async function verifySigningPassword(
 export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
   /** Refused, and told so on a page that still carries the reader's own rail. */
   const forbid = (reply: FastifyReply, role: string, code: 403 | 404 = 403) =>
-    reply.status(code).html(ForbiddenPage({ role }));
+    refuse(reply, role, code);
 
   app.get("/reports/:id/assessment-1", async (request, reply) => {
     const session = currentSession(request);

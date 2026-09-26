@@ -5,7 +5,7 @@ import { FIRST_ASSESSMENT, prefillDeviceRows, prefillEventRows } from "../../../
 import { type AssessorOption, loadReport } from "../../../../domain/report-detail.js";
 import { currentSession } from "../../session-guard.js";
 import type { SectionComment } from "../../shared/components/f004.js";
-import { ForbiddenPage } from "../../shared/forbidden.js";
+import { refuse } from "../../shared/forbidden.js";
 import { type CaseDetailActive, CaseDetailPage } from "../pages/report-detail.js";
 
 /**
@@ -258,7 +258,7 @@ export async function renderCaseDetail(
  */
 export async function caseDetailRoutes(app: FastifyInstance): Promise<void> {
   const forbid = (reply: FastifyReply, role: string) =>
-    reply.status(403).html(ForbiddenPage({ role }));
+    refuse(reply, role);
 
   const showCase = async (request: FastifyRequest, reply: FastifyReply) => {
     const session = currentSession(request);

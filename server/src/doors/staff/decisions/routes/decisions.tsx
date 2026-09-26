@@ -13,7 +13,7 @@ import { loadReport } from "../../../../domain/report-detail.js";
 import { isSeriousCase } from "../../../../domain/reports.js";
 import { renderCaseDetail } from "../../register/routes/report-detail.js";
 import { currentSession } from "../../session-guard.js";
-import { ForbiddenPage } from "../../shared/forbidden.js";
+import { refuse } from "../../shared/forbidden.js";
 
 const ReportId = z.uuid();
 const UserId = z.uuid();
@@ -33,7 +33,7 @@ const UserId = z.uuid();
  */
 export async function decisionRoutes(app: FastifyInstance): Promise<void> {
   const forbid = (reply: FastifyReply, role: string, code: 403 | 404 = 403) =>
-    reply.status(code).html(ForbiddenPage({ role }));
+    refuse(reply, role, code);
 
   app.post("/reports/:id/assign-next-assessor", async (request, reply) => {
     const session = currentSession(request);

@@ -1,3 +1,4 @@
+import type { FastifyReply } from "fastify";
 import { IconBack } from "../../../views/shared/icons.js";
 import { StaffShell } from "./shell.js";
 
@@ -6,36 +7,52 @@ export type ForbiddenPageProps = {
   role?: string | undefined;
   /** The signed-in person, for the title bar. */
   fullName?: string | undefined;
+  /** 404 when the case is not there to be had; 403 when it is, but not for this reader. */
+  status?: 403 | 404;
+  /**
+   * The refused request was trying to change something. Said out loud, because the one thing a
+   * reader must not come away believing is that their save went through.
+   */
+  unsaved?: boolean;
 };
 
 /**
- * The answer to a signed-in user who is not allowed here.
+ * The answer to a signed-in user refused one case — not a whole area.
  *
- * 403 rather than a redirect to the dashboard. The two guards above this one redirect because
- * there is somewhere to send the user — sign in, or set your password — and following that
- * redirect is how they get in. There is no such route out of "your role does not include this",
- * so a redirect would silently drop the request and read as though the page did not exist.
+ * A role barred from an area never sees a page at all: `requireRole` sends it to its dashboard.
+ * This is for the refusals that happen in the middle of ordinary work, where a silent redirect
+ * would mislead: the assessment was handed to someone else, the case has moved to its next step,
+ * or the case does not exist. An Officer who pressed Save on a reassigned assessment and landed
+ * on the dashboard would reasonably think it had saved.
  *
- * It renders inside the shell because it is reached from inside the app: whoever sees it is signed
- * in and settled, and the rail is how they get somewhere they are allowed. Their own role decides
- * what that rail offers, so this page cannot advertise the very thing it is refusing.
- *
- * It names the role required rather than only refusing. Which roles exist is not a secret — the
- * dashboard prints the reader's own — and a bare refusal only sends someone to ask a colleague
- * what they were supposed to click.
+ * It renders inside the shell because whoever sees it is signed in, and the rail is how they get
+ * somewhere they are allowed. It says no more than it must: which case, and why, stays with the
+ * people who can see it.
  */
-export function ForbiddenPage({ role, fullName }: ForbiddenPageProps = {}): JSX.Element {
+export function ForbiddenPage({
+  role,
+  fullName,
+  status = 403,
+  unsaved = false,
+}: ForbiddenPageProps = {}): JSX.Element {
+  const notFound = status === 404;
+  const heading = notFound ? "Not found" : "Not available";
+
   return (
     <StaffShell
-      title="Not permitted — e-reports"
-      pageTitle="Not permitted"
+      title={`${heading} — e-reports`}
+      pageTitle={heading}
       role={role}
       fullName={fullName}
     >
       <div class="staff-head">
         <div class="sp">
-          <p class="eyebrow">403</p>
-          <p class="hint">Only an administrator can manage staff accounts.</p>
+          <p class="hint">
+            {notFound
+              ? "This case could not be found."
+              : "This case is not assigned to you, or it has already moved on to its next step."}
+            {unsaved && " Nothing was saved."}
+          </p>
         </div>
       </div>
 
@@ -45,4 +62,15 @@ export function ForbiddenPage({ role, fullName }: ForbiddenPageProps = {}): JSX.
       </a>
     </StaffShell>
   );
+}
+
+/**
+ * Refuse one case. Every per-case refusal goes through here, so the status and whether to say
+ * "nothing was saved" are decided once rather than at each route: anything but a GET was an
+ * attempt to change something.
+ */
+export function refuse(reply: FastifyReply, role: string, status: 403 | 404 = 403) {
+  return reply
+    .status(status)
+    .html(ForbiddenPage({ role, status, unsaved: reply.request.method !== "GET" }));
 }

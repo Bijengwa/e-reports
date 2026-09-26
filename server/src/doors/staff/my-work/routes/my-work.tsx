@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import { currentSession } from "../../session-guard.js";
-import { ForbiddenPage } from "../../shared/forbidden.js";
+import { refuse } from "../../shared/forbidden.js";
 import { MyWorkPage, type WorkRow } from "../pages/my-work.js";
 
 /** Same reason as every other page's: a uuid column compared against arbitrary text raises 22P02. */
@@ -88,7 +88,7 @@ function toRow(raw: unknown): WorkRow {
  */
 export async function myWorkRoutes(app: FastifyInstance): Promise<void> {
   const forbid = (reply: FastifyReply, role: string, code: 403 | 404 = 403) =>
-    reply.status(code).html(ForbiddenPage({ role }));
+    refuse(reply, role, code);
 
   app.get("/my-work", async (request, reply) => {
     const session = currentSession(request);

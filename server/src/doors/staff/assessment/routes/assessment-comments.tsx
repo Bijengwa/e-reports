@@ -5,7 +5,7 @@ import { F004_SECTION_KEYS, FIRST_ASSESSMENT } from "../../../../domain/f004.js"
 import { loadReport } from "../../../../domain/report-detail.js";
 import { renderCaseDetail } from "../../register/routes/report-detail.js";
 import { currentSession } from "../../session-guard.js";
-import { ForbiddenPage } from "../../shared/forbidden.js";
+import { refuse } from "../../shared/forbidden.js";
 
 /** Same reason as every other report address: a uuid column against arbitrary text raises 22P02. */
 const ReportId = z.uuid();
@@ -46,7 +46,7 @@ const EMPTY = "Write a comment before sending it.";
 export async function assessmentCommentRoutes(app: FastifyInstance): Promise<void> {
   /** Refused, and told so on a page that still carries the reader's own rail. */
   const forbid = (reply: FastifyReply, role: string, code: 403 | 404 = 403) =>
-    reply.status(code).html(ForbiddenPage({ role }));
+    refuse(reply, role, code);
 
   app.post("/reports/:id/assessment-1/sections/:section/comments", async (request, reply) => {
     const session = currentSession(request);

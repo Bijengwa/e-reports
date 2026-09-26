@@ -170,8 +170,8 @@ export async function staffDoor(app: FastifyInstance, opts: StaffDoorOptions): P
 
       await active.register(async (administration) => {
         // Narrower still: creating staff accounts is the administrator's alone. A manager or
-        // assessor reaching anything registered here is refused with 403 rather than redirected —
-        // they are signed in and settled, so there is nowhere else to send them.
+        // assessor reaching anything registered here is sent to their own dashboard, like every
+        // other role scope (see `requireRole`).
         requireRole(administration, ["administrator"]);
 
         await administration.register(usersRoutes);
