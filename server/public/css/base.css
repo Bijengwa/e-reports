@@ -11,6 +11,73 @@
  * inline `style=""` attributes (style-src-attr falls back to style-src) — a view must never
  * reach for an inline style, only for a same-origin stylesheet such as this one.
  */
+/*
+ * IBM Plex, self-hosted. The family is named in `--sans`/`--mono` below, but naming a family is
+ * not loading one: until these faces existed the portal fell straight through the fallback chain
+ * and drew every page in Segoe UI. `server.ts` mounts `public/` at `/assets/`, so the files live
+ * in `public/fonts/` and are fetched from `/assets/fonts/` — same origin, which is what the CSP's
+ * `font-src 'self'` allows and what keeps a reporter's traffic off a third-party CDN.
+ *
+ * Six faces, one per weight the stylesheets actually ask for: sans at 400/500/600/700, mono at
+ * 400/500. Nothing here is speculative — a face earns its place by a rule needing it, because
+ * each one is another download on what may be a phone on mobile data.
+ *
+ * `swap`, not `block`: an adverse-event report is text, and text a reporter can read immediately
+ * in the fallback face beats a blank page waiting on a webfont.
+ *
+ * Two gaps, both harmless, neither worth a seventh file. `.countdown-serious` (`case.css`) asks
+ * for 800 and IBM Plex Sans stops at 700, so it renders at 700 — which is exactly what Segoe UI
+ * gave it before. The two italic rules (`.f4-blank`, `.imdrf-nodef`) get a synthesised oblique
+ * rather than a drawn italic.
+ */
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("/assets/fonts/ibm-plex-sans-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("/assets/fonts/ibm-plex-sans-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("/assets/fonts/ibm-plex-sans-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("/assets/fonts/ibm-plex-sans-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/assets/fonts/ibm-plex-mono-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/assets/fonts/ibm-plex-mono-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   /*
    * The portal is drawn in one light pack, on both doors. Saying so is what keeps a user agent on
@@ -24,6 +91,16 @@
   --ink: #101913;
   --ink-2: #45534a;
   --ink-3: #75837a;
+  /*
+   * White and its quieter companion, named for the job rather than the value: the foreground on a
+   * surface dark enough that `--ink` would vanish — the F004's section bars, the rail's active
+   * row, the logo's cross, a severity pill. `--card` is also #fff, but that one means "the surface
+   * a card is drawn on"; pointing a text colour at it would say the wrong thing the day either
+   * value moves. The rail keeps its own copy of the second value on purpose — see the note above
+   * `.rail` in `shell.css` — so the two are equal today by coincidence of intent, not by reference.
+   */
+  --ink-on-dark: #fff;
+  --ink-on-dark-2: #7fa48b;
   --paper: #f5f8f5;
   --card: #fff;
   --rule: #dfe7e0;
@@ -100,6 +177,22 @@
   --f4-risk-high: #c95a1a;
   --f4-risk-medium: #d4a11e;
   --f4-risk-low: #3f7e5a;
+  /*
+   * The second assessor's verdict on the first assessment: agree, ask for clarification, disagree.
+   * Three states, each with an ink, the tint its row sits on, and the border that closes it. The
+   * nine values were written out by hand in `case.css`, in nine different places, before they were
+   * named here. Like the risk four above they are a finding rather than a theme, so they stay put
+   * when the portal's palette moves.
+   */
+  --f4-agree: #16803c;
+  --f4-agree-bg: #f2faf4;
+  --f4-agree-line: #90c49e;
+  --f4-clarify: #7f173a;
+  --f4-clarify-bg: #fff3f6;
+  --f4-clarify-line: #8f1d3f;
+  --f4-disagree: #c20f0f;
+  --f4-disagree-bg: #fff1f1;
+  --f4-disagree-line: #b91c1c;
   --r: 5px;
   --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
@@ -135,6 +228,109 @@ textarea {
 
 a {
   color: var(--green);
+}
+
+/* ---------- icons ---------- */
+/*
+ * One definition of what an icon from `views/shared/icons.tsx` is. SVGs drawn elsewhere — the
+ * rail's own icons, the password toggle's eye, the note bubbles and tab icons in `case.css` — carry
+ * no `.ic` and keep their own stroke rules. Size travels in `--ic` rather than in
+ * `width`, so a caller resizes an icon from its own stylesheet without restating the rest of it;
+ * the CSP forbids the inline style that would otherwise be the obvious way to do that.
+ *
+ * `currentcolor` is the point of the thing. An icon is the colour of the text beside it, so it
+ * follows a button into its hover state and the serious card into its alarm red without needing
+ * a rule of its own for either.
+ */
+.ic {
+  flex: none;
+  width: var(--ic, 18px);
+  height: var(--ic, 18px);
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 120ms ease-out;
+}
+
+/*
+ * Motion moves the icon, never the label. A control that means a direction moves that way when it
+ * is hovered — back goes left, download goes down, send leaves towards the top right — so the
+ * movement repeats what the word already says instead of decorating it. One duration throughout.
+ *
+ * Nothing animates on load and nothing moves on its own. This portal is read all day, and idle
+ * motion sitting beside clinical numbers earns nothing. The blanket `prefers-reduced-motion` rule
+ * further down this file removes every transform below.
+ */
+.btn:hover .ic-back,
+a:hover .ic-back {
+  transform: translateX(-2px);
+}
+
+.btn:hover .ic-arrow-right,
+a:hover .ic-arrow-right {
+  transform: translateX(2px);
+}
+
+.btn:hover .ic-download {
+  transform: translateY(2px);
+}
+
+.btn:hover .ic-upload {
+  transform: translateY(-2px);
+}
+
+.btn:hover .ic-send {
+  transform: translate(2px, -2px);
+}
+
+.btn:hover .ic-sign-out,
+.btn:hover .ic-sign-in {
+  transform: translateX(2px);
+}
+
+.btn:hover .ic-search {
+  transform: scale(1.1);
+}
+
+.btn:hover .ic-check {
+  transform: scale(1.15);
+}
+
+/* An X is symmetrical under a quarter turn, so this reads as a spin that lands where it started. */
+.btn:hover .ic-close {
+  transform: rotate(90deg);
+}
+
+/* Disclosure follows the element's own state, so the arrow is never out of step with its panel. */
+[aria-expanded="true"] .ic-chevron,
+details[open] > summary .ic-chevron {
+  transform: rotate(180deg);
+}
+
+/*
+ * On a card the icon is a quiet label rather than a control: it sits with the eyebrow, at the
+ * eyebrow's size, in the muted ink. The one card that is also a link keeps the card's own colour,
+ * because that card is red for a reason and a grey icon would soften it.
+ */
+.stat .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stat .eyebrow .ic {
+  --ic: 14px;
+  color: var(--ink-3);
+}
+
+a.stat-serious .eyebrow .ic {
+  color: inherit;
+}
+
+a.stat:hover .eyebrow .ic {
+  transform: translateY(-1px);
 }
 
 /* ---------- primitives ---------- */
@@ -181,7 +377,7 @@ a {
 
 .btn {
   background: var(--green);
-  color: #fff;
+  color: var(--ink-on-dark);
   border: 1px solid var(--green);
   padding: 8px 15px;
   border-radius: var(--r);
@@ -190,7 +386,10 @@ a {
   font-size: 13.5px;
   white-space: nowrap;
   text-decoration: none;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  /* Only has an effect when a button holds an icon as well as its label. */
+  gap: 7px;
 }
 
 .btn:hover {
@@ -217,7 +416,7 @@ a {
 .btn.danger {
   background: var(--flag);
   border-color: var(--flag);
-  color: #fff;
+  color: var(--ink-on-dark);
 }
 
 .btn.danger:hover {
@@ -228,7 +427,7 @@ a {
 .btn.orange {
   background: var(--orange);
   border-color: var(--orange);
-  color: #fff;
+  color: var(--ink-on-dark);
 }
 
 .btn.orange:hover {
@@ -283,7 +482,7 @@ textarea:focus-visible,
   padding: 8px 10px;
   border: 1px solid var(--rule-2);
   border-radius: var(--r);
-  background: #fff;
+  background: var(--card);
 }
 
 .f textarea {
@@ -335,6 +534,15 @@ textarea:focus-visible,
   * {
     transition: none !important;
     animation: none !important;
+  }
+
+  /*
+   * Killing the transition alone would leave the hover transform in place, so an icon would still
+   * shift two pixels — instantly instead of smoothly, which is not what the setting asks for.
+   * Holding every icon at rest is what actually honours it.
+   */
+  .ic {
+    transform: none !important;
   }
 }
 /* ---------- staff account list ---------- */
@@ -580,11 +788,11 @@ textarea:focus-visible,
 }
 
 .logo .cross {
-  fill: #fff;
+  fill: var(--ink-on-dark);
 }
 
 .on-dark .logo .body {
-  fill: #fff;
+  fill: var(--ink-on-dark);
 }
 
 .on-dark .logo .cross {
@@ -620,11 +828,11 @@ textarea:focus-visible,
 }
 
 .on-dark .brand-text b {
-  color: #fff;
+  color: var(--ink-on-dark);
 }
 
 .on-dark .brand-text > span {
-  color: #7fa48b;
+  color: var(--ink-on-dark-2);
 }
 
 .login-header .brand-mark {

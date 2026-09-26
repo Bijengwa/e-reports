@@ -4,7 +4,7 @@ import { createAdmin, MAX_ADMINISTRATORS } from "./create-admin.js";
 import { resetPassword } from "./reset-password.js";
 import type { CommandResult } from "./result.js";
 
-const HELP = `AE Reports staff account tool.
+const HELP = `e-reports staff account tool.
 
   create          --email=<address> --name="<full name>"
                   Creates an administrator. Refuses once ${MAX_ADMINISTRATORS} exist.

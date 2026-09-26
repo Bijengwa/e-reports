@@ -41,7 +41,7 @@ function NewReportPage({
 }): JSX.Element {
   return (
     <StaffShell
-      title="New report — AE Reports"
+      title="New report — e-reports"
       pageTitle="New report"
       pageCss="orangeForm"
       role={session.role}

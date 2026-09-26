@@ -1,3 +1,4 @@
+import { IconKey } from "../../../../views/shared/icons.js";
 import { MIN_PASSWORD_LENGTH } from "../../../../auth/password.js";
 import { BrandMark } from "../../../../views/shared/brand-mark.js";
 import { Layout } from "../../../../views/shared/layout.js";
@@ -16,7 +17,7 @@ export type ChangePasswordPageProps = {
  */
 export function ChangePasswordPage({ error, isForced }: ChangePasswordPageProps): JSX.Element {
   return (
-    <Layout title="Change Password — AE Reports" locale="en" bodyClass="staff-login" passwordToggle auth>
+    <Layout title="Change Password — e-reports" locale="en" bodyClass="staff-login" passwordToggle auth>
       <div class="login-card">
         <div class="login-header">
           <BrandMark />
@@ -71,6 +72,7 @@ export function ChangePasswordPage({ error, isForced }: ChangePasswordPageProps)
           </div>
 
           <button type="submit" class="btn btn-primary">
+            <IconKey />
             Update Password
           </button>
         </form>

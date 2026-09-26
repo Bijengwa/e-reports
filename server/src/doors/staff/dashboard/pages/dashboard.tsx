@@ -1,3 +1,17 @@
+import {
+  IconAlertTriangle,
+  IconArchive,
+  IconArrowRight,
+  IconBriefcase,
+  IconCircle,
+  IconClipboardCheck,
+  IconClock,
+  IconFileCheck,
+  IconInbox,
+  IconPen,
+  IconUserCheck,
+  IconUsers,
+} from "../../../../views/shared/icons.js";
 import type { ReceivedRow } from "../../../../domain/report-detail.js";
 import { type ActivityEntry, ActivityTable } from "../../activity/pages/activity.js";
 import { ReceivedRows } from "../../shared/components/report-views.js";
@@ -39,7 +53,7 @@ export function DashboardPage({
 }: DashboardPageProps): JSX.Element {
   return (
     <StaffShell
-      title="AE Reports — Staff"
+      title="e-reports — Staff"
       pageTitle="Dashboard"
       pageCss="dashboard"
       role={role}
@@ -48,14 +62,14 @@ export function DashboardPage({
     >
       <div class="stats">
         <div class="stat">
-          <span class="eyebrow">Reports</span>
+          <span class="eyebrow"><IconArchive />Reports</span>
           <b>{reportCount}</b>
           <span class="hint">in the register</span>
         </div>
 
         {received !== undefined && (
           <div class="stat">
-            <span class="eyebrow">Received</span>
+            <span class="eyebrow"><IconInbox />Received</span>
             <b>{received.count}</b>
             <span class="hint">not yet assessed</span>
           </div>
@@ -64,31 +78,31 @@ export function DashboardPage({
         {managerSummary !== undefined && (
           <>
             <div class="stat">
-              <span class="eyebrow">Not started</span>
+              <span class="eyebrow"><IconCircle />Not started</span>
               <b>{managerSummary.notStarted}</b>
               <span class="hint">assessment not begun</span>
             </div>
 
             <div class="stat">
-              <span class="eyebrow">In progress</span>
+              <span class="eyebrow"><IconClock />In progress</span>
               <b>{managerSummary.inProgress}</b>
               <span class="hint">being assessed now</span>
             </div>
 
             <div class="stat">
-              <span class="eyebrow">Decision</span>
+              <span class="eyebrow"><IconPen />Decision</span>
               <b>{managerSummary.decision}</b>
               <span class="hint">waiting on you</span>
             </div>
 
             <div class="stat">
-              <span class="eyebrow">Assigned for work</span>
+              <span class="eyebrow"><IconUserCheck />Assigned for work</span>
               <b>{managerSummary.assignedForWork}</b>
               <span class="hint">approved and handed out</span>
             </div>
 
             <div class="stat">
-              <span class="eyebrow">Final reports</span>
+              <span class="eyebrow"><IconFileCheck />Final reports</span>
               <b>{managerSummary.finalReports}</b>
               <span class="hint">approved F004 documents</span>
             </div>
@@ -97,7 +111,7 @@ export function DashboardPage({
 
         {seriousSummary !== undefined && (
           <a href="/workload" class="stat stat-serious">
-            <span class="eyebrow">Serious AEs/AIs</span>
+            <span class="eyebrow"><IconAlertTriangle />Serious AEs/AIs</span>
             <b>{seriousSummary.total}</b>
             <span class="hint">
               {seriousSummary.overdue > 0 ? (
@@ -113,7 +127,7 @@ export function DashboardPage({
 
         {activeStaff !== undefined && (
           <div class="stat">
-            <span class="eyebrow">Staff</span>
+            <span class="eyebrow"><IconUsers />Staff</span>
             <b>{activeStaff}</b>
             <span class="hint">active accounts</span>
           </div>
@@ -125,18 +139,22 @@ export function DashboardPage({
     {received !== undefined ? (
           <>
             <a href="/assessments" class="btn">
+              <IconClipboardCheck />
               My assessments
             </a>{" "}
             <a href="/my-work" class="btn ghost">
+              <IconBriefcase />
               My work
             </a>
           </>
         ) : managerSummary !== undefined ? (
           <>
             <a href="/workload" class="btn">
+              <IconBriefcase />
               Open workload
             </a>{" "}
             <a href="/final-reports" class="btn ghost">
+              <IconFileCheck />
               Final reports
             </a>
           </>
@@ -170,6 +188,7 @@ export function DashboardPage({
             </div>
             <a href="/activity" class="btn ghost btn-sm">
               See all
+              <IconArrowRight />
             </a>
           </div>
 

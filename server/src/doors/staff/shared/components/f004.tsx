@@ -44,6 +44,7 @@ import {
   YES_NO,
 } from "../../../../domain/f004.js";
 import { reasonLabel } from "../../../../domain/f004-semantics.js";
+import { IconCheck, IconPen, IconSave, IconSearch, IconSend } from "../../../../views/shared/icons.js";
 
 /** a, b, c, … — the paper's own sub-labels, for the IMDRF items and the signal criteria list. */
 const LETTERS = "abcdefghij";
@@ -333,6 +334,7 @@ function SectionComments({
             placeholder="Write a comment…"
           ></textarea>
           <button type="submit" class="btn btn-sm">
+            <IconSend />
             Send
           </button>
         </form>
@@ -1192,6 +1194,7 @@ function ImdrfPicker({
       {!locked && (
         <div class="f4-field f4-imdrf-pick">
           <button type="button" class="btn btn-sm" data-imdrf-pick-open>
+            <IconSearch />
             Choose term…
           </button>
           <div class="imdrf-pick-panel" data-imdrf-pick-panel hidden>
@@ -2022,6 +2025,7 @@ export function F004Form({
                   <div class="f4-field">
                     <span class="f4-k">Assessor</span>
                     <button type="button" class="btn" data-f4-sign-open>
+                      <IconPen />
                       Sign assessment
                     </button>
                   </div>
@@ -2051,6 +2055,7 @@ export function F004Form({
                     <div class="f4-field">
                       <span class="f4-k">Assessor</span>
                       <button type="button" class="btn" data-f4-sign-open>
+                        <IconPen />
                         Sign assessment
                       </button>
                     </div>
@@ -2087,6 +2092,7 @@ export function F004Form({
                       Cancel
                     </button>
                     <button type="submit" name="intent" value="submit" class="btn">
+                      <IconCheck />
                       Confirm and sign
                     </button>
                   </div>
@@ -2112,6 +2118,7 @@ export function F004Form({
         ) : writingA2 ? (
           <div class="bar f4-buttons">
             <button type="submit" name="intent" value="save" class="btn ghost">
+              <IconSave />
               Save draft
             </button>
           </div>
@@ -2125,6 +2132,7 @@ export function F004Form({
           !locked && (
             <div class="bar f4-buttons">
               <button type="submit" name="intent" value="save" class="btn ghost">
+                <IconSave />
                 Save draft
               </button>
             </div>

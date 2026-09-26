@@ -3,7 +3,7 @@ import type { FinalDocument } from "../../../../domain/final-document.js";
 import type { ReportDetail } from "../../../../domain/report-detail.js";
 import { Layout } from "../../../../views/shared/layout.js";
 import { F004Form, type PriorSecondaryReview } from "../../shared/components/f004.js";
-import { IconBack, IconClose, IconDownload, IconPrint } from "../../shared/components/icons.js";
+import { IconBack, IconClose, IconDownload, IconPrint } from "../../../../views/shared/icons.js";
 import {
   OrangeReportIdentity,
   OrangeReportSurface,

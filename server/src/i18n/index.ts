@@ -22,8 +22,8 @@ export const LOCALE_COOKIE = "locale";
 
 const messages = {
   // ---- Chrome ----------------------------------------------------------------
-  "app.formTitle": { en: "Orange Form — AE Reports", sw: "Fomu ya Machungwa — AE Reports" },
-  "app.confirmTitle": { en: "Report Submitted — AE Reports", sw: "Ripoti Imetumwa — AE Reports" },
+  "app.formTitle": { en: "Orange Form — e-reports", sw: "Fomu ya Machungwa — e-reports" },
+  "app.confirmTitle": { en: "Report Submitted — e-reports", sw: "Ripoti Imetumwa — e-reports" },
   "app.heading": {
     en: "Medical Device Adverse Event Report",
     sw: "Ripoti ya Tukio Baya la Kifaa Tiba",

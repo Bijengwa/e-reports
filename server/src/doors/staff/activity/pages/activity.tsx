@@ -151,7 +151,7 @@ export type ActivityPageProps = {
 export function ActivityPage({ entries, viewerRole, viewerName }: ActivityPageProps): JSX.Element {
   return (
     <StaffShell
-      title="Activity — AE Reports"
+      title="Activity — e-reports"
       pageTitle="Activity"
       pageCss="activity"
       role={viewerRole}

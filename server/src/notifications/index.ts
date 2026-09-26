@@ -77,7 +77,7 @@ export async function notifyAssessmentSubmitted(
     `Submitted on: ${notice.submittedOn}`,
     `View the report: ${notice.reportUrl}`,
     "",
-    "This is an automated message from AE Reports.",
+    "This is an automated message from e-reports.",
   ].join("\n");
 
   const smsBody = `TMDA: Your assessment for report ${notice.reportNumber} has been submitted successfully.`;

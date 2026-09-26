@@ -57,7 +57,7 @@
 
 .countdown-serious.countdown-overdue {
   background: var(--red);
-  color: #fff;
+  color: var(--ink-on-dark);
   border-color: var(--red-d);
   box-shadow: 0 0 0 2px var(--red-bg);
 }
@@ -87,7 +87,7 @@ tr.wl-row-serious.row-link:hover > td {
 
 .tag.tag-serious {
   background: var(--red);
-  color: #fff;
+  color: var(--ink-on-dark);
   font-weight: 700;
 }
 
@@ -270,7 +270,7 @@ tr.wl-row-serious.row-link:hover > td {
   padding: 8px 10px;
   font-family: inherit;
   font-size: 13px;
-  background: #fff;
+  background: var(--card);
   resize: vertical;
 }
 
@@ -281,23 +281,23 @@ tr.wl-row-serious.row-link:hover > td {
 /* Live, not stored: the tint follows the radio that is checked right now, which is also what the
    server rendered as checked. One rule covers the saved draft and the unsaved click. */
 .a2-inline:has(.a2-agree input:checked) {
-  border-color: #90c49e;
-  background: #f2faf4;
+  border-color: var(--f4-agree-line);
+  background: var(--f4-agree-bg);
 }
 
 .a2-inline:has(.a2-clarification input:checked) {
-  border-color: #8f1d3f;
-  background: #fff3f6;
+  border-color: var(--f4-clarify-line);
+  background: var(--f4-clarify-bg);
 }
 
 .a2-inline:has(.a2-disagree input:checked) {
-  border-color: #b91c1c;
-  background: #fff1f1;
+  border-color: var(--f4-disagree-line);
+  background: var(--f4-disagree-bg);
 }
 
-.a2-summary-row.is-agree { border-color: #90c49e; background: #f2faf4; }
-.a2-summary-row.is-clarification { border-color: #8f1d3f; background: #fff3f6; }
-.a2-summary-row.is-disagree { border-color: #b91c1c; background: #fff1f1; }
+.a2-summary-row.is-agree { border-color: var(--f4-agree-line); background: var(--f4-agree-bg); }
+.a2-summary-row.is-clarification { border-color: var(--f4-clarify-line); background: var(--f4-clarify-bg); }
+.a2-summary-row.is-disagree { border-color: var(--f4-disagree-line); background: var(--f4-disagree-bg); }
 
 .a2-inline-head {
   display: flex;
@@ -314,7 +314,7 @@ tr.wl-row-serious.row-link:hover > td {
   padding: 3px 8px;
   border-radius: 3px;
   background: var(--green-d);
-  color: #fff;
+  color: var(--ink-on-dark);
   font-size: 11px;
   letter-spacing: 0.01em;
   white-space: nowrap;
@@ -347,7 +347,7 @@ tr.wl-row-serious.row-link:hover > td {
   border: 1px solid var(--rule-2);
   border-radius: var(--r);
   padding: 8px 10px;
-  background: #fff;
+  background: var(--card);
   font-weight: 600;
   cursor: pointer;
 }
@@ -357,22 +357,22 @@ tr.wl-row-serious.row-link:hover > td {
 }
 
 .a2-degree:has(input:checked) {
-  color: #fff;
+  color: var(--ink-on-dark);
 }
 
 .a2-agree:has(input:checked) {
-  background: #16803c;
-  border-color: #16803c;
+  background: var(--f4-agree);
+  border-color: var(--f4-agree);
 }
 
 .a2-clarification:has(input:checked) {
-  background: #7f173a;
-  border-color: #7f173a;
+  background: var(--f4-clarify);
+  border-color: var(--f4-clarify);
 }
 
 .a2-disagree:has(input:checked) {
-  background: #c20f0f;
-  border-color: #c20f0f;
+  background: var(--f4-disagree);
+  border-color: var(--f4-disagree);
 }
 
 /* Both follow-ups are closed until a degree earns them. */
@@ -425,7 +425,7 @@ tr.wl-row-serious.row-link:hover > td {
   border: 1px solid var(--rule-2);
   border-radius: var(--r);
   padding: 8px 10px;
-  background: #fff;
+  background: var(--card);
   font-family: inherit;
   font-size: 13px;
   resize: vertical;
@@ -449,9 +449,9 @@ tr.wl-row-serious.row-link:hover > td {
   gap: 7px;
   margin: 4px 0 2px 22px;
   padding: 5px 10px;
-  border: 1px solid #b91c1c;
+  border: 1px solid var(--f4-disagree-line);
   border-radius: var(--r);
-  background: #fff1f1;
+  background: var(--f4-disagree-bg);
   font-size: 12.5px;
   cursor: pointer;
 }
@@ -466,8 +466,8 @@ tr.wl-row-serious.row-link:hover > td {
   width: 20px;
   height: 16px;
   border-radius: 3px;
-  background: #c20f0f;
-  color: #fff;
+  background: var(--f4-disagree);
+  color: var(--ink-on-dark);
   font-family: var(--mono);
   font-size: 9.5px;
   flex: none;
@@ -493,17 +493,17 @@ tr.wl-row-serious.row-link:hover > td {
  */
 :is(.f4-block, .f4-assessed):has(> .a2-inline .a2-agree input:checked),
 .f4-imdrf-item:has(.a2-inline .a2-agree input:checked) {
-  background: #f2faf4;
+  background: var(--f4-agree-bg);
 }
 
 :is(.f4-block, .f4-assessed):has(> .a2-inline .a2-clarification input:checked),
 .f4-imdrf-item:has(.a2-inline .a2-clarification input:checked) {
-  background: #fff3f6;
+  background: var(--f4-clarify-bg);
 }
 
 :is(.f4-block, .f4-assessed):has(> .a2-inline .a2-disagree input:checked),
 .f4-imdrf-item:has(.a2-inline .a2-disagree input:checked) {
-  background: #fff1f1;
+  background: var(--f4-disagree-bg);
 }
 
 /* The fill-in box's own option list — `.a2-fillin` alone offers these, since a reviewed item's
@@ -520,7 +520,7 @@ tr.wl-row-serious.row-link:hover > td {
   align-items: flex-start;
   border: 1px solid var(--rule-2);
   border-radius: var(--r);
-  background: #fff;
+  background: var(--card);
   padding: 7px 9px;
 }
 
@@ -551,7 +551,7 @@ tr.wl-row-serious.row-link:hover > td {
   padding: 6px 10px;
   font-family: inherit;
   font-size: 13px;
-  background: #fff;
+  background: var(--card);
 }
 
 .a2-summary-row span {
@@ -564,18 +564,18 @@ tr.wl-row-serious.row-link:hover > td {
 }
 
 .a2-summary-row.is-agree span {
-  background: #16803c;
-  color: #fff;
+  background: var(--f4-agree);
+  color: var(--ink-on-dark);
 }
 
 .a2-summary-row.is-clarification span {
-  background: #7f173a;
-  color: #fff;
+  background: var(--f4-clarify);
+  color: var(--ink-on-dark);
 }
 
 .a2-summary-row.is-disagree span {
-  background: #c20f0f;
-  color: #fff;
+  background: var(--f4-disagree);
+  color: var(--ink-on-dark);
 }
 
 .a2-summary-row p {
@@ -664,7 +664,7 @@ tr.wl-row-serious.row-link:hover > td {
    green section title lands below them instead of behind them. */
 .f4-section { scroll-margin-top: 116px; }
 .f4-bar {
-  background: var(--f4-bar); color: #fff; padding: 9px 16px; font-weight: 600; font-size: 13px;
+  background: var(--f4-bar); color: var(--ink-on-dark); padding: 9px 16px; font-weight: 600; font-size: 13px;
   display: flex; gap: 10px; align-items: center; letter-spacing: 0.01em;
 }
 /* Light against the bar's dark green, so the number reads as a mark on it rather than as part of
@@ -939,7 +939,7 @@ ul.f4-card-c li { margin-bottom: 3px; }
 /* Which section is on screen right now, kept in sync with scroll by f4-find.js. Solid fill rather
    than the hover tint, so "here" reads differently from "hovering" at a glance. */
 .f4-jump-links a.on {
-  background: var(--f4-bar); border-color: var(--f4-bar); color: #fff;
+  background: var(--f4-bar); border-color: var(--f4-bar); color: var(--ink-on-dark);
 }
 
 .f4-find-wrap { display: flex; align-items: center; gap: 6px; margin-left: auto; }
@@ -1114,7 +1114,7 @@ ul.f4-card-c li { margin-bottom: 3px; }
 
 .f4-type-switch a[aria-current="page"] {
   background: var(--green);
-  color: #fff;
+  color: var(--ink-on-dark);
 }
 
 /*
@@ -1422,19 +1422,19 @@ ul.f4-card-c li { margin-bottom: 3px; }
   padding: 2px 9px;
   font-size: 11.5px;
   font-weight: 600;
-  color: #fff;
+  color: var(--ink-on-dark);
 }
 
 .a2-history-degree.a2-agree {
-  background: #16803c;
+  background: var(--f4-agree);
 }
 
 .a2-history-degree.a2-clarification {
-  background: #7f173a;
+  background: var(--f4-clarify);
 }
 
 .a2-history-degree.a2-disagree {
-  background: #c20f0f;
+  background: var(--f4-disagree);
 }
 
 .a2-history-degree.a2-supplied {
@@ -1474,7 +1474,7 @@ ul.f4-card-c li { margin-bottom: 3px; }
 }
 
 .a-hist-done {
-  color: #16803c;
+  color: var(--f4-agree);
 }
 
 .a-hist-current {
@@ -1622,7 +1622,7 @@ ul.f4-card-c li { margin-bottom: 3px; }
   }
 
   body {
-    background: #fff;
+    background: var(--card);
   }
 
   .fd-print-page {
@@ -1719,7 +1719,7 @@ ul.f4-card-c li { margin-bottom: 3px; }
 }
 
 .orange-report-surface .card {
-  background: #fff;
+  background: var(--card);
   border-color: var(--orange-line);
 }
 
@@ -1741,7 +1741,7 @@ ul.f4-card-c li { margin-bottom: 3px; }
 }
 
 .orange-report-surface .report-group dd {
-  background: #fff;
+  background: var(--card);
   border-bottom-color: var(--orange-line);
 }
 
@@ -1762,7 +1762,7 @@ ul.f4-card-c li { margin-bottom: 3px; }
 .btn.orange-action {
   background: var(--orange);
   border-color: var(--orange);
-  color: #fff;
+  color: var(--ink-on-dark);
 }
 
 .btn.orange-action:hover {

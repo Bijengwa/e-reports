@@ -11,7 +11,7 @@
  */
 export function Logo(): JSX.Element {
   return (
-    <svg class="logo" viewBox="0 0 512 512" role="img" aria-label="AE Reports">
+    <svg class="logo" viewBox="0 0 512 512" role="img" aria-label="e-reports">
       <path class="doc" d="M177 47h258a38 38 0 0 1 38 38v300a38 38 0 0 1-38 38h-14" />
       <rect class="tab" x="243" y="103" width="172" height="42" rx="9" />
       <path

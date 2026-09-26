@@ -8,6 +8,7 @@ import {
   type AnnexSummary,
 } from "../../../../domain/imdrf/types.js";
 import type { ValidationIssue } from "../../../../domain/imdrf/validate.js";
+import { IconBack, IconCheck, IconSend, IconUpload } from "../../../../views/shared/icons.js";
 import { StaffShell } from "../../shared/shell.js";
 
 const DEFAULT_DOCUMENT_CODE = "IMDRF/AE WG/N43";
@@ -41,7 +42,7 @@ export function ImdrfLibraryPage({
 
   return (
     <StaffShell
-      title="Manage IMDRF — AE Reports"
+      title="Manage IMDRF — e-reports"
       pageTitle="Manage IMDRF"
       pageCss="imdrf"
       role={viewerRole}
@@ -62,7 +63,8 @@ export function ImdrfLibraryPage({
           </p>
         </div>
         <a href="/imdrf/manage/import" class="btn">
-          + Import New Release
+          <IconUpload />
+          Import New Release
         </a>
       </div>
 
@@ -112,6 +114,7 @@ export function ImdrfLibraryPage({
                 {selected.status === "draft" && (
                   <form method="POST" action={`/imdrf/manage/${selected.id}/publish`}>
                     <button type="submit" class="btn">
+                      <IconSend />
                       Publish
                     </button>
                   </form>
@@ -177,7 +180,7 @@ export function ImdrfImportPage({
 }: ImdrfImportPageProps): JSX.Element {
   return (
     <StaffShell
-      title="Import IMDRF release — AE Reports"
+      title="Import IMDRF release — e-reports"
       pageTitle="Import IMDRF release"
       pageCss="imdrf"
       role={viewerRole}
@@ -198,7 +201,8 @@ export function ImdrfImportPage({
           </p>
         </div>
         <a href="/imdrf/manage" class="btn ghost">
-          ← Back to releases
+          <IconBack />
+          Back to releases
         </a>
       </div>
 
@@ -256,6 +260,7 @@ export function ImdrfImportPage({
           </div>
           <div class="bar">
             <button type="submit" class="btn">
+              <IconCheck />
               Validate
             </button>
           </div>
@@ -303,7 +308,7 @@ export function ImdrfImportPreviewPage({
 
   return (
     <StaffShell
-      title="Preview import — AE Reports"
+      title="Preview import — e-reports"
       pageTitle="Preview import"
       pageCss="imdrf"
       role={viewerRole}
@@ -391,6 +396,7 @@ export function ImdrfImportPreviewPage({
             <input type="hidden" name="token" value={preview.token} />
             <div class="bar">
               <button type="submit" class="btn">
+                <IconUpload />
                 Import release
               </button>
               <a href="/imdrf/manage" class="btn ghost">
@@ -451,6 +457,7 @@ export function ImdrfImportPreviewPage({
 
           <div class="bar">
             <a href="/imdrf/manage/import" class="btn ghost">
+              <IconBack />
               Back
             </a>
           </div>

@@ -3,7 +3,7 @@ import type { ManagerReviewNote, ReportDetail } from "../../../../domain/report-
 import { isSeriousCase } from "../../../../domain/reports.js";
 import { DocHeader } from "../../shared/components/doc-header.js";
 import { F004Form, type PriorSecondaryReview } from "../../shared/components/f004.js";
-import { IconClose } from "../../shared/components/icons.js";
+import { IconClose } from "../../../../views/shared/icons.js";
 import { OrangeReportSurface } from "../../shared/components/orange-report.js";
 import { ManagerReviewBlock, ReportDocument } from "../../shared/components/report-views.js";
 import { StaffShell } from "../../shared/shell.js";

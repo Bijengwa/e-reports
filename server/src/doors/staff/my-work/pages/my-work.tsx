@@ -53,7 +53,7 @@ const STATUS_LABELS: Record<string, string> = {
 export function MyWorkPage({ viewerRole, viewerName, rows }: MyWorkPageProps): JSX.Element {
   return (
     <StaffShell
-      title="My work — AE Reports"
+      title="My work — e-reports"
       pageTitle="My work"
       role={viewerRole}
       fullName={viewerName}

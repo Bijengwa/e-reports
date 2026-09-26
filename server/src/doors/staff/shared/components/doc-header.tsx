@@ -1,5 +1,5 @@
 import type { Children } from "@kitajs/html";
-import { IconBack } from "./icons.js";
+import { IconBack } from "../../../../views/shared/icons.js";
 
 export type DocHeaderProps = {
   /** Where the icon-only back control goes. */

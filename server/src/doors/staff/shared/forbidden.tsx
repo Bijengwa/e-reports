@@ -1,3 +1,4 @@
+import { IconBack } from "../../../views/shared/icons.js";
 import { StaffShell } from "./shell.js";
 
 export type ForbiddenPageProps = {
@@ -26,7 +27,7 @@ export type ForbiddenPageProps = {
 export function ForbiddenPage({ role, fullName }: ForbiddenPageProps = {}): JSX.Element {
   return (
     <StaffShell
-      title="Not permitted — AE Reports"
+      title="Not permitted — e-reports"
       pageTitle="Not permitted"
       role={role}
       fullName={fullName}
@@ -39,6 +40,7 @@ export function ForbiddenPage({ role, fullName }: ForbiddenPageProps = {}): JSX.
       </div>
 
       <a href="/dashboard" class="btn ghost">
+        <IconBack />
         Back to the dashboard
       </a>
     </StaffShell>

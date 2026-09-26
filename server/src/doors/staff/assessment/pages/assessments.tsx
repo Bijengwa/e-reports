@@ -263,7 +263,7 @@ export function MyAssessmentsPage({
 }: MyAssessmentsPageProps): JSX.Element {
   return (
     <StaffShell
-      title="My assessments — AE Reports"
+      title="My assessments — e-reports"
       pageTitle="My assessments"
       pageCss="caseCss"
       role={viewerRole}

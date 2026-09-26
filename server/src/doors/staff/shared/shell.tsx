@@ -608,7 +608,7 @@ export function StaffShell({
           <div class="modal-body">
             <h2 id="signout-title">Sign out</h2>
             <p class="hint">
-              You will be signed out of AE Reports on this device and will need your password to
+              You will be signed out of e-reports on this device and will need your password to
               come back.
             </p>
 

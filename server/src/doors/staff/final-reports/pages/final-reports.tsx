@@ -46,7 +46,7 @@ export function FinalReportsPage({
 }: FinalReportsPageProps): JSX.Element {
   return (
     <StaffShell
-      title="Final Reports — AE Reports"
+      title="Final Reports — e-reports"
       pageTitle="Final Reports"
       role={viewerRole}
       fullName={viewerName}

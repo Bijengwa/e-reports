@@ -117,7 +117,7 @@
 
 .rail-nav a:hover {
   background: var(--rail-hover);
-  color: #fff;
+  color: var(--ink-on-dark);
 }
 
 /*
@@ -126,7 +126,7 @@
  */
 .rail-nav a.on {
   background: var(--rail-on);
-  color: #fff;
+  color: var(--ink-on-dark);
   font-weight: 500;
   box-shadow: inset 3px 0 0 var(--leaf);
 }
@@ -176,7 +176,7 @@
 
 .rail-signout:hover {
   background: var(--rail-hover);
-  color: #fff;
+  color: var(--ink-on-dark);
 }
 
 .rail-collapse {
@@ -201,7 +201,7 @@
 
 .rail-collapse:hover {
   background: var(--rail-hover);
-  color: #fff;
+  color: var(--ink-on-dark);
 }
 
 /* Expanded is the default, so the arrow and the word that mean "collapse" are the ones on show. */
@@ -617,7 +617,7 @@ details.top-release[open] > summary {
     padding: 6px 10px;
     border-radius: 6px;
     background: #072a14;
-    color: #fff;
+    color: var(--ink-on-dark);
     font-size: 12.5px;
     font-weight: 500;
     line-height: 1.2;

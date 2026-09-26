@@ -1,4 +1,5 @@
 import { BrandMark } from "../../../../views/shared/brand-mark.js";
+import { IconSignOut } from "../../../../views/shared/icons.js";
 import { Layout } from "../../../../views/shared/layout.js";
 
 /**
@@ -16,7 +17,7 @@ import { Layout } from "../../../../views/shared/layout.js";
  */
 export function SignOutPage(): JSX.Element {
   return (
-    <Layout title="Sign out — AE Reports" locale="en" bodyClass="staff-login" auth>
+    <Layout title="Sign out — e-reports" locale="en" bodyClass="staff-login" auth>
       <div class="login-card">
         <div class="login-header">
           <BrandMark />
@@ -32,6 +33,7 @@ export function SignOutPage(): JSX.Element {
               Cancel
             </a>
             <button type="submit" class="btn">
+              <IconSignOut />
               Sign out
             </button>
           </div>

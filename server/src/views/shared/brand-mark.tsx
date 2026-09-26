@@ -16,7 +16,7 @@ export function BrandMark(): JSX.Element {
     <span class="brand-mark">
       <Logo />
       <span class="brand-text">
-        <b>AE Reports</b>
+        <b>e-reports</b>
         <span>TMDA · Device vigilance</span>
       </span>
     </span>

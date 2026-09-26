@@ -18,7 +18,16 @@ import {
   type PriorSecondaryReview,
   type SectionComment,
 } from "../../shared/components/f004.js";
-import { IconBack, IconClose } from "../../shared/components/icons.js";
+import {
+  IconBack,
+  IconCheck,
+  IconClose,
+  IconFileCheck,
+  IconFileText,
+  IconPen,
+  IconSave,
+  IconUserPlus,
+} from "../../../../views/shared/icons.js";
 import {
   OrangeReportIdentity,
   OrangeReportSurface,
@@ -201,16 +210,19 @@ function CaseDetailTopContent({
         )}
         {showFinalDocument && (
           <a href={`/reports/${reportId}/final-document`} class="btn">
+            <IconFileCheck />
             Final F004
           </a>
         )}
         {canAssess && (
           <a href={assessment1Href(reportId)} class="btn">
+            <IconFileText />
             Assessment 1
           </a>
         )}
         {mySecondaryOrdinal !== null && (
           <a href={secondaryAssessmentHref(reportId)} class="btn">
+            <IconPen />
             {`My assessment (A${mySecondaryOrdinal})`}
           </a>
         )}
@@ -314,7 +326,7 @@ export function CaseDetailPage({
 
   return (
     <StaffShell
-      title={`${report.number} — AE Reports`}
+      title={`${report.number} — e-reports`}
       pageCss="caseCss"
       // Unused once `topContent` is given — `StaffShell` renders `topContent` in its place — but
       // still required by `StaffShellProps`, exactly as `FinalDocumentPage` also passes one. Kept
@@ -459,6 +471,7 @@ export function CaseDetailPage({
               <div class="bar">
                 <div class="sp"></div>
                 <button type="submit" class="btn">
+                  <IconSave />
                   {assessment1Review.managerComment ? "Update review" : "Save review"}
                 </button>
               </div>
@@ -529,6 +542,7 @@ export function CaseDetailPage({
                     <div class="bar">
                       <div class="sp"></div>
                       <button type="submit" class="btn ghost">
+                        <IconUserPlus />
                         Assign first assessor
                       </button>
                     </div>
@@ -575,6 +589,7 @@ export function CaseDetailPage({
                     <div class="bar">
                       <div class="sp"></div>
                       <button type="submit" class="btn ghost">
+                        <IconUserPlus />
                         Assign next assessor
                       </button>
                     </div>
@@ -617,6 +632,7 @@ export function CaseDetailPage({
                     <div class="bar">
                       <div class="sp"></div>
                       <button type="submit" class="btn">
+                        <IconCheck />
                         Approve & assign work
                       </button>
                     </div>

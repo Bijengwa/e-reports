@@ -1,3 +1,4 @@
+import { IconSignIn } from "../../../../views/shared/icons.js";
 import { BrandMark } from "../../../../views/shared/brand-mark.js";
 import { Layout } from "../../../../views/shared/layout.js";
 
@@ -20,7 +21,7 @@ export type LoginPageProps = {
  */
 export function LoginPage({ error, publicFormUrl }: LoginPageProps): JSX.Element {
   return (
-    <Layout title="Staff sign in — AE Reports" locale="en" bodyClass="staff-login" passwordToggle auth>
+    <Layout title="Staff sign in — e-reports" locale="en" bodyClass="staff-login" passwordToggle auth>
       <div class="login-card">
         <div class="login-header">
           <BrandMark />
@@ -58,6 +59,7 @@ export function LoginPage({ error, publicFormUrl }: LoginPageProps): JSX.Element
           </div>
 
           <button type="submit" class="btn btn-primary">
+            <IconSignIn />
             Sign in
           </button>
         </form>

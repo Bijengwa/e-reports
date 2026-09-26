@@ -1,4 +1,5 @@
 import { roleLabel } from "../../../../domain/roles.js";
+import { IconCheck, IconKey, IconUserPlus } from "../../../../views/shared/icons.js";
 import { StaffShell } from "../../shared/shell.js";
 
 /** The roles an administrator may hand out. Never `administrator`. */
@@ -40,7 +41,7 @@ export type UsersPageProps = {
 export function UsersPage({ users, error, viewerRole, viewerName }: UsersPageProps): JSX.Element {
   return (
     <StaffShell
-      title="Staff accounts — AE Reports"
+      title="Staff accounts — e-reports"
       pageTitle="Staff accounts"
       pageCss="users"
       role={viewerRole}
@@ -54,6 +55,7 @@ export function UsersPage({ users, error, viewerRole, viewerName }: UsersPagePro
           </p>
         </div>
         <a href="/users/new" class="btn">
+          <IconUserPlus />
           Add user
         </a>
       </div>
@@ -106,6 +108,7 @@ export function UsersPage({ users, error, viewerRole, viewerName }: UsersPagePro
                       {user.isActive && (
                         <form method="POST" action={`/users/${user.id}/reset`}>
                           <button type="submit" class="btn ghost btn-sm">
+                            <IconKey />
                             Reset password
                           </button>
                         </form>
@@ -153,7 +156,7 @@ export function NewUserPage({
 }: NewUserPageProps): JSX.Element {
   return (
     <StaffShell
-      title="Add a staff account — AE Reports"
+      title="Add a staff account — e-reports"
       pageTitle="Add a staff account"
       pageCss="users"
       role={viewerRole}
@@ -218,6 +221,7 @@ export function NewUserPage({
 
             <div class="bar">
               <button type="submit" class="btn">
+                <IconUserPlus />
                 Create account
               </button>
               <a href="/users" class="btn ghost">
@@ -262,7 +266,7 @@ export function UserCreatedPage({
 }: UserCreatedPageProps): JSX.Element {
   return (
     <StaffShell
-      title="Account created — AE Reports"
+      title="Account created — e-reports"
       pageTitle="Account created"
       pageCss="users"
       role={viewerRole}
@@ -291,9 +295,11 @@ export function UserCreatedPage({
 
         <div class="bar">
           <a href="/users/new" class="btn ghost">
+            <IconUserPlus />
             Add another
           </a>
           <a href="/users" class="btn">
+            <IconCheck />
             Done
           </a>
         </div>
@@ -329,7 +335,7 @@ export function PasswordResetPage({
 }: PasswordResetPageProps): JSX.Element {
   return (
     <StaffShell
-      title="Password reset — AE Reports"
+      title="Password reset — e-reports"
       pageTitle="Password reset"
       pageCss="users"
       role={viewerRole}
@@ -364,6 +370,7 @@ export function PasswordResetPage({
 
         <div class="bar">
           <a href="/users" class="btn">
+            <IconCheck />
             Done
           </a>
         </div>

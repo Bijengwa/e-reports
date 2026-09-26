@@ -7,7 +7,7 @@ export type RequestErrorPageProps = {
   title?: string;
 };
 
-const DEFAULT_TITLE = "Something went wrong — AE Reports";
+const DEFAULT_TITLE = "Something went wrong — e-reports";
 const DEFAULT_HEADING = "Something went wrong";
 const DEFAULT_MESSAGE = "Please try again later.";
 

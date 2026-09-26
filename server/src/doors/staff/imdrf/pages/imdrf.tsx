@@ -121,7 +121,7 @@ export function ImdrfBrowserPage({
 }: ImdrfBrowserPageProps): JSX.Element {
   return (
     <StaffShell
-      title="IMDRF terminology — AE Reports"
+      title="IMDRF terminology — e-reports"
       pageTitle="IMDRF terminology"
       titleExtra={selected ? <ReleaseBadge releases={releases} selected={selected} /> : undefined}
       pageCss="imdrf"

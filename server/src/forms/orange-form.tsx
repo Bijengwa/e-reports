@@ -20,6 +20,7 @@ import { FORM_VERSION } from "../domain/reports.js";
 import { type Locale, type MessageKey, type Translate, translatorFor } from "../i18n/index.js";
 import { MAX_ATTACHMENTS } from "../storage/index.js";
 import { BrandMark } from "../views/shared/brand-mark.js";
+import { IconArrowRight, IconBack, IconSend } from "../views/shared/icons.js";
 import { Layout } from "../views/shared/layout.js";
 
 export type { Answers, Step };
@@ -935,17 +936,19 @@ export function OrangeForm(props: OrangeFormProps): JSX.Element {
               // `formnovalidate` matters: going back must never be blocked by a required field
               // the reporter has not reached a decision on yet.
               <button type="submit" name="action" value="back" class="btn ghost" formnovalidate>
-                ← <span safe>{t("nav.back")}</span>
+                <IconBack /> <span safe>{t("nav.back")}</span>
               </button>
             )}
             <div class="sp"></div>
             {currentStep < LAST_STEP ? (
-              <button type="submit" name="action" value="next" class="btn orange" safe>
-                {t("nav.continue")}
+              <button type="submit" name="action" value="next" class="btn orange">
+                <span safe>{t("nav.continue")}</span>
+                <IconArrowRight />
               </button>
             ) : (
-              <button type="submit" name="action" value="submit" class="btn orange" safe>
-                {t("nav.submit")}
+              <button type="submit" name="action" value="submit" class="btn orange">
+                <IconSend />
+                <span safe>{t("nav.submit")}</span>
               </button>
             )}
           </div>
