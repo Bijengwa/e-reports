@@ -47,13 +47,15 @@
   font-size: 13px;
   font-weight: 600;
   text-decoration: none;
-  box-shadow: 0 8px 24px rgb(12 59 30 / 26%);
   transform: translateY(-160%);
   transition: transform 0.14s ease;
 }
 
+/* The shadow only while it is on screen. Parked above the viewport, a 24px blur still reached
+   down into the top of every page as a grey smudge over the title bar. */
 .skip-link:focus-visible {
   transform: none;
+  box-shadow: 0 8px 24px rgb(12 59 30 / 26%);
 }
 
 /* ---------- the rail ---------- */
@@ -404,143 +406,6 @@ details.top-release[open] > summary {
   transition: opacity 0.2s ease;
 }
 
-/* ---------- the tool strip ---------- */
-/*
- * Below 900px the rail is off-canvas, so a reader part way down a long page has nothing on
- * screen saying which tool they are in. `rail.js` clones the rail's own links into this strip
- * while the page is being scrolled and takes the class off a few seconds after it stops; above
- * 900px the rail itself answers the question and the strip is never built.
- *
- * It is `position: fixed`, not a band in the flow, and that is the point: appearing and
- * disappearing must not change the height of the document underneath it. A strip that took 42px
- * of flow every time the reader scrolled would move the paragraph they were reading, twice.
- *
- * It is also the one thing in the shell that may scroll sideways, and it scrolls sideways so that
- * the document never has to: `overflow-x: auto` here, and nothing wider than the viewport
- * anywhere else.
- *
- * A page that carries a permanent navigation of its own across the top — `[data-nav-strip]`, which
- * today is the IMDRF terminology page's row of coding items — does not get this one as well:
- * `rail.js` stands down there, so there is one strip across the top of a page and never two. The
- * drawer is `visibility: hidden` while shut so that it is not a third.
- */
-.top-tools {
-  display: none;
-}
-
-@media (max-width: 900px) {
-  .top-tools {
-    display: flex;
-    position: fixed;
-    top: 56px;
-    left: 0;
-    right: 0;
-    z-index: 29;
-    gap: 4px;
-    /* 7px, not 6: a 2px focus ring at 2px offset has to fit inside a box that clips its own
-       overflow, or the ring round the first tabbed item is sliced off. */
-    padding: 7px 10px;
-    background: var(--card);
-    border-bottom: 1px solid var(--rule);
-    box-shadow: 0 10px 20px -16px rgb(12 59 30 / 65%);
-    overflow-x: auto;
-    overflow-y: hidden;
-    overscroll-behavior-x: contain;
-    scroll-padding-inline: 14px;
-    scrollbar-width: none;
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(-8px);
-    transition:
-      opacity 0.16s ease,
-      transform 0.16s ease,
-      visibility 0.16s;
-  }
-
-  .top-tools::-webkit-scrollbar {
-    display: none;
-  }
-
-  :root.tools-on .top-tools {
-    opacity: 1;
-    visibility: visible;
-    transform: none;
-  }
-
-  /* The drawer is the whole navigation, opened deliberately. The transient copy of it steps
-     aside rather than sitting behind the scrim arguing with it. */
-  :root.rail-open .top-tools {
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(-8px);
-  }
-
-  /*
-   * A fade at whichever end still has links past it. `rail.js` measures the strip and sets
-   * `data-edge`; nothing is faded when everything already fits, so a strip of three entries never
-   * has its first and last labels dimmed for no reason.
-   */
-  .top-tools[data-edge="end"] {
-    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
-  }
-
-  .top-tools[data-edge="start"] {
-    mask-image: linear-gradient(to right, transparent 0, #000 28px);
-  }
-
-  .top-tools[data-edge="both"] {
-    mask-image: linear-gradient(
-      to right,
-      transparent 0,
-      #000 28px,
-      #000 calc(100% - 28px),
-      transparent 100%
-    );
-  }
-
-  .top-tools a {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 10px;
-    border-radius: 999px;
-    color: var(--ink-2);
-    text-decoration: none;
-    font-size: 12.5px;
-    line-height: 1.2;
-    white-space: nowrap;
-    transition:
-      background-color 0.12s ease,
-      color 0.12s ease;
-  }
-
-  .top-tools a:hover {
-    background: var(--paper);
-    color: var(--ink);
-  }
-
-  .top-tools a svg {
-    width: 15px;
-    height: 15px;
-    flex: none;
-    fill: none;
-    stroke: currentcolor;
-    stroke-width: 1.7;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-
-  /* The tool being read. The ring carries it as well as the tint, so the answer does not rest on
-     colour alone. */
-  .top-tools a.on {
-    background: var(--green-bg);
-    color: var(--green);
-    font-weight: 600;
-    box-shadow: inset 0 0 0 1px var(--green);
-  }
-}
-
 /* ---------- the collapsed rail ---------- */
 /*
  * Only meaningful while the rail is a column. Below 900px it is a drawer, and a 64px drawer would
@@ -672,8 +537,8 @@ details.top-release[open] > summary {
     /*
      * `visibility` is doing real work here, not decoration. A drawer parked off-canvas with
      * `transform` alone is still in the tab order and still read out — so a reader on a phone
-     * would meet the whole navigation twice, once in the strip above and once in a panel they
-     * cannot see. Hidden while shut, there is exactly one navigation on screen and in the tree.
+     * would tab through a whole navigation they cannot see. Hidden while shut, the drawer is
+     * reachable only through the menu button that opens it.
      */
     visibility: hidden;
     box-shadow: 0 0 40px rgb(6 26 14 / 45%);

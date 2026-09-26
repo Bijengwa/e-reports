@@ -709,8 +709,6 @@
      *
      * This file owns all of it: which item is marked, bringing that item into the strip's own
      * view, fading whichever end has more past it, the arrow keys, and what pressing one does.
-     * `rail.js` stands its own transient tools strip down wherever `[data-nav-strip]` is present,
-     * so there is one navigation across the top of this page and never two.
      *
      * Marking is by reading position, not by which sections happen to be open. A reader may open
      * three of the seven; the one they are LOOKING at is the one whose heading has most recently
