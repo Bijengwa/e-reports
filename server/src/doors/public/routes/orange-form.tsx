@@ -100,6 +100,7 @@ export async function orangeFormRoutes(app: FastifyInstance): Promise<void> {
     }
   });
 
-  // Unauthenticated liveness probe, scoped to this door.
-  app.get("/healthz", async () => ({ status: "ok", door: "public" }));
+  // Unauthenticated liveness probe, scoped to this door. Quiet at info for the same reason as the
+  // staff door's: a keep-alive or platform health check may request it every few minutes.
+  app.get("/healthz", { logLevel: "warn" }, async () => ({ status: "ok", door: "public" }));
 }

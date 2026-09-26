@@ -151,7 +151,9 @@ export async function loginRoutes(app: FastifyInstance, opts: LoginRoutesOptions
     return reply.redirect(user.must_change_password ? "/change-password" : "/dashboard", 303);
   });
 
-  app.get("/healthz", async () => ({ status: "ok", door: "staff" }));
+  // Requested every five minutes by the keep-alive (see keep-alive.ts), so its request log is kept
+  // below info — otherwise it would bury everything else. A failure still logs.
+  app.get("/healthz", { logLevel: "warn" }, async () => ({ status: "ok", door: "staff" }));
 }
 
 

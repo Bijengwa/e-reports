@@ -12,6 +12,7 @@ import { type Config, loadConfig, publicOrigin } from "./config.js";
 import { createDatabase } from "./db/client.js";
 import { publicDoor } from "./doors/public/index.js";
 import { staffDoor } from "./doors/staff/index.js";
+import { startKeepAlive } from "./keep-alive.js";
 import { createPdfRenderer } from "./pdf/index.js";
 import { createStorage, MAX_ATTACHMENTS } from "./storage/index.js";
 import { RequestErrorPage } from "./views/shared/request-error-page.js";
@@ -127,6 +128,16 @@ export async function buildServer(config: Config = loadConfig()): Promise<Fastif
 export async function start(): Promise<void> {
   const config = loadConfig();
   const app = await buildServer(config);
+
+  // Here rather than in buildServer: it is a property of where the process runs, and a test that
+  // builds the server must never start pinging anything.
+  if (config.KEEP_ALIVE_URL !== undefined) {
+    const stopKeepAlive = startKeepAlive({ url: config.KEEP_ALIVE_URL, log: app.log });
+    app.addHook("onClose", async () => {
+      stopKeepAlive();
+    });
+  }
+
   await app.listen({ host: config.HOST, port: config.PORT });
 }
 

@@ -45,6 +45,14 @@ const EnvSchema = z.object({
    * Alpine's musl libc, and installing one there is the standard workaround.
    */
   PDF_CHROMIUM_PATH: z.string().min(1).optional(),
+
+  /**
+   * One of this app's own public addresses — normally `https://<STAFF_HOST>/healthz` — requested
+   * every five minutes so a host that sleeps when idle (Render's free tier, after 15 minutes)
+   * keeps the service running. Unset turns it off, which is right for any host that stays up on
+   * its own. See `keep-alive.ts`.
+   */
+  KEEP_ALIVE_URL: z.url({ protocol: /^https?$/ }).optional(),
 });
 
 export type Config = Readonly<z.infer<typeof EnvSchema>>;
