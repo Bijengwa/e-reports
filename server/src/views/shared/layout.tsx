@@ -126,6 +126,9 @@ export function Layout({
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="referrer" content="same-origin" />
         <title>{title}</title>
+        {/* Served from our own origin like every other asset. SVG only: the portal targets current
+            browsers and an .ico would be a second copy of the mark to keep in step for nothing. */}
+        <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
         {/* Design tokens, resets and the primitives (buttons, cards, fields, tables) every page —
             both doors — reaches for. Everything past this one is a page's own opt-in, the same
             shape as the scripts below: a page that does not render a rail must not be made to fetch

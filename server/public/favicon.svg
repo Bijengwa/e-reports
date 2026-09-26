@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="e-reports">
+  <!--
+    The tab icon. Colours are written out rather than tokenised because a favicon is fetched as its
+    own document: it never sees base.css, so var(--green) would resolve to nothing. #166534 is
+    --green and must be changed in both places if it ever moves.
+
+    The full mark (document, folder, cross) turns to mush below about 24px, so the favicon keeps
+    only the cross, on the green the rest of the mark is drawn in. It stays legible at 16px and
+    still reads as the same product beside the brand mark in the page.
+  -->
+  <rect width="512" height="512" rx="96" fill="#166534"/>
+  <path d="M208 128h96v80h80v96h-80v80h-96v-80h-80v-96h80z" fill="#fff"/>
+</svg>
