@@ -125,4 +125,3 @@ export function currentSession(request: FastifyRequest): StaffSession {
 
   return request.staffSession;
 }
-

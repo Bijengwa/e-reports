@@ -136,11 +136,15 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
     const target = ReportId.safeParse((request.params as { id: string }).id);
     if (!target.success) return forbid(reply, session.role, 404);
 
-    const found = await loadReport(app, target.data);
+    // The draft is read alongside the report rather than after it: one round trip instead of two.
+    // It is only used once the checks below have passed, so reading it early shows nobody anything.
+    const [found, draft] = await Promise.all([
+      loadReport(app, target.data),
+      loadDraft(app, target.data),
+    ]);
     if (found === null) return forbid(reply, session.role, 404);
     if (found.assessor1UserId !== session.userId) return forbid(reply, session.role);
 
-    const draft = await loadDraft(app, found.report.id);
     // Resolved server-side, always — the release this page's IMDRF pickers search against, and
     // the same one `resolveA1Imdrf` will stamp into the payload on save. Stamped into `answers`
     // itself rather than passed as a separate prop, so `F004Form`'s pickers read one source
@@ -175,11 +179,14 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
     const target = ReportId.safeParse((request.params as { id: string }).id);
     if (!target.success) return forbid(reply, session.role, 404);
 
-    const found = await loadReport(app, target.data);
+    // Read together, as on the GET: one round trip instead of two.
+    const [found, existing] = await Promise.all([
+      loadReport(app, target.data),
+      loadDraft(app, target.data),
+    ]);
     if (found === null) return forbid(reply, session.role, 404);
     if (found.assessor1UserId !== session.userId) return forbid(reply, session.role);
 
-    const existing = await loadDraft(app, found.report.id);
 
     if (existing.submitted) return forbid(reply, session.role);
 

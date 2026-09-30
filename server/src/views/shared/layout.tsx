@@ -1,5 +1,6 @@
 import type { Children } from "@kitajs/html";
 import type { Locale } from "../../i18n/index.js";
+import { asset } from "./asset.js";
 
 export type { Locale };
 
@@ -128,52 +129,52 @@ export function Layout({
         <title>{title}</title>
         {/* Served from our own origin like every other asset. SVG only: the portal targets current
             browsers and an .ico would be a second copy of the mark to keep in step for nothing. */}
-        <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+        <link rel="icon" href={asset("favicon.svg")} type="image/svg+xml" />
         {/* Design tokens, resets and the primitives (buttons, cards, fields, tables) every page —
             both doors — reaches for. Everything past this one is a page's own opt-in, the same
             shape as the scripts below: a page that does not render a rail must not be made to fetch
             the rail's stylesheet, and so on for the rest. */}
-        <link rel="stylesheet" href="/assets/css/base.css" />
-        {shell && <link rel="stylesheet" href="/assets/css/shell.css" />}
-        {auth && <link rel="stylesheet" href="/assets/css/auth.css" />}
-        {orangeForm && <link rel="stylesheet" href="/assets/css/orange-form.css" />}
-        {register && <link rel="stylesheet" href="/assets/css/register.css" />}
-        {dashboard && <link rel="stylesheet" href="/assets/css/dashboard.css" />}
-        {users && <link rel="stylesheet" href="/assets/css/users.css" />}
-        {activity && <link rel="stylesheet" href="/assets/css/activity.css" />}
-        {imdrf && <link rel="stylesheet" href="/assets/css/imdrf.css" />}
-        {caseCss && <link rel="stylesheet" href="/assets/css/case.css" />}
+        <link rel="stylesheet" href={asset("css/base.css")} />
+        {shell && <link rel="stylesheet" href={asset("css/shell.css")} />}
+        {auth && <link rel="stylesheet" href={asset("css/auth.css")} />}
+        {orangeForm && <link rel="stylesheet" href={asset("css/orange-form.css")} />}
+        {register && <link rel="stylesheet" href={asset("css/register.css")} />}
+        {dashboard && <link rel="stylesheet" href={asset("css/dashboard.css")} />}
+        {users && <link rel="stylesheet" href={asset("css/users.css")} />}
+        {activity && <link rel="stylesheet" href={asset("css/activity.css")} />}
+        {imdrf && <link rel="stylesheet" href={asset("css/imdrf.css")} />}
+        {caseCss && <link rel="stylesheet" href={asset("css/case.css")} />}
         {/* Deliberately not deferred — it has to run before the rail is painted. It is a few
             hundred bytes and sets one class on <html>. */}
-        {railScript && <script src="/assets/rail.js"></script>}
+        {railScript && <script src={asset("rail.js")}></script>}
         {/* Enhancement only — the form works with this blocked, because every rule it applies is
             also enforced server-side. Served from our own origin to satisfy the CSP. */}
-        <script src="/assets/orange-form.js" defer></script>
+        <script src={asset("orange-form.js")} defer></script>
         {/* Also enhancement only, and also served from our own origin to satisfy the CSP. The
             field works without it; the script only ever changes the input's `type`. */}
-        {passwordToggle && <script src="/assets/password-toggle.js" defer></script>}
+        {passwordToggle && <script src={asset("password-toggle.js")} defer></script>}
         {/* Enhancement only, and the reason it can be: highlighting a heading is not something a
             reader needs to be told happened, so a browser that blocks this leaves the page
             exactly as readable as it was. Served from our own origin to satisfy the CSP. */}
-        {f4Find && <script src="/assets/f4-find.js" defer></script>}
+        {f4Find && <script src={asset("f4-find.js")} defer></script>}
         {/* Enhancement only: the server has already rendered the true remaining time as of the
             response, so a browser that blocks this leaves a correct but static countdown rather
             than a broken page. Served from our own origin to satisfy the CSP. */}
-        {countdown && <script src="/assets/countdown.js" defer></script>}
+        {countdown && <script src={asset("countdown.js")} defer></script>}
         {/* Enhancement only: the plain `<a href>` this button degrades to already downloads the
             file with this blocked, so a browser refusing the script leaves a working, merely
             plainer, download in its place. Served from our own origin to satisfy the CSP. */}
-        {registerDownload && <script src="/assets/register.js" defer></script>}
+        {registerDownload && <script src={asset("register.js")} defer></script>}
         {/* Enhancement only: the button this attaches to has no non-script equivalent
             (`window.print()` cannot be reached from a bare href), so a browser that blocks this
             leaves the button inert rather than broken — the document itself, and the browser's own
             Ctrl+P, are both still there. Served from our own origin to satisfy the CSP. */}
-        {f4Print && <script src="/assets/f4-print.js" defer></script>}
+        {f4Print && <script src={asset("f4-print.js")} defer></script>}
         {/* Enhancement only: the hidden term-id input and the read-only display boxes it fills
             are both rendered server-side already, so a browser refusing this leaves the picker
             button doing nothing rather than a broken form — the assessor is told to try again
             without JavaScript blocked, and nothing already chosen is lost. */}
-        {imdrfPicker && <script src="/assets/f004-imdrf-picker.js" defer></script>}
+        {imdrfPicker && <script src={asset("f004-imdrf-picker.js")} defer></script>}
       </head>
       <body class={bodyClass ?? ""}>{children}</body>
     </html>

@@ -131,29 +131,69 @@ export async function renderCaseDetail(
   // A1 arriving and the manager naming who reads it next, and in no other.
   const reviewIsActionable = found.report.status === "awaiting_second_assessor";
 
+  const wantsComments = isManager && found.assessment1 !== null;
+
+  const canAssignFirst =
+    isManager && found.report.status === "received" && found.assessor1UserId === null;
+
+  const canAssignNext =
+    isManager &&
+    (found.report.status === "awaiting_second_assessor" ||
+      found.report.status === "awaiting_decision") &&
+    found.assessment1 !== null;
+
+  const canAssignWork =
+    isManager &&
+    found.report.status === "awaiting_decision" &&
+    found.secondaryAssessments.some((a) => a.submitted) &&
+    !found.secondaryAssessments.some((a) => !a.submitted);
+
+  // Everything below depends on the report and on nothing else here, so it is asked for at once.
+  // Each read is a full round trip to the database; in series they cost one each before the page
+  // can render.
+  const [commentRows, firstAssessorPicker, nextAssessorPicker, workOfficerPicker, finalDocument] =
+    await Promise.all([
+      wantsComments
+        ? app.db.execute(sql`
+            SELECT c.section, c.body, c.created_at, u.full_name AS author
+              FROM assessment_comments c
+              JOIN assessments a ON a.id = c.assessment_id
+              JOIN users u ON u.id = c.author_user_id
+             WHERE a.report_id = ${found.report.id}
+               AND a.ordinal = ${FIRST_ASSESSMENT}
+             ORDER BY c.section, c.created_at
+          `)
+        : [],
+      canAssignFirst ? officerWorkloadOptions(app) : undefined,
+      canAssignNext ? officerWorkloadOptions(app, found.report.id) : undefined,
+      canAssignWork
+        ? app.db
+            .execute(
+              sql`SELECT id, full_name FROM users WHERE role = 'assessor' AND is_active ORDER BY full_name`,
+            )
+            .then((rows): AssessorOption[] =>
+              rows.map((r) => {
+                const u = r as { id: string; full_name: string };
+                return { id: u.id, fullName: u.full_name };
+              }),
+            )
+        : undefined,
+      app.db.execute(sql`
+        SELECT 1 FROM report_final_documents WHERE report_id = ${found.report.id}
+      `),
+    ]);
+
   const sectionComments: Record<string, SectionComment[]> = {};
 
-  if (isManager && found.assessment1 !== null) {
-    const rows = await app.db.execute(sql`
-      SELECT c.section, c.body, c.created_at, u.full_name AS author
-        FROM assessment_comments c
-        JOIN assessments a ON a.id = c.assessment_id
-        JOIN users u ON u.id = c.author_user_id
-       WHERE a.report_id = ${found.report.id}
-         AND a.ordinal = ${FIRST_ASSESSMENT}
-       ORDER BY c.section, c.created_at
-    `);
-
-    for (const raw of rows) {
-      const note = raw as { section: string; body: string; created_at: Date; author: string };
-      const bucket = sectionComments[note.section] ?? [];
-      bucket.push({
-        author: note.author,
-        body: note.body,
-        at: new Date(note.created_at).toISOString().slice(0, 16).replace("T", " "),
-      });
-      sectionComments[note.section] = bucket;
-    }
+  for (const raw of commentRows) {
+    const note = raw as { section: string; body: string; created_at: Date; author: string };
+    const bucket = sectionComments[note.section] ?? [];
+    bucket.push({
+      author: note.author,
+      body: note.body,
+      at: new Date(note.created_at).toISOString().slice(0, 16).replace("T", " "),
+    });
+    sectionComments[note.section] = bucket;
   }
 
   const assessment1Review =
@@ -169,44 +209,6 @@ export async function renderCaseDetail(
             : undefined,
         }
       : undefined;
-
-  const canAssignFirst =
-    isManager && found.report.status === "received" && found.assessor1UserId === null;
-
-  const firstAssessorPicker: AssessorOption[] | undefined = canAssignFirst
-    ? await officerWorkloadOptions(app)
-    : undefined;
-
-  const canAssignNext =
-    isManager &&
-    (found.report.status === "awaiting_second_assessor" ||
-      found.report.status === "awaiting_decision") &&
-    found.assessment1 !== null;
-
-  const nextAssessorPicker: AssessorOption[] | undefined = canAssignNext
-    ? await officerWorkloadOptions(app, found.report.id)
-    : undefined;
-
-  const canAssignWork =
-    isManager &&
-    found.report.status === "awaiting_decision" &&
-    found.secondaryAssessments.some((a) => a.submitted) &&
-    !found.secondaryAssessments.some((a) => !a.submitted);
-
-  const workOfficerPicker: AssessorOption[] | undefined = canAssignWork
-    ? (
-        await app.db.execute(
-          sql`SELECT id, full_name FROM users WHERE role = 'assessor' AND is_active ORDER BY full_name`,
-        )
-      ).map((r) => {
-        const u = r as { id: string; full_name: string };
-        return { id: u.id, fullName: u.full_name };
-      })
-    : undefined;
-
-  const finalDocument = await app.db.execute(sql`
-    SELECT 1 FROM report_final_documents WHERE report_id = ${found.report.id}
-  `);
 
   return reply
     .status(status)
@@ -267,13 +269,14 @@ export async function caseDetailRoutes(app: FastifyInstance): Promise<void> {
     if (!target.success) return reply.redirect("/register", 302);
 
     if (session.role === "assessor") {
-      if (!(await officerIsPartyTo(app, target.data, session.userId))) {
-        return forbid(reply, session.role);
-      }
+      const [isParty, rows] = await Promise.all([
+        officerIsPartyTo(app, target.data, session.userId),
+        app.db.execute(sql`
+          SELECT status::text AS status FROM reports WHERE id = ${target.data}
+        `),
+      ]);
+      if (!isParty) return forbid(reply, session.role);
 
-      const rows = await app.db.execute(sql`
-        SELECT status::text AS status FROM reports WHERE id = ${target.data}
-      `);
       const status = (rows[0] as { status: string } | undefined)?.status;
       if (status === "assigned_for_work") return forbid(reply, session.role);
     }

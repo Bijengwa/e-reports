@@ -225,26 +225,52 @@ export async function loadReport(
   secondaryAssessments: SecondaryAssignment[];
   decisions: DecisionEntry[];
 } | null> {
-  const rows = await app.db.execute(sql`
-    SELECT r.id, r.number, r.received_at, r.device_name, r.severity, r.status, r.channel,
-           r.facility, r.reporter_name, r.form_version, r.payload, r.assessor1_user_id,
-           r.assessor2_user_id,
-           u.full_name AS filled_by,
-           a1.full_name AS assessor1_name,
-           asm.payload AS assessment1_payload,
-           asm.conclusion AS assessment1_conclusion,
-           asm.submitted_at AS assessment1_submitted_at,
-           asm.due_at AS assessment1_due_at,
-           asm.manager_comment AS assessment1_comment,
-           asm.manager_comment_at AS assessment1_comment_at,
-           mc.full_name AS assessment1_comment_by
-      FROM reports r
-      LEFT JOIN users u ON u.id = r.entered_by_user_id
-      LEFT JOIN users a1 ON a1.id = r.assessor1_user_id
-      LEFT JOIN assessments asm ON asm.report_id = r.id AND asm.ordinal = 1
-      LEFT JOIN users mc ON mc.id = asm.manager_comment_by
-     WHERE r.id = ${id}
-  `);
+  // Three independent reads, all keyed on the report id alone, sent together: each is a full
+  // round trip to the database, and in series they cost three of them before the page can render.
+  // Every secondary assessment this report has ever had, ordinal 2 upward, draft or submitted;
+  // and the manager's decision history: who decided, when, what, and who it was handed to next.
+  const [rows, secondaryRows, decisionRows] = await Promise.all([
+    app.db.execute(sql`
+      SELECT r.id, r.number, r.received_at, r.device_name, r.severity, r.status, r.channel,
+             r.facility, r.reporter_name, r.form_version, r.payload, r.assessor1_user_id,
+             r.assessor2_user_id,
+             u.full_name AS filled_by,
+             a1.full_name AS assessor1_name,
+             asm.payload AS assessment1_payload,
+             asm.conclusion AS assessment1_conclusion,
+             asm.submitted_at AS assessment1_submitted_at,
+             asm.due_at AS assessment1_due_at,
+             asm.manager_comment AS assessment1_comment,
+             asm.manager_comment_at AS assessment1_comment_at,
+             mc.full_name AS assessment1_comment_by
+        FROM reports r
+        LEFT JOIN users u ON u.id = r.entered_by_user_id
+        LEFT JOIN users a1 ON a1.id = r.assessor1_user_id
+        LEFT JOIN assessments asm ON asm.report_id = r.id AND asm.ordinal = 1
+        LEFT JOIN users mc ON mc.id = asm.manager_comment_by
+       WHERE r.id = ${id}
+    `),
+    app.db.execute(sql`
+      SELECT a.ordinal, a.assessor_id, u.full_name AS assessor_name, a.payload, a.submitted_at,
+             a.due_at
+        FROM assessments a
+        JOIN users u ON u.id = a.assessor_id
+       WHERE a.report_id = ${id} AND a.ordinal > 1
+       ORDER BY a.ordinal ASC
+    `),
+    app.db.execute(sql`
+      SELECT d.kind, d.comment, d.decided_at, d.reviewed_through_ordinal,
+             dby.full_name AS decided_by_name,
+             na.full_name AS next_assessor_name, d.next_ordinal,
+             wo.full_name AS work_officer_name
+        FROM report_decisions d
+        JOIN users dby ON dby.id = d.decided_by_user_id
+        LEFT JOIN users na ON na.id = d.next_assessor_user_id
+        LEFT JOIN users wo ON wo.id = d.work_officer_user_id
+       WHERE d.report_id = ${id}
+       ORDER BY d.decided_at ASC
+    `),
+  ]);
 
   if (rows.length === 0) return null;
 
@@ -287,16 +313,6 @@ export async function loadReport(
           managerComment,
         };
 
-  // Every secondary assessment this report has ever had, ordinal 2 upward, draft or submitted.
-  const secondaryRows = await app.db.execute(sql`
-    SELECT a.ordinal, a.assessor_id, u.full_name AS assessor_name, a.payload, a.submitted_at,
-           a.due_at
-      FROM assessments a
-      JOIN users u ON u.id = a.assessor_id
-     WHERE a.report_id = ${id} AND a.ordinal > 1
-     ORDER BY a.ordinal ASC
-  `);
-
   const secondaryAssessments: SecondaryAssignment[] = secondaryRows.map((raw) => {
     const r = raw as {
       ordinal: number;
@@ -317,20 +333,6 @@ export async function loadReport(
       answers: normalizeSecondaryReview(r.payload) as SecondaryReviewPayload,
     };
   });
-
-  // The manager's decision history: who decided, when, what, and who it was handed to next.
-  const decisionRows = await app.db.execute(sql`
-    SELECT d.kind, d.comment, d.decided_at, d.reviewed_through_ordinal,
-           dby.full_name AS decided_by_name,
-           na.full_name AS next_assessor_name, d.next_ordinal,
-           wo.full_name AS work_officer_name
-      FROM report_decisions d
-      JOIN users dby ON dby.id = d.decided_by_user_id
-      LEFT JOIN users na ON na.id = d.next_assessor_user_id
-      LEFT JOIN users wo ON wo.id = d.work_officer_user_id
-     WHERE d.report_id = ${id}
-     ORDER BY d.decided_at ASC
-  `);
 
   const decisions: DecisionEntry[] = decisionRows.map((raw) => {
     const r = raw as {

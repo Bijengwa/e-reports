@@ -95,7 +95,22 @@ export async function buildServer(config: Config = loadConfig()): Promise<Fastif
   });
 
   // Assets are deliberately unconstrained by host — both doors need them.
-  await app.register(staticFiles, { root: assetsRoot, prefix: "/assets/" });
+  //
+  // Every page links its assets through `asset()`, which stamps the address with a hash of the
+  // file's contents. A stamped address can therefore never name different bytes, and is cached for
+  // a year without the browser asking again. Anything reached without a stamp — the fonts, which
+  // are referenced from inside the stylesheet — is cached for a day and then revalidated.
+  await app.register(staticFiles, {
+    root: assetsRoot,
+    prefix: "/assets/",
+    setHeaders: (reply) => {
+      const versioned = typeof (reply.request.query as { v?: unknown }).v === "string";
+      reply.header(
+        "Cache-Control",
+        versioned ? "public, max-age=31536000, immutable" : "public, max-age=86400",
+      );
+    },
+  });
 
   app.decorate(
     "storage",

@@ -203,7 +203,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the deadline countdown", () => {
     const body = (await get("/assessments", officer.cookie)).body;
 
     expect(body).toContain(`data-due-at="${dueAt.toISOString()}"`);
-    expect(body).toContain('src="/assets/countdown.js"');
+    expect(body).toContain('src="/assets/countdown.js?v=');
   });
 
   it("shows the same countdown on the Manager's report page", async () => {
@@ -226,7 +226,7 @@ describe.skipIf(!INTEGRATION_ENABLED)("the deadline countdown", () => {
     // this assertion, a regression that dropped the `countdown` flag from `ReportPage` (leaving
     // the countdown looking right on load but static thereafter) would pass every other check in
     // this suite.
-    expect(body).toContain('src="/assets/countdown.js"');
+    expect(body).toContain('src="/assets/countdown.js?v=');
   });
 
   it("shows no countdown, only the checkmark, for a report with no deadline recorded", async () => {

@@ -2,6 +2,7 @@
 import { IMDRF_GROUPS } from "../../../../domain/f004.js";
 import type { ReleaseSummary } from "../../../../domain/imdrf/query-service.js";
 import { ANNEX_DESCRIPTIONS, type AnnexSummary } from "../../../../domain/imdrf/types.js";
+import { asset } from "../../../../views/shared/asset.js";
 import { StaffShell } from "../../shared/shell.js";
 
 export type ImdrfBrowserPageProps = {
@@ -233,7 +234,7 @@ export function ImdrfBrowserPage({
           </div>
         </>
       )}
-      {selected && <script src="/assets/imdrf-browser.js" defer></script>}
+      {selected && <script src={asset("imdrf-browser.js")} defer></script>}
     </StaffShell>
   );
 }

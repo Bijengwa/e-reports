@@ -45,19 +45,21 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
     // calls it, and a branch written against the caption would break the day the caption changes.
     const isOfficer = session.role === "assessor";
 
+    // Every read below is independent of the others and is started here, then awaited together
+    // once the last is under way: each is a full round trip to the database, and in series the
+    // page would pay one per card before it could render.
+
     // Counted with ::int rather than left as bigint, which the driver hands back as a string.
     // A vigilance register that outgrows an int is not a problem this line will be around for.
-    const totals = await app.db.execute(sql`SELECT count(*)::int AS reports FROM reports`);
-    const reportCount = (totals[0] as { reports: number }).reports;
+    const totalsQuery = app.db.execute(sql`SELECT count(*)::int AS reports FROM reports`);
 
     // The administrator's extras are fetched only for an administrator. A manager's dashboard
     // must not run the queries behind a page they would be refused.
-    const staffRows = isAdministrator
-      ? await app.db.execute(sql`SELECT count(*)::int AS staff FROM users WHERE is_active`)
+    const staffQuery = isAdministrator
+      ? app.db.execute(sql`SELECT count(*)::int AS staff FROM users WHERE is_active`)
       : [];
-    const activeStaff = isAdministrator ? (staffRows[0] as { staff: number }).staff : undefined;
 
-    const recent = isAdministrator ? await loadActivity(app, RECENT_ACTIVITY) : [];
+    const recentQuery = isAdministrator ? loadActivity(app, RECENT_ACTIVITY) : [];
 
     // The Officer's queue: what has arrived, has had nothing done to it, and is theirs to do.
     // Fetched for an Officer alone, on the same argument as the administrator's extras above.
@@ -72,8 +74,8 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
     // statements could print "seven waiting" over six rows if a report arrived between them. The
     // count sits inside this WHERE, so the figure counts exactly the reports the list draws from.
     // Cast to int because count() is bigint, which the driver hands back as a string.
-    const queue = isOfficer
-      ? await app.db.execute(sql`
+    const queueQuery = isOfficer
+      ? app.db.execute(sql`
           SELECT id, number, received_at, device_name, severity, assessor1_user_id,
                  (count(*) OVER ())::int AS received
             FROM reports
@@ -99,8 +101,8 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
      * workload bar has no tab for it — nothing writes it and the MVP has no closing workflow. It
      * is therefore counted in `reports` and in no state, which is the honest answer.
      */
-    const summaryRows = isManager
-      ? await app.db.execute(sql`
+    const summaryQuery = isManager
+      ? app.db.execute(sql`
           SELECT
             count(*) FILTER (WHERE status = 'received')::int AS not_started,
             count(*) FILTER (
@@ -114,6 +116,49 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
           FROM reports
         `)
       : [];
+
+    /*
+     * The serious AE/AI figure: death or life-threatening (`isSeriousCase`), still somewhere on the
+     * assessment/decision path — `assigned_for_work` and `closed` are excluded because the office's
+     * work on those is done, and a card meant to draw attention to what still needs it must not
+     * count what no longer does.
+     *
+     * The overdue figure reads the same "current assignment" a report is on that `workload.tsx`'s
+     * own lateral join reads — the latest `assessments` row for that report, whichever ordinal it
+     * is — so this card's overdue count can never disagree with what Workload itself would show
+     * filtered to the same reports.
+     */
+    const seriousQuery = isManager
+      ? app.db.execute(sql`
+          SELECT
+            count(*)::int AS total,
+            count(*) FILTER (
+              WHERE cur.due_at IS NOT NULL AND cur.submitted_at IS NULL AND cur.due_at < now()
+            )::int AS overdue
+            FROM reports r
+            LEFT JOIN LATERAL (
+              SELECT a.due_at, a.submitted_at
+                FROM assessments a
+               WHERE a.report_id = r.id
+               ORDER BY a.ordinal DESC
+               LIMIT 1
+            ) cur ON true
+           WHERE r.severity IN ('death', 'life_threatening')
+             AND r.status NOT IN ('assigned_for_work', 'closed')
+        `)
+      : [];
+
+    const [totals, staffRows, recent, queue, summaryRows, seriousRows] = await Promise.all([
+      totalsQuery,
+      staffQuery,
+      recentQuery,
+      queueQuery,
+      summaryQuery,
+      seriousQuery,
+    ]);
+
+    const reportCount = (totals[0] as { reports: number }).reports;
+    const activeStaff = isAdministrator ? (staffRows[0] as { staff: number }).staff : undefined;
 
     const managerSummary = isManager
       ? (() => {
@@ -133,37 +178,6 @@ export async function dashboardRoutes(app: FastifyInstance): Promise<void> {
           };
         })()
       : undefined;
-
-    /*
-     * The serious AE/AI figure: death or life-threatening (`isSeriousCase`), still somewhere on the
-     * assessment/decision path — `assigned_for_work` and `closed` are excluded because the office's
-     * work on those is done, and a card meant to draw attention to what still needs it must not
-     * count what no longer does.
-     *
-     * The overdue figure reads the same "current assignment" a report is on that `workload.tsx`'s
-     * own lateral join reads — the latest `assessments` row for that report, whichever ordinal it
-     * is — so this card's overdue count can never disagree with what Workload itself would show
-     * filtered to the same reports.
-     */
-    const seriousRows = isManager
-      ? await app.db.execute(sql`
-          SELECT
-            count(*)::int AS total,
-            count(*) FILTER (
-              WHERE cur.due_at IS NOT NULL AND cur.submitted_at IS NULL AND cur.due_at < now()
-            )::int AS overdue
-            FROM reports r
-            LEFT JOIN LATERAL (
-              SELECT a.due_at, a.submitted_at
-                FROM assessments a
-               WHERE a.report_id = r.id
-               ORDER BY a.ordinal DESC
-               LIMIT 1
-            ) cur ON true
-           WHERE r.severity IN ('death', 'life_threatening')
-             AND r.status NOT IN ('assigned_for_work', 'closed')
-        `)
-      : [];
 
     const seriousSummary = isManager
       ? (() => {

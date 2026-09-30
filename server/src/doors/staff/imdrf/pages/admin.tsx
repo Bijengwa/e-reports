@@ -8,6 +8,7 @@ import {
   type AnnexSummary,
 } from "../../../../domain/imdrf/types.js";
 import type { ValidationIssue } from "../../../../domain/imdrf/validate.js";
+import { asset } from "../../../../views/shared/asset.js";
 import { IconBack, IconCheck, IconSend, IconUpload } from "../../../../views/shared/icons.js";
 import { StaffShell } from "../../shared/shell.js";
 
@@ -267,7 +268,7 @@ export function ImdrfImportPage({
         </form>
       </div>
 
-      <script src="/assets/imdrf-paste.js" defer></script>
+      <script src={asset("imdrf-paste.js")} defer></script>
     </StaffShell>
   );
 }

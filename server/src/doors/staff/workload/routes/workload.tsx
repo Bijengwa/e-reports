@@ -93,20 +93,6 @@ export async function workloadRoutes(app: FastifyInstance): Promise<void> {
     const asked = StageFilter.safeParse((request.query as { stage?: unknown }).stage);
     const selected = asked.success ? asked.data : null;
 
-    const totals = await app.db.execute(sql`
-      SELECT status::text AS status, count(*)::int AS count FROM reports GROUP BY status
-    `);
-
-    const counts: Record<string, number> = {};
-    for (const row of totals) {
-      const total = row as { status: string; count: number };
-      // A status no bucket claims is counted into no bucket. `closed` is the only one today, and
-      // it must not silently inflate a figure under a tab that would not list it.
-      const bucket = bucketOfStatus(total.status);
-      if (bucket === undefined) continue;
-      counts[bucket.id] = (counts[bucket.id] ?? 0) + total.count;
-    }
-
     // The unfiltered page is every state the bar draws, not literally every row in the table: a
     // report the page has no tab for is one the reader cannot navigate back to, so listing it
     // under "All reports" would be showing them a stage that does not exist for them.
@@ -120,6 +106,10 @@ export async function workloadRoutes(app: FastifyInstance): Promise<void> {
       sql`, `,
     );
 
+    const totalsQuery = app.db.execute(sql`
+      SELECT status::text AS status, count(*)::int AS count FROM reports GROUP BY status
+    `);
+
     // A lateral join rather than two correlated subqueries: the ordinal and the name come from one
     // row — the latest assessment on this report — and reading them separately is how a page ends
     // up printing one assessor's name against another's ordinal.
@@ -128,7 +118,7 @@ export async function workloadRoutes(app: FastifyInstance): Promise<void> {
     // `assessments` row does not exist yet (it is written lazily, on the first draft save). Legacy
     // secondary assignments need no fallback of their own: migration 0013 backfilled them, and
     // nothing writes `assessor2_user_id` any more.
-    const rows = await app.db.execute(sql`
+    const rowsQuery = app.db.execute(sql`
       SELECT r.id, r.number, r.received_at, r.device_name, r.severity, r.status::text AS status,
              coalesce(cur.ordinal, 1) AS current_ordinal,
              coalesce(cur.full_name, a1.full_name) AS current_assessor_name,
@@ -149,6 +139,19 @@ export async function workloadRoutes(app: FastifyInstance): Promise<void> {
        ORDER BY r.received_at DESC, r.number DESC
        LIMIT ${WORKLOAD_LIMIT}
     `);
+
+    // The two reads are independent, so both are in flight at once: one round trip, not two.
+    const [totals, rows] = await Promise.all([totalsQuery, rowsQuery]);
+
+    const counts: Record<string, number> = {};
+    for (const row of totals) {
+      const total = row as { status: string; count: number };
+      // A status no bucket claims is counted into no bucket. `closed` is the only one today, and
+      // it must not silently inflate a figure under a tab that would not list it.
+      const bucket = bucketOfStatus(total.status);
+      if (bucket === undefined) continue;
+      counts[bucket.id] = (counts[bucket.id] ?? 0) + total.count;
+    }
 
     return reply.html(
       <WorkloadPage
