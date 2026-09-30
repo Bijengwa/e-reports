@@ -92,6 +92,13 @@ export type StaffShellProps = {
    */
   imdrfPicker?: boolean;
   /**
+   * Load the F004 background draft saving.
+   *
+   * Opt-in for the same reason `imdrfPicker` is: a page with no live `[data-f4-autosave]` form on
+   * it must not be made to fetch a script that would find nothing to attach to.
+   */
+  f4Autosave?: boolean;
+  /**
    * Load the Final F004 print button's enhancement.
    *
    * Opt-in for the same reason `imdrfPicker` is: a page with no `[data-f4-print]` button on it
@@ -300,6 +307,7 @@ export function StaffShell({
   countdown,
   registerDownload,
   imdrfPicker,
+  f4Autosave,
   f4Print,
   pageCss,
   children,
@@ -320,6 +328,7 @@ export function StaffShell({
       countdown={countdown}
       registerDownload={registerDownload}
       imdrfPicker={imdrfPicker}
+      f4Autosave={f4Autosave}
       f4Print={f4Print}
       register={pageCss === "register"}
       dashboard={pageCss === "dashboard"}

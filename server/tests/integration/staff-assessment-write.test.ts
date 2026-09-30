@@ -410,6 +410,110 @@ describe.skipIf(!INTEGRATION_ENABLED)("saving a draft", () => {
   });
 });
 
+/** What `f4-autosave.js` sends when the page is left or typing stops. */
+function autosave(url: string, cookie: string, form: Record<string, string>) {
+  return app.inject({
+    method: "POST",
+    url,
+    headers: {
+      host: STAFF_HOST,
+      cookie,
+      "content-type": "application/x-www-form-urlencoded",
+      "x-f4-autosave": "1",
+    },
+    payload: new URLSearchParams(form).toString(),
+  });
+}
+
+describe.skipIf(!INTEGRATION_ENABLED)("saving in the background", () => {
+  beforeEach(start);
+
+  it("loads the autosave script on the live form, and marks the form for it", async () => {
+    const { officer, report } = await assigned();
+
+    const body = (await get(`/reports/${report.id}/assessment-1`, officer.cookie)).body;
+
+    expect(body).toContain("/assets/f4-autosave.js");
+    expect(body).toContain("data-f4-autosave");
+    expect(body).toContain("data-f4-autosave-status");
+  });
+
+  it("stores a draft and answers with no body, not a redirect", async () => {
+    const { officer, report } = await assigned();
+
+    const res = await autosave(`/reports/${report.id}/assessment-1`, officer.cookie, {
+      intent: "save",
+      conclusion: "Left to read the IMDRF annex.",
+    });
+
+    expect(res.statusCode).toBe(204);
+    expect(res.body).toBe("");
+
+    const [row] = await assessments();
+    expect(row.conclusion).toBe("Left to read the IMDRF annex.");
+    expect(row.submitted_at).toBeNull();
+    expect((await theReport()).status).toBe("first_assessment");
+
+    const back = (await get(`/reports/${report.id}/assessment-1`, officer.cookie)).body;
+    expect(back).toContain("Left to read the IMDRF annex.");
+  });
+
+  it("never submits, even with a complete assessment and intent=submit", async () => {
+    const { officer, report } = await assigned();
+
+    const res = await autosave(
+      `/reports/${report.id}/assessment-1`,
+      officer.cookie,
+      completeAssessment(),
+    );
+
+    expect(res.statusCode).toBe(204);
+    const [row] = await assessments();
+    expect(row.submitted_at).toBeNull();
+    expect(row.payload.signature ?? "").toBe("");
+    expect((await theReport()).status).toBe("first_assessment");
+  });
+
+  it("refuses everyone but the assignee, and writes nothing for them", async () => {
+    const { report } = await assigned();
+    const stranger = await signedInAs("assessor");
+
+    const res = await autosave(`/reports/${report.id}/assessment-1`, stranger.cookie, {
+      intent: "save",
+      conclusion: "Not mine to write.",
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect(await assessmentCount()).toBe(0);
+  });
+
+  it("saves a draft carrying a malformed IMDRF term id instead of failing with a 500", async () => {
+    const { officer, report } = await assigned();
+
+    const res = await autosave(`/reports/${report.id}/assessment-1`, officer.cookie, {
+      intent: "save",
+      imdrf_component_term_id: "not-a-uuid",
+      conclusion: "Still here.",
+    });
+
+    expect(res.statusCode).toBe(204);
+    expect((await assessments())[0].conclusion).toBe("Still here.");
+  });
+
+  it("cannot reopen a submitted assessment", async () => {
+    const { officer, report } = await assigned();
+    const url = `/reports/${report.id}/assessment-1`;
+
+    await post(url, officer.cookie, completeAssessment());
+    const first = (await assessments())[0];
+
+    const res = await autosave(url, officer.cookie, { intent: "save", conclusion: "Late edit." });
+
+    expect(res.statusCode).toBe(403);
+    expect((await assessments())[0].conclusion).toBe(first.conclusion);
+  });
+});
+
 describe.skipIf(!INTEGRATION_ENABLED)("submitting", () => {
   beforeEach(start);
 

@@ -54,6 +54,15 @@ async function imdrfReleaseForDisplay(
   };
 }
 
+/**
+ * A background save from `f4-autosave.js`, not a person pressing a button. It is always a draft —
+ * never a submission, whatever the body says — and it is answered with a bare status instead of a
+ * redirect, so leaving the page to read the IMDRF handbook does not cost a full re-render.
+ */
+function isAutosave(request: FastifyRequest): boolean {
+  return request.headers["x-f4-autosave"] === "1";
+}
+
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -192,7 +201,8 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
 
     const posted = fields(request);
     const answers = collect(posted);
-    const submitting = value(posted, "intent") === "submit";
+    const autosave = isAutosave(request);
+    const submitting = !autosave && value(posted, "intent") === "submit";
 
     // Resolves every IMDRF item's `_term_id` against the repository and overwrites the display
     // fields with the authoritative text either way — a draft save gets this too, so the officer
@@ -235,7 +245,7 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
         />,
       );
 
-    if (issues.length > 0) return page(422, issues);
+    if (issues.length > 0) return autosave ? reply.status(422).send() : page(422, issues);
 
     // The authenticated account is the signature now, not whatever name was typed — there is no
     // longer a `signature` input on the page at all. Stamped only on a real submission: a draft
@@ -245,21 +255,23 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
     const conclusion = value(answers, "conclusion").trim();
     const assessorId = found.assessor1UserId;
 
-    await app.db.transaction(async (tx) => {
-      await tx.execute(sql`
-        INSERT INTO assessments (report_id, assessor_id, ordinal, form_version, payload,
-                                 conclusion, submitted_at)
-        VALUES (${found.report.id}, ${assessorId}, ${FIRST_ASSESSMENT}, ${F004_VERSION},
-                ${JSON.stringify(answers)}::jsonb, ${conclusion === "" ? null : conclusion},
-                ${submitting ? sql`now()` : sql`NULL`})
-        ON CONFLICT (report_id, ordinal) DO UPDATE
-           SET payload      = EXCLUDED.payload,
-               conclusion   = EXCLUDED.conclusion,
-               form_version = EXCLUDED.form_version,
-               submitted_at = COALESCE(assessments.submitted_at, EXCLUDED.submitted_at)
-      `);
+    const upsert = sql`
+      INSERT INTO assessments (report_id, assessor_id, ordinal, form_version, payload,
+                               conclusion, submitted_at)
+      VALUES (${found.report.id}, ${assessorId}, ${FIRST_ASSESSMENT}, ${F004_VERSION},
+              ${JSON.stringify(answers)}::jsonb, ${conclusion === "" ? null : conclusion},
+              ${submitting ? sql`now()` : sql`NULL`})
+      ON CONFLICT (report_id, ordinal) DO UPDATE
+         SET payload      = EXCLUDED.payload,
+             conclusion   = EXCLUDED.conclusion,
+             form_version = EXCLUDED.form_version,
+             submitted_at = COALESCE(assessments.submitted_at, EXCLUDED.submitted_at)
+    `;
 
-      if (submitting) {
+    if (submitting) {
+      await app.db.transaction(async (tx) => {
+        await tx.execute(upsert);
+
         await tx.execute(sql`
           UPDATE reports SET status = 'awaiting_second_assessor' WHERE id = ${found.report.id}
         `);
@@ -269,18 +281,24 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
           VALUES (${session.userId}, 'assessment.submitted', 'report', ${found.report.id},
                   ${JSON.stringify({ number: found.report.number, ordinal: FIRST_ASSESSMENT })}::jsonb)
         `);
-      } else {
-        await tx.execute(sql`
-          UPDATE reports SET status = 'first_assessment'
-           WHERE id = ${found.report.id} AND status = 'received'
-        `);
-      }
-    });
+      });
+    } else {
+      // A draft is one statement, not a transaction: a data-modifying CTE always runs to
+      // completion with the statement around it, so the two writes are still all-or-nothing, and
+      // it costs one database round trip instead of four — this path runs on every autosave.
+      await app.db.execute(sql`
+        WITH saved AS (${upsert} RETURNING 1)
+        UPDATE reports SET status = 'first_assessment'
+         WHERE id = ${found.report.id} AND status = 'received'
+      `);
+    }
 
     request.log.info(
       { report: found.report.number, ordinal: FIRST_ASSESSMENT, submitted: submitting },
       "assessment saved",
     );
+
+    if (autosave) return reply.status(204).send();
 
     if (submitting) {
       await notifyAssessmentSubmitted(request.log, {
@@ -398,7 +416,8 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
 
     const posted = fields(request);
     const answers = collectSecondaryReview(posted, first.answers);
-    const submitting = value(posted, "intent") === "submit";
+    const autosave = isAutosave(request);
+    const submitting = !autosave && value(posted, "intent") === "submit";
 
     // A Disagree on one of the seven IMDRF rows must replace A1's term with another real one from
     // the same published release — never free text, never a different release. Resolved and
@@ -423,6 +442,8 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
       const passwordIssue = await verifySigningPassword(app, session.userId, posted);
       if (passwordIssue !== null) issues.push(passwordIssue);
     }
+
+    if (issues.length > 0 && autosave) return reply.status(422).send();
 
     if (issues.length > 0) {
       const priorReviews = found.secondaryAssessments
@@ -487,21 +508,25 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
           ? (conclusionResponse.statement ?? "").trim()
           : "";
 
-    await app.db.transaction(async (tx) => {
-      await tx.execute(sql`
-        INSERT INTO assessments (report_id, assessor_id, ordinal, form_version, payload,
-                                 conclusion, submitted_at)
-        VALUES (${found.report.id}, ${assessorId}, ${ordinal}, ${F004_VERSION},
-                ${JSON.stringify(answers)}::jsonb, ${conclusion === "" ? null : conclusion},
-                ${submitting ? sql`now()` : sql`NULL`})
-        ON CONFLICT (report_id, ordinal) DO UPDATE
-           SET payload      = EXCLUDED.payload,
-               conclusion   = EXCLUDED.conclusion,
-               form_version = EXCLUDED.form_version,
-               submitted_at = COALESCE(assessments.submitted_at, EXCLUDED.submitted_at)
-      `);
+    const upsert = sql`
+      INSERT INTO assessments (report_id, assessor_id, ordinal, form_version, payload,
+                               conclusion, submitted_at)
+      VALUES (${found.report.id}, ${assessorId}, ${ordinal}, ${F004_VERSION},
+              ${JSON.stringify(answers)}::jsonb, ${conclusion === "" ? null : conclusion},
+              ${submitting ? sql`now()` : sql`NULL`})
+      ON CONFLICT (report_id, ordinal) DO UPDATE
+         SET payload      = EXCLUDED.payload,
+             conclusion   = EXCLUDED.conclusion,
+             form_version = EXCLUDED.form_version,
+             submitted_at = COALESCE(assessments.submitted_at, EXCLUDED.submitted_at)
+    `;
 
-      if (submitting) {
+    // A draft is the one statement on its own, with no BEGIN/COMMIT round trips around it — this
+    // path runs on every autosave. A submission keeps its transaction.
+    if (submitting) {
+      await app.db.transaction(async (tx) => {
+        await tx.execute(upsert);
+
         await tx.execute(sql`
           UPDATE reports SET status = 'awaiting_decision'
            WHERE id = ${found.report.id} AND status = 'second_assessment'
@@ -512,13 +537,17 @@ export async function assessmentRoutes(app: FastifyInstance): Promise<void> {
           VALUES (${session.userId}, 'assessment.submitted', 'report', ${found.report.id},
                   ${JSON.stringify({ number: found.report.number, ordinal })}::jsonb)
         `);
-      }
-    });
+      });
+    } else {
+      await app.db.execute(upsert);
+    }
 
     request.log.info(
       { report: found.report.number, ordinal, submitted: submitting },
       "secondary assessment saved",
     );
+
+    if (autosave) return reply.status(204).send();
 
     if (submitting) {
       await notifyAssessmentSubmitted(request.log, {

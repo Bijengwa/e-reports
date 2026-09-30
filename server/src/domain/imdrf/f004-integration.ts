@@ -32,6 +32,8 @@ import {
 import { getReleaseCached, getTermCached, getTermLineageCached } from "./cached-query-service.js";
 import { getLatestPublishedRelease, type ReleaseSummary } from "./query-service.js";
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export type ResolvedImdrfTerm = { l1: string; l2: string; l3: string; code: string };
 
 /**
@@ -53,7 +55,9 @@ export async function resolveImdrfTerm(
   termId: string,
 ): Promise<{ ok: true; resolved: ResolvedImdrfTerm } | { ok: false; message: string }> {
   const label = item.title.replace(/\s*\(If applicable\)\s*$/, "");
-  const term = await getTermCached(db, releaseId, termId);
+  // A term id that is not even a uuid names nothing, and must read as exactly that: handed to the
+  // uuid column as-is it raised 22P02 and turned an ordinary Save draft into a 500.
+  const term = UUID.test(termId) ? await getTermCached(db, releaseId, termId) : null;
   if (term === null) {
     return {
       ok: false,
@@ -235,11 +239,18 @@ export async function resolveA1Imdrf(
 
   const releasePublished = release?.status === "published";
 
-  for (const group of IMDRF_GROUPS) {
-    for (const item of group.items) {
-      await resolveOneA1Item(db, answers, item, releaseId, releasePublished, strict, issues);
-    }
-  }
+  // Every item resolves at once rather than one after another: each is its own lookup, and against
+  // a remote database a sequential loop paid one round trip per item on every save. Each item
+  // collects its own issues so they still come back in the page's order, not completion order.
+  const items = IMDRF_GROUPS.flatMap((group) => group.items);
+  const perItem = await Promise.all(
+    items.map(async (item) => {
+      const own: Issue[] = [];
+      await resolveOneA1Item(db, answers, item, releaseId, releasePublished, strict, own);
+      return own;
+    }),
+  );
+  for (const found of perItem) issues.push(...found);
 
   return issues;
 }

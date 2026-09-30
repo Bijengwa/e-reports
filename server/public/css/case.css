@@ -1925,3 +1925,8 @@ ul.f4-card-c li { margin-bottom: 3px; }
   border-left: 1px dashed var(--f4-divider);
 }
 
+
+/* The background-save status beside Save draft — see `f4-autosave.js`. Empty until the first
+   change, so a page nobody has touched says nothing about saving. */
+.f4-autosave { margin-right: auto; align-self: center; color: var(--ink-2); font-size: 0.9em; }
+.f4-autosave.is-error { color: var(--red, #b3261e); }

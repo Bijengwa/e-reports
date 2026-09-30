@@ -245,7 +245,14 @@ function Sheet({
   }
 
   return (
-    <form method="POST" action={action ?? `/reports/${reportId}/assessment-1`} class="f4">
+    // `data-f4-autosave` is what `f4-autosave.js` looks for: only the live, postable sheet saves
+    // itself in the background, never a locked one.
+    <form
+      method="POST"
+      action={action ?? `/reports/${reportId}/assessment-1`}
+      class="f4"
+      data-f4-autosave
+    >
       {children}
     </form>
   );
@@ -2117,6 +2124,7 @@ export function F004Form({
           </p>
         ) : writingA2 ? (
           <div class="bar f4-buttons">
+            <span class="f4-autosave" data-f4-autosave-status aria-live="polite"></span>
             <button type="submit" name="intent" value="save" class="btn ghost">
               <IconSave />
               Save draft
@@ -2131,6 +2139,7 @@ export function F004Form({
           // Only ever reached on the live path, where `Sheet` is a real form for this to submit.
           !locked && (
             <div class="bar f4-buttons">
+              <span class="f4-autosave" data-f4-autosave-status aria-live="polite"></span>
               <button type="submit" name="intent" value="save" class="btn ghost">
                 <IconSave />
                 Save draft

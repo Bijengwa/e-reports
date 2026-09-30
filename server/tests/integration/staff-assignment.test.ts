@@ -106,6 +106,7 @@ function completeForm(overrides: Record<string, string> = {}): Record<string, st
   return {
     step: "5",
     action: "submit",
+    report_type: "adverse_event",
     device_name: "Infusion Pump X",
     incident_date: "2026-08-01",
     incident_type: "Malfunction",

@@ -75,6 +75,7 @@ export function Assessment1Page({
       f4Find
       countdown
       imdrfPicker
+      f4Autosave
       // One `.top` bar, not a second row underneath it — see `DocHeader`'s own doc comment. Back,
       // the title, the countdown and Orange Report all live here now, beside the shell's own
       // hamburger and signed-in name/role, rather than repeated a second time below them.

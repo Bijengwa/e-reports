@@ -53,6 +53,13 @@ export type LayoutProps = {
    */
   imdrfPicker?: boolean;
   /**
+   * Load the F004 background draft saving.
+   *
+   * Opt-in for the same reason `imdrfPicker` is: a page with no live `[data-f4-autosave]` form on
+   * it must not be made to fetch a script that would find nothing to attach to.
+   */
+  f4Autosave?: boolean;
+  /**
    * Load the Final F004 print button's enhancement.
    *
    * Opt-in for the same reason `countdown` is: a page with no `[data-f4-print]` button on it must
@@ -108,6 +115,7 @@ export function Layout({
   countdown,
   registerDownload,
   imdrfPicker,
+  f4Autosave,
   f4Print,
   shell,
   auth,
@@ -175,6 +183,8 @@ export function Layout({
             button doing nothing rather than a broken form — the assessor is told to try again
             without JavaScript blocked, and nothing already chosen is lost. */}
         {imdrfPicker && <script src={asset("f004-imdrf-picker.js")} defer></script>}
+        {/* Enhancement only: Save draft is still the form's own button with this blocked. */}
+        {f4Autosave && <script src={asset("f4-autosave.js")} defer></script>}
       </head>
       <body class={bodyClass ?? ""}>{children}</body>
     </html>
